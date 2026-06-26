@@ -495,7 +495,7 @@ function Kpi({
               style={{ width: `${Math.min(100, progress.pct)}%` }}
             />
           </div>
-          <div className="mt-0.5 text-[9px] text-slate-400">Meta: {progress.meta}%</div>
+          <div className="mt-0.5 text-[11px] font-medium text-slate-500">Meta: {progress.meta}%</div>
         </div>
       )}
     </div>
