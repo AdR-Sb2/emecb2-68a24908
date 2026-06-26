@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   Bar,
   BarChart,
@@ -48,7 +49,7 @@ type Row = {
 };
 
 const DATA = rawData as Row[];
-const TIPOS = Array.from(new Set(DATA.map((d) => d.TIPO).filter(Boolean))) as string[];
+const STORAGE_KEY = "elevatorias_data_v1";
 
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
@@ -70,13 +71,34 @@ function countBy<T extends string | number>(rows: Row[], key: (r: Row) => T | nu
 }
 
 function DashboardPage() {
+  const [data, setData] = useState<Row[]>(DATA);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Row[];
+        if (Array.isArray(parsed) && parsed.length) setData(parsed);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+  const TIPOS = useMemo(
+    () => Array.from(new Set(data.map((d) => d.TIPO).filter(Boolean))) as string[],
+    [data],
+  );
+
   const [tipo, setTipo] = useState<string>("EAT");
   const [municipio, setMunicipio] = useState<string>("TODOS");
   const [aguardandoFilter, setAguardandoFilter] = useState<string>("TODOS");
+  const [sensorFilter, setSensorFilter] = useState<string>("TODOS");
+  const [search, setSearch] = useState<string>("");
+  const [tableExpanded, setTableExpanded] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const rows = useMemo(
     () =>
-      DATA.filter(
+      data.filter(
         (d) => {
           if (tipo !== "TODOS" && d.TIPO !== tipo) return false;
           if (municipio !== "TODOS" && d.MUNICIPIO !== municipio) return false;
@@ -86,22 +108,43 @@ function DashboardPage() {
             if (aguardandoFilter === "SIM" && !isAguardando) return false;
             if (aguardandoFilter === "NAO" && isAguardando) return false;
           }
+          if (sensorFilter !== "TODOS") {
+            const has = d["TEM SENSOR?"] === "SIM";
+            if (sensorFilter === "SIM" && !has) return false;
+            if (sensorFilter === "NAO" && has) return false;
+          }
           return true;
         },
       ),
-    [tipo, municipio, aguardandoFilter],
+    [data, tipo, municipio, aguardandoFilter, sensorFilter],
   );
+
+  const tableRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [
+        r.ELEVATORIAS,
+        r.PLANTA,
+        r.MUNICIPIO,
+        r["TIPO CONSTRUTIVO DA ELEVATORIA"],
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [rows, search]);
 
   const MUNICIPIOS = useMemo(
     () =>
       Array.from(
         new Set(
-          DATA.filter((d) => tipo === "TODOS" || d.TIPO === tipo)
+          data
+            .filter((d) => tipo === "TODOS" || d.TIPO === tipo)
             .map((d) => d.MUNICIPIO)
             .filter(Boolean) as string[],
         ),
       ).sort(),
-    [tipo],
+    [data, tipo],
   );
 
   const total = rows.length;
@@ -154,6 +197,25 @@ function DashboardPage() {
       .map(([name, v]) => ({ name, pct: Math.round((v.com / v.total) * 1000) / 10 }))
       .sort((a, b) => b.pct - a.pct);
   }, [rows]);
+
+  const handleUpload = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Row>(ws, { defval: null });
+      if (!json.length) {
+        alert("Planilha vazia ou inválida.");
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
+      setData(json);
+      alert(`Planilha atualizada com ${json.length} registros.`);
+    } catch (err) {
+      console.error(err);
+      alert("Falha ao ler a planilha.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
