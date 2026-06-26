@@ -65,7 +65,6 @@ const STORAGE_KEY = "testes_data_v1";
 
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
-const BLUE_LIGHT = "#9ec8ee";
 
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
