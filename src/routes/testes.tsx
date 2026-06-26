@@ -67,15 +67,6 @@ const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
 const BLUE_LIGHT = "#9ec8ee";
 
-function parseNumeric(v: unknown): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const s = String(v).replace(",", ".");
-  const m = s.match(/-?\d+(?:\.\d+)?/);
-  if (!m) return null;
-  const n = parseFloat(m[0]);
-  return Number.isFinite(n) ? n : null;
-}
-
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const s = String(v).replace(/,/g, ".");
