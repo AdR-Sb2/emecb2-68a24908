@@ -318,6 +318,59 @@ function TestesPage() {
       .slice(0, 12);
   }, [rows]);
 
+  // Padrão (ShutOff de referência) por elevatória — usa o valor mais frequente
+  const padraoPorElev = useMemo(() => {
+    const mode = (arr: number[]): number | null => {
+      if (!arr.length) return null;
+      const c = new Map<number, number>();
+      for (const n of arr) c.set(n, (c.get(n) ?? 0) + 1);
+      let best: number | null = null;
+      let bestN = -1;
+      for (const [v, n] of c) if (n > bestN) { best = v; bestN = n; }
+      return best;
+    };
+    const m = new Map<
+      string,
+      { grupo: string; iSO: number[]; retSO: number[]; recSO: number[]; n: number; ultimo: string | null }
+    >();
+    for (const r of rows) {
+      if (!r.Elevatória) continue;
+      const cur =
+        m.get(r.Elevatória) ?? {
+          grupo: r.Grupo != null ? String(r.Grupo) : "",
+          iSO: [],
+          retSO: [],
+          recSO: [],
+          n: 0,
+          ultimo: null,
+        };
+      const i = parseAvg(r["Corrente ShutOff"]);
+      const ret = parseAvg(r["Retaguarda ShutOff"]);
+      const rec = parseAvg(r["Recalque ShutOff"]);
+      if (i !== null) cur.iSO.push(i);
+      if (ret !== null) cur.retSO.push(ret);
+      if (rec !== null) cur.recSO.push(rec);
+      cur.n += 1;
+      const d = r["Data do Teste"];
+      if (d && (!cur.ultimo || d > cur.ultimo)) cur.ultimo = d;
+      m.set(r.Elevatória, cur);
+    }
+    return Array.from(m.entries())
+      .map(([name, v]) => ({
+        name,
+        grupo: v.grupo,
+        n: v.n,
+        ultimo: v.ultimo,
+        correnteSO: mode(v.iSO),
+        retagSO: mode(v.retSO),
+        recalSO: mode(v.recSO),
+        correnteVar: v.iSO.length ? new Set(v.iSO.map((x) => x.toFixed(1))).size : 0,
+        retagVar: v.retSO.length ? new Set(v.retSO.map((x) => x.toFixed(1))).size : 0,
+        recalVar: v.recSO.length ? new Set(v.recSO.map((x) => x.toFixed(1))).size : 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
   const handleUpload = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
@@ -626,6 +679,61 @@ function TestesPage() {
                       </tr>
                     );
                   })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+
+      {/* Padrão por elevatória (referência ShutOff) */}
+      <div className="mb-4">
+        <Card title="Padrão por Elevatória (referência ShutOff)">
+          <div className="mb-2 text-[11px] text-slate-500">
+            Valores de referência (Shut-Off) consolidados a partir dos testes. Quando há divergência
+            entre registros, é marcado em amarelo — vale revisar a placa do equipamento.
+          </div>
+          <div className="max-h-[420px] overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                <tr>
+                  <th className="px-2 py-1.5">Elevatória</th>
+                  <th className="px-2 py-1.5">Grupo</th>
+                  <th className="px-2 py-1.5 text-right">Testes</th>
+                  <th className="px-2 py-1.5 text-right">Corrente ShutOff (A)</th>
+                  <th className="px-2 py-1.5 text-right">Retaguarda ShutOff (mca)</th>
+                  <th className="px-2 py-1.5 text-right">Recalque ShutOff (mca)</th>
+                  <th className="px-2 py-1.5">Último teste</th>
+                </tr>
+              </thead>
+              <tbody>
+                {padraoPorElev.map((p) => (
+                  <tr key={p.name} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-2 py-1 font-medium">{p.name}</td>
+                    <td className="px-2 py-1">{p.grupo}</td>
+                    <td className="px-2 py-1 text-right">{p.n}</td>
+                    <td
+                      className={`px-2 py-1 text-right ${p.correnteVar > 1 ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                      title={p.correnteVar > 1 ? `${p.correnteVar} valores diferentes registrados` : ""}
+                    >
+                      {p.correnteSO ?? "—"}
+                    </td>
+                    <td
+                      className={`px-2 py-1 text-right ${p.retagVar > 1 ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                      title={p.retagVar > 1 ? `${p.retagVar} valores diferentes registrados` : ""}
+                    >
+                      {p.retagSO ?? "—"}
+                    </td>
+                    <td
+                      className={`px-2 py-1 text-right ${p.recalVar > 1 ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                      title={p.recalVar > 1 ? `${p.recalVar} valores diferentes registrados` : ""}
+                    >
+                      {p.recalSO ?? "—"}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      {p.ultimo ? new Date(p.ultimo).toLocaleDateString("pt-BR") : ""}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
