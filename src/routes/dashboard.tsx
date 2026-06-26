@@ -238,7 +238,7 @@ function DashboardPage() {
         <Kpi label="Com PCP" value={comPCP} />
         <Kpi
           label="Com Sensores"
-          value={comSensores}
+          value={`${comSensores} (${sensoresPct}%)`}
           progress={{ pct: sensoresPct, meta: METAS.sensores }}
         />
         <Kpi
