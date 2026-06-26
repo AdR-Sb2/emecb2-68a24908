@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
 });
 
 const SISTEMAS_OPERACIONAL_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/";
-const SISTEMAS_ADMINISTRATIVO_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/";
+const SISTEMAS_ADMINISTRATIVO_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/adm/adm.html";
 
 function Index() {
   const [dashOpen, setDashOpen] = useState(false);
