@@ -708,11 +708,18 @@ function TestesPage() {
                   <th className="px-2 py-1.5">Colaboradores</th>
                   <th className="px-2 py-1.5">Serviço Executado</th>
                   <th className="px-2 py-1.5">Observação</th>
-                  <th className="px-2 py-1.5">Status</th>
+                  <th className="px-2 py-1.5">Alertas</th>
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((r, i) => (
+                {tableRows.map((r, i) => {
+                  const a = computeAlerts(r);
+                  const chips: { label: string; cls: string }[] = [];
+                  if (a.tensao) chips.push({ label: "Tensão", cls: "bg-rose-100 text-rose-700" });
+                  if (a.corrente) chips.push({ label: "Corrente", cls: "bg-orange-100 text-orange-700" });
+                  if (a.retaguarda) chips.push({ label: "Retaguarda", cls: "bg-amber-100 text-amber-700" });
+                  if (a.recalque) chips.push({ label: "Recalque", cls: "bg-violet-100 text-violet-700" });
+                  return (
                   <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 align-top">
                     <td className="px-2 py-1 whitespace-nowrap">
                       {r["Data do Teste"] ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR") : ""}
@@ -723,9 +730,22 @@ function TestesPage() {
                     <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
                     <td className="px-2 py-1 max-w-xs">{r["Serviço Executado:"]}</td>
                     <td className="px-2 py-1 max-w-xs">{r["Observação:"]}</td>
-                    <td className="px-2 py-1">{r.Status}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex flex-wrap gap-1">
+                        {chips.length === 0 ? (
+                          <span className="text-emerald-600 text-[10px] font-semibold">OK</span>
+                        ) : (
+                          chips.map((c) => (
+                            <span key={c.label} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${c.cls}`}>
+                              {c.label}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
