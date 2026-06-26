@@ -299,13 +299,29 @@ function DashboardPage() {
             <option value="NAO">Não</option>
           </select>
         </div>
-        {(tipo !== "TODOS" || municipio !== "TODOS" || aguardandoFilter !== "TODOS") && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-slate-700">TEM SENSOR?</label>
+          <select
+            value={sensorFilter}
+            onChange={(e) => setSensorFilter(e.target.value)}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+          >
+            <option value="TODOS">Todos</option>
+            <option value="SIM">Sim</option>
+            <option value="NAO">Não</option>
+          </select>
+        </div>
+        {(tipo !== "TODOS" ||
+          municipio !== "TODOS" ||
+          aguardandoFilter !== "TODOS" ||
+          sensorFilter !== "TODOS") && (
           <button
             type="button"
             onClick={() => {
               setTipo("TODOS");
               setMunicipio("TODOS");
               setAguardandoFilter("TODOS");
+              setSensorFilter("TODOS");
             }}
             className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
           >
