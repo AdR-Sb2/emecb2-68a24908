@@ -685,6 +685,61 @@ function TestesPage() {
         </Card>
       </div>
 
+      {/* Padrão por elevatória (referência ShutOff) */}
+      <div className="mb-4">
+        <Card title="Padrão por Elevatória (referência ShutOff)">
+          <div className="mb-2 text-[11px] text-slate-500">
+            Valores de referência (Shut-Off) consolidados a partir dos testes. Quando há divergência
+            entre registros, é marcado em amarelo — vale revisar a placa do equipamento.
+          </div>
+          <div className="max-h-[420px] overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                <tr>
+                  <th className="px-2 py-1.5">Elevatória</th>
+                  <th className="px-2 py-1.5">Grupo</th>
+                  <th className="px-2 py-1.5 text-right">Testes</th>
+                  <th className="px-2 py-1.5 text-right">Corrente ShutOff (A)</th>
+                  <th className="px-2 py-1.5 text-right">Retaguarda ShutOff (mca)</th>
+                  <th className="px-2 py-1.5 text-right">Recalque ShutOff (mca)</th>
+                  <th className="px-2 py-1.5">Último teste</th>
+                </tr>
+              </thead>
+              <tbody>
+                {padraoPorElev.map((p) => (
+                  <tr key={p.name} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-2 py-1 font-medium">{p.name}</td>
+                    <td className="px-2 py-1">{p.grupo}</td>
+                    <td className="px-2 py-1 text-right">{p.n}</td>
+                    <td
+                      className={`px-2 py-1 text-right ${p.correnteVar > 1 ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                      title={p.correnteVar > 1 ? `${p.correnteVar} valores diferentes registrados` : ""}
+                    >
+                      {p.correnteSO ?? "—"}
+                    </td>
+                    <td
+                      className={`px-2 py-1 text-right ${p.retagVar > 1 ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                      title={p.retagVar > 1 ? `${p.retagVar} valores diferentes registrados` : ""}
+                    >
+                      {p.retagSO ?? "—"}
+                    </td>
+                    <td
+                      className={`px-2 py-1 text-right ${p.recalVar > 1 ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                      title={p.recalVar > 1 ? `${p.recalVar} valores diferentes registrados` : ""}
+                    >
+                      {p.recalSO ?? "—"}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      {p.ultimo ? new Date(p.ultimo).toLocaleDateString("pt-BR") : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+
       {/* Tabela detalhada — equipes e serviços */}
       <div className="mb-4">
         <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
