@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   Bar,
   BarChart,
@@ -48,7 +49,7 @@ type Row = {
 };
 
 const DATA = rawData as Row[];
-const TIPOS = Array.from(new Set(DATA.map((d) => d.TIPO).filter(Boolean))) as string[];
+const STORAGE_KEY = "elevatorias_data_v1";
 
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
@@ -70,13 +71,38 @@ function countBy<T extends string | number>(rows: Row[], key: (r: Row) => T | nu
 }
 
 function DashboardPage() {
+  const [data, setData] = useState<Row[]>(DATA);
+  const [hasCustomData, setHasCustomData] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Row[];
+        if (Array.isArray(parsed) && parsed.length) {
+          setData(parsed);
+          setHasCustomData(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+  const TIPOS = useMemo(
+    () => Array.from(new Set(data.map((d) => d.TIPO).filter(Boolean))) as string[],
+    [data],
+  );
+
   const [tipo, setTipo] = useState<string>("EAT");
   const [municipio, setMunicipio] = useState<string>("TODOS");
   const [aguardandoFilter, setAguardandoFilter] = useState<string>("TODOS");
+  const [sensorFilter, setSensorFilter] = useState<string>("TODOS");
+  const [search, setSearch] = useState<string>("");
+  const [tableExpanded, setTableExpanded] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const rows = useMemo(
     () =>
-      DATA.filter(
+      data.filter(
         (d) => {
           if (tipo !== "TODOS" && d.TIPO !== tipo) return false;
           if (municipio !== "TODOS" && d.MUNICIPIO !== municipio) return false;
@@ -86,22 +112,43 @@ function DashboardPage() {
             if (aguardandoFilter === "SIM" && !isAguardando) return false;
             if (aguardandoFilter === "NAO" && isAguardando) return false;
           }
+          if (sensorFilter !== "TODOS") {
+            const has = d["TEM SENSOR?"] === "SIM";
+            if (sensorFilter === "SIM" && !has) return false;
+            if (sensorFilter === "NAO" && has) return false;
+          }
           return true;
         },
       ),
-    [tipo, municipio, aguardandoFilter],
+    [data, tipo, municipio, aguardandoFilter, sensorFilter],
   );
+
+  const tableRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [
+        r.ELEVATORIAS,
+        r.PLANTA,
+        r.MUNICIPIO,
+        r["TIPO CONSTRUTIVO DA ELEVATORIA"],
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [rows, search]);
 
   const MUNICIPIOS = useMemo(
     () =>
       Array.from(
         new Set(
-          DATA.filter((d) => tipo === "TODOS" || d.TIPO === tipo)
+          data
+            .filter((d) => tipo === "TODOS" || d.TIPO === tipo)
             .map((d) => d.MUNICIPIO)
             .filter(Boolean) as string[],
         ),
       ).sort(),
-    [tipo],
+    [data, tipo],
   );
 
   const total = rows.length;
@@ -155,6 +202,26 @@ function DashboardPage() {
       .sort((a, b) => b.pct - a.pct);
   }, [rows]);
 
+  const handleUpload = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Row>(ws, { defval: null });
+      if (!json.length) {
+        alert("Planilha vazia ou inválida.");
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
+      setData(json);
+      setHasCustomData(true);
+      alert(`Planilha atualizada com ${json.length} registros.`);
+    } catch (err) {
+      console.error(err);
+      alert("Falha ao ler a planilha.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       {/* Header com logo */}
@@ -176,7 +243,7 @@ function DashboardPage() {
         <Kpi label="Com PCP" value={comPCP} />
         <Kpi
           label="Com Sensores"
-          value={comSensores}
+          value={`${comSensores} (${sensoresPct}%)`}
           progress={{ pct: sensoresPct, meta: METAS.sensores }}
         />
         <Kpi
@@ -237,13 +304,29 @@ function DashboardPage() {
             <option value="NAO">Não</option>
           </select>
         </div>
-        {(tipo !== "TODOS" || municipio !== "TODOS" || aguardandoFilter !== "TODOS") && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-slate-700">TEM SENSOR?</label>
+          <select
+            value={sensorFilter}
+            onChange={(e) => setSensorFilter(e.target.value)}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+          >
+            <option value="TODOS">Todos</option>
+            <option value="SIM">Sim</option>
+            <option value="NAO">Não</option>
+          </select>
+        </div>
+        {(tipo !== "TODOS" ||
+          municipio !== "TODOS" ||
+          aguardandoFilter !== "TODOS" ||
+          sensorFilter !== "TODOS") && (
           <button
             type="button"
             onClick={() => {
               setTipo("TODOS");
               setMunicipio("TODOS");
               setAguardandoFilter("TODOS");
+              setSensorFilter("TODOS");
             }}
             className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
           >
@@ -313,12 +396,60 @@ function DashboardPage() {
       </div>
 
       {/* Charts row 2 */}
-      <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Card title="Tabela de Elevatórias" className="lg:col-span-2">
-          <div className="mb-2 text-xs text-slate-500">
-            Mostrando {rows.length} de {DATA.length} ativos
-          </div>
-          <div className="max-h-[360px] overflow-auto">
+      <div className={`mb-4 grid gap-4 ${tableExpanded ? "" : "lg:grid-cols-3"}`}>
+        <div className={tableExpanded ? "" : "lg:col-span-2"}>
+          <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-700">Tabela de Elevatórias</h2>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Pesquisar elevatória, planta, município..."
+                  className="w-64 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTableExpanded((v) => !v)}
+                  title={tableExpanded ? "Recolher tabela" : "Expandir tabela"}
+                  aria-label={tableExpanded ? "Recolher tabela" : "Expandir tabela"}
+                  className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 shadow-sm hover:bg-slate-100"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {tableExpanded ? (
+                      <>
+                        <polyline points="4 14 10 14 10 20" />
+                        <polyline points="20 10 14 10 14 4" />
+                        <line x1="14" y1="10" x2="21" y2="3" />
+                        <line x1="3" y1="21" x2="10" y2="14" />
+                      </>
+                    ) : (
+                      <>
+                        <polyline points="15 3 21 3 21 9" />
+                        <polyline points="9 21 3 21 3 15" />
+                        <line x1="21" y1="3" x2="14" y2="10" />
+                        <line x1="3" y1="21" x2="10" y2="14" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="mb-2 text-xs text-slate-500">
+              Mostrando {tableRows.length} de {data.length} ativos
+            </div>
+            <div className={`${tableExpanded ? "max-h-[70vh]" : "max-h-[360px]"} overflow-auto`}>
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-slate-100 text-slate-700">
                 <tr>
@@ -334,7 +465,7 @@ function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
+                {tableRows.map((r, i) => (
                   <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-2 py-1">{r.ELEVATORIAS}</td>
                     <td className="px-2 py-1">{r.PLANTA}</td>
@@ -349,9 +480,11 @@ function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
-        </Card>
+        </div>
 
+        {!tableExpanded && (
         <Card title="Relação de elevatórias com CLP/PCP por cidade (%)">
           <ResponsiveContainer width="100%" height={Math.max(340, clpPorCidade.length * 28)}>
             <BarChart
@@ -379,12 +512,47 @@ function DashboardPage() {
             </BarChart>
           </ResponsiveContainer>
         </Card>
+        )}
       </div>
 
       <p className="text-center text-xs text-slate-500">
-        Fonte: Relação Automação de Elevatórias · {DATA.length} registros · TIPO: {tipo} ·
+        Fonte: Relação Automação de Elevatórias · {data.length} registros · TIPO: {tipo} ·
         MUNICÍPIO: {municipio}
       </p>
+
+      {/* Hidden upload trigger (bottom-right) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleUpload(f);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        title="Atualizar planilha"
+        aria-label="Atualizar planilha"
+        className="fixed bottom-2 right-2 h-3 w-3 rounded-full bg-slate-300/30 opacity-30 transition hover:scale-150 hover:bg-blue-500 hover:opacity-100"
+      />
+      {hasCustomData && (
+        <button
+          type="button"
+          onClick={() => {
+            window.localStorage.removeItem(STORAGE_KEY);
+            setData(DATA);
+            setHasCustomData(false);
+          }}
+          title="Restaurar planilha original"
+          className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white"
+        >
+          restaurar
+        </button>
+      )}
     </div>
   );
 }
@@ -433,7 +601,7 @@ function Kpi({
               style={{ width: `${Math.min(100, progress.pct)}%` }}
             />
           </div>
-          <div className="mt-0.5 text-[9px] text-slate-400">Meta: {progress.meta}%</div>
+          <div className="mt-0.5 text-[11px] font-medium text-slate-500">Meta: {progress.meta}%</div>
         </div>
       )}
     </div>
