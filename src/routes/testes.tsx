@@ -318,6 +318,59 @@ function TestesPage() {
       .slice(0, 12);
   }, [rows]);
 
+  // Padrão (ShutOff de referência) por elevatória — usa o valor mais frequente
+  const padraoPorElev = useMemo(() => {
+    const mode = (arr: number[]): number | null => {
+      if (!arr.length) return null;
+      const c = new Map<number, number>();
+      for (const n of arr) c.set(n, (c.get(n) ?? 0) + 1);
+      let best: number | null = null;
+      let bestN = -1;
+      for (const [v, n] of c) if (n > bestN) { best = v; bestN = n; }
+      return best;
+    };
+    const m = new Map<
+      string,
+      { grupo: string; iSO: number[]; retSO: number[]; recSO: number[]; n: number; ultimo: string | null }
+    >();
+    for (const r of rows) {
+      if (!r.Elevatória) continue;
+      const cur =
+        m.get(r.Elevatória) ?? {
+          grupo: r.Grupo != null ? String(r.Grupo) : "",
+          iSO: [],
+          retSO: [],
+          recSO: [],
+          n: 0,
+          ultimo: null,
+        };
+      const i = parseAvg(r["Corrente ShutOff"]);
+      const ret = parseAvg(r["Retaguarda ShutOff"]);
+      const rec = parseAvg(r["Recalque ShutOff"]);
+      if (i !== null) cur.iSO.push(i);
+      if (ret !== null) cur.retSO.push(ret);
+      if (rec !== null) cur.recSO.push(rec);
+      cur.n += 1;
+      const d = r["Data do Teste"];
+      if (d && (!cur.ultimo || d > cur.ultimo)) cur.ultimo = d;
+      m.set(r.Elevatória, cur);
+    }
+    return Array.from(m.entries())
+      .map(([name, v]) => ({
+        name,
+        grupo: v.grupo,
+        n: v.n,
+        ultimo: v.ultimo,
+        correnteSO: mode(v.iSO),
+        retagSO: mode(v.retSO),
+        recalSO: mode(v.recSO),
+        correnteVar: v.iSO.length ? new Set(v.iSO.map((x) => x.toFixed(1))).size : 0,
+        retagVar: v.retSO.length ? new Set(v.retSO.map((x) => x.toFixed(1))).size : 0,
+        recalVar: v.recSO.length ? new Set(v.recSO.map((x) => x.toFixed(1))).size : 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
   const handleUpload = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
