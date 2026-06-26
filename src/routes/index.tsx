@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { LayoutDashboard, Boxes, ArrowRight, Lock } from "lucide-react";
+import { LayoutDashboard, Boxes, ArrowRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -116,16 +116,19 @@ function Index() {
               <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
             </Link>
 
-            <div
-              aria-disabled
-              className="flex cursor-not-allowed items-center justify-between rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-left opacity-70"
+            <Link
+              to="/testes"
+              onClick={() => setDashOpen(false)}
+              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
             >
               <div>
-                <div className="font-semibold text-[#0b3a73]">Testes e Medições</div>
-                <div className="text-xs text-slate-500">Em breve</div>
+                <div className="font-semibold text-[#0b3a73]">Testes & Aferições</div>
+                <div className="text-xs text-slate-500">
+                  Serviços · equipes · parâmetros · impossibilidade
+                </div>
               </div>
-              <Lock className="h-4 w-4 text-slate-400" />
-            </div>
+              <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+            </Link>
           </div>
         </DialogContent>
       </Dialog>
