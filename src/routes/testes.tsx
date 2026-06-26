@@ -76,6 +76,57 @@ function parseNumeric(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseAvg(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(v).replace(/,/g, ".");
+  const nums = s.match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || !nums.length) return null;
+  const arr = nums.map((n) => parseFloat(n)).filter((n) => Number.isFinite(n));
+  if (!arr.length) return null;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// Operating thresholds
+const V_NOMINAL = 220;
+const V_TOL = 0.1; // ±10% → 198–242 V
+const V_MIN = V_NOMINAL * (1 - V_TOL);
+const V_MAX = V_NOMINAL * (1 + V_TOL);
+const I_ALERT_RATIO = 0.9; // corrente ≥ 90% do ShutOff = alerta
+const RET_MIN = 3; // mca — risco de cavitação / sucção de ar
+const RET_RATIO = 0.85; // retaguarda ≥ 85% ShutOff = alerta
+const REC_RATIO = 0.95; // recalque ≥ 95% ShutOff = alerta
+
+type Alerts = {
+  tensao: boolean;
+  corrente: boolean;
+  retaguarda: boolean;
+  recalque: boolean;
+  tensaoLow?: boolean;
+  tensaoHigh?: boolean;
+};
+
+function computeAlerts(r: Row): Alerts {
+  const v = parseAvg(r["Tensão ( V )"]);
+  const i = parseAvg(r["Corrente ( A )"]);
+  const iSO = parseAvg(r["Corrente ShutOff"]);
+  const ret = parseAvg(r.Retaguarda);
+  const retSO = parseAvg(r["Retaguarda ShutOff"]);
+  const rec = parseAvg(r.Recalque);
+  const recSO = parseAvg(r["Recalque ShutOff"]);
+  const tensaoLow = v !== null && v > 0 && v < V_MIN;
+  const tensaoHigh = v !== null && v > V_MAX;
+  return {
+    tensao: !!(tensaoLow || tensaoHigh),
+    tensaoLow,
+    tensaoHigh,
+    corrente: i !== null && iSO !== null && iSO > 0 && i >= iSO * I_ALERT_RATIO,
+    retaguarda:
+      (ret !== null && ret > 0 && ret < RET_MIN) ||
+      (ret !== null && retSO !== null && retSO > 0 && ret >= retSO * RET_RATIO),
+    recalque: rec !== null && recSO !== null && recSO > 0 && rec >= recSO * REC_RATIO,
+  };
+}
+
 function monthKey(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -120,7 +171,7 @@ function TestesPage() {
   const [tipo, setTipo] = useState<string>("TODOS");
   const [grupo, setGrupo] = useState<string>("TODOS");
   const [elev, setElev] = useState<string>("TODOS");
-  const [statusF, setStatusF] = useState<string>("TODOS");
+  const [alertF, setAlertF] = useState<string>("TODOS");
   const [search, setSearch] = useState<string>("");
   const [tableExpanded, setTableExpanded] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,14 +182,18 @@ function TestesPage() {
         if (tipo !== "TODOS" && d["Tipo de Serviço"] !== tipo) return false;
         if (grupo !== "TODOS" && String(d.Grupo ?? "") !== grupo) return false;
         if (elev !== "TODOS" && d.Elevatória !== elev) return false;
-        if (statusF !== "TODOS") {
-          const s = (d.Status ?? "").toLowerCase();
-          if (statusF === "AUTO" && !s.startsWith("autom")) return false;
-          if (statusF === "MAN" && !s.startsWith("man")) return false;
+        if (alertF !== "TODOS") {
+          const a = computeAlerts(d);
+          if (alertF === "TENSAO" && !a.tensao) return false;
+          if (alertF === "CORRENTE" && !a.corrente) return false;
+          if (alertF === "RETAGUARDA" && !a.retaguarda) return false;
+          if (alertF === "RECALQUE" && !a.recalque) return false;
+          if (alertF === "QUALQUER" && !(a.tensao || a.corrente || a.retaguarda || a.recalque))
+            return false;
         }
         return true;
       }),
-    [data, tipo, grupo, elev, statusF],
+    [data, tipo, grupo, elev, alertF],
   );
 
   const tableRows = useMemo(() => {
@@ -158,30 +213,43 @@ function TestesPage() {
     );
   }, [rows, search]);
 
+  // Alerts cache
+  const rowAlerts = useMemo(() => rows.map((r) => ({ r, a: computeAlerts(r) })), [rows]);
+
   // KPIs
   const total = rows.length;
   const ativosUnicos = new Set(rows.map((r) => r.Elevatória).filter(Boolean)).size;
-  const automaticos = rows.filter((r) => (r.Status ?? "").toLowerCase().startsWith("autom"))
-    .length;
-  const manuais = rows.filter((r) => (r.Status ?? "").toLowerCase().startsWith("man")).length;
-  const totalStatus = automaticos + manuais;
-  const autoPct = totalStatus ? Math.round((automaticos / totalStatus) * 100) : 0;
-  const manualPct = totalStatus ? 100 - autoPct : 0;
-  const impossiveis = rows.filter((r) => r["Impossibilidade:"] && String(r["Impossibilidade:"]).trim()).length;
-  const impossPct = total ? Math.round((impossiveis / total) * 100) : 0;
+  const aTensao = rowAlerts.filter((x) => x.a.tensao).length;
+  const aCorrente = rowAlerts.filter((x) => x.a.corrente).length;
+  const aRetag = rowAlerts.filter((x) => x.a.retaguarda).length;
+  const aRecal = rowAlerts.filter((x) => x.a.recalque).length;
+  const aQualquer = rowAlerts.filter(
+    (x) => x.a.tensao || x.a.corrente || x.a.retaguarda || x.a.recalque,
+  ).length;
+  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
+  const impossiveis = rows.filter(
+    (r) =>
+      r["Impossibilidade:"] &&
+      String(r["Impossibilidade:"]).trim() &&
+      !/^(n\/?a|nenhuma)/i.test(String(r["Impossibilidade:"]).trim()),
+  ).length;
+  const impossPct = pct(impossiveis);
 
-  // Evolução temporal
+  // Evolução temporal: testes vs alertas
   const porMes = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const k = monthKey(r["Data do Teste"]);
+    const m = new Map<string, { testes: number; alertas: number }>();
+    for (const x of rowAlerts) {
+      const k = monthKey(x.r["Data do Teste"]);
       if (!k) continue;
-      m.set(k, (m.get(k) ?? 0) + 1);
+      const cur = m.get(k) ?? { testes: 0, alertas: 0 };
+      cur.testes += 1;
+      if (x.a.tensao || x.a.corrente || x.a.retaguarda || x.a.recalque) cur.alertas += 1;
+      m.set(k, cur);
     }
     return Array.from(m.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, value]) => ({ name, value }));
-  }, [rows]);
+      .map(([name, v]) => ({ name, ...v }));
+  }, [rowAlerts]);
 
   // Por tipo de serviço
   const porTipo = useMemo(() => {
@@ -196,25 +264,69 @@ function TestesPage() {
       .map(([name, value]) => ({ name, value }));
   }, [rows]);
 
-  // Top elevatórias
-  const topElev = useMemo(() => {
+  // Top elevatórias com mais alertas
+  const topElevAlertas = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of rows) {
-      if (!r.Elevatória) continue;
-      m.set(r.Elevatória, (m.get(r.Elevatória) ?? 0) + 1);
+    for (const x of rowAlerts) {
+      if (!x.r.Elevatória) continue;
+      const has = x.a.tensao || x.a.corrente || x.a.retaguarda || x.a.recalque;
+      if (!has) continue;
+      m.set(x.r.Elevatória, (m.get(x.r.Elevatória) ?? 0) + 1);
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
+  }, [rowAlerts]);
+
+  // Distribuição por tipo de alerta
+  const alertasPie = [
+    { name: "Tensão fora da faixa", value: aTensao, color: "#dc2626" },
+    { name: "Corrente perto ShutOff", value: aCorrente, color: "#ea580c" },
+    { name: "Retaguarda anômala", value: aRetag, color: "#ca8a04" },
+    { name: "Recalque perto ShutOff", value: aRecal, color: "#7c3aed" },
+  ].filter((s) => s.value > 0);
+
+  // Tensão média por top elevatórias (para visualizar dispersão vs nominal)
+  const tensaoPorElev = useMemo(() => {
+    const m = new Map<string, { sum: number; n: number; min: number; max: number }>();
+    for (const r of rows) {
+      const v = parseAvg(r["Tensão ( V )"]);
+      if (v === null || v <= 0 || !r.Elevatória) continue;
+      const cur = m.get(r.Elevatória) ?? { sum: 0, n: 0, min: Infinity, max: -Infinity };
+      cur.sum += v;
+      cur.n += 1;
+      cur.min = Math.min(cur.min, v);
+      cur.max = Math.max(cur.max, v);
+      m.set(r.Elevatória, cur);
+    }
+    return Array.from(m.entries())
+      .map(([name, v]) => ({
+        name,
+        media: +(v.sum / v.n).toFixed(1),
+        min: +v.min.toFixed(1),
+        max: +v.max.toFixed(1),
+      }))
+      .sort((a, b) => Math.abs(b.media - V_NOMINAL) - Math.abs(a.media - V_NOMINAL))
+      .slice(0, 12);
   }, [rows]);
 
-  // Status pie
-  const statusData = [
-    { name: "Automático", value: automaticos, color: BLUE_DARK },
-    { name: "Manual", value: manuais, color: BLUE },
-    { name: "Sem status", value: rows.length - automaticos - manuais, color: BLUE_LIGHT },
-  ].filter((s) => s.value > 0);
+  // Retaguarda média por top elevatórias
+  const retagPorElev = useMemo(() => {
+    const m = new Map<string, { sum: number; n: number }>();
+    for (const r of rows) {
+      const v = parseAvg(r.Retaguarda);
+      if (v === null || !r.Elevatória) continue;
+      const cur = m.get(r.Elevatória) ?? { sum: 0, n: 0 };
+      cur.sum += v;
+      cur.n += 1;
+      m.set(r.Elevatória, cur);
+    }
+    return Array.from(m.entries())
+      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(2) }))
+      .sort((a, b) => a.media - b.media)
+      .slice(0, 12);
+  }, [rows]);
 
   const handleUpload = async (file: File) => {
     try {
@@ -263,17 +375,34 @@ function TestesPage() {
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
       {/* KPIs */}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
         <Kpi label="Total de Testes" value={total} />
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
-        <Kpi label="Automáticos" value={`${automaticos} (${autoPct}%)`} />
-        <Kpi label="Manuais" value={`${manuais} (${manualPct}%)`} />
         <Kpi
-          label="Índice de Impossibilidade"
-          value={`${impossPct}%`}
+          label="Alertas de Tensão"
+          value={`${aTensao} (${pct(aTensao)}%)`}
+          progress={{ pct: pct(aTensao), meta: 5, lowerIsBetter: true }}
+        />
+        <Kpi
+          label="Corrente ≥ ShutOff"
+          value={`${aCorrente} (${pct(aCorrente)}%)`}
+          progress={{ pct: pct(aCorrente), meta: 5, lowerIsBetter: true }}
+        />
+        <Kpi
+          label="Retaguarda Anômala"
+          value={`${aRetag} (${pct(aRetag)}%)`}
+          progress={{ pct: pct(aRetag), meta: 10, lowerIsBetter: true }}
+        />
+        <Kpi
+          label="Testes com Alerta"
+          value={`${aQualquer} (${pct(aQualquer)}%)`}
+          progress={{ pct: pct(aQualquer), meta: 15, lowerIsBetter: true }}
+        />
+        <Kpi
+          label="Impossibilidade"
+          value={`${impossiveis} (${impossPct}%)`}
           progress={{ pct: impossPct, meta: 5, lowerIsBetter: true }}
         />
-        <Kpi label="Testes com Impossibilidade" value={impossiveis} />
       </div>
 
       {/* Filtros */}
@@ -282,25 +411,28 @@ function TestesPage() {
         <FilterSelect label="GRUPO" value={grupo} onChange={setGrupo} options={GRUPOS} />
         <FilterSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} />
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">STATUS</label>
+          <label className="text-sm font-medium text-slate-700">ALERTA</label>
           <select
-            value={statusF}
-            onChange={(e) => setStatusF(e.target.value)}
+            value={alertF}
+            onChange={(e) => setAlertF(e.target.value)}
             className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
           >
             <option value="TODOS">Todos</option>
-            <option value="AUTO">Automático</option>
-            <option value="MAN">Manual</option>
+            <option value="QUALQUER">Qualquer alerta</option>
+            <option value="TENSAO">Tensão fora faixa</option>
+            <option value="CORRENTE">Corrente ≥ ShutOff</option>
+            <option value="RETAGUARDA">Retaguarda anômala</option>
+            <option value="RECALQUE">Recalque crítico</option>
           </select>
         </div>
-        {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS" || statusF !== "TODOS") && (
+        {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS" || alertF !== "TODOS") && (
           <button
             type="button"
             onClick={() => {
               setTipo("TODOS");
               setGrupo("TODOS");
               setElev("TODOS");
-              setStatusF("TODOS");
+              setAlertF("TODOS");
             }}
             className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
           >
@@ -311,26 +443,30 @@ function TestesPage() {
 
       {/* Charts row 1 */}
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Card title="Evolução de testes ao longo do tempo">
+        <Card title="Evolução: testes × alertas">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={porMes} margin={{ left: 10, right: 20, top: 10 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
+              <Legend />
               <Line
                 type="monotone"
-                dataKey="value"
+                name="Testes"
+                dataKey="testes"
                 stroke={BLUE}
                 strokeWidth={2.5}
-                dot={{ r: 4, fill: BLUE_DARK }}
-              >
-                <LabelList
-                  dataKey="value"
-                  position="top"
-                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
-                />
-              </Line>
+                dot={{ r: 3, fill: BLUE_DARK }}
+              />
+              <Line
+                type="monotone"
+                name="Alertas"
+                dataKey="alertas"
+                stroke="#dc2626"
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: "#dc2626" }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -360,44 +496,90 @@ function TestesPage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card title="Manual vs Automático">
+        <Card title="Distribuição de Alertas">
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie
-                data={statusData}
+                data={alertasPie}
                 dataKey="value"
                 nameKey="name"
                 innerRadius={55}
                 outerRadius={90}
-                label={(d: { value: number }) =>
-                  totalStatus ? `${d.value} (${Math.round((d.value / (rows.length || 1)) * 100)}%)` : d.value
-                }
+                label={(d: { value: number }) => `${d.value} (${pct(d.value)}%)`}
               >
-                {statusData.map((s) => (
+                {alertasPie.map((s) => (
                   <Cell key={s.name} fill={s.color} />
                 ))}
               </Pie>
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
-      {/* Charts row 2 — Top elevatórias */}
+      {/* Charts row 2 — análise por elevatória */}
       <div className="mb-4 grid gap-4 lg:grid-cols-2">
-        <Card title="Top 10 elevatórias com mais intervenções">
-          <ResponsiveContainer width="100%" height={Math.max(320, topElev.length * 32)}>
-            <BarChart data={topElev} layout="vertical" margin={{ left: 10, right: 50 }}>
+        <Card title="Top 10 elevatórias com mais ALERTAS">
+          <ResponsiveContainer width="100%" height={Math.max(320, topElevAlertas.length * 32)}>
+            <BarChart data={topElevAlertas} layout="vertical" margin={{ left: 10, right: 50 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Bar dataKey="value" fill={BLUE}>
+              <Bar dataKey="value" fill="#dc2626">
                 <LabelList
                   dataKey="value"
                   position="right"
-                  style={{ fontSize: 13, fontWeight: 700, fill: BLUE_DARK }}
+                  style={{ fontSize: 13, fontWeight: 700, fill: "#7f1d1d" }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card title={`Tensão média por elevatória (nominal ${V_NOMINAL}V · faixa ${V_MIN}-${V_MAX}V)`}>
+          <ResponsiveContainer width="100%" height={Math.max(320, tensaoPorElev.length * 28)}>
+            <BarChart data={tensaoPorElev} layout="vertical" margin={{ left: 10, right: 50 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" domain={[180, 250]} />
+              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Bar dataKey="media">
+                {tensaoPorElev.map((d) => (
+                  <Cell
+                    key={d.name}
+                    fill={d.media < V_MIN || d.media > V_MAX ? "#dc2626" : BLUE}
+                  />
+                ))}
+                <LabelList
+                  dataKey="media"
+                  position="right"
+                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      {/* Charts row 3 — retaguarda e tabela de parâmetros */}
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <Card title={`Menores retaguardas médias (alerta < ${RET_MIN} mca)`}>
+          <ResponsiveContainer width="100%" height={Math.max(320, retagPorElev.length * 28)}>
+            <BarChart data={retagPorElev} layout="vertical" margin={{ left: 10, right: 50 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" />
+              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Bar dataKey="media">
+                {retagPorElev.map((d) => (
+                  <Cell key={d.name} fill={d.media < RET_MIN ? "#dc2626" : BLUE} />
+                ))}
+                <LabelList
+                  dataKey="media"
+                  position="right"
+                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
                 />
               </Bar>
             </BarChart>
@@ -432,20 +614,24 @@ function TestesPage() {
                       r["Recalque ShutOff"],
                   )
                   .map((r, i) => {
-                    const corr = parseNumeric(r["Corrente ( A )"]);
-                    const corrSO = parseNumeric(r["Corrente ShutOff"]);
-                    const corrAlert = corr !== null && corrSO !== null && corr >= corrSO;
+                    const a = computeAlerts(r);
                     return (
                       <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
                         <td className="px-2 py-1 font-medium">{r.Elevatória}</td>
-                        <td className="px-2 py-1">{r["Tensão ( V )"] ?? ""}</td>
-                        <td className={`px-2 py-1 ${corrAlert ? "text-rose-600 font-semibold" : ""}`}>
+                        <td className={`px-2 py-1 ${a.tensao ? "bg-rose-50 text-rose-700 font-semibold" : ""}`} title={a.tensaoLow ? "Tensão abaixo do mínimo" : a.tensaoHigh ? "Tensão acima do máximo" : ""}>
+                          {r["Tensão ( V )"] ?? ""}
+                        </td>
+                        <td className={`px-2 py-1 ${a.corrente ? "bg-rose-50 text-rose-700 font-semibold" : ""}`}>
                           {r["Corrente ( A )"] ?? ""}
                         </td>
                         <td className="px-2 py-1">{r["Corrente ShutOff"] ?? ""}</td>
-                        <td className="px-2 py-1">{r.Retaguarda ?? ""}</td>
+                        <td className={`px-2 py-1 ${a.retaguarda ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}>
+                          {r.Retaguarda ?? ""}
+                        </td>
                         <td className="px-2 py-1">{r["Retaguarda ShutOff"] ?? ""}</td>
-                        <td className="px-2 py-1">{r.Recalque ?? ""}</td>
+                        <td className={`px-2 py-1 ${a.recalque ? "bg-violet-50 text-violet-700 font-semibold" : ""}`}>
+                          {r.Recalque ?? ""}
+                        </td>
                         <td className="px-2 py-1">{r["Recalque ShutOff"] ?? ""}</td>
                       </tr>
                     );
