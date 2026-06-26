@@ -72,12 +72,16 @@ function countBy<T extends string | number>(rows: Row[], key: (r: Row) => T | nu
 
 function DashboardPage() {
   const [data, setData] = useState<Row[]>(DATA);
+  const [hasCustomData, setHasCustomData] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Row[];
-        if (Array.isArray(parsed) && parsed.length) setData(parsed);
+        if (Array.isArray(parsed) && parsed.length) {
+          setData(parsed);
+          setHasCustomData(true);
+        }
       }
     } catch {
       // ignore
@@ -210,6 +214,7 @@ function DashboardPage() {
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(json));
       setData(json);
+      setHasCustomData(true);
       alert(`Planilha atualizada com ${json.length} registros.`);
     } catch (err) {
       console.error(err);
@@ -534,21 +539,20 @@ function DashboardPage() {
         aria-label="Atualizar planilha"
         className="fixed bottom-2 right-2 h-3 w-3 rounded-full bg-slate-300/30 opacity-30 transition hover:scale-150 hover:bg-blue-500 hover:opacity-100"
       />
-      {localStorage !== undefined &&
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(STORAGE_KEY) && (
-          <button
-            type="button"
-            onClick={() => {
-              window.localStorage.removeItem(STORAGE_KEY);
-              setData(DATA);
-            }}
-            title="Restaurar planilha original"
-            className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white"
-          >
-            restaurar
-          </button>
-        )}
+      {hasCustomData && (
+        <button
+          type="button"
+          onClick={() => {
+            window.localStorage.removeItem(STORAGE_KEY);
+            setData(DATA);
+            setHasCustomData(false);
+          }}
+          title="Restaurar planilha original"
+          className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white"
+        >
+          restaurar
+        </button>
+      )}
     </div>
   );
 }
