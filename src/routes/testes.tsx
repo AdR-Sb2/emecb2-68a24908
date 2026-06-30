@@ -159,17 +159,30 @@ function TestesPage() {
   const total = rows.length;
   const ativosUnicos = new Set(rows.map((r) => r.Elevatória).filter(Boolean)).size;
 
-  const mediaTensaoGeral = useMemo(() => {
-    const vals = rows.map((r) => parseAvg(r["Tensão ( V )"])).filter((v): v is number => v !== null);
-    if (!vals.length) return null;
-    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-  }, [rows]);
+  // Enriquece cada linha com tensão/corrente numéricas e classe BT/MT.
+  const enriched = useMemo(
+    () =>
+      rows.map((r) => {
+        const tensao = parseAvg(r["Tensão ( V )"]);
+        const corrente = parseAvg(r["Corrente ( A )"]);
+        return { r, tensao, corrente, classe: classifyTensao(tensao) };
+      }),
+    [rows],
+  );
 
-  const mediaCorrenteGeral = useMemo(() => {
-    const vals = rows.map((r) => parseAvg(r["Corrente ( A )"])).filter((v): v is number => v !== null);
+  const mediaBy = (key: "tensao" | "corrente", classe: "BT" | "MT") => {
+    const vals = enriched
+      .filter((e) => e.classe === classe)
+      .map((e) => e[key])
+      .filter((v): v is number => v !== null);
     if (!vals.length) return null;
-    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
-  }, [rows]);
+    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(key === "tensao" ? 1 : 2);
+  };
+
+  const mediaTensaoBT = useMemo(() => mediaBy("tensao", "BT"), [enriched]);
+  const mediaTensaoMT = useMemo(() => mediaBy("tensao", "MT"), [enriched]);
+  const mediaCorrenteBT = useMemo(() => mediaBy("corrente", "BT"), [enriched]);
+  const mediaCorrenteMT = useMemo(() => mediaBy("corrente", "MT"), [enriched]);
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
@@ -183,35 +196,26 @@ function TestesPage() {
       .map(([name, testes]) => ({ name, testes }));
   }, [rows]);
 
-  const tensaoPorElev = useMemo(() => {
+  const aggPorElev = (key: "tensao" | "corrente", classe: "BT" | "MT", decimals: number) => {
     const m = new Map<string, { sum: number; n: number }>();
-    for (const r of rows) {
-      const v = parseAvg(r["Tensão ( V )"]);
-      if (v === null || !r.Elevatória) continue;
-      const cur = m.get(r.Elevatória) ?? { sum: 0, n: 0 };
+    for (const e of enriched) {
+      if (e.classe !== classe) continue;
+      const v = e[key];
+      if (v === null || !e.r.Elevatória) continue;
+      const cur = m.get(e.r.Elevatória) ?? { sum: 0, n: 0 };
       cur.sum += v;
       cur.n += 1;
-      m.set(r.Elevatória, cur);
+      m.set(e.r.Elevatória, cur);
     }
     return Array.from(m.entries())
-      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(1), testes: v.n }))
+      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(decimals), testes: v.n }))
       .sort((a, b) => b.media - a.media);
-  }, [rows]);
+  };
 
-  const correntePorElev = useMemo(() => {
-    const m = new Map<string, { sum: number; n: number }>();
-    for (const r of rows) {
-      const v = parseAvg(r["Corrente ( A )"]);
-      if (v === null || !r.Elevatória) continue;
-      const cur = m.get(r.Elevatória) ?? { sum: 0, n: 0 };
-      cur.sum += v;
-      cur.n += 1;
-      m.set(r.Elevatória, cur);
-    }
-    return Array.from(m.entries())
-      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(2), testes: v.n }))
-      .sort((a, b) => b.media - a.media);
-  }, [rows]);
+  const tensaoBTPorElev = useMemo(() => aggPorElev("tensao", "BT", 1), [enriched]);
+  const tensaoMTPorElev = useMemo(() => aggPorElev("tensao", "MT", 1), [enriched]);
+  const correnteBTPorElev = useMemo(() => aggPorElev("corrente", "BT", 2), [enriched]);
+  const correnteMTPorElev = useMemo(() => aggPorElev("corrente", "MT", 2), [enriched]);
 
   const handleUpload = async (file: File) => {
     try {
