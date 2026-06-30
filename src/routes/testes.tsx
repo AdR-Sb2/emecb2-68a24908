@@ -57,7 +57,7 @@ type Row = {
   Status: string | null;
 };
 
-const DATA = rawData as Row[];
+const DATA = rawData as unknown as Row[];
 const STORAGE_KEY = "testes_data_v1";
 
 const BLUE = "#1f7ad6";
@@ -71,6 +71,14 @@ function parseAvg(v: unknown): number | null {
   const arr = nums.map((n) => parseFloat(n)).filter((n) => Number.isFinite(n) && n !== 0);
   if (!arr.length) return null;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// Brazilian pump-station convention used here:
+// BT (baixa tensão) → tensões nominais até ~300 V (220/240 V)
+// MT (média tensão) → 380 V em diante (380/440/460 V)
+function classifyTensao(v: number | null): "BT" | "MT" | null {
+  if (v === null) return null;
+  return v < 300 ? "BT" : "MT";
 }
 
 function monthKey(iso: string | null): string | null {
@@ -151,17 +159,30 @@ function TestesPage() {
   const total = rows.length;
   const ativosUnicos = new Set(rows.map((r) => r.Elevatória).filter(Boolean)).size;
 
-  const mediaTensaoGeral = useMemo(() => {
-    const vals = rows.map((r) => parseAvg(r["Tensão ( V )"])).filter((v): v is number => v !== null);
-    if (!vals.length) return null;
-    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-  }, [rows]);
+  // Enriquece cada linha com tensão/corrente numéricas e classe BT/MT.
+  const enriched = useMemo(
+    () =>
+      rows.map((r) => {
+        const tensao = parseAvg(r["Tensão ( V )"]);
+        const corrente = parseAvg(r["Corrente ( A )"]);
+        return { r, tensao, corrente, classe: classifyTensao(tensao) };
+      }),
+    [rows],
+  );
 
-  const mediaCorrenteGeral = useMemo(() => {
-    const vals = rows.map((r) => parseAvg(r["Corrente ( A )"])).filter((v): v is number => v !== null);
+  const mediaBy = (key: "tensao" | "corrente", classe: "BT" | "MT") => {
+    const vals = enriched
+      .filter((e) => e.classe === classe)
+      .map((e) => e[key])
+      .filter((v): v is number => v !== null);
     if (!vals.length) return null;
-    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
-  }, [rows]);
+    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(key === "tensao" ? 1 : 2);
+  };
+
+  const mediaTensaoBT = useMemo(() => mediaBy("tensao", "BT"), [enriched]);
+  const mediaTensaoMT = useMemo(() => mediaBy("tensao", "MT"), [enriched]);
+  const mediaCorrenteBT = useMemo(() => mediaBy("corrente", "BT"), [enriched]);
+  const mediaCorrenteMT = useMemo(() => mediaBy("corrente", "MT"), [enriched]);
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
@@ -175,35 +196,26 @@ function TestesPage() {
       .map(([name, testes]) => ({ name, testes }));
   }, [rows]);
 
-  const tensaoPorElev = useMemo(() => {
+  const aggPorElev = (key: "tensao" | "corrente", classe: "BT" | "MT", decimals: number) => {
     const m = new Map<string, { sum: number; n: number }>();
-    for (const r of rows) {
-      const v = parseAvg(r["Tensão ( V )"]);
-      if (v === null || !r.Elevatória) continue;
-      const cur = m.get(r.Elevatória) ?? { sum: 0, n: 0 };
+    for (const e of enriched) {
+      if (e.classe !== classe) continue;
+      const v = e[key];
+      if (v === null || !e.r.Elevatória) continue;
+      const cur = m.get(e.r.Elevatória) ?? { sum: 0, n: 0 };
       cur.sum += v;
       cur.n += 1;
-      m.set(r.Elevatória, cur);
+      m.set(e.r.Elevatória, cur);
     }
     return Array.from(m.entries())
-      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(1), testes: v.n }))
+      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(decimals), testes: v.n }))
       .sort((a, b) => b.media - a.media);
-  }, [rows]);
+  };
 
-  const correntePorElev = useMemo(() => {
-    const m = new Map<string, { sum: number; n: number }>();
-    for (const r of rows) {
-      const v = parseAvg(r["Corrente ( A )"]);
-      if (v === null || !r.Elevatória) continue;
-      const cur = m.get(r.Elevatória) ?? { sum: 0, n: 0 };
-      cur.sum += v;
-      cur.n += 1;
-      m.set(r.Elevatória, cur);
-    }
-    return Array.from(m.entries())
-      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(2), testes: v.n }))
-      .sort((a, b) => b.media - a.media);
-  }, [rows]);
+  const tensaoBTPorElev = useMemo(() => aggPorElev("tensao", "BT", 1), [enriched]);
+  const tensaoMTPorElev = useMemo(() => aggPorElev("tensao", "MT", 1), [enriched]);
+  const correnteBTPorElev = useMemo(() => aggPorElev("corrente", "BT", 2), [enriched]);
+  const correnteMTPorElev = useMemo(() => aggPorElev("corrente", "MT", 2), [enriched]);
 
   const handleUpload = async (file: File) => {
     try {
@@ -249,17 +261,19 @@ function TestesPage() {
       </div>
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi label="Total de Testes" value={total} />
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
-        <Kpi label="Média de Tensão" value={mediaTensaoGeral !== null ? `${mediaTensaoGeral} V` : "—"} />
-        <Kpi label="Média de Corrente" value={mediaCorrenteGeral !== null ? `${mediaCorrenteGeral} A` : "—"} />
+        <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
+        <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
+        <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
+        <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
         <FilterSelect label="GRUPO" value={grupo} onChange={setGrupo} options={GRUPOS} />
-        <FilterSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} />
+        <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." />
         {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS") && (
           <button
             type="button"
@@ -276,7 +290,7 @@ function TestesPage() {
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Card title="Evolução mensal de testes" className="lg:col-span-1">
+        <Card title="Evolução mensal de testes" className="lg:col-span-3">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={porMes} margin={{ left: 10, right: 20, top: 10 }}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -295,44 +309,13 @@ function TestesPage() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
+      </div>
 
-        <Card title="Média de Tensão por Elevatória">
-          <ResponsiveContainer width="100%" height={Math.max(260, tensaoPorElev.length * 24)}>
-            <BarChart data={tensaoPorElev} layout="vertical" margin={{ left: 10, right: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => [`${v} V`, "Média"]} />
-              <Bar dataKey="media" fill={BLUE}>
-                <LabelList
-                  dataKey="media"
-                  position="right"
-                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
-                  formatter={(v: number) => `${v} V`}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card title="Média de Corrente por Elevatória">
-          <ResponsiveContainer width="100%" height={Math.max(260, correntePorElev.length * 24)}>
-            <BarChart data={correntePorElev} layout="vertical" margin={{ left: 10, right: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => [`${v} A`, "Média"]} />
-              <Bar dataKey="media" fill={BLUE}>
-                <LabelList
-                  dataKey="media"
-                  position="right"
-                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
-                  formatter={(v: number) => `${v} A`}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+      <div className="mb-4 grid gap-4 md:grid-cols-2">
+        <ScrollChart title="Média de Tensão por Elevatória — BT" data={tensaoBTPorElev} unit="V" />
+        <ScrollChart title="Média de Tensão por Elevatória — MT" data={tensaoMTPorElev} unit="V" />
+        <ScrollChart title="Média de Corrente por Elevatória — BT" data={correnteBTPorElev} unit="A" />
+        <ScrollChart title="Média de Corrente por Elevatória — MT" data={correnteMTPorElev} unit="A" />
       </div>
 
       <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
@@ -455,11 +438,145 @@ function FilterSelect({
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string | number }) {
+function Kpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
       <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
       <div className="text-xl font-bold text-[#0b3a73]">{value}</div>
+      {hint && <div className="text-[10px] text-slate-400">{hint}</div>}
+    </div>
+  );
+}
+
+function SearchableSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
+  const display = value === "TODOS" ? "Todos" : value;
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-medium text-slate-700">{label}</label>
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="w-[260px] truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-sm shadow-sm hover:bg-slate-50"
+        >
+          {display}
+        </button>
+        {open && (
+          <div className="absolute z-20 mt-1 w-[300px] rounded-md border border-slate-200 bg-white shadow-lg">
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder ?? "Buscar..."}
+              className="w-full rounded-t-md border-b border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none"
+            />
+            <ul className="max-h-64 overflow-auto py-1 text-sm">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("TODOS");
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === "TODOS" ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""}`}
+                >
+                  Todos
+                </button>
+              </li>
+              {filtered.map((o) => (
+                <li key={o}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(o);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === o ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""}`}
+                  >
+                    {o}
+                  </button>
+                </li>
+              ))}
+              {!filtered.length && (
+                <li className="px-3 py-2 text-xs text-slate-400">Nenhum resultado</li>
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScrollChart({
+  title,
+  data,
+  unit,
+}: {
+  title: string;
+  data: { name: string; media: number; testes: number }[];
+  unit: "V" | "A";
+}) {
+  const ROW = 26;
+  const innerHeight = Math.max(data.length * ROW + 40, 160);
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        <span className="text-[11px] text-slate-500">{data.length} ativos</span>
+      </div>
+      {data.length === 0 ? (
+        <div className="flex h-[320px] items-center justify-center text-xs text-slate-400">
+          Sem dados para esta classe de tensão.
+        </div>
+      ) : (
+        <div className="max-h-[360px] overflow-y-auto pr-1">
+          <div style={{ height: innerHeight }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ left: 10, right: 60, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} interval={0} />
+                <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
+                <Bar dataKey="media" fill={BLUE} barSize={14} radius={[0, 4, 4, 0]}>
+                  <LabelList
+                    dataKey="media"
+                    position="right"
+                    style={{ fontSize: 10, fontWeight: 700, fill: BLUE_DARK }}
+                    formatter={(v: number) => `${v} ${unit}`}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
