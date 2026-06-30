@@ -73,6 +73,14 @@ function parseAvg(v: unknown): number | null {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+// Brazilian pump-station convention used here:
+// BT (baixa tensão) → tensões nominais até ~300 V (220/240 V)
+// MT (média tensão) → 380 V em diante (380/440/460 V)
+function classifyTensao(v: number | null): "BT" | "MT" | null {
+  if (v === null) return null;
+  return v < 300 ? "BT" : "MT";
+}
+
 function monthKey(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
