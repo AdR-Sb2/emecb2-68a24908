@@ -8,6 +8,7 @@ import {
   LabelList,
   Line,
   LineChart,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
