@@ -438,11 +438,145 @@ function FilterSelect({
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string | number }) {
+function Kpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
       <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
       <div className="text-xl font-bold text-[#0b3a73]">{value}</div>
+      {hint && <div className="text-[10px] text-slate-400">{hint}</div>}
+    </div>
+  );
+}
+
+function SearchableSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
+  const display = value === "TODOS" ? "Todos" : value;
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-medium text-slate-700">{label}</label>
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="w-[260px] truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-sm shadow-sm hover:bg-slate-50"
+        >
+          {display}
+        </button>
+        {open && (
+          <div className="absolute z-20 mt-1 w-[300px] rounded-md border border-slate-200 bg-white shadow-lg">
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder ?? "Buscar..."}
+              className="w-full rounded-t-md border-b border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none"
+            />
+            <ul className="max-h-64 overflow-auto py-1 text-sm">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("TODOS");
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === "TODOS" ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""}`}
+                >
+                  Todos
+                </button>
+              </li>
+              {filtered.map((o) => (
+                <li key={o}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(o);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === o ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""}`}
+                  >
+                    {o}
+                  </button>
+                </li>
+              ))}
+              {!filtered.length && (
+                <li className="px-3 py-2 text-xs text-slate-400">Nenhum resultado</li>
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScrollChart({
+  title,
+  data,
+  unit,
+}: {
+  title: string;
+  data: { name: string; media: number; testes: number }[];
+  unit: "V" | "A";
+}) {
+  const ROW = 26;
+  const innerHeight = Math.max(data.length * ROW + 40, 160);
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        <span className="text-[11px] text-slate-500">{data.length} ativos</span>
+      </div>
+      {data.length === 0 ? (
+        <div className="flex h-[320px] items-center justify-center text-xs text-slate-400">
+          Sem dados para esta classe de tensão.
+        </div>
+      ) : (
+        <div className="max-h-[360px] overflow-y-auto pr-1">
+          <div style={{ height: innerHeight }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ left: 10, right: 60, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} interval={0} />
+                <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
+                <Bar dataKey="media" fill={BLUE} barSize={14} radius={[0, 4, 4, 0]}>
+                  <LabelList
+                    dataKey="media"
+                    position="right"
+                    style={{ fontSize: 10, fontWeight: 700, fill: BLUE_DARK }}
+                    formatter={(v: number) => `${v} ${unit}`}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
