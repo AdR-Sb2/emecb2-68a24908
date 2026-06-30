@@ -261,17 +261,19 @@ function TestesPage() {
       </div>
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi label="Total de Testes" value={total} />
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
-        <Kpi label="Média de Tensão" value={mediaTensaoGeral !== null ? `${mediaTensaoGeral} V` : "—"} />
-        <Kpi label="Média de Corrente" value={mediaCorrenteGeral !== null ? `${mediaCorrenteGeral} A` : "—"} />
+        <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
+        <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
+        <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
+        <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
         <FilterSelect label="GRUPO" value={grupo} onChange={setGrupo} options={GRUPOS} />
-        <FilterSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} />
+        <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." />
         {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS") && (
           <button
             type="button"
@@ -288,7 +290,7 @@ function TestesPage() {
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Card title="Evolução mensal de testes" className="lg:col-span-1">
+        <Card title="Evolução mensal de testes" className="lg:col-span-3">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={porMes} margin={{ left: 10, right: 20, top: 10 }}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -307,44 +309,13 @@ function TestesPage() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
+      </div>
 
-        <Card title="Média de Tensão por Elevatória">
-          <ResponsiveContainer width="100%" height={Math.max(260, tensaoPorElev.length * 24)}>
-            <BarChart data={tensaoPorElev} layout="vertical" margin={{ left: 10, right: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => [`${v} V`, "Média"]} />
-              <Bar dataKey="media" fill={BLUE}>
-                <LabelList
-                  dataKey="media"
-                  position="right"
-                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
-                  formatter={(v: number) => `${v} V`}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card title="Média de Corrente por Elevatória">
-          <ResponsiveContainer width="100%" height={Math.max(260, correntePorElev.length * 24)}>
-            <BarChart data={correntePorElev} layout="vertical" margin={{ left: 10, right: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => [`${v} A`, "Média"]} />
-              <Bar dataKey="media" fill={BLUE}>
-                <LabelList
-                  dataKey="media"
-                  position="right"
-                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
-                  formatter={(v: number) => `${v} A`}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+      <div className="mb-4 grid gap-4 md:grid-cols-2">
+        <ScrollChart title="Média de Tensão por Elevatória — BT" data={tensaoBTPorElev} unit="V" />
+        <ScrollChart title="Média de Tensão por Elevatória — MT" data={tensaoMTPorElev} unit="V" />
+        <ScrollChart title="Média de Corrente por Elevatória — BT" data={correnteBTPorElev} unit="A" />
+        <ScrollChart title="Média de Corrente por Elevatória — MT" data={correnteMTPorElev} unit="A" />
       </div>
 
       <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
