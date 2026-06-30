@@ -57,7 +57,7 @@ type Row = {
   Status: string | null;
 };
 
-const DATA = rawData as Row[];
+const DATA = rawData as unknown as Row[];
 const STORAGE_KEY = "testes_data_v1";
 
 const BLUE = "#1f7ad6";
