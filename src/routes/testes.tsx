@@ -1260,3 +1260,119 @@ function Card({ title, className, children }: { title: string; className?: strin
     </div>
   );
 }
+
+function MetricEvolutionChart({
+  className,
+  series,
+  metric,
+  onMetricChange,
+  elevName,
+}: {
+  className?: string;
+  series: { t: number; date: string; value: number }[];
+  metric: Metric;
+  onMetricChange: (m: Metric) => void;
+  elevName: string | null;
+}) {
+  const meta = METRIC_META[metric];
+  // Regressão linear leve para tendência (quando houver >= 2 pontos)
+  const withTrend = useMemo(() => {
+    if (series.length < 2) return series.map((p) => ({ ...p, trend: null as number | null }));
+    const n = series.length;
+    const xs = series.map((_, i) => i);
+    const ys = series.map((p) => p.value);
+    const meanX = xs.reduce((a, b) => a + b, 0) / n;
+    const meanY = ys.reduce((a, b) => a + b, 0) / n;
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < n; i++) {
+      num += (xs[i] - meanX) * (ys[i] - meanY);
+      den += (xs[i] - meanX) ** 2;
+    }
+    const slope = den === 0 ? 0 : num / den;
+    const intercept = meanY - slope * meanX;
+    return series.map((p, i) => ({ ...p, trend: +(intercept + slope * i).toFixed(meta.decimals) }));
+  }, [series, meta.decimals]);
+
+  const title = elevName
+    ? `Evolução de Métricas — ${elevName}`
+    : "Evolução de Métricas por Elevatória";
+
+  return (
+    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        <div className="flex items-center gap-2">
+          <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            Métrica
+          </label>
+          <select
+            value={metric}
+            onChange={(e) => onMetricChange(e.target.value as Metric)}
+            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm"
+          >
+            <option value="tensao">Tensão (V)</option>
+            <option value="corrente">Corrente (A)</option>
+            <option value="recalque">Recalque (mca)</option>
+            <option value="retaguarda">Retaguarda (mca)</option>
+          </select>
+        </div>
+      </div>
+      {!elevName ? (
+        <div className="flex h-[240px] items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50 text-center text-xs text-slate-500">
+          Selecione uma elevatória (no filtro ou clicando em uma barra) para ver a
+          <br />evolução de métricas técnicas.
+        </div>
+      ) : withTrend.length === 0 ? (
+        <div className="flex h-[240px] items-center justify-center text-xs text-slate-400">
+          Sem leituras de {meta.label.toLowerCase()} para esta elevatória no período.
+        </div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={withTrend} margin={{ left: 10, right: 20, top: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                label={{ value: meta.unit, angle: -90, position: "insideLeft", fontSize: 11 }}
+              />
+              <Tooltip
+                formatter={(v: number, n: string) => [
+                  `${v} ${meta.unit}`,
+                  n === "trend" ? "Tendência" : meta.label,
+                ]}
+                labelFormatter={(l) => `Data: ${l}`}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                name={meta.label}
+                dataKey="value"
+                stroke={BLUE}
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: BLUE_DARK }}
+                activeDot={{ r: 5 }}
+              />
+              {withTrend.length >= 2 && (
+                <Line
+                  type="linear"
+                  name="trend"
+                  dataKey="trend"
+                  stroke="#e11d48"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={false}
+                  activeDot={false}
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="mt-1 text-[10px] text-slate-400">
+            {withTrend.length} leitura{withTrend.length > 1 ? "s" : ""} · linha tracejada = tendência linear
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
