@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -17,7 +17,7 @@ import {
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/testes.json";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, X, Home } from "lucide-react";
 
 export const Route = createFileRoute("/testes")({
   head: () => ({
@@ -64,6 +64,13 @@ const STORAGE_KEY = "testes_data_v1";
 
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
+
+const METRIC_COLORS: Record<Metric, string> = {
+  tensao: "#1f7ad6",
+  corrente: "#f59e0b",
+  recalque: "#10b981",
+  retaguarda: "#8b5cf6",
+};
 
 const MONTH_LABELS = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
