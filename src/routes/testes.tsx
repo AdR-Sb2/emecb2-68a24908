@@ -72,6 +72,7 @@ const MONTH_LABELS = [
 
 type SortMode = "az" | "za" | "desc" | "asc";
 type TableSort = "recent" | "oldest" | "az" | "za";
+type HydroTab = "eletrica" | "hidraulica";
 
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
@@ -82,6 +83,21 @@ function parseAvg(v: unknown): number | null {
   if (!arr.length) return null;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
+
+// Extrai um único valor numérico (ex.: "7mca", "08mca" → 7, 8).
+// Trata 0/00/vazio como dado ausente (teste não aferido).
+function parseHydro(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const m = s.match(/-?\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0].replace(",", "."));
+  if (!Number.isFinite(n) || n === 0) return null;
+  return n;
+}
+
+const OBSTR_RE = /(obstru|sem tomada|imposs[íi]vel|n[ãa]o foi poss[íi]vel|sem press[ãa]o)/i;
 
 // Brazilian pump-station convention used here:
 // BT (baixa tensão) → tensões nominais até ~300 V (220/240 V)
@@ -124,9 +140,13 @@ function TestesPage() {
     [data],
   );
   const GRUPOS = useMemo(
-    () =>
-      Array.from(new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)))
-        .sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[],
+    () => {
+      const nonEmpty = Array.from(
+        new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)),
+      ).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[];
+      const hasEmpty = data.some((d) => !d.Grupo);
+      return hasEmpty ? [...nonEmpty, "__VAZIO__"] : nonEmpty;
+    },
     [data],
   );
   const ELEVS = useMemo(
@@ -156,10 +176,12 @@ function TestesPage() {
   const [search, setSearch] = useState<string>("");
   const [tableSort, setTableSort] = useState<TableSort>("recent");
   const [expandedCell, setExpandedCell] = useState<string | null>(null);
+  const [hydroTab, setHydroTab] = useState<HydroTab>("eletrica");
+  const [tableExpanded, setTableExpanded] = useState(false);
   const [zoomChart, setZoomChart] = useState<null | {
     title: string;
     data: { name: string; media: number; testes: number }[];
-    unit: "V" | "A";
+    unit: string;
   }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,7 +189,13 @@ function TestesPage() {
     () =>
       data.filter((d) => {
         if (tipo !== "TODOS" && d["Tipo de Serviço"] !== tipo) return false;
-        if (grupo !== "TODOS" && String(d.Grupo ?? "") !== grupo) return false;
+        if (grupo !== "TODOS") {
+          if (grupo === "__VAZIO__") {
+            if (d.Grupo) return false;
+          } else if (String(d.Grupo ?? "") !== grupo) {
+            return false;
+          }
+        }
         if (elev !== "TODOS" && d.Elevatória !== elev) return false;
         const mk = monthKey(d["Data do Teste"]);
         if (mesIni !== "TODOS" && (!mk || mk < mesIni)) return false;
@@ -223,7 +251,16 @@ function TestesPage() {
       rows.map((r) => {
         const tensao = parseAvg(r["Tensão ( V )"]);
         const corrente = parseAvg(r["Corrente ( A )"]);
-        return { r, tensao, corrente, classe: classifyTensao(tensao) };
+        return {
+          r,
+          tensao,
+          corrente,
+          classe: classifyTensao(tensao),
+          recalque: parseHydro(r.Recalque),
+          retaguarda: parseHydro(r.Retaguarda),
+          recalqueSO: parseHydro(r["Recalque ShutOff"]),
+          retaguardaSO: parseHydro(r["Retaguarda ShutOff"]),
+        };
       }),
     [rows],
   );
@@ -241,6 +278,42 @@ function TestesPage() {
   const mediaTensaoMT = useMemo(() => mediaBy("tensao", "MT"), [enriched]);
   const mediaCorrenteBT = useMemo(() => mediaBy("corrente", "BT"), [enriched]);
   const mediaCorrenteMT = useMemo(() => mediaBy("corrente", "MT"), [enriched]);
+
+  const mediaHydro = (key: "recalque" | "retaguarda" | "recalqueSO" | "retaguardaSO") => {
+    const vals = enriched.map((e) => e[key]).filter((v): v is number => v !== null);
+    if (!vals.length) return null;
+    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+  };
+  const mediaRecalque = useMemo(() => mediaHydro("recalque"), [enriched]);
+  const mediaRetaguarda = useMemo(() => mediaHydro("retaguarda"), [enriched]);
+  const mediaRecalqueSO = useMemo(() => mediaHydro("recalqueSO"), [enriched]);
+  const mediaRetaguardaSO = useMemo(() => mediaHydro("retaguardaSO"), [enriched]);
+
+  const aggHydroPorElev = (key: "recalque" | "retaguarda") => {
+    const m = new Map<string, { sum: number; n: number }>();
+    for (const e of enriched) {
+      const v = e[key];
+      if (v === null || !e.r.Elevatória) continue;
+      const cur = m.get(e.r.Elevatória) ?? { sum: 0, n: 0 };
+      cur.sum += v;
+      cur.n += 1;
+      m.set(e.r.Elevatória, cur);
+    }
+    return Array.from(m.entries())
+      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(1), testes: v.n }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  };
+  const recalquePorElev = useMemo(() => aggHydroPorElev("recalque"), [enriched]);
+  const retaguardaPorElev = useMemo(() => aggHydroPorElev("retaguarda"), [enriched]);
+
+  const obstrCount = useMemo(
+    () =>
+      rows.filter((r) => {
+        const t = `${r["Observação:"] ?? ""} ${r["Impossibilidade:"] ?? ""} ${r.Recalque ?? ""} ${r.Retaguarda ?? ""}`;
+        return OBSTR_RE.test(t);
+      }).length,
+    [rows],
+  );
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
@@ -319,18 +392,20 @@ function TestesPage() {
       </div>
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <Kpi label="Total de Testes" value={total} />
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
-        <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
-        <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
-        <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
-        <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
-        <FilterSelect label="GRUPO" value={grupo} onChange={setGrupo} options={GRUPOS} />
+        <FilterSelect
+          label="GRUPO"
+          value={grupo}
+          onChange={setGrupo}
+          options={GRUPOS}
+          renderOption={(v) => (v === "__VAZIO__" ? "(Vazio)" : v)}
+        />
         <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." />
         <FilterSelect
           label="MÊS INICIAL"
@@ -440,47 +515,116 @@ function TestesPage() {
         </Card>
       </div>
 
-      <div className="mb-4 grid gap-4 md:grid-cols-2">
-        <ScrollChart
-          title="Média de Tensão por Elevatória — BT"
-          data={tensaoBTPorElev}
-          unit="V"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Tensão por Elevatória — BT", data: tensaoBTPorElev, unit: "V" })
-          }
-        />
-        <ScrollChart
-          title="Média de Tensão por Elevatória — MT"
-          data={tensaoMTPorElev}
-          unit="V"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Tensão por Elevatória — MT", data: tensaoMTPorElev, unit: "V" })
-          }
-        />
-        <ScrollChart
-          title="Média de Corrente por Elevatória — BT"
-          data={correnteBTPorElev}
-          unit="A"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Corrente por Elevatória — BT", data: correnteBTPorElev, unit: "A" })
-          }
-        />
-        <ScrollChart
-          title="Média de Corrente por Elevatória — MT"
-          data={correnteMTPorElev}
-          unit="A"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Corrente por Elevatória — MT", data: correnteMTPorElev, unit: "A" })
-          }
-        />
+      <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="mb-3 inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+          <button
+            type="button"
+            onClick={() => setHydroTab("eletrica")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition ${
+              hydroTab === "eletrica" ? "bg-[#0b3a73] text-white shadow" : "text-slate-600 hover:text-[#0b3a73]"
+            }`}
+          >
+            ⚡ Elétrica
+          </button>
+          <button
+            type="button"
+            onClick={() => setHydroTab("hidraulica")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition ${
+              hydroTab === "hidraulica" ? "bg-[#0b3a73] text-white shadow" : "text-slate-600 hover:text-[#0b3a73]"
+            }`}
+          >
+            💧 Hidráulica
+          </button>
+        </div>
+
+        {hydroTab === "eletrica" ? (
+          <div className="animate-in fade-in duration-200">
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
+              <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
+              <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
+              <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <ScrollChart
+                title="Média de Tensão por Elevatória — BT"
+                data={tensaoBTPorElev}
+                unit="V"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Tensão por Elevatória — BT", data: tensaoBTPorElev, unit: "V" })
+                }
+              />
+              <ScrollChart
+                title="Média de Tensão por Elevatória — MT"
+                data={tensaoMTPorElev}
+                unit="V"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Tensão por Elevatória — MT", data: tensaoMTPorElev, unit: "V" })
+                }
+              />
+              <ScrollChart
+                title="Média de Corrente por Elevatória — BT"
+                data={correnteBTPorElev}
+                unit="A"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Corrente por Elevatória — BT", data: correnteBTPorElev, unit: "A" })
+                }
+              />
+              <ScrollChart
+                title="Média de Corrente por Elevatória — MT"
+                data={correnteMTPorElev}
+                unit="A"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Corrente por Elevatória — MT", data: correnteMTPorElev, unit: "A" })
+                }
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-200">
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Kpi label="Média de Recalque" value={mediaRecalque !== null ? `${mediaRecalque} mca` : "—"} hint="pressão de saída" />
+              <Kpi label="Média de Retaguarda" value={mediaRetaguarda !== null ? `${mediaRetaguarda} mca` : "—"} hint="pressão de entrada" />
+              <Kpi label="Média Recalque SHUTOFF" value={mediaRecalqueSO !== null ? `${mediaRecalqueSO} mca` : "—"} hint="pressão fechada" />
+              <Kpi label="Média Retaguarda SHUTOFF" value={mediaRetaguardaSO !== null ? `${mediaRetaguardaSO} mca` : "—"} hint="pressão fechada" />
+            </div>
+            {obstrCount > 0 && (
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                ⚠ {obstrCount} registro{obstrCount > 1 ? "s" : ""} com obstrução / impossibilidade de aferir recalque ou retaguarda
+              </div>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <ScrollChart
+                title="Média de Recalque por Elevatória"
+                data={recalquePorElev}
+                unit="mca"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Recalque por Elevatória", data: recalquePorElev, unit: "mca" })
+                }
+              />
+              <ScrollChart
+                title="Média de Retaguarda por Elevatória"
+                data={retaguardaPorElev}
+                unit="mca"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Retaguarda por Elevatória", data: retaguardaPorElev, unit: "mca" })
+                }
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
@@ -504,6 +648,14 @@ function TestesPage() {
               placeholder="Pesquisar elevatória, colaborador, serviço..."
               className="w-72 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
             />
+            <button
+              type="button"
+              onClick={() => setTableExpanded(true)}
+              title="Expandir"
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73]"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
         <div className="mb-2 text-xs text-slate-500">
@@ -610,6 +762,55 @@ function TestesPage() {
               onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
+        <DialogContent className="max-w-[95vw]">
+          <DialogHeader>
+            <DialogTitle>Registros — {tableRows.length} de {data.length} testes</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[80vh] overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                <tr>
+                  <th className="px-2 py-1.5">Data</th>
+                  <th className="px-2 py-1.5">Elevatória</th>
+                  <th className="px-2 py-1.5">Grupo</th>
+                  <th className="px-2 py-1.5">Tipo</th>
+                  <th className="px-2 py-1.5">Colaboradores</th>
+                  <th className="px-2 py-1.5">Serviço Executado</th>
+                  <th className="px-2 py-1.5">Observação</th>
+                  <th className="px-2 py-1.5">Tensão (V)</th>
+                  <th className="px-2 py-1.5">Corrente (A)</th>
+                  <th className="px-2 py-1.5">Recalque</th>
+                  <th className="px-2 py-1.5">Retaguarda</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((r, i) => {
+                  const rowKey = `exp-${r.Id ?? "row"}-${i}`;
+                  return (
+                    <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
+                      <td className="px-2 py-1 whitespace-nowrap">
+                        {r["Data do Teste"] ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR") : ""}
+                      </td>
+                      <td className="px-2 py-1">{r.Elevatória}</td>
+                      <td className="px-2 py-1">{r.Grupo}</td>
+                      <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
+                      <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
+                      <td className="px-2 py-1 whitespace-normal">{r["Serviço Executado:"]}</td>
+                      <td className="px-2 py-1 whitespace-normal">{r["Observação:"]}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
@@ -843,7 +1044,7 @@ function ScrollChart({
 }: {
   title: string;
   data: { name: string; media: number; testes: number }[];
-  unit: "V" | "A";
+  unit: string;
   activeName?: string | null;
   onBarClick?: (name: string) => void;
   onExpand?: () => void;
@@ -879,10 +1080,10 @@ function ScrollChart({
         <div className="max-h-[360px] overflow-y-auto pr-1">
           <div style={{ height: innerHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sorted} layout="vertical" margin={{ left: 10, right: 60, top: 4, bottom: 4 }}>
+              <BarChart data={sorted} layout="vertical" margin={{ left: 0, right: 60, top: 4, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 12 }} interval={0} />
+                <YAxis type="category" dataKey="name" width={260} tick={{ fontSize: 11 }} interval={0} />
                 <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
                 <Bar
                   dataKey="media"
@@ -929,7 +1130,7 @@ function ExpandedBarChart({
   onBarClick,
 }: {
   data: { name: string; media: number; testes: number }[];
-  unit: "V" | "A";
+  unit: string;
   activeName?: string | null;
   onBarClick?: (name: string) => void;
 }) {
