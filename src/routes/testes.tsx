@@ -1407,14 +1407,14 @@ function MetricEvolutionChart({
           Selecione uma elevatória (no filtro ou clicando em uma barra) para ver a
           <br />evolução de métricas técnicas.
         </div>
-      ) : withTrend.length === 0 ? (
+      ) : series.length === 0 ? (
         <div className="flex h-[240px] items-center justify-center text-xs text-slate-400">
           Sem leituras para esta elevatória no período.
         </div>
       ) : (
         <>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={withTrend} margin={{ left: 10, right: 20, top: 10 }}>
+            <LineChart data={series} margin={{ left: 10, right: 20, top: 10 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
               {units.slice(0, 2).map((u, i) => {
@@ -1442,20 +1442,16 @@ function MetricEvolutionChart({
                 formatter={(v: any, n: any) => {
                   const name = String(n);
                   if (v === null || v === undefined) return ["—", name];
-                  const isTrend = name.endsWith("_trend");
-                  const key = (isTrend ? name.replace("_trend", "") : name) as Metric;
-                  const meta = METRIC_META[key];
+                  const meta = METRIC_META[name as Metric];
                   if (!meta) return [v as any, name];
-                  return [`${v} ${meta.unit}`, isTrend ? `Tendência ${meta.label}` : meta.label];
+                  return [`${v} ${meta.unit}`, meta.label];
                 }}
                 labelFormatter={(l) => `Data: ${l}`}
               />
               <Legend
                 formatter={(value: string) => {
-                  const isTrend = value.endsWith("_trend");
-                  const key = (isTrend ? value.replace("_trend", "") : value) as Metric;
-                  const meta = METRIC_META[key];
-                  return meta ? (isTrend ? `Tendência ${meta.label}` : meta.label) : value;
+                  const meta = METRIC_META[value as Metric];
+                  return meta ? meta.label : value;
                 }}
               />
               {selected.map((m) => {
@@ -1476,40 +1472,13 @@ function MetricEvolutionChart({
                   />
                 );
               })}
-              {selected.map((m) => {
-                if ((counts[m] ?? 0) < 2) return null;
-                const yId = axisForUnit[METRIC_META[m].unit] ?? "left";
-                const color = METRIC_COLORS[m];
-                return (
-                  <Line
-                    key={`${m}_trend`}
-                    type="linear"
-                    name={`${m}_trend`}
-                    dataKey={`${m}_trend`}
-                    yAxisId={yId}
-                    stroke={color}
-                    strokeOpacity={0.45}
-                    strokeWidth={1.5}
-                    strokeDasharray="4 4"
-                    dot={false}
-                    activeDot={false}
-                    connectNulls
-                    legendType="none"
-                  />
-                );
-              })}
             </LineChart>
           </ResponsiveContainer>
           <div className="mt-1 space-y-0.5 text-[10px] text-slate-400">
-            <p>{withTrend.length} data{withTrend.length > 1 ? "s" : ""} · linha tracejada = tendência linear</p>
+            <p>{series.length} ponto{series.length > 1 ? "s" : ""}</p>
             {multiUnitWarn && (
               <p className="text-amber-600">
                 Métricas com unidades diferentes agrupadas por eixo (máx 2 eixos exibidos).
-              </p>
-            )}
-            {smallSample.length > 0 && (
-              <p className="text-amber-600">
-                Amostra pequena (&lt; 5 leituras) em: {smallSample.map((m) => METRIC_META[m].label).join(", ")} — tendência pouco confiável.
               </p>
             )}
           </div>
