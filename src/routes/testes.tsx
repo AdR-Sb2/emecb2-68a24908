@@ -1354,8 +1354,6 @@ function MetricEvolutionChart({
     }
   };
 
-  const smallSample = selected.filter((m) => counts[m] > 0 && counts[m] < 5);
-
   return (
     <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
