@@ -764,6 +764,55 @@ function TestesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
+        <DialogContent className="max-w-[95vw]">
+          <DialogHeader>
+            <DialogTitle>Registros — {tableRows.length} de {data.length} testes</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[80vh] overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                <tr>
+                  <th className="px-2 py-1.5">Data</th>
+                  <th className="px-2 py-1.5">Elevatória</th>
+                  <th className="px-2 py-1.5">Grupo</th>
+                  <th className="px-2 py-1.5">Tipo</th>
+                  <th className="px-2 py-1.5">Colaboradores</th>
+                  <th className="px-2 py-1.5">Serviço Executado</th>
+                  <th className="px-2 py-1.5">Observação</th>
+                  <th className="px-2 py-1.5">Tensão (V)</th>
+                  <th className="px-2 py-1.5">Corrente (A)</th>
+                  <th className="px-2 py-1.5">Recalque</th>
+                  <th className="px-2 py-1.5">Retaguarda</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.map((r, i) => {
+                  const rowKey = `exp-${r.Id ?? "row"}-${i}`;
+                  return (
+                    <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
+                      <td className="px-2 py-1 whitespace-nowrap">
+                        {r["Data do Teste"] ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR") : ""}
+                      </td>
+                      <td className="px-2 py-1">{r.Elevatória}</td>
+                      <td className="px-2 py-1">{r.Grupo}</td>
+                      <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
+                      <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
+                      <td className="px-2 py-1 whitespace-normal">{r["Serviço Executado:"]}</td>
+                      <td className="px-2 py-1 whitespace-normal">{r["Observação:"]}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
