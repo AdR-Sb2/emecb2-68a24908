@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Home, Copy, Send, Search } from "lucide-react";
+import { Home, Send, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import elevatorias from "@/data/elevatorias.json";
@@ -41,28 +41,46 @@ function todayBR() {
   return d.toLocaleDateString("pt-BR");
 }
 
-function copyText(text: string) {
+async function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(
-      () => toast.success("Texto copiado!"),
-      () => fallbackCopy(text),
-    );
-  } else fallbackCopy(text);
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return fallbackCopy(text);
+    }
+  }
+  return fallbackCopy(text);
 }
-function fallbackCopy(text: string) {
+function fallbackCopy(text: string): boolean {
   const ta = document.createElement("textarea");
   ta.value = text;
   ta.style.position = "fixed";
   ta.style.opacity = "0";
   document.body.appendChild(ta);
   ta.select();
+  let ok = false;
   try {
-    document.execCommand("copy");
-    toast.success("Texto copiado!");
-  } catch {
-    toast.error("Não foi possível copiar.");
-  }
+    ok = document.execCommand("copy");
+  } catch { ok = false; }
   document.body.removeChild(ta);
+  return ok;
+}
+
+async function copyAndPrompt(text: string) {
+  const ok = await copyText(text);
+  if (!ok) {
+    toast.error("Não foi possível copiar o texto.");
+    return;
+  }
+  toast.success("Texto copiado!", {
+    description: "Deseja também enviar por WhatsApp?",
+    duration: 10000,
+    action: {
+      label: "Enviar WhatsApp",
+      onClick: () => openWhatsApp(text),
+    },
+  });
 }
 
 function openWhatsApp(text: string) {
@@ -300,17 +318,11 @@ function RelatorioTecnico() {
     return null;
   };
 
-  const handleCopy = () => {
-    const err = validar();
-    if (err) return toast.error(err);
-    copyText(gerarTexto());
-  };
-
   const handleEnviar = async () => {
     const err = validar();
     if (err) return toast.error(err);
     const texto = gerarTexto();
-    openWhatsApp(texto);
+    await copyAndPrompt(texto);
     await postSheet("tecnico", {
       data,
       tag: l.planta,
@@ -337,7 +349,6 @@ function RelatorioTecnico() {
         .map((s) => s.trim())
         .filter(Boolean),
     });
-    if (!APPS_SCRIPT_URL) toast.info("WhatsApp aberto. (Planilha não configurada.)");
   };
 
   return (
@@ -478,7 +489,7 @@ function RelatorioTecnico() {
         </div>
       </section>
 
-      <ActionBar onCopy={handleCopy} onSend={handleEnviar} />
+      <ActionBar onSend={handleEnviar} />
     </div>
   );
 }
@@ -542,15 +553,10 @@ function RelatorioPlanta() {
     return null;
   };
 
-  const handleCopy = () => {
-    const err = validar();
-    if (err) return toast.error(err);
-    copyText(gerarTexto());
-  };
   const handleEnviar = async () => {
     const err = validar();
     if (err) return toast.error(err);
-    openWhatsApp(gerarTexto());
+    await copyAndPrompt(gerarTexto());
     await postSheet("planta", {
       data,
       tag: l.planta,
@@ -565,7 +571,6 @@ function RelatorioPlanta() {
       necessidades: necessidades.trim() || "Nenhuma pendência crítica",
       responsavel,
     });
-    if (!APPS_SCRIPT_URL) toast.info("WhatsApp aberto. (Planilha não configurada.)");
   };
 
   return (
@@ -624,27 +629,20 @@ function RelatorioPlanta() {
         </div>
       </section>
 
-      <ActionBar onCopy={handleCopy} onSend={handleEnviar} />
+      <ActionBar onSend={handleEnviar} />
     </div>
   );
 }
 
-function ActionBar({ onCopy, onSend }: { onCopy: () => void; onSend: () => void }) {
+function ActionBar({ onSend }: { onSend: () => void }) {
   return (
     <div className="sticky bottom-2 z-10 flex flex-wrap gap-2 rounded-2xl border border-[#334155] bg-[#111827]/95 p-3 backdrop-blur">
-      <button
-        type="button"
-        onClick={onCopy}
-        className="inline-flex items-center gap-2 rounded-lg bg-[#f59e0b] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
-      >
-        <Copy className="h-4 w-4" /> Copiar Texto
-      </button>
       <button
         type="button"
         onClick={onSend}
         className="inline-flex items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
       >
-        <Send className="h-4 w-4" /> Enviar (WhatsApp)
+        <Send className="h-4 w-4" /> Enviar
       </button>
       <Link
         to="/"
