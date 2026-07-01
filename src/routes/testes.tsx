@@ -1334,48 +1334,6 @@ function MetricEvolutionChart({
   const [pickerOpen, setPickerOpen] = useState(false);
   const selected = METRIC_ORDER.filter((m) => metrics.includes(m));
 
-  // Regressão linear leve por métrica
-  const withTrend = useMemo(() => {
-    const enriched = series.map((p) => ({ ...p })) as (MetricPoint & Record<string, number | null>)[];
-    for (const m of selected) {
-      const idxs: number[] = [];
-      const ys: number[] = [];
-      series.forEach((p, i) => {
-        const v = p[m];
-        if (v !== null && v !== 0) {
-          idxs.push(i);
-          ys.push(v);
-        }
-      });
-      if (ys.length < 2) {
-        enriched.forEach((e) => (e[`${m}_trend`] = null));
-        continue;
-      }
-      const n = ys.length;
-      const meanX = idxs.reduce((a, b) => a + b, 0) / n;
-      const meanY = ys.reduce((a, b) => a + b, 0) / n;
-      let num = 0;
-      let den = 0;
-      for (let i = 0; i < n; i++) {
-        num += (idxs[i] - meanX) * (ys[i] - meanY);
-        den += (idxs[i] - meanX) ** 2;
-      }
-      const slope = den === 0 ? 0 : num / den;
-      const intercept = meanY - slope * meanX;
-      const dec = METRIC_META[m].decimals;
-      enriched.forEach((e, i) => (e[`${m}_trend`] = +(intercept + slope * i).toFixed(dec)));
-    }
-    return enriched;
-  }, [series, selected]);
-
-  // Contagens por métrica (para aviso de amostra pequena)
-  const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const m of selected) {
-      c[m] = series.filter((p) => p[m] !== null && p[m] !== 0).length;
-    }
-    return c;
-  }, [series, selected]);
 
   // Agrupar unidades → yAxisIds (máx 2 eixos)
   const units = Array.from(new Set(selected.map((m) => METRIC_META[m].unit)));
