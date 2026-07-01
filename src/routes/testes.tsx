@@ -194,14 +194,15 @@ function TestesPage() {
   const [hydroTab, setHydroTab] = useState<HydroTab>("eletrica");
   const [tableExpanded, setTableExpanded] = useState(false);
   const [obstrOnly, setObstrOnly] = useState(false);
-  const [evoMetric, setEvoMetric] = useState<Metric>("tensao");
-  // Pré-selecionar métrica ao trocar de aba (sem travar o dropdown)
+  const [evoMetrics, setEvoMetrics] = useState<Metric[]>(["tensao"]);
+  // Pré-selecionar métrica ao trocar de aba (garante ao menos uma da aba atual)
   useEffect(() => {
-    setEvoMetric((cur) => {
-      if (hydroTab === "eletrica") {
-        return cur === "tensao" || cur === "corrente" ? cur : "tensao";
-      }
-      return cur === "recalque" || cur === "retaguarda" ? cur : "recalque";
+    setEvoMetrics((cur) => {
+      const elet = cur.some((m) => m === "tensao" || m === "corrente");
+      const hidr = cur.some((m) => m === "recalque" || m === "retaguarda");
+      if (hydroTab === "eletrica" && !elet) return [...cur, "tensao"];
+      if (hydroTab === "hidraulica" && !hidr) return [...cur, "recalque"];
+      return cur;
     });
   }, [hydroTab]);
   const [zoomChart, setZoomChart] = useState<null | {
