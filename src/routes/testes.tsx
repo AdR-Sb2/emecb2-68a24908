@@ -81,6 +81,14 @@ const METRIC_META: Record<Metric, { label: string; unit: string; decimals: numbe
   retaguarda: { label: "Retaguarda", unit: "mca", decimals: 1 },
 };
 
+const METRIC_COLORS: Record<Metric, string> = {
+  tensao: "#1f7ad6",
+  corrente: "#f59e0b",
+  recalque: "#10b981",
+  retaguarda: "#8b5cf6",
+};
+const METRIC_ORDER: Metric[] = ["tensao", "corrente", "recalque", "retaguarda"];
+
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const s = String(v).replace(/,/g, ".");
