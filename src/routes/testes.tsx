@@ -515,47 +515,116 @@ function TestesPage() {
         </Card>
       </div>
 
-      <div className="mb-4 grid gap-4 md:grid-cols-2">
-        <ScrollChart
-          title="Média de Tensão por Elevatória — BT"
-          data={tensaoBTPorElev}
-          unit="V"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Tensão por Elevatória — BT", data: tensaoBTPorElev, unit: "V" })
-          }
-        />
-        <ScrollChart
-          title="Média de Tensão por Elevatória — MT"
-          data={tensaoMTPorElev}
-          unit="V"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Tensão por Elevatória — MT", data: tensaoMTPorElev, unit: "V" })
-          }
-        />
-        <ScrollChart
-          title="Média de Corrente por Elevatória — BT"
-          data={correnteBTPorElev}
-          unit="A"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Corrente por Elevatória — BT", data: correnteBTPorElev, unit: "A" })
-          }
-        />
-        <ScrollChart
-          title="Média de Corrente por Elevatória — MT"
-          data={correnteMTPorElev}
-          unit="A"
-          activeName={crossElev}
-          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
-          onExpand={() =>
-            setZoomChart({ title: "Média de Corrente por Elevatória — MT", data: correnteMTPorElev, unit: "A" })
-          }
-        />
+      <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="mb-3 inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+          <button
+            type="button"
+            onClick={() => setHydroTab("eletrica")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition ${
+              hydroTab === "eletrica" ? "bg-[#0b3a73] text-white shadow" : "text-slate-600 hover:text-[#0b3a73]"
+            }`}
+          >
+            ⚡ Elétrica
+          </button>
+          <button
+            type="button"
+            onClick={() => setHydroTab("hidraulica")}
+            className={`rounded px-4 py-1.5 text-sm font-medium transition ${
+              hydroTab === "hidraulica" ? "bg-[#0b3a73] text-white shadow" : "text-slate-600 hover:text-[#0b3a73]"
+            }`}
+          >
+            💧 Hidráulica
+          </button>
+        </div>
+
+        {hydroTab === "eletrica" ? (
+          <div className="animate-in fade-in duration-200">
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
+              <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
+              <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
+              <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <ScrollChart
+                title="Média de Tensão por Elevatória — BT"
+                data={tensaoBTPorElev}
+                unit="V"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Tensão por Elevatória — BT", data: tensaoBTPorElev, unit: "V" })
+                }
+              />
+              <ScrollChart
+                title="Média de Tensão por Elevatória — MT"
+                data={tensaoMTPorElev}
+                unit="V"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Tensão por Elevatória — MT", data: tensaoMTPorElev, unit: "V" })
+                }
+              />
+              <ScrollChart
+                title="Média de Corrente por Elevatória — BT"
+                data={correnteBTPorElev}
+                unit="A"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Corrente por Elevatória — BT", data: correnteBTPorElev, unit: "A" })
+                }
+              />
+              <ScrollChart
+                title="Média de Corrente por Elevatória — MT"
+                data={correnteMTPorElev}
+                unit="A"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Corrente por Elevatória — MT", data: correnteMTPorElev, unit: "A" })
+                }
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-200">
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Kpi label="Média de Recalque" value={mediaRecalque !== null ? `${mediaRecalque} mca` : "—"} hint="pressão de saída" />
+              <Kpi label="Média de Retaguarda" value={mediaRetaguarda !== null ? `${mediaRetaguarda} mca` : "—"} hint="pressão de entrada" />
+              <Kpi label="Média Recalque SHUTOFF" value={mediaRecalqueSO !== null ? `${mediaRecalqueSO} mca` : "—"} hint="pressão fechada" />
+              <Kpi label="Média Retaguarda SHUTOFF" value={mediaRetaguardaSO !== null ? `${mediaRetaguardaSO} mca` : "—"} hint="pressão fechada" />
+            </div>
+            {obstrCount > 0 && (
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                ⚠ {obstrCount} registro{obstrCount > 1 ? "s" : ""} com obstrução / impossibilidade de aferir recalque ou retaguarda
+              </div>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <ScrollChart
+                title="Média de Recalque por Elevatória"
+                data={recalquePorElev}
+                unit="mca"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Recalque por Elevatória", data: recalquePorElev, unit: "mca" })
+                }
+              />
+              <ScrollChart
+                title="Média de Retaguarda por Elevatória"
+                data={retaguardaPorElev}
+                unit="mca"
+                activeName={crossElev}
+                onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+                onExpand={() =>
+                  setZoomChart({ title: "Média de Retaguarda por Elevatória", data: retaguardaPorElev, unit: "mca" })
+                }
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
