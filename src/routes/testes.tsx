@@ -767,6 +767,8 @@ function TestesPage() {
                     />
                     <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
                     <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? ""}</td>
                   </tr>
                 );
               })}
