@@ -140,9 +140,13 @@ function TestesPage() {
     [data],
   );
   const GRUPOS = useMemo(
-    () =>
-      Array.from(new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)))
-        .sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[],
+    () => {
+      const nonEmpty = Array.from(
+        new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)),
+      ).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[];
+      const hasEmpty = data.some((d) => !d.Grupo);
+      return hasEmpty ? [...nonEmpty, "__VAZIO__"] : nonEmpty;
+    },
     [data],
   );
   const ELEVS = useMemo(
@@ -172,10 +176,12 @@ function TestesPage() {
   const [search, setSearch] = useState<string>("");
   const [tableSort, setTableSort] = useState<TableSort>("recent");
   const [expandedCell, setExpandedCell] = useState<string | null>(null);
+  const [hydroTab, setHydroTab] = useState<HydroTab>("eletrica");
+  const [tableExpanded, setTableExpanded] = useState(false);
   const [zoomChart, setZoomChart] = useState<null | {
     title: string;
     data: { name: string; media: number; testes: number }[];
-    unit: "V" | "A";
+    unit: string;
   }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -183,7 +189,13 @@ function TestesPage() {
     () =>
       data.filter((d) => {
         if (tipo !== "TODOS" && d["Tipo de Serviço"] !== tipo) return false;
-        if (grupo !== "TODOS" && String(d.Grupo ?? "") !== grupo) return false;
+        if (grupo !== "TODOS") {
+          if (grupo === "__VAZIO__") {
+            if (d.Grupo) return false;
+          } else if (String(d.Grupo ?? "") !== grupo) {
+            return false;
+          }
+        }
         if (elev !== "TODOS" && d.Elevatória !== elev) return false;
         const mk = monthKey(d["Data do Teste"]);
         if (mesIni !== "TODOS" && (!mk || mk < mesIni)) return false;
