@@ -351,24 +351,25 @@ function TestesPage() {
 
   // Série da métrica selecionada para a elevatória focada (respeita filtros de período)
   const metricSeries = useMemo(() => {
-    if (!focusedElev) return [] as { t: number; date: string; value: number }[];
-    const out: { t: number; date: string; value: number }[] = [];
+    if (!focusedElev) return [] as MetricPoint[];
+    const out: MetricPoint[] = [];
     for (const r of rows) {
       if (r.Elevatória !== focusedElev) continue;
       const iso = r["Data do Teste"];
       if (!iso) continue;
       const d = new Date(iso);
       if (isNaN(d.getTime())) continue;
-      let v: number | null = null;
-      if (evoMetric === "tensao") v = parseAvg(r["Tensão ( V )"]);
-      else if (evoMetric === "corrente") v = parseAvg(r["Corrente ( A )"]);
-      else if (evoMetric === "recalque") v = parseHydro(r.Recalque);
-      else v = parseHydro(r.Retaguarda);
-      if (v === null) continue;
-      out.push({ t: d.getTime(), date: d.toLocaleDateString("pt-BR"), value: v });
+      out.push({
+        t: d.getTime(),
+        date: d.toLocaleDateString("pt-BR"),
+        tensao: parseAvg(r["Tensão ( V )"]),
+        corrente: parseAvg(r["Corrente ( A )"]),
+        recalque: parseHydro(r.Recalque),
+        retaguarda: parseHydro(r.Retaguarda),
+      });
     }
     return out.sort((a, b) => a.t - b.t);
-  }, [rows, focusedElev, evoMetric]);
+  }, [rows, focusedElev]);
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
