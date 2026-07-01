@@ -648,6 +648,14 @@ function TestesPage() {
               placeholder="Pesquisar elevatória, colaborador, serviço..."
               className="w-72 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
             />
+            <button
+              type="button"
+              onClick={() => setTableExpanded(true)}
+              title="Expandir"
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73]"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
         <div className="mb-2 text-xs text-slate-500">
