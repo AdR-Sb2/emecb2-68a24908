@@ -16,7 +16,7 @@ export const Route = createFileRoute("/relatorio")({
 });
 
 // URL do Apps Script publicado como Web App (deixe vazio se ainda não configurado).
-const APPS_SCRIPT_URL = "";
+const APPS_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1mgXVkJL-_q_Pgr08SqnsrP6Gww-IwnM1c1Z7k_e2T7o/edit?usp=sharing";
 
 // Elevatórias com regra de recalque duplo (JK Velho / JK Novo) + retaguarda pré-preenchida
 const DUPLO_RECALQUE: Array<{ match: (tag: string, nome: string) => boolean; labels: [string, string]; retaguardaDefault: string }> = [
