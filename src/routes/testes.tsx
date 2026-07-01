@@ -445,7 +445,7 @@ function TestesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="mb-4 overflow-hidden rounded-md shadow">
+      <div className="relative mb-4 overflow-hidden rounded-md shadow">
         <img
           src={logoAsset.url}
           alt="Águas do Rio - Eletromecânica"
@@ -454,6 +454,14 @@ function TestesPage() {
           height={160}
           loading="eager"
         />
+        <Link
+          to="/"
+          title="Voltar ao Hub"
+          aria-label="Voltar ao Hub"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105"
+        >
+          <Home className="h-4.5 w-4.5" />
+        </Link>
       </div>
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
