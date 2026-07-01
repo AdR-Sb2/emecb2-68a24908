@@ -677,19 +677,22 @@ function RelatorioPlanta() {
 
 function ActionBar({ onSend }: { onSend: () => void }) {
   return (
-    <div className="sticky bottom-2 z-10 flex flex-wrap gap-2 rounded-2xl border border-[#334155] bg-[#111827]/95 p-3 backdrop-blur">
+    <div className="sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
+      <span className="hidden text-xs text-slate-500 sm:inline">
+        Revise os campos e envie — o texto será copiado e registrado na planilha.
+      </span>
       <button
         type="button"
         onClick={onSend}
-        className="inline-flex items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+        className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#1f7ad6] to-[#0b3a73] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
       >
-        <Send className="h-4 w-4" /> Enviar
+        <Send className="h-4 w-4" /> Enviar Relatório
       </button>
       <Link
         to="/"
-        className="ml-auto inline-flex items-center gap-2 rounded-lg border border-[#334155] px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-[#1e293b]"
+        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
       >
-        Voltar ao Menu
+        Voltar
       </Link>
     </div>
   );
@@ -698,41 +701,76 @@ function ActionBar({ onSend }: { onSend: () => void }) {
 function RelatorioPage() {
   const [aba, setAba] = useState<"tecnico" | "planta">("tecnico");
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
       <Toaster richColors position="top-right" />
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Relatórios</h1>
-            <p className="text-sm text-slate-400">Técnico e de Planta/Unidade · geração para WhatsApp</p>
-          </div>
+      <div className="mx-auto max-w-5xl p-4 md:p-6">
+        {/* Header com logo — mesmo padrão do dashboard */}
+        <div className="relative mb-4 overflow-hidden rounded-md shadow">
+          <img
+            src={logoAsset.url}
+            alt="Águas do Rio - Eletromecânica"
+            className="w-full object-cover"
+            width={1024}
+            height={160}
+            loading="eager"
+          />
           <Link
             to="/"
-            className="inline-flex items-center gap-2 rounded-lg border border-[#334155] px-3 py-2 text-sm hover:bg-[#1e293b]"
+            title="Voltar ao Hub"
+            aria-label="Voltar ao Hub"
+            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
           >
-            <Home className="h-4 w-4" /> Início
+            <Home className="h-4 w-4" />
           </Link>
         </div>
 
-        <div className="mb-4 inline-flex rounded-xl border border-[#334155] bg-[#111827] p-1">
-          <button
-            type="button"
-            onClick={() => setAba("tecnico")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              aba === "tecnico" ? "bg-[#0ea5e9] text-white" : "text-slate-300 hover:text-white"
-            }`}
+        {/* Título + tabs */}
+        <div className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#0b3a73] text-white shadow-sm">
+              <FileText className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-lg font-bold text-[#0b3a73] md:text-xl">
+                Geração de Relatórios
+              </h1>
+              <p className="text-xs text-slate-500 md:text-sm">
+                Técnico e de Planta/Unidade · pronto para WhatsApp e planilha
+              </p>
+            </div>
+          </div>
+
+          <div
+            role="tablist"
+            className="inline-flex w-full flex-wrap gap-1 rounded-md bg-slate-100 p-1 sm:w-auto"
           >
-            Relatório Técnico
-          </button>
-          <button
-            type="button"
-            onClick={() => setAba("planta")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              aba === "planta" ? "bg-[#0ea5e9] text-white" : "text-slate-300 hover:text-white"
-            }`}
-          >
-            Relatório de Planta
-          </button>
+            <button
+              role="tab"
+              aria-selected={aba === "tecnico"}
+              type="button"
+              onClick={() => setAba("tecnico")}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition sm:flex-none ${
+                aba === "tecnico"
+                  ? "bg-white text-[#0b3a73] shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-600 hover:text-[#0b3a73]"
+              }`}
+            >
+              <Wrench className="h-4 w-4" /> Técnico
+            </button>
+            <button
+              role="tab"
+              aria-selected={aba === "planta"}
+              type="button"
+              onClick={() => setAba("planta")}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition sm:flex-none ${
+                aba === "planta"
+                  ? "bg-white text-[#0b3a73] shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-600 hover:text-[#0b3a73]"
+              }`}
+            >
+              <ClipboardCheck className="h-4 w-4" /> Planta
+            </button>
+          </div>
         </div>
 
         {aba === "tecnico" ? <RelatorioTecnico /> : <RelatorioPlanta />}
