@@ -72,6 +72,7 @@ const MONTH_LABELS = [
 
 type SortMode = "az" | "za" | "desc" | "asc";
 type TableSort = "recent" | "oldest" | "az" | "za";
+type HydroTab = "eletrica" | "hidraulica";
 
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
@@ -82,6 +83,21 @@ function parseAvg(v: unknown): number | null {
   if (!arr.length) return null;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
+
+// Extrai um único valor numérico (ex.: "7mca", "08mca" → 7, 8).
+// Trata 0/00/vazio como dado ausente (teste não aferido).
+function parseHydro(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const m = s.match(/-?\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0].replace(",", "."));
+  if (!Number.isFinite(n) || n === 0) return null;
+  return n;
+}
+
+const OBSTR_RE = /(obstru|sem tomada|imposs[íi]vel|n[ãa]o foi poss[íi]vel|sem press[ãa]o)/i;
 
 // Brazilian pump-station convention used here:
 // BT (baixa tensão) → tensões nominais até ~300 V (220/240 V)
