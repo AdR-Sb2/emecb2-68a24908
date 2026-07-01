@@ -16,6 +16,8 @@ import {
 } from "recharts";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/testes.json";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Maximize2, X } from "lucide-react";
 
 export const Route = createFileRoute("/testes")({
   head: () => ({
@@ -63,6 +65,14 @@ const STORAGE_KEY = "testes_data_v1";
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
 
+const MONTH_LABELS = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
+type SortMode = "az" | "za" | "desc" | "asc";
+type TableSort = "recent" | "oldest" | "az" | "za";
+
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const s = String(v).replace(/,/g, ".");
@@ -108,24 +118,49 @@ function TestesPage() {
 
   const TIPOS = useMemo(
     () =>
-      Array.from(new Set(data.map((d) => d["Tipo de Serviço"]).filter(Boolean))) as string[],
+      (Array.from(new Set(data.map((d) => d["Tipo de Serviço"]).filter(Boolean))) as string[]).sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
     [data],
   );
   const GRUPOS = useMemo(
     () =>
       Array.from(new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)))
-        .sort() as string[],
+        .sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[],
     [data],
   );
   const ELEVS = useMemo(
-    () => Array.from(new Set(data.map((d) => d.Elevatória).filter(Boolean))).sort() as string[],
+    () =>
+      (Array.from(new Set(data.map((d) => d.Elevatória).filter(Boolean))) as string[]).sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
     [data],
   );
+  const MESES_DISPONIVEIS = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of data) {
+      const k = monthKey(d["Data do Teste"]);
+      if (k) s.add(k);
+    }
+    return Array.from(s).sort();
+  }, [data]);
 
   const [tipo, setTipo] = useState<string>("TODOS");
   const [grupo, setGrupo] = useState<string>("TODOS");
   const [elev, setElev] = useState<string>("TODOS");
+  const [mesIni, setMesIni] = useState<string>("TODOS");
+  const [mesFim, setMesFim] = useState<string>("TODOS");
+  // Cross-filters (Power BI style): temporary highlights from chart clicks
+  const [crossElev, setCrossElev] = useState<string | null>(null);
+  const [crossMes, setCrossMes] = useState<string | null>(null);
   const [search, setSearch] = useState<string>("");
+  const [tableSort, setTableSort] = useState<TableSort>("recent");
+  const [expandedCell, setExpandedCell] = useState<string | null>(null);
+  const [zoomChart, setZoomChart] = useState<null | {
+    title: string;
+    data: { name: string; media: number; testes: number }[];
+    unit: "V" | "A";
+  }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const rows = useMemo(
@@ -134,27 +169,50 @@ function TestesPage() {
         if (tipo !== "TODOS" && d["Tipo de Serviço"] !== tipo) return false;
         if (grupo !== "TODOS" && String(d.Grupo ?? "") !== grupo) return false;
         if (elev !== "TODOS" && d.Elevatória !== elev) return false;
+        const mk = monthKey(d["Data do Teste"]);
+        if (mesIni !== "TODOS" && (!mk || mk < mesIni)) return false;
+        if (mesFim !== "TODOS" && (!mk || mk > mesFim)) return false;
+        if (crossElev && d.Elevatória !== crossElev) return false;
+        if (crossMes && mk !== crossMes) return false;
         return true;
       }),
-    [data, tipo, grupo, elev],
+    [data, tipo, grupo, elev, mesIni, mesFim, crossElev, crossMes],
   );
 
   const tableRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      [
-        r.Elevatória,
-        r["Tipo de Serviço"],
-        r["Nome dos Colaboradores:"],
-        r["Serviço Executado:"],
-        r["Observação:"],
-        r.Nome,
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
-    );
-  }, [rows, search]);
+    const filtered = !q
+      ? rows
+      : rows.filter((r) =>
+          [
+            r.Elevatória,
+            r["Tipo de Serviço"],
+            r["Nome dos Colaboradores:"],
+            r["Serviço Executado:"],
+            r["Observação:"],
+            r.Nome,
+          ]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(q)),
+        );
+    const sorted = [...filtered];
+    const dt = (r: Row) => (r["Data do Teste"] ? new Date(r["Data do Teste"]).getTime() : 0);
+    switch (tableSort) {
+      case "recent":
+        sorted.sort((a, b) => dt(b) - dt(a));
+        break;
+      case "oldest":
+        sorted.sort((a, b) => dt(a) - dt(b));
+        break;
+      case "az":
+        sorted.sort((a, b) => (a.Elevatória ?? "").localeCompare(b.Elevatória ?? "", "pt-BR"));
+        break;
+      case "za":
+        sorted.sort((a, b) => (b.Elevatória ?? "").localeCompare(a.Elevatória ?? "", "pt-BR"));
+        break;
+    }
+    return sorted;
+  }, [rows, search, tableSort]);
 
   const total = rows.length;
   const ativosUnicos = new Set(rows.map((r) => r.Elevatória).filter(Boolean)).size;
@@ -193,7 +251,7 @@ function TestesPage() {
     }
     return Array.from(m.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, testes]) => ({ name, testes }));
+      .map(([name, testes]) => ({ name, testes, label: labelMes(name) }));
   }, [rows]);
 
   const aggPorElev = (key: "tensao" | "corrente", classe: "BT" | "MT", decimals: number) => {
@@ -274,13 +332,33 @@ function TestesPage() {
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
         <FilterSelect label="GRUPO" value={grupo} onChange={setGrupo} options={GRUPOS} />
         <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." />
-        {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS") && (
+        <FilterSelect
+          label="MÊS INICIAL"
+          value={mesIni}
+          onChange={setMesIni}
+          options={MESES_DISPONIVEIS}
+          renderOption={labelMes}
+        />
+        <FilterSelect
+          label="MÊS FINAL"
+          value={mesFim}
+          onChange={setMesFim}
+          options={MESES_DISPONIVEIS}
+          renderOption={labelMes}
+        />
+        {(tipo !== "TODOS" ||
+          grupo !== "TODOS" ||
+          elev !== "TODOS" ||
+          mesIni !== "TODOS" ||
+          mesFim !== "TODOS") && (
           <button
             type="button"
             onClick={() => {
               setTipo("TODOS");
               setGrupo("TODOS");
               setElev("TODOS");
+              setMesIni("TODOS");
+              setMesFim("TODOS");
             }}
             className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
           >
@@ -289,14 +367,49 @@ function TestesPage() {
         )}
       </div>
 
+      {(crossElev || crossMes) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Cross-filter ativo:
+          </span>
+          {crossElev && (
+            <CrossChip label={`Elevatória: ${crossElev}`} onClear={() => setCrossElev(null)} />
+          )}
+          {crossMes && (
+            <CrossChip label={`Mês: ${labelMes(crossMes)}`} onClear={() => setCrossMes(null)} />
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setCrossElev(null);
+              setCrossMes(null);
+            }}
+            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700"
+          >
+            limpar todos
+          </button>
+        </div>
+      )}
+
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <Card title="Evolução mensal de testes" className="lg:col-span-3">
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={porMes} margin={{ left: 10, right: 20, top: 10 }}>
+            <LineChart
+              data={porMes}
+              margin={{ left: 10, right: 20, top: 10 }}
+              onClick={(e: any) => {
+                const p = e?.activePayload?.[0]?.payload;
+                if (!p?.name) return;
+                setCrossMes((cur) => (cur === p.name ? null : p.name));
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip
+                formatter={(v: number) => [v, "Testes"]}
+                labelFormatter={(l) => `Mês: ${l}`}
+              />
               <Legend />
               <Line
                 type="monotone"
@@ -304,30 +417,94 @@ function TestesPage() {
                 dataKey="testes"
                 stroke={BLUE}
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: BLUE_DARK }}
+                dot={(props: any) => {
+                  const active = crossMes === props.payload?.name;
+                  return (
+                    <circle
+                      key={props.key ?? `${props.cx}-${props.cy}`}
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={active ? 6 : 3}
+                      fill={active ? "#e11d48" : BLUE_DARK}
+                      stroke={active ? "#fff" : "none"}
+                      strokeWidth={active ? 2 : 0}
+                      style={{ cursor: "pointer" }}
+                    />
+                  );
+                }}
+                activeDot={{ r: 6, style: { cursor: "pointer" } }}
               />
             </LineChart>
           </ResponsiveContainer>
+          <p className="mt-1 text-[10px] text-slate-400">Clique em um ponto para filtrar pelo mês.</p>
         </Card>
       </div>
 
       <div className="mb-4 grid gap-4 md:grid-cols-2">
-        <ScrollChart title="Média de Tensão por Elevatória — BT" data={tensaoBTPorElev} unit="V" />
-        <ScrollChart title="Média de Tensão por Elevatória — MT" data={tensaoMTPorElev} unit="V" />
-        <ScrollChart title="Média de Corrente por Elevatória — BT" data={correnteBTPorElev} unit="A" />
-        <ScrollChart title="Média de Corrente por Elevatória — MT" data={correnteMTPorElev} unit="A" />
+        <ScrollChart
+          title="Média de Tensão por Elevatória — BT"
+          data={tensaoBTPorElev}
+          unit="V"
+          activeName={crossElev}
+          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+          onExpand={() =>
+            setZoomChart({ title: "Média de Tensão por Elevatória — BT", data: tensaoBTPorElev, unit: "V" })
+          }
+        />
+        <ScrollChart
+          title="Média de Tensão por Elevatória — MT"
+          data={tensaoMTPorElev}
+          unit="V"
+          activeName={crossElev}
+          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+          onExpand={() =>
+            setZoomChart({ title: "Média de Tensão por Elevatória — MT", data: tensaoMTPorElev, unit: "V" })
+          }
+        />
+        <ScrollChart
+          title="Média de Corrente por Elevatória — BT"
+          data={correnteBTPorElev}
+          unit="A"
+          activeName={crossElev}
+          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+          onExpand={() =>
+            setZoomChart({ title: "Média de Corrente por Elevatória — BT", data: correnteBTPorElev, unit: "A" })
+          }
+        />
+        <ScrollChart
+          title="Média de Corrente por Elevatória — MT"
+          data={correnteMTPorElev}
+          unit="A"
+          activeName={crossElev}
+          onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+          onExpand={() =>
+            setZoomChart({ title: "Média de Corrente por Elevatória — MT", data: correnteMTPorElev, unit: "A" })
+          }
+        />
       </div>
 
       <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-slate-700">Registros</h2>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pesquisar elevatória, colaborador, serviço..."
-            className="w-72 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={tableSort}
+              onChange={(e) => setTableSort(e.target.value as TableSort)}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm"
+            >
+              <option value="recent">Mais recente → mais antigo</option>
+              <option value="oldest">Mais antigo → mais recente</option>
+              <option value="az">Elevatória A → Z</option>
+              <option value="za">Elevatória Z → A</option>
+            </select>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Pesquisar elevatória, colaborador, serviço..."
+              className="w-72 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
+            />
+          </div>
         </div>
         <div className="mb-2 text-xs text-slate-500">
           Mostrando {tableRows.length} de {data.length} testes
@@ -348,21 +525,36 @@ function TestesPage() {
               </tr>
             </thead>
             <tbody>
-              {tableRows.map((r, i) => (
-                <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 align-top">
-                  <td className="px-2 py-1 whitespace-nowrap">
-                    {r["Data do Teste"] ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR") : ""}
-                  </td>
-                  <td className="px-2 py-1">{r.Elevatória}</td>
-                  <td className="px-2 py-1">{r.Grupo}</td>
-                  <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
-                  <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
-                  <td className="px-2 py-1 max-w-xs">{r["Serviço Executado:"]}</td>
-                  <td className="px-2 py-1 max-w-xs">{r["Observação:"]}</td>
-                  <td className="px-2 py-1">{r["Tensão ( V )"] ?? ""}</td>
-                  <td className="px-2 py-1">{r["Corrente ( A )"] ?? ""}</td>
-                </tr>
-              ))}
+              {tableRows.map((r, i) => {
+                const rowKey = `${r.Id ?? "row"}-${i}`;
+                return (
+                  <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
+                    <td className="px-2 py-1 whitespace-nowrap">
+                      {r["Data do Teste"]
+                        ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR")
+                        : ""}
+                    </td>
+                    <td className="px-2 py-1">{r.Elevatória}</td>
+                    <td className="px-2 py-1">{r.Grupo}</td>
+                    <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
+                    <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
+                    <ExpandableCell
+                      value={r["Serviço Executado:"]}
+                      cellKey={`${rowKey}-serv`}
+                      expandedKey={expandedCell}
+                      onToggle={setExpandedCell}
+                    />
+                    <ExpandableCell
+                      value={r["Observação:"]}
+                      cellKey={`${rowKey}-obs`}
+                      expandedKey={expandedCell}
+                      onToggle={setExpandedCell}
+                    />
+                    <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -404,6 +596,22 @@ function TestesPage() {
           restaurar
         </button>
       )}
+
+      <Dialog open={!!zoomChart} onOpenChange={(o) => !o && setZoomChart(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{zoomChart?.title}</DialogTitle>
+          </DialogHeader>
+          {zoomChart && (
+            <ExpandedBarChart
+              data={zoomChart.data}
+              unit={zoomChart.unit}
+              activeName={crossElev}
+              onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -413,11 +621,13 @@ function FilterSelect({
   value,
   onChange,
   options,
+  renderOption,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
+  renderOption?: (v: string) => string;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -430,11 +640,57 @@ function FilterSelect({
         <option value="TODOS">Todos</option>
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {renderOption ? renderOption(o) : o}
           </option>
         ))}
       </select>
     </div>
+  );
+}
+
+function CrossChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-[#0b3a73]">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        className="rounded-full p-0.5 hover:bg-blue-200"
+        aria-label="Remover"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
+function ExpandableCell({
+  value,
+  cellKey,
+  expandedKey,
+  onToggle,
+}: {
+  value: string | null;
+  cellKey: string;
+  expandedKey: string | null;
+  onToggle: (k: string | null) => void;
+}) {
+  const v = value ?? "";
+  const isExpanded = expandedKey === cellKey;
+  const long = v.length > 60;
+  if (!v) return <td className="px-2 py-1" />;
+  if (!long) return <td className="px-2 py-1">{v}</td>;
+  return (
+    <td className="px-2 py-1 max-w-[260px]">
+      <button
+        type="button"
+        title={v}
+        onClick={() => onToggle(isExpanded ? null : cellKey)}
+        className={`text-left w-full ${isExpanded ? "whitespace-normal" : "truncate line-clamp-1"} cursor-pointer text-slate-700 hover:text-[#0b3a73]`}
+      >
+        {isExpanded ? v : v.slice(0, 60) + "…"}
+      </button>
+    </td>
   );
 }
 
@@ -534,24 +790,88 @@ function SearchableSelect({
   );
 }
 
+function labelMes(yyyymm: string) {
+  const [y, m] = yyyymm.split("-").map(Number);
+  if (!y || !m) return yyyymm;
+  return `${MONTH_LABELS[m - 1]}/${String(y).slice(2)}`;
+}
+
+function sortChartData(
+  data: { name: string; media: number; testes: number }[],
+  mode: SortMode,
+) {
+  const arr = [...data];
+  switch (mode) {
+    case "az":
+      arr.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      break;
+    case "za":
+      arr.sort((a, b) => b.name.localeCompare(a.name, "pt-BR"));
+      break;
+    case "desc":
+      arr.sort((a, b) => b.media - a.media);
+      break;
+    case "asc":
+      arr.sort((a, b) => a.media - b.media);
+      break;
+  }
+  return arr;
+}
+
+function SortSelect({ value, onChange }: { value: SortMode; onChange: (v: SortMode) => void }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as SortMode)}
+      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] shadow-sm"
+    >
+      <option value="az">A → Z</option>
+      <option value="za">Z → A</option>
+      <option value="desc">Maior → Menor</option>
+      <option value="asc">Menor → Maior</option>
+    </select>
+  );
+}
+
 function ScrollChart({
   title,
   data,
   unit,
+  activeName,
+  onBarClick,
+  onExpand,
 }: {
   title: string;
   data: { name: string; media: number; testes: number }[];
   unit: "V" | "A";
+  activeName?: string | null;
+  onBarClick?: (name: string) => void;
+  onExpand?: () => void;
 }) {
-  const ROW = 26;
-  const innerHeight = Math.max(data.length * ROW + 40, 160);
+  const [sort, setSort] = useState<SortMode>("az");
+  const sorted = useMemo(() => sortChartData(data, sort), [data, sort]);
+  const ROW = 30;
+  const innerHeight = Math.max(sorted.length * ROW + 40, 160);
   return (
     <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-        <span className="text-[11px] text-slate-500">{data.length} ativos</span>
+        <div className="flex items-center gap-2">
+          <SortSelect value={sort} onChange={setSort} />
+          <span className="text-[11px] text-slate-500">{sorted.length} ativos</span>
+          {onExpand && (
+            <button
+              type="button"
+              onClick={onExpand}
+              title="Expandir"
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73]"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
-      {data.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="flex h-[320px] items-center justify-center text-xs text-slate-400">
           Sem dados para esta classe de tensão.
         </div>
@@ -559,12 +879,33 @@ function ScrollChart({
         <div className="max-h-[360px] overflow-y-auto pr-1">
           <div style={{ height: innerHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} layout="vertical" margin={{ left: 10, right: 60, top: 4, bottom: 4 }}>
+              <BarChart data={sorted} layout="vertical" margin={{ left: 10, right: 60, top: 4, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} interval={0} />
+                <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 12 }} interval={0} />
                 <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
-                <Bar dataKey="media" fill={BLUE} barSize={14} radius={[0, 4, 4, 0]}>
+                <Bar
+                  dataKey="media"
+                  fill={BLUE}
+                  barSize={16}
+                  radius={[0, 4, 4, 0]}
+                  onClick={(d: any) => onBarClick?.(d?.name)}
+                  style={{ cursor: onBarClick ? "pointer" : "default" }}
+                  shape={(props: any) => {
+                    const active = activeName && props.payload?.name === activeName;
+                    return (
+                      <rect
+                        x={props.x}
+                        y={props.y}
+                        width={props.width}
+                        height={props.height}
+                        rx={2}
+                        fill={active ? "#e11d48" : BLUE}
+                        opacity={activeName && !active ? 0.35 : 1}
+                      />
+                    );
+                  }}
+                >
                   <LabelList
                     dataKey="media"
                     position="right"
@@ -577,6 +918,72 @@ function ScrollChart({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ExpandedBarChart({
+  data,
+  unit,
+  activeName,
+  onBarClick,
+}: {
+  data: { name: string; media: number; testes: number }[];
+  unit: "V" | "A";
+  activeName?: string | null;
+  onBarClick?: (name: string) => void;
+}) {
+  const [sort, setSort] = useState<SortMode>("desc");
+  const sorted = useMemo(() => sortChartData(data, sort), [data, sort]);
+  const ROW = 30;
+  const innerHeight = Math.max(sorted.length * ROW + 40, 260);
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <SortSelect value={sort} onChange={setSort} />
+        <span className="text-xs text-slate-500">{sorted.length} ativos</span>
+      </div>
+      <div className="max-h-[75vh] overflow-y-auto pr-1">
+        <div style={{ height: innerHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={sorted} layout="vertical" margin={{ left: 10, right: 70, top: 4, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis type="category" dataKey="name" width={260} tick={{ fontSize: 12 }} interval={0} />
+              <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
+              <Bar
+                dataKey="media"
+                fill={BLUE}
+                barSize={18}
+                radius={[0, 4, 4, 0]}
+                onClick={(d: any) => onBarClick?.(d?.name)}
+                style={{ cursor: onBarClick ? "pointer" : "default" }}
+                shape={(props: any) => {
+                  const active = activeName && props.payload?.name === activeName;
+                  return (
+                    <rect
+                      x={props.x}
+                      y={props.y}
+                      width={props.width}
+                      height={props.height}
+                      rx={2}
+                      fill={active ? "#e11d48" : BLUE}
+                      opacity={activeName && !active ? 0.35 : 1}
+                    />
+                  );
+                }}
+              >
+                <LabelList
+                  dataKey="media"
+                  position="right"
+                  style={{ fontSize: 11, fontWeight: 700, fill: BLUE_DARK }}
+                  formatter={(v: number) => `${v} ${unit}`}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
