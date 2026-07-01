@@ -89,6 +89,15 @@ const METRIC_COLORS: Record<Metric, string> = {
 };
 const METRIC_ORDER: Metric[] = ["tensao", "corrente", "recalque", "retaguarda"];
 
+type MetricPoint = {
+  t: number;
+  date: string;
+  tensao: number | null;
+  corrente: number | null;
+  recalque: number | null;
+  retaguarda: number | null;
+};
+
 function parseAvg(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const s = String(v).replace(/,/g, ".");
