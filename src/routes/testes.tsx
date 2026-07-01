@@ -392,18 +392,20 @@ function TestesPage() {
       </div>
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <Kpi label="Total de Testes" value={total} />
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
-        <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
-        <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
-        <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
-        <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
-        <FilterSelect label="GRUPO" value={grupo} onChange={setGrupo} options={GRUPOS} />
+        <FilterSelect
+          label="GRUPO"
+          value={grupo}
+          onChange={setGrupo}
+          options={GRUPOS}
+          renderOption={(v) => (v === "__VAZIO__" ? "(Vazio)" : v)}
+        />
         <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." />
         <FilterSelect
           label="MÊS INICIAL"
