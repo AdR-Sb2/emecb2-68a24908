@@ -65,13 +65,6 @@ const STORAGE_KEY = "testes_data_v1";
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
 
-const METRIC_COLORS: Record<Metric, string> = {
-  tensao: "#1f7ad6",
-  corrente: "#f59e0b",
-  recalque: "#10b981",
-  retaguarda: "#8b5cf6",
-};
-
 const MONTH_LABELS = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
