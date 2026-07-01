@@ -737,6 +737,8 @@ function TestesPage() {
                 <th className="px-2 py-1.5">Observação</th>
                 <th className="px-2 py-1.5">Tensão (V)</th>
                 <th className="px-2 py-1.5">Corrente (A)</th>
+                <th className="px-2 py-1.5">Recalque</th>
+                <th className="px-2 py-1.5">Retaguarda</th>
               </tr>
             </thead>
             <tbody>
@@ -767,6 +769,8 @@ function TestesPage() {
                     />
                     <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
                     <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? ""}</td>
                   </tr>
                 );
               })}
@@ -1113,7 +1117,12 @@ function ScrollChart({
   onExpand?: () => void;
 }) {
   const [sort, setSort] = useState<SortMode>("az");
-  const sorted = useMemo(() => sortChartData(data, sort), [data, sort]);
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? data.filter((d) => d.name.toLowerCase().includes(q)) : data;
+  }, [data, query]);
+  const sorted = useMemo(() => sortChartData(filtered, sort), [filtered, sort]);
   const ROW = 30;
   const innerHeight = Math.max(sorted.length * ROW + 40, 160);
   return (
@@ -1121,6 +1130,13 @@ function ScrollChart({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
         <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Pesquisar..."
+            className="h-7 w-36 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none"
+          />
           <SortSelect value={sort} onChange={setSort} />
           <span className="text-[11px] text-slate-500">{sorted.length} ativos</span>
           {onExpand && (
@@ -1198,13 +1214,27 @@ function ExpandedBarChart({
   onBarClick?: (name: string) => void;
 }) {
   const [sort, setSort] = useState<SortMode>("desc");
-  const sorted = useMemo(() => sortChartData(data, sort), [data, sort]);
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? data.filter((d) => d.name.toLowerCase().includes(q)) : data;
+  }, [data, query]);
+  const sorted = useMemo(() => sortChartData(filtered, sort), [filtered, sort]);
   const ROW = 30;
   const innerHeight = Math.max(sorted.length * ROW + 40, 260);
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <SortSelect value={sort} onChange={setSort} />
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Pesquisar elevatória..."
+            className="h-8 w-56 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none"
+          />
+          <SortSelect value={sort} onChange={setSort} />
+        </div>
         <span className="text-xs text-slate-500">{sorted.length} ativos</span>
       </div>
       <div className="max-h-[75vh] overflow-y-auto pr-1">
