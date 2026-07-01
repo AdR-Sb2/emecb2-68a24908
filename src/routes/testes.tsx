@@ -1080,10 +1080,10 @@ function ScrollChart({
         <div className="max-h-[360px] overflow-y-auto pr-1">
           <div style={{ height: innerHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sorted} layout="vertical" margin={{ left: 10, right: 60, top: 4, bottom: 4 }}>
+              <BarChart data={sorted} layout="vertical" margin={{ left: 0, right: 60, top: 4, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" width={200} tick={{ fontSize: 12 }} interval={0} />
+                <YAxis type="category" dataKey="name" width={260} tick={{ fontSize: 11 }} interval={0} />
                 <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
                 <Bar
                   dataKey="media"
