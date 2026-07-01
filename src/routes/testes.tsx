@@ -581,8 +581,8 @@ function TestesPage() {
         <MetricEvolutionChart
           className="lg:col-span-3"
           series={metricSeries}
-          metric={evoMetric}
-          onMetricChange={setEvoMetric}
+          metrics={evoMetrics}
+          onMetricsChange={setEvoMetrics}
           elevName={focusedElev}
         />
       </div>
