@@ -1,8 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Home, Send, Search } from "lucide-react";
+import {
+  Home,
+  Send,
+  Search,
+  FileText,
+  ClipboardCheck,
+  MapPin,
+  Settings2,
+  Droplets,
+  Gauge,
+  Wrench,
+  Building2,
+  ShieldCheck,
+  BarChart3,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import elevatorias from "@/data/elevatorias.json";
 
 export const Route = createFileRoute("/relatorio")({
@@ -141,10 +157,13 @@ function useLookup() {
 /* ---------------- shared UI ---------------- */
 
 const inputCls =
-  "w-full rounded-lg border-2 border-[#334155] bg-[#1e293b] px-3 py-2 text-sm text-white outline-none focus:border-[#0ea5e9]";
-const labelCls = "mb-1 block text-xs font-semibold text-slate-300";
-const cardCls = "rounded-2xl border border-[#334155] bg-[#111827] p-4";
-const sectionTitleCls = "mb-3 text-xs font-bold uppercase tracking-wider text-[#0ea5e9]";
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 disabled:bg-slate-50";
+const labelCls =
+  "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600";
+const cardCls =
+  "rounded-md border border-slate-200 bg-white p-4 shadow-sm md:p-5";
+const sectionTitleCls =
+  "mb-3 flex items-center gap-2 text-sm font-semibold text-[#0b3a73]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -155,10 +174,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <h2 className={sectionTitleCls}>
+      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#1f7ad6]/10 text-[#1f7ad6]">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="uppercase tracking-wide">{children}</span>
+    </h2>
+  );
+}
+
 function IdentificacaoBlock(l: ReturnType<typeof useLookup>) {
   return (
     <section className={cardCls}>
-      <h2 className={sectionTitleCls}>Identificação</h2>
+      <SectionTitle icon={MapPin}>Identificação</SectionTitle>
       <Field label="Buscar por TAG ou Nome">
         <div className="flex gap-2">
           <input
@@ -171,12 +201,20 @@ function IdentificacaoBlock(l: ReturnType<typeof useLookup>) {
           <button
             type="button"
             onClick={l.buscar}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#0ea5e9] px-3 py-2 text-sm font-semibold text-white hover:bg-[#0284c7]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#1f7ad6] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b3a73] active:scale-[0.98]"
           >
             <Search className="h-4 w-4" /> Buscar
           </button>
         </div>
       </Field>
+      {l.found !== null && (l.unidade || l.planta) && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          <CheckCircle2 className="h-4 w-4" />
+          <span className="font-medium">
+            {l.found ? "Ativo localizado na base." : "Não localizado — preenchimento manual."}
+          </span>
+        </div>
+      )}
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Field label="Unidade">
           <input className={inputCls} value={l.unidade} onChange={(e) => l.setUnidade(e.target.value)} />
@@ -357,9 +395,9 @@ function RelatorioTecnico() {
 
       <section className={cardCls}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className={sectionTitleCls + " mb-0"}>Grupos Motor-Bomba</h2>
+          <SectionTitle icon={Settings2}>Grupos Motor-Bomba</SectionTitle>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-300">Quantidade</label>
+            <label className="text-xs font-medium text-slate-600">Quantidade</label>
             <select
               value={qtd}
               onChange={(e) => setQtd(Number(e.target.value))}
@@ -375,8 +413,11 @@ function RelatorioTecnico() {
         </div>
         <div className="space-y-4">
           {grupos.map((g, i) => (
-            <div key={i} className="rounded-xl border border-[#334155] bg-[#0f172a] p-3">
-              <div className="mb-2 flex items-center gap-2">
+            <div key={i} className="rounded-md border border-slate-200 bg-slate-50/60 p-3 transition hover:border-[#1f7ad6]/40">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex h-6 items-center rounded-full bg-[#0b3a73] px-2 text-[11px] font-bold uppercase tracking-wider text-white">
+                  Grupo {i + 1}
+                </span>
                 <input
                   className={inputCls + " max-w-[140px] font-semibold"}
                   value={g.nome}
@@ -409,7 +450,7 @@ function RelatorioTecnico() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Parâmetros Hidráulicos (Operação)</h2>
+        <SectionTitle icon={Droplets}>Parâmetros Hidráulicos (Operação)</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Retaguarda (mca)">
             <input className={inputCls} value={retaguarda} onChange={(e) => setRetaguarda(e.target.value)} />
@@ -432,7 +473,7 @@ function RelatorioTecnico() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Teste em Shutoff (Válvula Fechada)</h2>
+        <SectionTitle icon={Gauge}>Teste em Shutoff (Válvula Fechada)</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Retaguarda Shutoff (mca)">
             <input className={inputCls} value={retShutoff} onChange={(e) => setRetShutoff(e.target.value)} />
@@ -444,7 +485,7 @@ function RelatorioTecnico() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Execução do Serviço</h2>
+        <SectionTitle icon={Wrench}>Execução do Serviço</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Tipo de Serviço">
             <select className={inputCls} value={tipoServ} onChange={(e) => setTipoServ(e.target.value as "Preventiva" | "Corretiva")}>
@@ -578,7 +619,7 @@ function RelatorioPlanta() {
       <IdentificacaoBlock {...l} />
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Condições da Infraestrutura</h2>
+        <SectionTitle icon={Building2}>Condições da Infraestrutura</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Estrutura Civil/Prédio">
             <select className={inputCls} value={estrutura} onChange={(e) => setEstrutura(e.target.value)}>
@@ -594,7 +635,7 @@ function RelatorioPlanta() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Segurança e Acesso</h2>
+        <SectionTitle icon={ShieldCheck}>Segurança e Acesso</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Cercas, Portões e Cadeados">
             <select className={inputCls} value={cercas} onChange={(e) => setCercas(e.target.value)}>
@@ -610,7 +651,7 @@ function RelatorioPlanta() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Resumo da Situação Geral</h2>
+        <SectionTitle icon={BarChart3}>Resumo da Situação Geral</SectionTitle>
         <div className="grid gap-3">
           <Field label="Status Operacional da Unidade">
             <select className={inputCls} value={statusGeral} onChange={(e) => setStatusGeral(e.target.value)}>
@@ -636,19 +677,22 @@ function RelatorioPlanta() {
 
 function ActionBar({ onSend }: { onSend: () => void }) {
   return (
-    <div className="sticky bottom-2 z-10 flex flex-wrap gap-2 rounded-2xl border border-[#334155] bg-[#111827]/95 p-3 backdrop-blur">
+    <div className="sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
+      <span className="hidden text-xs text-slate-500 sm:inline">
+        Revise os campos e envie — o texto será copiado e registrado na planilha.
+      </span>
       <button
         type="button"
         onClick={onSend}
-        className="inline-flex items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+        className="ml-auto inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#1f7ad6] to-[#0b3a73] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
       >
-        <Send className="h-4 w-4" /> Enviar
+        <Send className="h-4 w-4" /> Enviar Relatório
       </button>
       <Link
         to="/"
-        className="ml-auto inline-flex items-center gap-2 rounded-lg border border-[#334155] px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-[#1e293b]"
+        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
       >
-        Voltar ao Menu
+        Voltar
       </Link>
     </div>
   );
@@ -657,41 +701,76 @@ function ActionBar({ onSend }: { onSend: () => void }) {
 function RelatorioPage() {
   const [aba, setAba] = useState<"tecnico" | "planta">("tecnico");
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
       <Toaster richColors position="top-right" />
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Relatórios</h1>
-            <p className="text-sm text-slate-400">Técnico e de Planta/Unidade · geração para WhatsApp</p>
-          </div>
+      <div className="mx-auto max-w-5xl p-4 md:p-6">
+        {/* Header com logo — mesmo padrão do dashboard */}
+        <div className="relative mb-4 overflow-hidden rounded-md shadow">
+          <img
+            src={logoAsset.url}
+            alt="Águas do Rio - Eletromecânica"
+            className="w-full object-cover"
+            width={1024}
+            height={160}
+            loading="eager"
+          />
           <Link
             to="/"
-            className="inline-flex items-center gap-2 rounded-lg border border-[#334155] px-3 py-2 text-sm hover:bg-[#1e293b]"
+            title="Voltar ao Hub"
+            aria-label="Voltar ao Hub"
+            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
           >
-            <Home className="h-4 w-4" /> Início
+            <Home className="h-4 w-4" />
           </Link>
         </div>
 
-        <div className="mb-4 inline-flex rounded-xl border border-[#334155] bg-[#111827] p-1">
-          <button
-            type="button"
-            onClick={() => setAba("tecnico")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              aba === "tecnico" ? "bg-[#0ea5e9] text-white" : "text-slate-300 hover:text-white"
-            }`}
+        {/* Título + tabs */}
+        <div className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#0b3a73] text-white shadow-sm">
+              <FileText className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-lg font-bold text-[#0b3a73] md:text-xl">
+                Geração de Relatórios
+              </h1>
+              <p className="text-xs text-slate-500 md:text-sm">
+                Técnico e de Planta/Unidade · pronto para WhatsApp e planilha
+              </p>
+            </div>
+          </div>
+
+          <div
+            role="tablist"
+            className="inline-flex w-full flex-wrap gap-1 rounded-md bg-slate-100 p-1 sm:w-auto"
           >
-            Relatório Técnico
-          </button>
-          <button
-            type="button"
-            onClick={() => setAba("planta")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              aba === "planta" ? "bg-[#0ea5e9] text-white" : "text-slate-300 hover:text-white"
-            }`}
-          >
-            Relatório de Planta
-          </button>
+            <button
+              role="tab"
+              aria-selected={aba === "tecnico"}
+              type="button"
+              onClick={() => setAba("tecnico")}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition sm:flex-none ${
+                aba === "tecnico"
+                  ? "bg-white text-[#0b3a73] shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-600 hover:text-[#0b3a73]"
+              }`}
+            >
+              <Wrench className="h-4 w-4" /> Técnico
+            </button>
+            <button
+              role="tab"
+              aria-selected={aba === "planta"}
+              type="button"
+              onClick={() => setAba("planta")}
+              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition sm:flex-none ${
+                aba === "planta"
+                  ? "bg-white text-[#0b3a73] shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-600 hover:text-[#0b3a73]"
+              }`}
+            >
+              <ClipboardCheck className="h-4 w-4" /> Planta
+            </button>
+          </div>
         </div>
 
         {aba === "tecnico" ? <RelatorioTecnico /> : <RelatorioPlanta />}
