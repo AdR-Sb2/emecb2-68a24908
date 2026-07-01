@@ -871,7 +871,7 @@ function ScrollChart({
 }: {
   title: string;
   data: { name: string; media: number; testes: number }[];
-  unit: "V" | "A";
+  unit: string;
   activeName?: string | null;
   onBarClick?: (name: string) => void;
   onExpand?: () => void;
@@ -957,7 +957,7 @@ function ExpandedBarChart({
   onBarClick,
 }: {
   data: { name: string; media: number; testes: number }[];
-  unit: "V" | "A";
+  unit: string;
   activeName?: string | null;
   onBarClick?: (name: string) => void;
 }) {
