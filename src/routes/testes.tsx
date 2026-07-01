@@ -1475,12 +1475,13 @@ function MetricEvolutionChart({
                 );
               })}
               <Tooltip
-                formatter={(v: number | null, n: string) => {
-                  if (v === null || v === undefined) return ["—", n];
-                  const isTrend = n.endsWith("_trend");
-                  const key = (isTrend ? n.replace("_trend", "") : n) as Metric;
+                formatter={(v: any, n: any) => {
+                  const name = String(n);
+                  if (v === null || v === undefined) return ["—", name];
+                  const isTrend = name.endsWith("_trend");
+                  const key = (isTrend ? name.replace("_trend", "") : name) as Metric;
                   const meta = METRIC_META[key];
-                  if (!meta) return [v, n];
+                  if (!meta) return [v as any, name];
                   return [`${v} ${meta.unit}`, isTrend ? `Tendência ${meta.label}` : meta.label];
                 }}
                 labelFormatter={(l) => `Data: ${l}`}
