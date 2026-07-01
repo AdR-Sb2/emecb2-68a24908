@@ -318,17 +318,11 @@ function RelatorioTecnico() {
     return null;
   };
 
-  const handleCopy = () => {
-    const err = validar();
-    if (err) return toast.error(err);
-    copyText(gerarTexto());
-  };
-
   const handleEnviar = async () => {
     const err = validar();
     if (err) return toast.error(err);
     const texto = gerarTexto();
-    openWhatsApp(texto);
+    await copyAndPrompt(texto);
     await postSheet("tecnico", {
       data,
       tag: l.planta,
@@ -355,7 +349,6 @@ function RelatorioTecnico() {
         .map((s) => s.trim())
         .filter(Boolean),
     });
-    if (!APPS_SCRIPT_URL) toast.info("WhatsApp aberto. (Planilha não configurada.)");
   };
 
   return (
@@ -496,7 +489,7 @@ function RelatorioTecnico() {
         </div>
       </section>
 
-      <ActionBar onCopy={handleCopy} onSend={handleEnviar} />
+      <ActionBar onSend={handleEnviar} />
     </div>
   );
 }
@@ -560,15 +553,10 @@ function RelatorioPlanta() {
     return null;
   };
 
-  const handleCopy = () => {
-    const err = validar();
-    if (err) return toast.error(err);
-    copyText(gerarTexto());
-  };
   const handleEnviar = async () => {
     const err = validar();
     if (err) return toast.error(err);
-    openWhatsApp(gerarTexto());
+    await copyAndPrompt(gerarTexto());
     await postSheet("planta", {
       data,
       tag: l.planta,
@@ -583,7 +571,6 @@ function RelatorioPlanta() {
       necessidades: necessidades.trim() || "Nenhuma pendência crítica",
       responsavel,
     });
-    if (!APPS_SCRIPT_URL) toast.info("WhatsApp aberto. (Planilha não configurada.)");
   };
 
   return (
@@ -642,27 +629,20 @@ function RelatorioPlanta() {
         </div>
       </section>
 
-      <ActionBar onCopy={handleCopy} onSend={handleEnviar} />
+      <ActionBar onSend={handleEnviar} />
     </div>
   );
 }
 
-function ActionBar({ onCopy, onSend }: { onCopy: () => void; onSend: () => void }) {
+function ActionBar({ onSend }: { onSend: () => void }) {
   return (
     <div className="sticky bottom-2 z-10 flex flex-wrap gap-2 rounded-2xl border border-[#334155] bg-[#111827]/95 p-3 backdrop-blur">
-      <button
-        type="button"
-        onClick={onCopy}
-        className="inline-flex items-center gap-2 rounded-lg bg-[#f59e0b] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
-      >
-        <Copy className="h-4 w-4" /> Copiar Texto
-      </button>
       <button
         type="button"
         onClick={onSend}
         className="inline-flex items-center gap-2 rounded-lg bg-[#10b981] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
       >
-        <Send className="h-4 w-4" /> Enviar (WhatsApp)
+        <Send className="h-4 w-4" /> Enviar
       </button>
       <Link
         to="/"
