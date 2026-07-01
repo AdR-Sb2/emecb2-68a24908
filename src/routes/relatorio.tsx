@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Home, Copy, Send, Search } from "lucide-react";
+import { Home, Send, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import elevatorias from "@/data/elevatorias.json";
@@ -41,28 +41,46 @@ function todayBR() {
   return d.toLocaleDateString("pt-BR");
 }
 
-function copyText(text: string) {
+async function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(
-      () => toast.success("Texto copiado!"),
-      () => fallbackCopy(text),
-    );
-  } else fallbackCopy(text);
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return fallbackCopy(text);
+    }
+  }
+  return fallbackCopy(text);
 }
-function fallbackCopy(text: string) {
+function fallbackCopy(text: string): boolean {
   const ta = document.createElement("textarea");
   ta.value = text;
   ta.style.position = "fixed";
   ta.style.opacity = "0";
   document.body.appendChild(ta);
   ta.select();
+  let ok = false;
   try {
-    document.execCommand("copy");
-    toast.success("Texto copiado!");
-  } catch {
-    toast.error("Não foi possível copiar.");
-  }
+    ok = document.execCommand("copy");
+  } catch { ok = false; }
   document.body.removeChild(ta);
+  return ok;
+}
+
+async function copyAndPrompt(text: string) {
+  const ok = await copyText(text);
+  if (!ok) {
+    toast.error("Não foi possível copiar o texto.");
+    return;
+  }
+  toast.success("Texto copiado!", {
+    description: "Deseja também enviar por WhatsApp?",
+    duration: 10000,
+    action: {
+      label: "Enviar WhatsApp",
+      onClick: () => openWhatsApp(text),
+    },
+  });
 }
 
 function openWhatsApp(text: string) {
