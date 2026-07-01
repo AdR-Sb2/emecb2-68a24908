@@ -251,7 +251,16 @@ function TestesPage() {
       rows.map((r) => {
         const tensao = parseAvg(r["Tensão ( V )"]);
         const corrente = parseAvg(r["Corrente ( A )"]);
-        return { r, tensao, corrente, classe: classifyTensao(tensao) };
+        return {
+          r,
+          tensao,
+          corrente,
+          classe: classifyTensao(tensao),
+          recalque: parseHydro(r.Recalque),
+          retaguarda: parseHydro(r.Retaguarda),
+          recalqueSO: parseHydro(r["Recalque ShutOff"]),
+          retaguardaSO: parseHydro(r["Retaguarda ShutOff"]),
+        };
       }),
     [rows],
   );
@@ -269,6 +278,42 @@ function TestesPage() {
   const mediaTensaoMT = useMemo(() => mediaBy("tensao", "MT"), [enriched]);
   const mediaCorrenteBT = useMemo(() => mediaBy("corrente", "BT"), [enriched]);
   const mediaCorrenteMT = useMemo(() => mediaBy("corrente", "MT"), [enriched]);
+
+  const mediaHydro = (key: "recalque" | "retaguarda" | "recalqueSO" | "retaguardaSO") => {
+    const vals = enriched.map((e) => e[key]).filter((v): v is number => v !== null);
+    if (!vals.length) return null;
+    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+  };
+  const mediaRecalque = useMemo(() => mediaHydro("recalque"), [enriched]);
+  const mediaRetaguarda = useMemo(() => mediaHydro("retaguarda"), [enriched]);
+  const mediaRecalqueSO = useMemo(() => mediaHydro("recalqueSO"), [enriched]);
+  const mediaRetaguardaSO = useMemo(() => mediaHydro("retaguardaSO"), [enriched]);
+
+  const aggHydroPorElev = (key: "recalque" | "retaguarda") => {
+    const m = new Map<string, { sum: number; n: number }>();
+    for (const e of enriched) {
+      const v = e[key];
+      if (v === null || !e.r.Elevatória) continue;
+      const cur = m.get(e.r.Elevatória) ?? { sum: 0, n: 0 };
+      cur.sum += v;
+      cur.n += 1;
+      m.set(e.r.Elevatória, cur);
+    }
+    return Array.from(m.entries())
+      .map(([name, v]) => ({ name, media: +(v.sum / v.n).toFixed(1), testes: v.n }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  };
+  const recalquePorElev = useMemo(() => aggHydroPorElev("recalque"), [enriched]);
+  const retaguardaPorElev = useMemo(() => aggHydroPorElev("retaguarda"), [enriched]);
+
+  const obstrCount = useMemo(
+    () =>
+      rows.filter((r) => {
+        const t = `${r["Observação:"] ?? ""} ${r["Impossibilidade:"] ?? ""} ${r.Recalque ?? ""} ${r.Retaguarda ?? ""}`;
+        return OBSTR_RE.test(t);
+      }).length,
+    [rows],
+  );
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
