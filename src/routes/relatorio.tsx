@@ -1,8 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Home, Send, Search } from "lucide-react";
+import {
+  Home,
+  Send,
+  Search,
+  FileText,
+  ClipboardCheck,
+  MapPin,
+  Settings2,
+  Droplets,
+  Gauge,
+  Wrench,
+  Building2,
+  ShieldCheck,
+  BarChart3,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import elevatorias from "@/data/elevatorias.json";
 
 export const Route = createFileRoute("/relatorio")({
@@ -141,10 +157,13 @@ function useLookup() {
 /* ---------------- shared UI ---------------- */
 
 const inputCls =
-  "w-full rounded-lg border-2 border-[#334155] bg-[#1e293b] px-3 py-2 text-sm text-white outline-none focus:border-[#0ea5e9]";
-const labelCls = "mb-1 block text-xs font-semibold text-slate-300";
-const cardCls = "rounded-2xl border border-[#334155] bg-[#111827] p-4";
-const sectionTitleCls = "mb-3 text-xs font-bold uppercase tracking-wider text-[#0ea5e9]";
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 disabled:bg-slate-50";
+const labelCls =
+  "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600";
+const cardCls =
+  "rounded-md border border-slate-200 bg-white p-4 shadow-sm md:p-5";
+const sectionTitleCls =
+  "mb-3 flex items-center gap-2 text-sm font-semibold text-[#0b3a73]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -155,10 +174,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <h2 className={sectionTitleCls}>
+      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#1f7ad6]/10 text-[#1f7ad6]">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="uppercase tracking-wide">{children}</span>
+    </h2>
+  );
+}
+
 function IdentificacaoBlock(l: ReturnType<typeof useLookup>) {
   return (
     <section className={cardCls}>
-      <h2 className={sectionTitleCls}>Identificação</h2>
+      <SectionTitle icon={MapPin}>Identificação</SectionTitle>
       <Field label="Buscar por TAG ou Nome">
         <div className="flex gap-2">
           <input
@@ -171,12 +201,20 @@ function IdentificacaoBlock(l: ReturnType<typeof useLookup>) {
           <button
             type="button"
             onClick={l.buscar}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#0ea5e9] px-3 py-2 text-sm font-semibold text-white hover:bg-[#0284c7]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#1f7ad6] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b3a73] active:scale-[0.98]"
           >
             <Search className="h-4 w-4" /> Buscar
           </button>
         </div>
       </Field>
+      {l.found !== null && (l.unidade || l.planta) && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          <CheckCircle2 className="h-4 w-4" />
+          <span className="font-medium">
+            {l.found ? "Ativo localizado na base." : "Não localizado — preenchimento manual."}
+          </span>
+        </div>
+      )}
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Field label="Unidade">
           <input className={inputCls} value={l.unidade} onChange={(e) => l.setUnidade(e.target.value)} />
