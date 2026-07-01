@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Home, Copy, Send, Search, Plus, Trash2 } from "lucide-react";
+import { Home, Copy, Send, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import elevatorias from "@/data/elevatorias.json";
