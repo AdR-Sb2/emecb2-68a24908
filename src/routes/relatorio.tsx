@@ -395,9 +395,9 @@ function RelatorioTecnico() {
 
       <section className={cardCls}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className={sectionTitleCls + " mb-0"}>Grupos Motor-Bomba</h2>
+          <SectionTitle icon={Settings2}>Grupos Motor-Bomba</SectionTitle>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-300">Quantidade</label>
+            <label className="text-xs font-medium text-slate-600">Quantidade</label>
             <select
               value={qtd}
               onChange={(e) => setQtd(Number(e.target.value))}
@@ -413,8 +413,11 @@ function RelatorioTecnico() {
         </div>
         <div className="space-y-4">
           {grupos.map((g, i) => (
-            <div key={i} className="rounded-xl border border-[#334155] bg-[#0f172a] p-3">
-              <div className="mb-2 flex items-center gap-2">
+            <div key={i} className="rounded-md border border-slate-200 bg-slate-50/60 p-3 transition hover:border-[#1f7ad6]/40">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex h-6 items-center rounded-full bg-[#0b3a73] px-2 text-[11px] font-bold uppercase tracking-wider text-white">
+                  Grupo {i + 1}
+                </span>
                 <input
                   className={inputCls + " max-w-[140px] font-semibold"}
                   value={g.nome}
@@ -447,7 +450,7 @@ function RelatorioTecnico() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Parâmetros Hidráulicos (Operação)</h2>
+        <SectionTitle icon={Droplets}>Parâmetros Hidráulicos (Operação)</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Retaguarda (mca)">
             <input className={inputCls} value={retaguarda} onChange={(e) => setRetaguarda(e.target.value)} />
@@ -470,7 +473,7 @@ function RelatorioTecnico() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Teste em Shutoff (Válvula Fechada)</h2>
+        <SectionTitle icon={Gauge}>Teste em Shutoff (Válvula Fechada)</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Retaguarda Shutoff (mca)">
             <input className={inputCls} value={retShutoff} onChange={(e) => setRetShutoff(e.target.value)} />
@@ -482,7 +485,7 @@ function RelatorioTecnico() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Execução do Serviço</h2>
+        <SectionTitle icon={Wrench}>Execução do Serviço</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Tipo de Serviço">
             <select className={inputCls} value={tipoServ} onChange={(e) => setTipoServ(e.target.value as "Preventiva" | "Corretiva")}>
@@ -616,7 +619,7 @@ function RelatorioPlanta() {
       <IdentificacaoBlock {...l} />
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Condições da Infraestrutura</h2>
+        <SectionTitle icon={Building2}>Condições da Infraestrutura</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Estrutura Civil/Prédio">
             <select className={inputCls} value={estrutura} onChange={(e) => setEstrutura(e.target.value)}>
@@ -632,7 +635,7 @@ function RelatorioPlanta() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Segurança e Acesso</h2>
+        <SectionTitle icon={ShieldCheck}>Segurança e Acesso</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Cercas, Portões e Cadeados">
             <select className={inputCls} value={cercas} onChange={(e) => setCercas(e.target.value)}>
@@ -648,7 +651,7 @@ function RelatorioPlanta() {
       </section>
 
       <section className={cardCls}>
-        <h2 className={sectionTitleCls}>Resumo da Situação Geral</h2>
+        <SectionTitle icon={BarChart3}>Resumo da Situação Geral</SectionTitle>
         <div className="grid gap-3">
           <Field label="Status Operacional da Unidade">
             <select className={inputCls} value={statusGeral} onChange={(e) => setStatusGeral(e.target.value)}>
