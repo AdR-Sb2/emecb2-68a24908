@@ -737,6 +737,8 @@ function TestesPage() {
                 <th className="px-2 py-1.5">Observação</th>
                 <th className="px-2 py-1.5">Tensão (V)</th>
                 <th className="px-2 py-1.5">Corrente (A)</th>
+                <th className="px-2 py-1.5">Recalque</th>
+                <th className="px-2 py-1.5">Retaguarda</th>
               </tr>
             </thead>
             <tbody>
