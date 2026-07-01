@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -17,7 +17,7 @@ import {
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/testes.json";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, X, Home } from "lucide-react";
 
 export const Route = createFileRoute("/testes")({
   head: () => ({
@@ -79,6 +79,23 @@ const METRIC_META: Record<Metric, { label: string; unit: string; decimals: numbe
   corrente: { label: "Corrente", unit: "A", decimals: 2 },
   recalque: { label: "Recalque", unit: "mca", decimals: 1 },
   retaguarda: { label: "Retaguarda", unit: "mca", decimals: 1 },
+};
+
+const METRIC_COLORS: Record<Metric, string> = {
+  tensao: "#1f7ad6",
+  corrente: "#f59e0b",
+  recalque: "#10b981",
+  retaguarda: "#8b5cf6",
+};
+const METRIC_ORDER: Metric[] = ["tensao", "corrente", "recalque", "retaguarda"];
+
+type MetricPoint = {
+  t: number;
+  date: string;
+  tensao: number | null;
+  corrente: number | null;
+  recalque: number | null;
+  retaguarda: number | null;
 };
 
 function parseAvg(v: unknown): number | null {
@@ -186,14 +203,15 @@ function TestesPage() {
   const [hydroTab, setHydroTab] = useState<HydroTab>("eletrica");
   const [tableExpanded, setTableExpanded] = useState(false);
   const [obstrOnly, setObstrOnly] = useState(false);
-  const [evoMetric, setEvoMetric] = useState<Metric>("tensao");
-  // Pré-selecionar métrica ao trocar de aba (sem travar o dropdown)
+  const [evoMetrics, setEvoMetrics] = useState<Metric[]>(["tensao"]);
+  // Pré-selecionar métrica ao trocar de aba (garante ao menos uma da aba atual)
   useEffect(() => {
-    setEvoMetric((cur) => {
-      if (hydroTab === "eletrica") {
-        return cur === "tensao" || cur === "corrente" ? cur : "tensao";
-      }
-      return cur === "recalque" || cur === "retaguarda" ? cur : "recalque";
+    setEvoMetrics((cur) => {
+      const elet = cur.some((m) => m === "tensao" || m === "corrente");
+      const hidr = cur.some((m) => m === "recalque" || m === "retaguarda");
+      if (hydroTab === "eletrica" && !elet) return [...cur, "tensao"];
+      if (hydroTab === "hidraulica" && !hidr) return [...cur, "recalque"];
+      return cur;
     });
   }, [hydroTab]);
   const [zoomChart, setZoomChart] = useState<null | {
@@ -342,24 +360,25 @@ function TestesPage() {
 
   // Série da métrica selecionada para a elevatória focada (respeita filtros de período)
   const metricSeries = useMemo(() => {
-    if (!focusedElev) return [] as { t: number; date: string; value: number }[];
-    const out: { t: number; date: string; value: number }[] = [];
+    if (!focusedElev) return [] as MetricPoint[];
+    const out: MetricPoint[] = [];
     for (const r of rows) {
       if (r.Elevatória !== focusedElev) continue;
       const iso = r["Data do Teste"];
       if (!iso) continue;
       const d = new Date(iso);
       if (isNaN(d.getTime())) continue;
-      let v: number | null = null;
-      if (evoMetric === "tensao") v = parseAvg(r["Tensão ( V )"]);
-      else if (evoMetric === "corrente") v = parseAvg(r["Corrente ( A )"]);
-      else if (evoMetric === "recalque") v = parseHydro(r.Recalque);
-      else v = parseHydro(r.Retaguarda);
-      if (v === null) continue;
-      out.push({ t: d.getTime(), date: d.toLocaleDateString("pt-BR"), value: v });
+      out.push({
+        t: d.getTime(),
+        date: d.toLocaleDateString("pt-BR"),
+        tensao: parseAvg(r["Tensão ( V )"]),
+        corrente: parseAvg(r["Corrente ( A )"]),
+        recalque: parseHydro(r.Recalque),
+        retaguarda: parseHydro(r.Retaguarda),
+      });
     }
     return out.sort((a, b) => a.t - b.t);
-  }, [rows, focusedElev, evoMetric]);
+  }, [rows, focusedElev]);
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
@@ -426,7 +445,7 @@ function TestesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="mb-4 overflow-hidden rounded-md shadow">
+      <div className="relative mb-4 overflow-hidden rounded-md shadow">
         <img
           src={logoAsset.url}
           alt="Águas do Rio - Eletromecânica"
@@ -435,6 +454,14 @@ function TestesPage() {
           height={160}
           loading="eager"
         />
+        <Link
+          to="/"
+          title="Voltar ao Hub"
+          aria-label="Voltar ao Hub"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105"
+        >
+          <Home className="h-4.5 w-4.5" />
+        </Link>
       </div>
       <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
 
@@ -562,8 +589,8 @@ function TestesPage() {
         <MetricEvolutionChart
           className="lg:col-span-3"
           series={metricSeries}
-          metric={evoMetric}
-          onMetricChange={setEvoMetric}
+          metrics={evoMetrics}
+          onMetricsChange={setEvoMetrics}
           elevName={focusedElev}
         />
       </div>
@@ -1294,58 +1321,129 @@ function Card({ title, className, children }: { title: string; className?: strin
 function MetricEvolutionChart({
   className,
   series,
-  metric,
-  onMetricChange,
+  metrics,
+  onMetricsChange,
   elevName,
 }: {
   className?: string;
-  series: { t: number; date: string; value: number }[];
-  metric: Metric;
-  onMetricChange: (m: Metric) => void;
+  series: MetricPoint[];
+  metrics: Metric[];
+  onMetricsChange: (m: Metric[]) => void;
   elevName: string | null;
 }) {
-  const meta = METRIC_META[metric];
-  // Regressão linear leve para tendência (quando houver >= 2 pontos)
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const selected = METRIC_ORDER.filter((m) => metrics.includes(m));
+
+  // Regressão linear leve por métrica
   const withTrend = useMemo(() => {
-    if (series.length < 2) return series.map((p) => ({ ...p, trend: null as number | null }));
-    const n = series.length;
-    const xs = series.map((_, i) => i);
-    const ys = series.map((p) => p.value);
-    const meanX = xs.reduce((a, b) => a + b, 0) / n;
-    const meanY = ys.reduce((a, b) => a + b, 0) / n;
-    let num = 0;
-    let den = 0;
-    for (let i = 0; i < n; i++) {
-      num += (xs[i] - meanX) * (ys[i] - meanY);
-      den += (xs[i] - meanX) ** 2;
+    const enriched = series.map((p) => ({ ...p })) as (MetricPoint & Record<string, number | null>)[];
+    for (const m of selected) {
+      const idxs: number[] = [];
+      const ys: number[] = [];
+      series.forEach((p, i) => {
+        const v = p[m];
+        if (v !== null && v !== 0) {
+          idxs.push(i);
+          ys.push(v);
+        }
+      });
+      if (ys.length < 2) {
+        enriched.forEach((e) => (e[`${m}_trend`] = null));
+        continue;
+      }
+      const n = ys.length;
+      const meanX = idxs.reduce((a, b) => a + b, 0) / n;
+      const meanY = ys.reduce((a, b) => a + b, 0) / n;
+      let num = 0;
+      let den = 0;
+      for (let i = 0; i < n; i++) {
+        num += (idxs[i] - meanX) * (ys[i] - meanY);
+        den += (idxs[i] - meanX) ** 2;
+      }
+      const slope = den === 0 ? 0 : num / den;
+      const intercept = meanY - slope * meanX;
+      const dec = METRIC_META[m].decimals;
+      enriched.forEach((e, i) => (e[`${m}_trend`] = +(intercept + slope * i).toFixed(dec)));
     }
-    const slope = den === 0 ? 0 : num / den;
-    const intercept = meanY - slope * meanX;
-    return series.map((p, i) => ({ ...p, trend: +(intercept + slope * i).toFixed(meta.decimals) }));
-  }, [series, meta.decimals]);
+    return enriched;
+  }, [series, selected]);
+
+  // Contagens por métrica (para aviso de amostra pequena)
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const m of selected) {
+      c[m] = series.filter((p) => p[m] !== null && p[m] !== 0).length;
+    }
+    return c;
+  }, [series, selected]);
+
+  // Agrupar unidades → yAxisIds (máx 2 eixos)
+  const units = Array.from(new Set(selected.map((m) => METRIC_META[m].unit)));
+  const axisForUnit: Record<string, "left" | "right"> = {};
+  units.slice(0, 2).forEach((u, i) => (axisForUnit[u] = i === 0 ? "left" : "right"));
+  const multiUnitWarn = units.length > 2;
 
   const title = elevName
     ? `Evolução de Métricas — ${elevName}`
     : "Evolução de Métricas por Elevatória";
 
+  const toggle = (m: Metric) => {
+    if (metrics.includes(m)) {
+      if (metrics.length === 1) return; // manter ao menos 1
+      onMetricsChange(metrics.filter((x) => x !== m));
+    } else {
+      onMetricsChange([...metrics, m]);
+    }
+  };
+
+  const smallSample = selected.filter((m) => counts[m] > 0 && counts[m] < 5);
+
   return (
     <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-            Métrica
+            Métricas
           </label>
-          <select
-            value={metric}
-            onChange={(e) => onMetricChange(e.target.value as Metric)}
-            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm"
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm hover:border-[#0b3a73]"
           >
-            <option value="tensao">Tensão (V)</option>
-            <option value="corrente">Corrente (A)</option>
-            <option value="recalque">Recalque (mca)</option>
-            <option value="retaguarda">Retaguarda (mca)</option>
-          </select>
+            {selected.length} selecionada{selected.length > 1 ? "s" : ""}
+            <span className="text-slate-400">▾</span>
+          </button>
+          {pickerOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
+              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                {METRIC_ORDER.map((m) => {
+                  const checked = metrics.includes(m);
+                  return (
+                    <label
+                      key={m}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-slate-100"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(m)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-sm"
+                        style={{ background: METRIC_COLORS[m] }}
+                      />
+                      <span>
+                        {METRIC_META[m].label} ({METRIC_META[m].unit})
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
       {!elevName ? (
@@ -1355,52 +1453,110 @@ function MetricEvolutionChart({
         </div>
       ) : withTrend.length === 0 ? (
         <div className="flex h-[240px] items-center justify-center text-xs text-slate-400">
-          Sem leituras de {meta.label.toLowerCase()} para esta elevatória no período.
+          Sem leituras para esta elevatória no período.
         </div>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={280}>
             <LineChart data={withTrend} margin={{ left: 10, right: 20, top: 10 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis
-                tick={{ fontSize: 11 }}
-                label={{ value: meta.unit, angle: -90, position: "insideLeft", fontSize: 11 }}
-              />
+              {units.slice(0, 2).map((u, i) => {
+                const side = i === 0 ? "left" : "right";
+                const stroke =
+                  METRIC_COLORS[selected.find((m) => METRIC_META[m].unit === u) as Metric];
+                return (
+                  <YAxis
+                    key={u}
+                    yAxisId={side}
+                    orientation={side as "left" | "right"}
+                    tick={{ fontSize: 11, fill: stroke }}
+                    stroke={stroke}
+                    label={{
+                      value: u,
+                      angle: -90,
+                      position: side === "left" ? "insideLeft" : "insideRight",
+                      fontSize: 11,
+                      fill: stroke,
+                    }}
+                  />
+                );
+              })}
               <Tooltip
-                formatter={(v: number, n: string) => [
-                  `${v} ${meta.unit}`,
-                  n === "trend" ? "Tendência" : meta.label,
-                ]}
+                formatter={(v: any, n: any) => {
+                  const name = String(n);
+                  if (v === null || v === undefined) return ["—", name];
+                  const isTrend = name.endsWith("_trend");
+                  const key = (isTrend ? name.replace("_trend", "") : name) as Metric;
+                  const meta = METRIC_META[key];
+                  if (!meta) return [v as any, name];
+                  return [`${v} ${meta.unit}`, isTrend ? `Tendência ${meta.label}` : meta.label];
+                }}
                 labelFormatter={(l) => `Data: ${l}`}
               />
-              <Legend />
-              <Line
-                type="monotone"
-                name={meta.label}
-                dataKey="value"
-                stroke={BLUE}
-                strokeWidth={2.5}
-                dot={{ r: 3, fill: BLUE_DARK }}
-                activeDot={{ r: 5 }}
+              <Legend
+                formatter={(value: string) => {
+                  const isTrend = value.endsWith("_trend");
+                  const key = (isTrend ? value.replace("_trend", "") : value) as Metric;
+                  const meta = METRIC_META[key];
+                  return meta ? (isTrend ? `Tendência ${meta.label}` : meta.label) : value;
+                }}
               />
-              {withTrend.length >= 2 && (
-                <Line
-                  type="linear"
-                  name="trend"
-                  dataKey="trend"
-                  stroke="#e11d48"
-                  strokeWidth={1.5}
-                  strokeDasharray="4 4"
-                  dot={false}
-                  activeDot={false}
-                />
-              )}
+              {selected.map((m) => {
+                const yId = axisForUnit[METRIC_META[m].unit] ?? "left";
+                const color = METRIC_COLORS[m];
+                return (
+                  <Line
+                    key={m}
+                    type="monotone"
+                    name={m}
+                    dataKey={m}
+                    yAxisId={yId}
+                    stroke={color}
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: color }}
+                    activeDot={{ r: 5 }}
+                    connectNulls
+                  />
+                );
+              })}
+              {selected.map((m) => {
+                if ((counts[m] ?? 0) < 2) return null;
+                const yId = axisForUnit[METRIC_META[m].unit] ?? "left";
+                const color = METRIC_COLORS[m];
+                return (
+                  <Line
+                    key={`${m}_trend`}
+                    type="linear"
+                    name={`${m}_trend`}
+                    dataKey={`${m}_trend`}
+                    yAxisId={yId}
+                    stroke={color}
+                    strokeOpacity={0.45}
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    activeDot={false}
+                    connectNulls
+                    legendType="none"
+                  />
+                );
+              })}
             </LineChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-[10px] text-slate-400">
-            {withTrend.length} leitura{withTrend.length > 1 ? "s" : ""} · linha tracejada = tendência linear
-          </p>
+          <div className="mt-1 space-y-0.5 text-[10px] text-slate-400">
+            <p>{withTrend.length} data{withTrend.length > 1 ? "s" : ""} · linha tracejada = tendência linear</p>
+            {multiUnitWarn && (
+              <p className="text-amber-600">
+                Métricas com unidades diferentes agrupadas por eixo (máx 2 eixos exibidos).
+              </p>
+            )}
+            {smallSample.length > 0 && (
+              <p className="text-amber-600">
+                Amostra pequena (&lt; 5 leituras) em: {smallSample.map((m) => METRIC_META[m].label).join(", ")} — tendência pouco confiável.
+              </p>
+            )}
+          </div>
         </>
       )}
     </div>

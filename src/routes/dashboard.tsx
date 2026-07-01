@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/elevatorias.json";
+import { Home } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -225,7 +226,7 @@ function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       {/* Header com logo */}
-      <div className="mb-4 overflow-hidden rounded-md shadow">
+      <div className="relative mb-4 overflow-hidden rounded-md shadow">
         <img
           src={logoAsset.url}
           alt="Águas do Rio - Eletromecânica"
@@ -234,6 +235,14 @@ function DashboardPage() {
           height={160}
           loading="eager"
         />
+        <Link
+          to="/"
+          title="Voltar ao Hub"
+          aria-label="Voltar ao Hub"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105"
+        >
+          <Home className="h-4 w-4" />
+        </Link>
       </div>
 
       {/* KPIs */}
