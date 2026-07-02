@@ -17,7 +17,7 @@ import {
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/testes.json";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Maximize2, X, Home } from "lucide-react";
+import { Maximize2, X, Home, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/testes")({
   head: () => ({
@@ -135,7 +135,14 @@ function monthKey(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 }
 
 function TestesPage() {
@@ -370,7 +377,7 @@ function TestesPage() {
       if (isNaN(d.getTime())) continue;
       out.push({
         t: d.getTime(),
-        date: d.toLocaleDateString("pt-BR"),
+        date: fmtDate(iso),
         tensao: parseAvg(r["Tensão ( V )"]),
         corrente: parseAvg(r["Corrente ( A )"]),
         recalque: parseHydro(r.Recalque),
@@ -449,7 +456,7 @@ function TestesPage() {
         <img
           src={logoAsset.url}
           alt="Águas do Rio - Eletromecânica"
-          className="w-full object-cover"
+          className="h-20 w-full object-cover object-center sm:h-auto"
           width={1024}
           height={160}
           loading="eager"
@@ -458,19 +465,52 @@ function TestesPage() {
           to="/"
           title="Voltar ao Hub"
           aria-label="Voltar ao Hub"
-          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105"
+          className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105 sm:h-9 sm:w-9 sm:right-3 sm:top-3"
         >
-          <Home className="h-4.5 w-4.5" />
+          <Home className="h-5 w-5 sm:h-4 sm:w-4" />
         </Link>
       </div>
-      <h1 className="mb-3 text-lg font-bold text-[#0b3a73]">Testes & Aferições de Ativos</h1>
+      <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg">Testes & Aferições de Ativos</h1>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <Kpi label="Total de Testes" value={total} />
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <details className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm sm:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-sm font-medium text-slate-700">
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-[#0b3a73]" />
+            Filtros
+          </span>
+          <span className="text-xs text-slate-400">toque para expandir</span>
+        </summary>
+        <div className="flex flex-col gap-3 border-t border-slate-100 p-3">
+          <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} block />
+          <FilterSelect
+            label="GRUPO"
+            value={grupo}
+            onChange={setGrupo}
+            options={GRUPOS}
+            renderOption={(v) => (v === "__VAZIO__" ? "(Vazio)" : v)}
+            block
+          />
+          <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." block />
+          <FilterSelect label="MÊS INICIAL" value={mesIni} onChange={setMesIni} options={MESES_DISPONIVEIS} renderOption={labelMes} block />
+          <FilterSelect label="MÊS FINAL" value={mesFim} onChange={setMesFim} options={MESES_DISPONIVEIS} renderOption={labelMes} block />
+          {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS" || mesIni !== "TODOS" || mesFim !== "TODOS") && (
+            <button
+              type="button"
+              onClick={() => { setTipo("TODOS"); setGrupo("TODOS"); setElev("TODOS"); setMesIni("TODOS"); setMesFim("TODOS"); }}
+              className="min-h-11 rounded border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      </details>
+
+      <div className="mb-4 hidden flex-wrap items-center gap-3 sm:flex">
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
         <FilterSelect
           label="GRUPO"
@@ -752,10 +792,10 @@ function TestesPage() {
           Mostrando {tableRows.length} de {data.length} testes
         </div>
         <div className="max-h-[60vh] overflow-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="sticky top-0 bg-slate-100 text-slate-700">
               <tr>
-                <th className="px-2 py-1.5">Data</th>
+                <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5">Data</th>
                 <th className="px-2 py-1.5">Elevatória</th>
                 <th className="px-2 py-1.5">Grupo</th>
                 <th className="px-2 py-1.5">Tipo</th>
@@ -773,10 +813,8 @@ function TestesPage() {
                 const rowKey = `${r.Id ?? "row"}-${i}`;
                 return (
                   <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
-                    <td className="px-2 py-1 whitespace-nowrap">
-                      {r["Data do Teste"]
-                        ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR")
-                        : ""}
+                    <td className="sticky left-0 z-10 bg-white px-2 py-1 whitespace-nowrap shadow-[1px_0_0_rgba(0,0,0,0.05)]">
+                      {fmtDate(r["Data do Teste"])}
                     </td>
                     <td className="px-2 py-1">{r.Elevatória}</td>
                     <td className="px-2 py-1">{r.Grupo}</td>
@@ -887,7 +925,7 @@ function TestesPage() {
                   return (
                     <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
                       <td className="px-2 py-1 whitespace-nowrap">
-                        {r["Data do Teste"] ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR") : ""}
+                        {fmtDate(r["Data do Teste"])}
                       </td>
                       <td className="px-2 py-1">{r.Elevatória}</td>
                       <td className="px-2 py-1">{r.Grupo}</td>
@@ -917,20 +955,22 @@ function FilterSelect({
   onChange,
   options,
   renderOption,
+  block,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   renderOption?: (v: string) => string;
+  block?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
+    <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="max-w-[260px] truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+        className={`${block ? "w-full" : "max-w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-base shadow-sm sm:min-h-0 sm:text-sm`}
       >
         <option value="TODOS">Todos</option>
         {options.map((o) => (
@@ -1005,12 +1045,14 @@ function SearchableSelect({
   onChange,
   options,
   placeholder,
+  block,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   placeholder?: string;
+  block?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1025,18 +1067,18 @@ function SearchableSelect({
   const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
   const display = value === "TODOS" ? "Todos" : value;
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
-      <div ref={ref} className="relative">
+    <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">{label}</label>
+      <div ref={ref} className={`relative ${block ? "w-full" : ""}`}>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="w-[260px] truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-sm shadow-sm hover:bg-slate-50"
+          className={`${block ? "w-full" : "w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-base shadow-sm hover:bg-slate-50 sm:min-h-0 sm:text-sm`}
         >
           {display}
         </button>
         {open && (
-          <div className="absolute z-20 mt-1 w-[300px] rounded-md border border-slate-200 bg-white shadow-lg">
+          <div className={`absolute z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-lg ${block ? "w-full" : "w-[300px]"}`}>
             <input
               autoFocus
               type="text"
