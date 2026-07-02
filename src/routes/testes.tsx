@@ -17,7 +17,7 @@ import {
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/testes.json";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Maximize2, X, Home } from "lucide-react";
+import { Maximize2, X, Home, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/testes")({
   head: () => ({
@@ -135,7 +135,14 @@ function monthKey(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 }
 
 function TestesPage() {
