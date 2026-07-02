@@ -955,20 +955,22 @@ function FilterSelect({
   onChange,
   options,
   renderOption,
+  block,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   renderOption?: (v: string) => string;
+  block?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
+    <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="max-w-[260px] truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+        className={`${block ? "w-full" : "max-w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-base shadow-sm sm:min-h-0 sm:text-sm`}
       >
         <option value="TODOS">Todos</option>
         {options.map((o) => (
@@ -1043,12 +1045,14 @@ function SearchableSelect({
   onChange,
   options,
   placeholder,
+  block,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   placeholder?: string;
+  block?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1063,18 +1067,18 @@ function SearchableSelect({
   const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
   const display = value === "TODOS" ? "Todos" : value;
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
-      <div ref={ref} className="relative">
+    <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">{label}</label>
+      <div ref={ref} className={`relative ${block ? "w-full" : ""}`}>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="w-[260px] truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-sm shadow-sm hover:bg-slate-50"
+          className={`${block ? "w-full" : "w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-base shadow-sm hover:bg-slate-50 sm:min-h-0 sm:text-sm`}
         >
           {display}
         </button>
         {open && (
-          <div className="absolute z-20 mt-1 w-[300px] rounded-md border border-slate-200 bg-white shadow-lg">
+          <div className={`absolute z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-lg ${block ? "w-full" : "w-[300px]"}`}>
             <input
               autoFocus
               type="text"
