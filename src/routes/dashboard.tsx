@@ -17,7 +17,7 @@ import {
 } from "recharts";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/elevatorias.json";
-import { Home } from "lucide-react";
+import { Home, SlidersHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -230,7 +230,7 @@ function DashboardPage() {
         <img
           src={logoAsset.url}
           alt="Águas do Rio - Eletromecânica"
-          className="w-full object-cover"
+          className="h-20 w-full object-cover object-center sm:h-auto"
           width={1024}
           height={160}
           loading="eager"
@@ -239,9 +239,9 @@ function DashboardPage() {
           to="/"
           title="Voltar ao Hub"
           aria-label="Voltar ao Hub"
-          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105"
+          className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105 sm:right-3 sm:top-3 sm:h-9 sm:w-9"
         >
-          <Home className="h-4 w-4" />
+          <Home className="h-5 w-5 sm:h-4 sm:w-4" />
         </Link>
       </div>
 
@@ -269,8 +269,39 @@ function DashboardPage() {
         <Kpi label="Aguardando Comissionamento" value={aguardando} />
       </div>
 
-      {/* Filter */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      {/* Filters — mobile collapsible */}
+      <details className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm sm:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-sm font-medium text-slate-700">
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-[#0b3a73]" /> Filtros
+          </span>
+          <span className="text-xs text-slate-400">toque para expandir</span>
+        </summary>
+        <div className="grid gap-3 border-t border-slate-100 p-3">
+          {[
+            { label: "TIPO", value: tipo, set: setTipo, opts: ["TODOS", ...TIPOS] },
+            { label: "MUNICÍPIO", value: municipio, set: setMunicipio, opts: ["TODOS", ...MUNICIPIOS] },
+            { label: "AGUARDANDO COMISSIONAMENTO", value: aguardandoFilter, set: setAguardandoFilter, opts: ["TODOS", "SIM", "NAO"] },
+            { label: "TEM SENSOR?", value: sensorFilter, set: setSensorFilter, opts: ["TODOS", "SIM", "NAO"] },
+          ].map((f) => (
+            <div key={f.label} className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">{f.label}</label>
+              <select
+                value={f.value}
+                onChange={(e) => f.set(e.target.value)}
+                className="min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-base shadow-sm"
+              >
+                {f.opts.map((o) => (
+                  <option key={o} value={o}>{o === "TODOS" ? "Todos" : o === "NAO" ? "Não" : o === "SIM" ? "Sim" : o}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      </details>
+
+      {/* Filters — desktop row */}
+      <div className="mb-4 hidden flex-wrap items-center gap-3 sm:flex">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-slate-700">TIPO</label>
           <select
@@ -459,10 +490,10 @@ function DashboardPage() {
               Mostrando {tableRows.length} de {data.length} ativos
             </div>
             <div className={`${tableExpanded ? "max-h-[70vh]" : "max-h-[360px]"} overflow-auto`}>
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[720px] text-left text-xs">
               <thead className="sticky top-0 bg-slate-100 text-slate-700">
                 <tr>
-                  <th className="px-2 py-1.5">Elevatória</th>
+                  <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5">Elevatória</th>
                   <th className="px-2 py-1.5">Planta</th>
                   <th className="px-2 py-1.5">Município</th>
                   <th className="px-2 py-1.5">Construção</th>
@@ -476,7 +507,7 @@ function DashboardPage() {
               <tbody>
                 {tableRows.map((r, i) => (
                   <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="px-2 py-1">{r.ELEVATORIAS}</td>
+                    <td className="sticky left-0 z-10 bg-white px-2 py-1 shadow-[1px_0_0_rgba(0,0,0,0.05)]">{r.ELEVATORIAS}</td>
                     <td className="px-2 py-1">{r.PLANTA}</td>
                     <td className="px-2 py-1">{r.MUNICIPIO}</td>
                     <td className="px-2 py-1">{r["TIPO CONSTRUTIVO DA ELEVATORIA"]}</td>
