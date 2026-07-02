@@ -377,7 +377,7 @@ function TestesPage() {
       if (isNaN(d.getTime())) continue;
       out.push({
         t: d.getTime(),
-        date: d.toLocaleDateString("pt-BR"),
+        date: fmtDate(iso),
         tensao: parseAvg(r["Tensão ( V )"]),
         corrente: parseAvg(r["Corrente ( A )"]),
         recalque: parseHydro(r.Recalque),
@@ -780,10 +780,8 @@ function TestesPage() {
                 const rowKey = `${r.Id ?? "row"}-${i}`;
                 return (
                   <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
-                    <td className="px-2 py-1 whitespace-nowrap">
-                      {r["Data do Teste"]
-                        ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR")
-                        : ""}
+                    <td className="sticky left-0 z-10 bg-white px-2 py-1 whitespace-nowrap shadow-[1px_0_0_rgba(0,0,0,0.05)]">
+                      {fmtDate(r["Data do Teste"])}
                     </td>
                     <td className="px-2 py-1">{r.Elevatória}</td>
                     <td className="px-2 py-1">{r.Grupo}</td>
@@ -894,7 +892,7 @@ function TestesPage() {
                   return (
                     <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
                       <td className="px-2 py-1 whitespace-nowrap">
-                        {r["Data do Teste"] ? new Date(r["Data do Teste"]).toLocaleDateString("pt-BR") : ""}
+                        {fmtDate(r["Data do Teste"])}
                       </td>
                       <td className="px-2 py-1">{r.Elevatória}</td>
                       <td className="px-2 py-1">{r.Grupo}</td>
