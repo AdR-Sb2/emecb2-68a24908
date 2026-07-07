@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TestesRouteImport } from './routes/testes'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as BacklogRouteImport } from './routes/backlog'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TestesRoute = TestesRouteImport.update({
@@ -29,6 +30,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BacklogRoute = BacklogRouteImport.update({
+  id: '/backlog',
+  path: '/backlog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/backlog': typeof BacklogRoute
   '/dashboard': typeof DashboardRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/backlog': typeof BacklogRoute
   '/dashboard': typeof DashboardRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/backlog': typeof BacklogRoute
   '/dashboard': typeof DashboardRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/relatorio' | '/testes'
+  fullPaths: '/' | '/backlog' | '/dashboard' | '/relatorio' | '/testes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/relatorio' | '/testes'
-  id: '__root__' | '/' | '/dashboard' | '/relatorio' | '/testes'
+  to: '/' | '/backlog' | '/dashboard' | '/relatorio' | '/testes'
+  id: '__root__' | '/' | '/backlog' | '/dashboard' | '/relatorio' | '/testes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BacklogRoute: typeof BacklogRoute
   DashboardRoute: typeof DashboardRoute
   RelatorioRoute: typeof RelatorioRoute
   TestesRoute: typeof TestesRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/backlog': {
+      id: '/backlog'
+      path: '/backlog'
+      fullPath: '/backlog'
+      preLoaderRoute: typeof BacklogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BacklogRoute: BacklogRoute,
   DashboardRoute: DashboardRoute,
   RelatorioRoute: RelatorioRoute,
   TestesRoute: TestesRoute,
