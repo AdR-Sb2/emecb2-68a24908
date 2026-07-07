@@ -26,10 +26,16 @@ import {
   Clock,
   MapPin,
   X,
+  Search,
+  Maximize2,
+  Crosshair,
+  Zap,
+  TrendingUp,
 } from "lucide-react";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/backlog.json";
 import BacklogMap from "@/components/backlog-map";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   computeEquipe,
   computeResponsabilidade,
@@ -272,6 +278,85 @@ function MultiSelect({
   );
 }
 
+// ---------- combobox com busca (para lista longa de plantas) ----------
+function ComboboxSearch({
+  label,
+  options,
+  value,
+  onChange,
+  allLabel = "Todas",
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+  allLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const filtered = q
+    ? options.filter((o) => o.toLowerCase().includes(q.toLowerCase()))
+    : options;
+  const selectedLabel = value === "TODAS" ? allLabel : value;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6]"
+      >
+        <span className="truncate">
+          <span className="mr-1 text-xs text-slate-500">{label}:</span>
+          <span className="font-medium text-slate-800">{selectedLabel}</span>
+        </span>
+        <Search className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); setQ(""); }} />
+          <div className="absolute z-40 mt-1 w-full min-w-[260px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar…"
+                className="min-h-9 w-full border-none text-[14px] outline-none"
+              />
+              {q && (
+                <button onClick={() => setQ("")} className="text-slate-400 hover:text-slate-700">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="max-h-72 overflow-auto p-1">
+              <button
+                onClick={() => { onChange("TODAS"); setOpen(false); setQ(""); }}
+                className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${value === "TODAS" ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : ""}`}
+              >
+                {allLabel}
+              </button>
+              {filtered.length === 0 && (
+                <div className="px-2 py-2 text-xs text-slate-400">Nenhum resultado.</div>
+              )}
+              {filtered.map((o) => (
+                <button
+                  key={o}
+                  onClick={() => { onChange(o); setOpen(false); setQ(""); }}
+                  className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${value === o ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : ""}`}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------- página ----------
 function BacklogPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -306,28 +391,6 @@ function BacklogPage() {
 
   const enriched = useMemo(() => enrich(data, now), [data, now]);
 
-  // ---------- opções de filtro ----------
-  const OPT_PLANTA = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.planta).filter(Boolean))).sort(),
-    [enriched],
-  );
-  const OPT_RESP = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.responsabilidade))).sort(),
-    [enriched],
-  );
-  const OPT_STATUS = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.r["Status da Atividade"]).filter(Boolean))) as string[],
-    [enriched],
-  );
-  const OPT_EQUIPE = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.equipe))).sort(),
-    [enriched],
-  );
-  const OPT_CIDADE = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.r.Cidade).filter(Boolean))).sort() as string[],
-    [enriched],
-  );
-
   // ---------- filtros ----------
   const [fPlanta, setFPlanta] = useState<string>("TODAS");
   const [fResp, setFResp] = useState<string[]>([]);
@@ -339,22 +402,63 @@ function BacklogPage() {
   const [onlyEmerg, setOnlyEmerg] = useState(false);
   const [fSlaBefore, setFSlaBefore] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapFitSignal, setMapFitSignal] = useState(0);
 
-  const filtered = useMemo(() => {
+  // ---------- filtro em cascata: cada dropdown considera os demais filtros ----------
+  type FilterKey = "planta" | "resp" | "status" | "equipe" | "cidade" | "faixa" | "late" | "emerg" | "sla";
+  const applyFilters = (rows: Enriched[], skip?: FilterKey) => {
     const slaLimit = fSlaBefore ? new Date(fSlaBefore + "T00:00:00") : null;
-    return enriched.filter((e) => {
-      if (fPlanta !== "TODAS" && e.planta !== fPlanta) return false;
-      if (fResp.length && !fResp.includes(e.responsabilidade)) return false;
-      if (fStatus !== "TODOS" && e.r["Status da Atividade"] !== fStatus) return false;
-      if (fEquipe !== "TODAS" && e.equipe !== fEquipe) return false;
-      if (fCidade !== "TODAS" && e.r.Cidade !== fCidade) return false;
-      if (fFaixa !== "TODAS" && e.faixa !== fFaixa) return false;
-      if (onlyLate && e.slaStatus !== "ATRASADO") return false;
-      if (onlyEmerg && (e.r.PRIORIDADE || "").toUpperCase() !== "EMERGÊNCIA") return false;
-      if (slaLimit && e.fimSla && e.fimSla >= slaLimit) return false;
+    return rows.filter((e) => {
+      if (skip !== "planta" && fPlanta !== "TODAS" && e.planta !== fPlanta) return false;
+      if (skip !== "resp" && fResp.length && !fResp.includes(e.responsabilidade)) return false;
+      if (skip !== "status" && fStatus !== "TODOS" && (e.r["Status da Atividade"] || "").trim() !== fStatus) return false;
+      if (skip !== "equipe" && fEquipe !== "TODAS" && e.equipe !== fEquipe) return false;
+      if (skip !== "cidade" && fCidade !== "TODAS" && e.r.Cidade !== fCidade) return false;
+      if (skip !== "faixa" && fFaixa !== "TODAS" && e.faixa !== fFaixa) return false;
+      if (skip !== "late" && onlyLate && e.slaStatus !== "ATRASADO") return false;
+      if (skip !== "emerg" && onlyEmerg && (e.r.PRIORIDADE || "").toUpperCase() !== "EMERGÊNCIA") return false;
+      if (skip !== "sla" && slaLimit && e.fimSla && e.fimSla >= slaLimit) return false;
       return true;
     });
-  }, [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore]);
+  };
+  const filtered = useMemo(() => applyFilters(enriched), [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore]);
+
+  const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
+  const OPT_PLANTA = useMemo(
+    () => uniq(applyFilters(enriched, "planta").map((e) => e.planta).filter(Boolean)).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+  );
+  const OPT_RESP = useMemo(
+    () => uniq(applyFilters(enriched, "resp").map((e) => e.responsabilidade)).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fPlanta, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+  );
+  const OPT_STATUS = useMemo(
+    () => uniq(
+      applyFilters(enriched, "status")
+        .map((e) => (e.r["Status da Atividade"] || "").trim())
+        .filter(Boolean),
+    ).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fPlanta, fResp, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+  );
+  const OPT_EQUIPE = useMemo(
+    () => uniq(applyFilters(enriched, "equipe").map((e) => e.equipe)).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fPlanta, fResp, fStatus, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+  );
+  const OPT_CIDADE = useMemo(
+    () => uniq(applyFilters(enriched, "cidade").map((e) => e.r.Cidade).filter(Boolean)).sort() as string[],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fPlanta, fResp, fStatus, fEquipe, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+  );
+  const OPT_FAIXA = useMemo(
+    () => FAIXAS.filter((f) => applyFilters(enriched, "faixa").some((e) => e.faixa === f)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, onlyLate, onlyEmerg, fSlaBefore],
+  );
 
   // ---------- KPIs ----------
   const kTotal = filtered.length;
@@ -401,14 +505,16 @@ function BacklogPage() {
 
   // ---------- mapa: 1 marker por PLANTA única ----------
   const mapMarkers = useMemo(() => {
-    const m = new Map<string, { lat: number; lon: number; planta: string; count: number; late: number }>();
+    const m = new Map<string, { lat: number; lon: number; planta: string; count: number; late: number; emerg: number }>();
     for (const e of filtered) {
       if (e.lat === null || e.lon === null) continue;
       const key = e.planta;
+      const isEmerg = (e.r["Tipo de Atividade"] || "").toUpperCase().includes("MANUTENÇÃO CORRETIVA EMERGENCIAL");
       const cur = m.get(key);
       if (cur) {
         cur.count += 1;
         if (e.slaStatus === "ATRASADO") cur.late += 1;
+        if (isEmerg) cur.emerg += 1;
       } else {
         m.set(key, {
           lat: e.lat,
@@ -416,24 +522,37 @@ function BacklogPage() {
           planta: e.planta,
           count: 1,
           late: e.slaStatus === "ATRASADO" ? 1 : 0,
+          emerg: isEmerg ? 1 : 0,
         });
       }
     }
     return Array.from(m.values());
   }, [filtered]);
 
-  // ---------- programar semana ----------
-  const programar = useMemo(() => {
-    const priorityRank = (p: string) => ((p || "").toUpperCase() === "EMERGÊNCIA" ? 0 : 1);
-    return [...filtered]
-      .filter((e) => e.faixa === "8-15 dias" || e.faixa === "15+ dias")
-      .sort((a, b) => {
-        const p = priorityRank(a.r.PRIORIDADE || "") - priorityRank(b.r.PRIORIDADE || "");
-        if (p !== 0) return p;
-        return b.diasAberto - a.diasAberto;
-      })
-      .slice(0, 10);
+  // Toggle: clicar de novo na mesma planta desfaz o filtro.
+  const togglePlanta = (planta: string) =>
+    setFPlanta((cur) => (cur === planta ? "TODAS" : planta));
+
+  // ---------- Ações recomendadas ----------
+  const emergSemProgramacao = useMemo(
+    () => filtered.filter(
+      (e) => (e.r.PRIORIDADE || "").toUpperCase() === "EMERGÊNCIA"
+        && (e.r["Status da Atividade"] || "").toLowerCase().includes("pendente"),
+    ).length,
+    [filtered],
+  );
+  const topPlantasBacklog = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of filtered) if (e.faixa === "15+ dias") m.set(e.planta, (m.get(e.planta) || 0) + 1);
+    return Array.from(m.entries())
+      .map(([planta, count]) => ({ planta, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
   }, [filtered]);
+  const applyEmergPendente = () => {
+    setOnlyEmerg(true);
+    setFStatus(OPT_STATUS.find((s) => s.toLowerCase().includes("pendente")) || "TODOS");
+  };
 
   // ---------- ordenação da tabela ----------
   type SortKey = "om" | "textoBreve" | "planta" | "inicioSla" | "tipo";
@@ -563,6 +682,56 @@ function BacklogPage() {
     setFEquipe("TODAS"); setFCidade("TODAS"); setFFaixa("TODAS");
     setOnlyLate(false); setOnlyEmerg(false); setFSlaBefore("");
   };
+
+  const mapCard = (heightPx: number, showToolbar = true) => (
+    <>
+      {showToolbar && (
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-sm font-semibold text-[#0b3a73]">
+            <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
+          </div>
+          <div className="flex items-center gap-1">
+            {fPlanta !== "TODAS" && (
+              <button
+                onClick={() => setFPlanta("TODAS")}
+                className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
+              >
+                Limpar planta
+              </button>
+            )}
+            <button
+              onClick={() => setMapFitSignal((n) => n + 1)}
+              title="Centralizar nas plantas visíveis"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Crosshair className="h-3.5 w-3.5" /> Centralizar
+            </button>
+            <button
+              onClick={() => setMapOpen(true)}
+              title="Expandir mapa"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Maximize2 className="h-3.5 w-3.5" /> Expandir
+            </button>
+          </div>
+        </div>
+      )}
+      <div style={{ height: heightPx, width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
+        {mounted ? (
+          <BacklogMap
+            markers={mapMarkers}
+            onSelect={togglePlanta}
+            selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+            fitSignal={mapFitSignal}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-xs text-slate-400">
+            Carregando mapa…
+          </div>
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 md:p-6">
@@ -696,14 +865,7 @@ function BacklogPage() {
           <span>{showFilters ? "ocultar" : "mostrar"}</span>
         </button>
         <div className={`${showFilters ? "grid" : "hidden"} gap-2 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`}>
-          <select
-            value={fPlanta}
-            onChange={(e) => setFPlanta(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm"
-          >
-            <option value="TODAS">Elevatória: Todas</option>
-            {OPT_PLANTA.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <ComboboxSearch label="Elevatória" options={OPT_PLANTA} value={fPlanta} onChange={setFPlanta} allLabel="Todas" />
           <MultiSelect label="Responsabilidade" options={OPT_RESP} value={fResp} onChange={setFResp} />
           <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm">
             <option value="TODOS">Status: Todos</option>
@@ -719,7 +881,7 @@ function BacklogPage() {
           </select>
           <select value={fFaixa} onChange={(e) => setFFaixa(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm">
             <option value="TODAS">Faixa: Todas</option>
-            {FAIXAS.map((p) => <option key={p} value={p}>{p}</option>)}
+            {OPT_FAIXA.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
           <label className="flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm">
             <Clock className="h-4 w-4 text-slate-400" />
@@ -796,52 +958,85 @@ function BacklogPage() {
       {/* Mapa + Programar */}
       <div className="mb-4 grid gap-3 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-semibold text-[#0b3a73]">
-              <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
-            </div>
-            {fPlanta !== "TODAS" && (
-              <button onClick={() => setFPlanta("TODAS")} className="text-xs text-red-600 hover:underline">
-                Limpar filtro de planta
-              </button>
-            )}
-          </div>
-          <div style={{ height: 360, width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
-            {mounted ? (
-              <BacklogMap markers={mapMarkers} onSelect={setFPlanta} />
-            ) : (
-              <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                Carregando mapa…
-              </div>
-            )}
-          </div>
+          {mapCard(240)}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">Programar essa semana</div>
-          <p className="mb-2 text-[11px] text-slate-500">
-            Top 10 O.S. mais antigas (8+ dias), priorizando Emergência.
-          </p>
+          <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-[#0b3a73]">
+            <Zap className="h-4 w-4" /> Ações recomendadas
+          </div>
+
+          <button
+            onClick={applyEmergPendente}
+            className="mb-3 flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-left transition hover:border-red-400 hover:bg-red-100"
+          >
+            <div>
+              <div className="text-[11px] font-semibold uppercase text-red-700">Emergenciais pendentes</div>
+              <div className="text-2xl font-bold text-red-600">{emergSemProgramacao}</div>
+              <div className="text-[10px] text-red-500">clique para filtrar</div>
+            </div>
+            <Flame className="h-8 w-8 text-red-400" />
+          </button>
+
+          <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase text-slate-500">
+            <TrendingUp className="h-3 w-3" /> Top plantas (15+ dias)
+          </div>
           <ul className="space-y-1 text-xs">
-            {programar.length === 0 && <li className="text-slate-400">Nenhuma O.S. crítica.</li>}
-            {programar.map((e) => (
-              <li key={e.om} className="flex items-start justify-between gap-2 rounded border border-slate-100 p-2 hover:bg-slate-50">
-                <div className="min-w-0">
-                  <div className="font-mono text-[11px] text-slate-500">{e.om}</div>
-                  <div className="truncate font-medium text-[#0b3a73]">{e.r["TEXTO BREVE"] || "—"}</div>
-                  <div className="truncate text-[11px] text-slate-500">{e.plantaShort} · {e.r.Cidade || "—"}</div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className={`rounded px-1 text-[10px] font-semibold ${e.r.PRIORIDADE?.toUpperCase() === "EMERGÊNCIA" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600"}`}>
-                    {e.r.PRIORIDADE || "—"}
-                  </div>
-                  <div className="mt-1 text-[10px] text-slate-500">{e.diasAberto}d</div>
-                </div>
+            {topPlantasBacklog.length === 0 && (
+              <li className="text-slate-400">Nenhuma planta com backlog crítico.</li>
+            )}
+            {topPlantasBacklog.map((p) => (
+              <li key={p.planta}>
+                <button
+                  onClick={() => togglePlanta(p.planta)}
+                  className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlanta === p.planta ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100"}`}
+                >
+                  <span className="truncate font-medium text-[#0b3a73]">{p.planta.split(" - ")[0]}</span>
+                  <span className="ml-2 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                    {p.count} O.S.
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
         </div>
       </div>
+
+      <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+        <DialogContent className="max-w-6xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-1 pb-2">
+            {fPlanta !== "TODAS" && (
+              <button
+                onClick={() => setFPlanta("TODAS")}
+                className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
+              >
+                Limpar planta
+              </button>
+            )}
+            <button
+              onClick={() => setMapFitSignal((n) => n + 1)}
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Crosshair className="h-3.5 w-3.5" /> Centralizar
+            </button>
+          </div>
+          <div style={{ height: "70vh", width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
+            {mapOpen && mounted && (
+              <BacklogMap
+                markers={mapMarkers}
+                onSelect={togglePlanta}
+                selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                fitSignal={mapFitSignal}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Tabela */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
