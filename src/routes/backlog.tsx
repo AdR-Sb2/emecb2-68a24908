@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/backlog.json";
+import BacklogMap from "@/components/backlog-map";
 import {
   computeEquipe,
   computeResponsabilidade,
