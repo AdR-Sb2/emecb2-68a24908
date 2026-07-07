@@ -15,12 +15,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  MapContainer,
-  TileLayer,
-  CircleMarker,
-  Popup,
-} from "react-leaflet";
-import {
   Home,
   SlidersHorizontal,
   Upload,
@@ -284,6 +278,8 @@ function BacklogPage() {
   const [hasCustomData, setHasCustomData] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     try {
@@ -809,46 +805,14 @@ function BacklogPage() {
               </button>
             )}
           </div>
-          <div style={{ height: 360, width: "100%" }} className="overflow-hidden rounded-md">
-            <MapContainer
-              center={[-22.85, -43.5]}
-              zoom={10}
-              style={{ height: "100%", width: "100%" }}
-              scrollWheelZoom
-            >
-              <TileLayer
-                attribution='&copy; OpenStreetMap'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {mapMarkers.map((m) => (
-                <CircleMarker
-                  key={m.planta}
-                  center={[m.lat, m.lon]}
-                  radius={6 + Math.min(10, m.count)}
-                  pathOptions={{
-                    color: m.late > 0 ? "#dc2626" : BLUE_DARK,
-                    fillColor: m.late > 0 ? "#ef4444" : BLUE,
-                    fillOpacity: 0.75,
-                    weight: 2,
-                  }}
-                  eventHandlers={{ click: () => setFPlanta(m.planta) }}
-                >
-                  <Popup>
-                    <div className="text-xs">
-                      <div className="font-semibold text-[#0b3a73]">{m.planta}</div>
-                      <div>O.S.: {m.count}</div>
-                      <div>Atrasadas: {m.late}</div>
-                      <button
-                        className="mt-1 text-[#1f7ad6] underline"
-                        onClick={() => setFPlanta(m.planta)}
-                      >
-                        Filtrar por essa planta
-                      </button>
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
-            </MapContainer>
+          <div style={{ height: 360, width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
+            {mounted ? (
+              <BacklogMap markers={mapMarkers} onSelect={setFPlanta} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                Carregando mapa…
+              </div>
+            )}
           </div>
         </div>
 
