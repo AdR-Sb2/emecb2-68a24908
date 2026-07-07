@@ -61,6 +61,7 @@ export const PLANTAS_ECT_EXCECAO: string[] = [
 // vem no CSV como "CÓDIGO - DESCRIÇÃO").
 export const PLANTAS_BAIXADA_1: string[] = [
   "PL-RJB-EAB0001",
+  "PL-RJB-EAT0105",
 ];
 
 // (f) Outra SUP — PLANTAS (contém substring)
