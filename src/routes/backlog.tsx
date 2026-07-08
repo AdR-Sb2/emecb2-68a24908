@@ -687,6 +687,251 @@ function BacklogPage() {
     setOnlyLate(false); setOnlyEmerg(false); setFSlaBefore("");
   };
 
+  // ============================================================
+  // Route Builder — Montador Automático de Rota
+  // ============================================================
+  const DEFAULT_START_HINT = "PL-RJB-EAT1005";
+  const AVG_KMH = 38;
+  const URGENCY_WEIGHT_KM_PER_DAY = 0.35;
+  const findDefaultStart = () =>
+    enriched.find((e) => e.planta.toUpperCase().includes(DEFAULT_START_HINT))?.planta || "";
+
+  const allTipos = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.r["Tipo de Atividade"] || "").filter(Boolean))).sort(),
+    [enriched],
+  );
+  const allResps = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.responsabilidade))).sort(),
+    [enriched],
+  );
+  const allPlantas = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.planta).filter(Boolean))).sort(),
+    [enriched],
+  );
+  const allCidades = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.r.Cidade || "").filter(Boolean))).sort() as string[],
+    [enriched],
+  );
+
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
+  const [rbTipos, setRbTipos] = useState<string[]>([]);
+  const [rbResps, setRbResps] = useState<string[]>(["Baixada 2"]);
+  const [rbStart, setRbStart] = useState<string>("");
+  const [rbMaxStops, setRbMaxStops] = useState<number>(20);
+  const [rbTolerance, setRbTolerance] = useState<number>(3);
+  const [rbElevatorias, setRbElevatorias] = useState<string[]>([]);
+  const [rbCidades, setRbCidades] = useState<string[]>([]);
+  const [routeError, setRouteError] = useState<string>("");
+
+  useEffect(() => {
+    if (!rbStart && allPlantas.length) setRbStart(findDefaultStart() || allPlantas[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPlantas.length]);
+
+  type GeneratedRoute = {
+    start: RouteStart;
+    stops: RouteStop[];
+    details: Array<{
+      ordem: number;
+      planta: string;
+      plantaShort: string;
+      cidade: string;
+      distKm: number;
+      cumKm: number;
+      oss: Enriched[];
+      oldestFimSla: Date | null;
+    }>;
+    totalKm: number;
+    etaMin: number;
+    totalOs: number;
+    limitConfig: { max: number; tolerance: number };
+  };
+  const [generatedRoute, setGeneratedRoute] = useState<GeneratedRoute | null>(null);
+
+  function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+    const R = 6371;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  const generateRoute = () => {
+    setRouteError("");
+    if (!rbSlaBefore) { setRouteError("Informe a data/hora limite do Fim do SLA."); return; }
+    if (!rbStart) { setRouteError("Selecione o ponto de partida."); return; }
+    if (!rbMaxStops || rbMaxStops < 1) { setRouteError("Máximo de paradas deve ser ≥ 1."); return; }
+
+    const slaLimit = new Date(rbSlaBefore);
+    if (isNaN(slaLimit.getTime())) { setRouteError("Data/hora limite inválida."); return; }
+
+    // 1) candidatos
+    const candidates = enriched.filter((e) => {
+      if (!e.fimSla || e.fimSla >= slaLimit) return false;
+      if (rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || "")) return false;
+      if (rbResps.length && !rbResps.includes(e.responsabilidade)) return false;
+      if (rbElevatorias.length && !rbElevatorias.includes(e.planta)) return false;
+      if (rbCidades.length && !rbCidades.includes(e.r.Cidade || "")) return false;
+      if (e.lat === null || e.lon === null) return false;
+      return true;
+    });
+    if (!candidates.length) { setRouteError("Nenhuma O.S. atende aos critérios informados."); return; }
+
+    // 2) agrupa por planta
+    type Group = { planta: string; lat: number; lon: number; oss: Enriched[]; oldestFimSla: Date };
+    const groupMap = new Map<string, Group>();
+    for (const e of candidates) {
+      const cur = groupMap.get(e.planta);
+      if (!cur) {
+        groupMap.set(e.planta, {
+          planta: e.planta, lat: e.lat!, lon: e.lon!, oss: [e], oldestFimSla: e.fimSla!,
+        });
+      } else {
+        cur.oss.push(e);
+        if (e.fimSla! < cur.oldestFimSla) cur.oldestFimSla = e.fimSla!;
+      }
+    }
+    const groups = Array.from(groupMap.values());
+
+    // 3) ponto de partida
+    const startRow = enriched.find((e) => e.planta === rbStart && e.lat !== null && e.lon !== null);
+    if (!startRow) { setRouteError("Ponto de partida não possui coordenadas."); return; }
+    const startPt = { lat: startRow.lat!, lon: startRow.lon!, planta: rbStart };
+
+    // 4) Nearest-neighbor com urgência
+    const maxDaysAtraso = Math.max(
+      1,
+      ...groups.map((g) => Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000)),
+    );
+    const remaining = new Set(groups.map((g) => g.planta));
+    const orderedGroups: Group[] = [];
+    let cursor: { lat: number; lon: number } = startPt;
+    while (remaining.size) {
+      let best: Group | null = null;
+      let bestScore = Infinity;
+      for (const g of groups) {
+        if (!remaining.has(g.planta)) continue;
+        const d = haversineKm(cursor, g);
+        const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
+        const norm = days / maxDaysAtraso;
+        const score = d - URGENCY_WEIGHT_KM_PER_DAY * norm * 10;
+        if (score < bestScore) { bestScore = score; best = g; }
+      }
+      if (!best) break;
+      orderedGroups.push(best);
+      remaining.delete(best.planta);
+      cursor = { lat: best.lat, lon: best.lon };
+    }
+
+    // 5) Corte pelo máximo de paradas (com tolerância)
+    const chosen: Group[] = [];
+    let acc = 0;
+    for (const g of orderedGroups) {
+      if (acc >= rbMaxStops) break;
+      const next = acc + g.oss.length;
+      if (next <= rbMaxStops) {
+        chosen.push(g);
+        acc = next;
+      } else {
+        const overflow = next - rbMaxStops;
+        if (overflow <= rbTolerance) {
+          chosen.push(g);
+          acc = next;
+        }
+        break;
+      }
+    }
+    if (!chosen.length) { setRouteError("Máximo de paradas insuficiente até para o primeiro grupo."); return; }
+
+    // 6) monta stops + distâncias
+    let cumKm = 0;
+    let prev: { lat: number; lon: number } = startPt;
+    const details: GeneratedRoute["details"] = [];
+    const stops: RouteStop[] = [];
+    let totalOs = 0;
+    chosen.forEach((g, idx) => {
+      const d = haversineKm(prev, g);
+      cumKm += d;
+      const ordem = idx + 1;
+      details.push({
+        ordem,
+        planta: g.planta,
+        plantaShort: g.planta.split(" - ")[0] || g.planta,
+        cidade: g.oss[0]?.r.Cidade || "",
+        distKm: d,
+        cumKm,
+        oss: g.oss,
+        oldestFimSla: g.oldestFimSla,
+      });
+      stops.push({ planta: g.planta, lat: g.lat, lon: g.lon, ordem, osCount: g.oss.length });
+      totalOs += g.oss.length;
+      prev = { lat: g.lat, lon: g.lon };
+    });
+
+    const totalKm = cumKm;
+    const etaMin = Math.round((totalKm / AVG_KMH) * 60);
+
+    setGeneratedRoute({
+      start: { lat: startPt.lat, lon: startPt.lon, label: rbStart },
+      stops,
+      details,
+      totalKm,
+      etaMin,
+      totalOs,
+      limitConfig: { max: rbMaxStops, tolerance: rbTolerance },
+    });
+    setRouteDialogOpen(false);
+    setTimeout(() => setMapFitSignal((n) => n + 1), 100);
+  };
+
+  const clearRoute = () => setGeneratedRoute(null);
+
+  const exportRouteCSV = () => {
+    if (!generatedRoute) return;
+    const headers = ["Parada", "Planta", "Cidade", "Distância (km)", "Acumulado (km)", "Ordem", "Nota", "Fim SLA", "Prioridade", "Tipo", "TEXTO BREVE"];
+    const rows: string[][] = [];
+    for (const d of generatedRoute.details) {
+      for (const os of d.oss) {
+        rows.push([
+          String(d.ordem), d.planta, d.cidade,
+          d.distKm.toFixed(2), d.cumKm.toFixed(2),
+          os.om, os.r.NOTA ?? "", fmtDate(os.fimSla),
+          os.r.PRIORIDADE ?? "", os.r["Tipo de Atividade"] ?? "",
+          os.r["TEXTO BREVE"] ?? "",
+        ]);
+      }
+    }
+    const csv = [headers, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rota-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyRouteResumo = async () => {
+    if (!generatedRoute) return;
+    const lines = [
+      `🗺️ *Rota programada* — ${generatedRoute.totalOs} O.S. em ${generatedRoute.stops.length} paradas`,
+      `📏 ${generatedRoute.totalKm.toFixed(1)} km · ⏱️ ~${generatedRoute.etaMin} min de deslocamento`,
+      `🚩 Partida: ${generatedRoute.start.label.split(" - ")[0]}`,
+      "",
+      ...generatedRoute.details.map(
+        (d) => `${d.ordem}. ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`,
+      ),
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      alert("Rota copiada! Cole no WhatsApp.");
+    } catch { alert("Não foi possível copiar."); }
+  };
+
   const mapCard = (heightPx: number, showToolbar = true) => (
     <>
       {showToolbar && (
