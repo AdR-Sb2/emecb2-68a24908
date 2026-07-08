@@ -1327,16 +1327,214 @@ function BacklogPage() {
           </div>
           <div style={{ height: "70vh", width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
             {mapOpen && mounted && (
-              <BacklogMap
-                markers={mapMarkers}
-                onSelect={togglePlanta}
-                selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
-                fitSignal={mapFitSignal}
-              />
+              <Suspense fallback={null}>
+                <BacklogMap
+                  markers={mapMarkers}
+                  onSelect={togglePlanta}
+                  selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                  fitSignal={mapFitSignal}
+                  route={generatedRoute}
+                />
+              </Suspense>
             )}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Route Builder — Dialog de configuração */}
+      <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <RouteIcon className="mr-1 inline h-4 w-4" /> Montar Rota Otimizada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 text-sm">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Fim SLA anterior a *</span>
+                <input
+                  type="datetime-local"
+                  value={rbSlaBefore}
+                  onChange={(e) => setRbSlaBefore(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+                <span className="text-[10px] text-slate-400">critério de corte e de urgência (mais antigo = mais prioritário)</span>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Ponto de partida *</span>
+                <select
+                  value={rbStart}
+                  onChange={(e) => setRbStart(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                >
+                  <option value="">Selecione…</option>
+                  {allPlantas.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <span className="text-[10px] text-slate-400">só origem do trajeto — não é atendida</span>
+              </label>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <MultiSelect label="Tipo de Atividade *" options={allTipos} value={rbTipos} onChange={setRbTipos} />
+              <MultiSelect label="Responsabilidade *" options={allResps} value={rbResps} onChange={setRbResps} />
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Máximo de paradas (O.S.) *</span>
+                <input
+                  type="number" min={1}
+                  value={rbMaxStops}
+                  onChange={(e) => setRbMaxStops(Number(e.target.value) || 0)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Tolerância de estouro (O.S.)</span>
+                <input
+                  type="number" min={0}
+                  value={rbTolerance}
+                  onChange={(e) => setRbTolerance(Number(e.target.value) || 0)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+                <span className="text-[10px] text-slate-400">um grupo é incluído inteiro se estourar até isso</span>
+              </label>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <MultiSelect label="Elevatórias (opcional)" options={allPlantas} value={rbElevatorias} onChange={setRbElevatorias} />
+              <MultiSelect label="Cidade (opcional)" options={allCidades} value={rbCidades} onChange={setRbCidades} />
+            </div>
+
+            {routeError && (
+              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {routeError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setRouteDialogOpen(false)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={generateRoute}
+                className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
+              >
+                <RouteIcon className="h-4 w-4" /> Gerar Rota
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resultado da rota */}
+      {generatedRoute && (
+        <div className="mb-4 overflow-hidden rounded-xl border-2 border-[#f59e0b] bg-gradient-to-br from-orange-50 to-white shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200 bg-orange-100/50 px-4 py-3">
+            <div className="flex items-center gap-2 text-[#0b3a73]">
+              <RouteIcon className="h-5 w-5 text-[#f59e0b]" />
+              <div>
+                <div className="text-sm font-bold">Rota programada</div>
+                <div className="text-[11px] text-slate-600">
+                  {generatedRoute.totalOs} / {generatedRoute.limitConfig.max} O.S. em {generatedRoute.stops.length} paradas
+                  {generatedRoute.totalOs > generatedRoute.limitConfig.max &&
+                    ` (estouro de ${generatedRoute.totalOs - generatedRoute.limitConfig.max}, tolerância ${generatedRoute.limitConfig.tolerance})`}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="rounded bg-white px-2 py-1 shadow-sm">
+                <span className="text-slate-500">Distância:</span>{" "}
+                <span className="font-bold text-[#0b3a73]">{generatedRoute.totalKm.toFixed(1)} km</span>
+              </div>
+              <div className="rounded bg-white px-2 py-1 shadow-sm">
+                <span className="text-slate-500">Tempo est.:</span>{" "}
+                <span className="font-bold text-[#0b3a73]">~{generatedRoute.etaMin} min</span>
+              </div>
+              <button
+                onClick={exportRouteCSV}
+                className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white px-2 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb]"
+              >
+                <Download className="h-3 w-3" /> CSV
+              </button>
+              <button
+                onClick={copyRouteResumo}
+                className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <CopyIcon className="h-3 w-3" /> Copiar
+              </button>
+              <button
+                onClick={clearRoute}
+                className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100"
+              >
+                <X className="h-3 w-3" /> Limpar
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 p-3 lg:grid-cols-2">
+            <div className="rounded border border-orange-100 bg-white p-2 text-xs">
+              <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73]">
+                <Flag className="h-3 w-3 text-[#f59e0b]" /> Ponto de partida:{" "}
+                <span className="font-normal text-slate-700">{generatedRoute.start.label}</span>
+              </div>
+              <ol className="space-y-1">
+                {generatedRoute.details.map((d) => (
+                  <li key={d.ordem} className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0b3a73] text-[11px] font-bold text-white">
+                          {d.ordem}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-[#0b3a73]">{d.plantaShort}</div>
+                          <div className="text-[10px] text-slate-500">{d.cidade}</div>
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-slate-500">
+                        <div>+{d.distKm.toFixed(1)} km</div>
+                        <div className="text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
+                      </div>
+                    </div>
+                    <ul className="mt-1 ml-8 space-y-0.5">
+                      {d.oss.map((os) => (
+                        <li key={os.om} className="flex items-center gap-2 text-[11px] text-slate-600">
+                          <span className="font-mono text-[#1f7ad6]">{os.om}</span>
+                          <span className="truncate">{os.r["TEXTO BREVE"]}</span>
+                          {os.slaStatus === "ATRASADO" && (
+                            <span className="ml-auto shrink-0 rounded bg-red-100 px-1 text-[9px] font-semibold text-red-700">
+                              {os.diasAberto}d
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="min-h-[300px] rounded border border-orange-100 bg-slate-100">
+              <div className="h-full min-h-[300px]" style={{ height: 400 }}>
+                {mounted ? (
+                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+                    <BacklogMap
+                      markers={mapMarkers}
+                      onSelect={togglePlanta}
+                      selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                      fitSignal={mapFitSignal}
+                      route={generatedRoute}
+                    />
+                  </Suspense>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
