@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/backlog.json";
+import elevatoriasData from "@/data/elevatorias.json";
 import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -83,6 +84,41 @@ type Row = {
 };
 
 const DATA = rawData as unknown as Row[];
+
+const plantaToElevatoriaMap = new Map<string, string>();
+(elevatoriasData as Array<{ PLANTA: string | null; ELEVATORIAS: string | null }>).forEach((item) => {
+  if (item.PLANTA) {
+    plantaToElevatoriaMap.set(item.PLANTA.trim().toUpperCase(), item.ELEVATORIAS || "");
+  }
+});
+
+export function getElevatoriaName(plantaStr: string | null | undefined): string {
+  if (!plantaStr) return "—";
+  const code = plantaStr.split(" - ")[0].trim().toUpperCase();
+  const found = plantaToElevatoriaMap.get(code);
+  if (found) return found;
+
+  const parts = plantaStr.split(" - ");
+  if (parts.length > 1) {
+    return parts[1].replace(/^(EAT|ETE|EAB|EEA|ETA)\s+/i, "").trim();
+  }
+  return "—";
+}
+
+export function abbreviateAtividade(name: string | null | undefined): string {
+  if (!name) return "";
+  let s = String(name).trim();
+  s = s.replace(/MANUTENÇÃO PREVENTIVA/gi, "M. Preventiva");
+  s = s.replace(/MANUTENÇÃO PREDITIVA/gi, "M. Preditiva");
+  s = s.replace(/MANUTENÇÃO CORRETIVA/gi, "M. Corretiva");
+  s = s.replace(/EMERGENCIAL/gi, "Emerg.");
+  s = s.replace(/PROGRAMADA/gi, "Prog.");
+  s = s.replace(/FREQUENCIA/gi, "Frequência");
+  s = s.replace(/FREQUÊNCIA/gi, "Frequência");
+  s = s.replace(/ENGENHARIA DE MANUTENÇÃO/gi, "Eng. Manutenção");
+  return s;
+}
+
 const STORAGE_KEY = "backlog_data_v1";
 const VIEW_STORAGE_KEY = "backlog_saved_views_v1";
 
@@ -230,11 +266,13 @@ function MultiSelect({
   options,
   value,
   onChange,
+  hideInlineLabel,
 }: {
   label: string;
   options: string[];
   value: string[];
   onChange: (v: string[]) => void;
+  hideInlineLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const toggle = (o: string) => {
@@ -246,10 +284,10 @@ function MultiSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6]"
+        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
       >
         <span className="truncate">
-          <span className="mr-1 text-xs text-slate-500">{label}:</span>
+          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500">{label}:</span>}
           <span className="font-medium text-slate-800">
             {value.length === 0 ? "Todos" : value.length === 1 ? value[0] : `${value.length} selecionados`}
           </span>
@@ -289,12 +327,14 @@ function ComboboxSearch({
   value,
   onChange,
   allLabel = "Todas",
+  hideInlineLabel,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (v: string) => void;
   allLabel?: string;
+  hideInlineLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -307,10 +347,10 @@ function ComboboxSearch({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6]"
+        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
       >
         <span className="truncate">
-          <span className="mr-1 text-xs text-slate-500">{label}:</span>
+          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500">{label}:</span>}
           <span className="font-medium text-slate-800">{selectedLabel}</span>
         </span>
         <Search className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
@@ -369,6 +409,7 @@ function BacklogPage() {
   const [now, setNow] = useState(() => new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [activeRouteTab, setActiveRouteTab] = useState<number>(0);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -397,20 +438,23 @@ function BacklogPage() {
 
   // ---------- filtros ----------
   const [fPlanta, setFPlanta] = useState<string>("TODAS");
-  const [fResp, setFResp] = useState<string[]>([]);
+  const [fResp, setFResp] = useState<string[]>(["Baixada 2"]);
   const [fStatus, setFStatus] = useState<string>("TODOS");
   const [fEquipe, setFEquipe] = useState<string>("TODAS");
   const [fCidade, setFCidade] = useState<string>("TODAS");
   const [fFaixa, setFFaixa] = useState<string>("TODAS");
+  const [fTipo, setFTipo] = useState<string>("TODOS");
   const [onlyLate, setOnlyLate] = useState(false);
   const [onlyEmerg, setOnlyEmerg] = useState(false);
   const [fSlaBefore, setFSlaBefore] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [mapFitSignal, setMapFitSignal] = useState(0);
+  const [tableExpanded, setTableExpanded] = useState(false);
+  const [copiedOm, setCopiedOm] = useState<string | null>(null);
 
   // ---------- filtro em cascata: cada dropdown considera os demais filtros ----------
-  type FilterKey = "planta" | "resp" | "status" | "equipe" | "cidade" | "faixa" | "late" | "emerg" | "sla";
+  type FilterKey = "planta" | "resp" | "status" | "equipe" | "cidade" | "faixa" | "late" | "emerg" | "sla" | "tipo";
   const applyFilters = (rows: Enriched[], skip?: FilterKey) => {
     const slaLimit = fSlaBefore ? new Date(fSlaBefore + "T00:00:00") : null;
     return rows.filter((e) => {
@@ -420,24 +464,25 @@ function BacklogPage() {
       if (skip !== "equipe" && fEquipe !== "TODAS" && e.equipe !== fEquipe) return false;
       if (skip !== "cidade" && fCidade !== "TODAS" && e.r.Cidade !== fCidade) return false;
       if (skip !== "faixa" && fFaixa !== "TODAS" && e.faixa !== fFaixa) return false;
+      if (skip !== "tipo" && fTipo !== "TODOS" && e.r["Tipo de Atividade"] !== fTipo) return false;
       if (skip !== "late" && onlyLate && e.slaStatus !== "ATRASADO") return false;
       if (skip !== "emerg" && onlyEmerg && (e.r.PRIORIDADE || "").toUpperCase() !== "EMERGÊNCIA") return false;
       if (skip !== "sla" && slaLimit && e.fimSla && e.fimSla >= slaLimit) return false;
       return true;
     });
   };
-  const filtered = useMemo(() => applyFilters(enriched), [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore]);
+  const filtered = useMemo(() => applyFilters(enriched), [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore]);
 
   const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
   const OPT_PLANTA = useMemo(
     () => uniq(applyFilters(enriched, "planta").map((e) => e.planta).filter(Boolean)).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fResp, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_RESP = useMemo(
     () => uniq(applyFilters(enriched, "resp").map((e) => e.responsabilidade)).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlanta, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_STATUS = useMemo(
     () => uniq(
@@ -446,22 +491,27 @@ function BacklogPage() {
         .filter(Boolean),
     ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlanta, fResp, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_EQUIPE = useMemo(
     () => uniq(applyFilters(enriched, "equipe").map((e) => e.equipe)).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlanta, fResp, fStatus, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_CIDADE = useMemo(
     () => uniq(applyFilters(enriched, "cidade").map((e) => e.r.Cidade).filter(Boolean)).sort() as string[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fEquipe, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlanta, fResp, fStatus, fEquipe, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_FAIXA = useMemo(
     () => FAIXAS.filter((f) => applyFilters(enriched, "faixa").some((e) => e.faixa === f)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fTipo, onlyLate, onlyEmerg, fSlaBefore],
+  );
+  const OPT_TIPO = useMemo(
+    () => uniq(applyFilters(enriched, "tipo").map((e) => e.r["Tipo de Atividade"]).filter(Boolean)).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
   );
 
   // ---------- KPIs ----------
@@ -487,7 +537,7 @@ function BacklogPage() {
       m.set(k, (m.get(k) || 0) + 1);
     }
     return Array.from(m.entries())
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ name, displayName: abbreviateAtividade(name), value }))
       .sort((a, b) => b.value - a.value);
   }, [filtered]);
 
@@ -713,6 +763,8 @@ function BacklogPage() {
     [enriched],
   );
 
+  const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
+
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
   const [rbTipos, setRbTipos] = useState<string[]>([]);
@@ -722,6 +774,7 @@ function BacklogPage() {
   const [rbTolerance, setRbTolerance] = useState<number>(3);
   const [rbElevatorias, setRbElevatorias] = useState<string[]>([]);
   const [rbCidades, setRbCidades] = useState<string[]>([]);
+  const [rbRouteCount, setRbRouteCount] = useState<number>(1);
   const [routeError, setRouteError] = useState<string>("");
 
   useEffect(() => {
@@ -746,8 +799,9 @@ function BacklogPage() {
     etaMin: number;
     totalOs: number;
     limitConfig: { max: number; tolerance: number };
+    color?: string;
   };
-  const [generatedRoute, setGeneratedRoute] = useState<GeneratedRoute | null>(null);
+  const [generatedRoutes, setGeneratedRoutes] = useState<GeneratedRoute[]>([]);
 
   function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
     const R = 6371;
@@ -763,6 +817,7 @@ function BacklogPage() {
     if (!rbSlaBefore) { setRouteError("Informe a data/hora limite do Fim do SLA."); return; }
     if (!rbStart) { setRouteError("Selecione o ponto de partida."); return; }
     if (!rbMaxStops || rbMaxStops < 1) { setRouteError("Máximo de paradas deve ser ≥ 1."); return; }
+    if (rbRouteCount < 1) { setRouteError("Quantidade de rotas deve ser no mínimo 1."); return; }
 
     const slaLimit = new Date(rbSlaBefore);
     if (isNaN(slaLimit.getTime())) { setRouteError("Data/hora limite inválida."); return; }
@@ -779,130 +834,154 @@ function BacklogPage() {
     });
     if (!candidates.length) { setRouteError("Nenhuma O.S. atende aos critérios informados."); return; }
 
-    // 2) agrupa por planta
-    type Group = { planta: string; lat: number; lon: number; oss: Enriched[]; oldestFimSla: Date };
-    const groupMap = new Map<string, Group>();
-    for (const e of candidates) {
-      const cur = groupMap.get(e.planta);
-      if (!cur) {
-        groupMap.set(e.planta, {
-          planta: e.planta, lat: e.lat!, lon: e.lon!, oss: [e], oldestFimSla: e.fimSla!,
-        });
-      } else {
-        cur.oss.push(e);
-        if (e.fimSla! < cur.oldestFimSla) cur.oldestFimSla = e.fimSla!;
-      }
-    }
-    const groups = Array.from(groupMap.values());
-
-    // 3) ponto de partida
+    // 2) ponto de partida
     const startRow = enriched.find((e) => e.planta === rbStart && e.lat !== null && e.lon !== null);
     if (!startRow) { setRouteError("Ponto de partida não possui coordenadas."); return; }
     const startPt = { lat: startRow.lat!, lon: startRow.lon!, planta: rbStart };
 
-    // 4) Nearest-neighbor com urgência
-    const maxDaysAtraso = Math.max(
-      1,
-      ...groups.map((g) => Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000)),
-    );
-    const remaining = new Set(groups.map((g) => g.planta));
-    const orderedGroups: Group[] = [];
-    let cursor: { lat: number; lon: number } = startPt;
-    while (remaining.size) {
-      let best: Group | null = null;
-      let bestScore = Infinity;
-      for (const g of groups) {
-        if (!remaining.has(g.planta)) continue;
-        const d = haversineKm(cursor, g);
-        const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
-        const norm = days / maxDaysAtraso;
-        const score = d - URGENCY_WEIGHT_KM_PER_DAY * norm * 10;
-        if (score < bestScore) { bestScore = score; best = g; }
-      }
-      if (!best) break;
-      orderedGroups.push(best);
-      remaining.delete(best.planta);
-      cursor = { lat: best.lat, lon: best.lon };
-    }
+    const routesList: GeneratedRoute[] = [];
+    const visitedPlantas = new Set<string>();
 
-    // 5) Corte pelo máximo de paradas (com tolerância)
-    const chosen: Group[] = [];
-    let acc = 0;
-    for (const g of orderedGroups) {
-      if (acc >= rbMaxStops) break;
-      const next = acc + g.oss.length;
-      if (next <= rbMaxStops) {
-        chosen.push(g);
-        acc = next;
-      } else {
-        const overflow = next - rbMaxStops;
-        if (overflow <= rbTolerance) {
+    for (let rIdx = 0; rIdx < rbRouteCount; rIdx++) {
+      // Candidatos ainda não visitados
+      const activeCandidates = candidates.filter((e) => !visitedPlantas.has(e.planta));
+      if (!activeCandidates.length) break;
+
+      // 3) agrupa por planta
+      type Group = { planta: string; lat: number; lon: number; oss: Enriched[]; oldestFimSla: Date };
+      const groupMap = new Map<string, Group>();
+      for (const e of activeCandidates) {
+        const cur = groupMap.get(e.planta);
+        if (!cur) {
+          groupMap.set(e.planta, {
+            planta: e.planta, lat: e.lat!, lon: e.lon!, oss: [e], oldestFimSla: e.fimSla!,
+          });
+        } else {
+          cur.oss.push(e);
+          if (e.fimSla! < cur.oldestFimSla) cur.oldestFimSla = e.fimSla!;
+        }
+      }
+      const groups = Array.from(groupMap.values());
+      if (!groups.length) break;
+
+      // 4) Nearest-neighbor com urgência
+      const maxDaysAtraso = Math.max(
+        1,
+        ...groups.map((g) => Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000)),
+      );
+      const remaining = new Set(groups.map((g) => g.planta));
+      const orderedGroups: Group[] = [];
+      let cursor: { lat: number; lon: number } = startPt;
+      
+      while (remaining.size) {
+        let best: Group | null = null;
+        let bestScore = Infinity;
+        for (const g of groups) {
+          if (!remaining.has(g.planta)) continue;
+          const d = haversineKm(cursor, g);
+          const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
+          const norm = days / maxDaysAtraso;
+          const score = d - URGENCY_WEIGHT_KM_PER_DAY * norm * 10;
+          if (score < bestScore) { bestScore = score; best = g; }
+        }
+        if (!best) break;
+        orderedGroups.push(best);
+        remaining.delete(best.planta);
+        cursor = { lat: best.lat, lon: best.lon };
+      }
+
+      // 5) Corte pelo máximo de paradas (com tolerância)
+      const chosen: Group[] = [];
+      let acc = 0;
+      for (const g of orderedGroups) {
+        if (acc >= rbMaxStops) break;
+        const next = acc + g.oss.length;
+        if (next <= rbMaxStops) {
           chosen.push(g);
           acc = next;
+        } else {
+          const overflow = next - rbMaxStops;
+          if (overflow <= rbTolerance) {
+            chosen.push(g);
+            acc = next;
+          }
+          break;
         }
-        break;
       }
-    }
-    if (!chosen.length) { setRouteError("Máximo de paradas insuficiente até para o primeiro grupo."); return; }
+      if (!chosen.length) continue;
 
-    // 6) monta stops + distâncias
-    let cumKm = 0;
-    let prev: { lat: number; lon: number } = startPt;
-    const details: GeneratedRoute["details"] = [];
-    const stops: RouteStop[] = [];
-    let totalOs = 0;
-    chosen.forEach((g, idx) => {
-      const d = haversineKm(prev, g);
-      cumKm += d;
-      const ordem = idx + 1;
-      details.push({
-        ordem,
-        planta: g.planta,
-        plantaShort: g.planta.split(" - ")[0] || g.planta,
-        cidade: g.oss[0]?.r.Cidade || "",
-        distKm: d,
-        cumKm,
-        oss: g.oss,
-        oldestFimSla: g.oldestFimSla,
+      // 6) monta stops + distâncias
+      let cumKm = 0;
+      let prev: { lat: number; lon: number } = startPt;
+      const details: GeneratedRoute["details"] = [];
+      const stops: RouteStop[] = [];
+      let totalOs = 0;
+      
+      chosen.forEach((g, idx) => {
+        visitedPlantas.add(g.planta); // Marca planta como visitada nesta rota
+        const d = haversineKm(prev, g);
+        cumKm += d;
+        const ordem = idx + 1;
+        details.push({
+          ordem,
+          planta: g.planta,
+          plantaShort: g.planta.split(" - ")[0] || g.planta,
+          cidade: g.oss[0]?.r.Cidade || "",
+          distKm: d,
+          cumKm,
+          oss: g.oss,
+          oldestFimSla: g.oldestFimSla,
+        });
+        stops.push({ planta: g.planta, lat: g.lat, lon: g.lon, ordem, osCount: g.oss.length });
+        totalOs += g.oss.length;
+        prev = { lat: g.lat, lon: g.lon };
       });
-      stops.push({ planta: g.planta, lat: g.lat, lon: g.lon, ordem, osCount: g.oss.length });
-      totalOs += g.oss.length;
-      prev = { lat: g.lat, lon: g.lon };
-    });
 
-    const totalKm = cumKm;
-    const etaMin = Math.round((totalKm / AVG_KMH) * 60);
+      const totalKm = cumKm;
+      const etaMin = Math.round((totalKm / AVG_KMH) * 60);
 
-    setGeneratedRoute({
-      start: { lat: startPt.lat, lon: startPt.lon, label: rbStart },
-      stops,
-      details,
-      totalKm,
-      etaMin,
-      totalOs,
-      limitConfig: { max: rbMaxStops, tolerance: rbTolerance },
-    });
+      routesList.push({
+        start: { lat: startPt.lat, lon: startPt.lon, label: rbStart },
+        stops,
+        details,
+        totalKm,
+        etaMin,
+        totalOs,
+        limitConfig: { max: rbMaxStops, tolerance: rbTolerance },
+        color: ROUTE_COLORS[rIdx % ROUTE_COLORS.length],
+      });
+    }
+
+    if (!routesList.length) { setRouteError("Nenhuma rota pôde ser gerada com as O.S. restantes."); return; }
+
+    setGeneratedRoutes(routesList);
     setRouteDialogOpen(false);
     setTimeout(() => setMapFitSignal((n) => n + 1), 100);
   };
 
-  const clearRoute = () => setGeneratedRoute(null);
+  const clearRoute = () => setGeneratedRoutes([]);
 
-  const exportRouteCSV = () => {
-    if (!generatedRoute) return;
-    const headers = ["Parada", "Planta", "Cidade", "Distância (km)", "Acumulado (km)", "Ordem", "Nota", "Fim SLA", "Prioridade", "Tipo", "TEXTO BREVE"];
+  const exportRouteCSV = (routeIdx?: number) => {
+    if (!generatedRoutes.length) return;
+    const headers = ["Rota", "Parada", "Planta", "Cidade", "Distância (km)", "Acumulado (km)", "Ordem", "Nota", "Fim SLA", "Prioridade", "Tipo", "TEXTO BREVE"];
     const rows: string[][] = [];
-    for (const d of generatedRoute.details) {
-      for (const os of d.oss) {
-        rows.push([
-          String(d.ordem), d.planta, d.cidade,
-          d.distKm.toFixed(2), d.cumKm.toFixed(2),
-          os.om, os.r.NOTA ?? "", fmtDate(os.fimSla),
-          os.r.PRIORIDADE ?? "", os.r["Tipo de Atividade"] ?? "",
-          os.r["TEXTO BREVE"] ?? "",
-        ]);
+    
+    generatedRoutes.forEach((route, rIdx) => {
+      if (routeIdx !== undefined && routeIdx !== rIdx) return;
+      for (const d of route.details) {
+        for (const os of d.oss) {
+          rows.push([
+            `Rota ${rIdx + 1}`,
+            String(d.ordem), d.planta, d.cidade,
+            d.distKm.toFixed(2), d.cumKm.toFixed(2),
+            os.om, os.r.NOTA ?? "", fmtDate(os.fimSla),
+            os.r.PRIORIDADE ?? "", os.r["Tipo de Atividade"] ?? "",
+            os.r["TEXTO BREVE"] ?? "",
+          ]);
+        }
       }
-    }
+    });
+
     const csv = [headers, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
       .join("\n");
@@ -910,25 +989,33 @@ function BacklogPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `rota-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `rotas-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const copyRouteResumo = async () => {
-    if (!generatedRoute) return;
+    if (!generatedRoutes.length) return;
     const lines = [
-      `🗺️ *Rota programada* — ${generatedRoute.totalOs} O.S. em ${generatedRoute.stops.length} paradas`,
-      `📏 ${generatedRoute.totalKm.toFixed(1)} km · ⏱️ ~${generatedRoute.etaMin} min de deslocamento`,
-      `🚩 Partida: ${generatedRoute.start.label.split(" - ")[0]}`,
-      "",
-      ...generatedRoute.details.map(
-        (d) => `${d.ordem}. ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`,
-      ),
+      `🗺️ *Programação de Rotas* — ${generatedRoutes.reduce((acc, r) => acc + r.totalOs, 0)} O.S. no total`,
+      ""
     ];
+
+    generatedRoutes.forEach((route, rIdx) => {
+      lines.push(
+        `📍 *Rota ${rIdx + 1}* — ${route.totalOs} O.S. em ${route.stops.length} paradas`,
+        `📏 ${route.totalKm.toFixed(1)} km · ⏱️ ~${route.etaMin} min de deslocamento`,
+        `🚩 Partida: ${route.start.label.split(" - ")[0]}`,
+        ...route.details.map(
+          (d) => `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`
+        ),
+        ""
+      );
+    });
+
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
-      alert("Rota copiada! Cole no WhatsApp.");
+      alert("Resumo de todas as rotas copiado! Cole no WhatsApp.");
     } catch { alert("Não foi possível copiar."); }
   };
 
@@ -973,7 +1060,7 @@ function BacklogPage() {
               onSelect={togglePlanta}
               selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
               fitSignal={mapFitSignal}
-              route={generatedRoute}
+              routes={generatedRoutes}
             />
           </Suspense>
         ) : (
@@ -1113,54 +1200,129 @@ function BacklogPage() {
       </div>
 
       {/* Filtros */}
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <button
+          type="button"
           onClick={() => setShowFilters((v) => !v)}
-          className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-[#0b3a73] sm:hidden"
+          className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-[#0b3a73] sm:hidden cursor-pointer"
         >
-          <span className="flex items-center gap-1">
-            <SlidersHorizontal className="h-4 w-4" /> Filtros
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4" /> Filtros do Backlog
           </span>
           <span>{showFilters ? "ocultar" : "mostrar"}</span>
         </button>
-        <div className={`${showFilters ? "grid" : "hidden"} gap-2 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`}>
-          <ComboboxSearch label="Elevatória" options={OPT_PLANTA} value={fPlanta} onChange={setFPlanta} allLabel="Todas" />
-          <MultiSelect label="Responsabilidade" options={OPT_RESP} value={fResp} onChange={setFResp} />
-          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm">
-            <option value="TODOS">Status: Todos</option>
-            {OPT_STATUS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={fEquipe} onChange={(e) => setFEquipe(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm">
-            <option value="TODAS">Equipe: Todas</option>
-            {OPT_EQUIPE.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={fCidade} onChange={(e) => setFCidade(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm">
-            <option value="TODAS">Cidade: Todas</option>
-            {OPT_CIDADE.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={fFaixa} onChange={(e) => setFFaixa(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm">
-            <option value="TODAS">Faixa: Todas</option>
-            {OPT_FAIXA.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <label className="flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm">
-            <Clock className="h-4 w-4 text-slate-400" />
-            Fim SLA anterior a:
-            <input type="date" value={fSlaBefore} onChange={(e) => setFSlaBefore(e.target.value)} className="ml-auto min-h-9 rounded border-none text-[13px] outline-none" />
-          </label>
-          {savedViews.length > 0 && (
-            <select onChange={(e) => e.target.value && loadView(e.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[15px] shadow-sm" defaultValue="">
-              <option value="">Views salvas…</option>
-              {savedViews.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+        <div className={`${showFilters ? "grid" : "hidden"} gap-4 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`}>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Elevatória</label>
+            <ComboboxSearch label="Elevatória" options={OPT_PLANTA} value={fPlanta} onChange={setFPlanta} allLabel="Todas" hideInlineLabel />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Responsabilidade</label>
+            <MultiSelect label="Responsabilidade" options={OPT_RESP} value={fResp} onChange={setFResp} hideInlineLabel />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
+            <select
+              value={fStatus}
+              onChange={(e) => setFStatus(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+            >
+              <option value="TODOS">Todos</option>
+              {OPT_STATUS.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipe</label>
+            <select
+              value={fEquipe}
+              onChange={(e) => setFEquipe(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+            >
+              <option value="TODAS">Todas</option>
+              {OPT_EQUIPE.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Cidade</label>
+            <select
+              value={fCidade}
+              onChange={(e) => setFCidade(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+            >
+              <option value="TODAS">Todas</option>
+              {OPT_CIDADE.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tipo de Atividade</label>
+            <select
+              value={fTipo}
+              onChange={(e) => setFTipo(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+            >
+              <option value="TODOS">Todos</option>
+              {OPT_TIPO.map((p) => <option key={p} value={p}>{abbreviateAtividade(p)}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tempo Aberto</label>
+            <select
+              value={fFaixa}
+              onChange={(e) => setFFaixa(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+            >
+              <option value="TODAS">Todas as faixas</option>
+              {OPT_FAIXA.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Fim SLA anterior a</label>
+            <div className="relative flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 shadow-sm">
+              <Clock className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
+              <input
+                type="date"
+                value={fSlaBefore}
+                onChange={(e) => setFSlaBefore(e.target.value)}
+                className="w-full border-none text-[13px] outline-none bg-transparent cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {savedViews.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Views Salvas</label>
+              <select
+                onChange={(e) => e.target.value && loadView(e.target.value)}
+                className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                defaultValue=""
+              >
+                <option value="">Escolha uma view…</option>
+                {savedViews.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select>
+            </div>
           )}
-          <button onClick={clearAllFilters} className="min-h-11 rounded-md border border-slate-300 bg-slate-50 px-3 text-[13px] font-medium text-slate-600 hover:bg-slate-100">
-            Limpar filtros
-          </button>
+
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="min-h-11 w-full rounded-md border border-slate-300 bg-slate-50 px-3 text-[13px] font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition cursor-pointer"
+            >
+              Limpar filtros
+            </button>
+          </div>
         </div>
         {fPlanta !== "TODAS" && (
-          <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73]">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73]">
             Filtrando por planta: <strong>{fPlanta}</strong>
-            <button onClick={() => setFPlanta("TODAS")}><X className="h-3 w-3" /></button>
+            <button type="button" onClick={() => setFPlanta("TODAS")} className="cursor-pointer"><X className="h-3 w-3" /></button>
           </div>
         )}
       </div>
@@ -1175,7 +1337,17 @@ function BacklogPage() {
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
               <Tooltip />
-              <Bar dataKey="value" fill={BLUE} radius={[0, 4, 4, 0]}>
+              <Bar
+                dataKey="value"
+                fill={BLUE}
+                radius={[0, 4, 4, 0]}
+                onClick={(data) => {
+                  if (data && data.name) {
+                    setFFaixa((prev) => (prev === data.name ? "TODAS" : data.name));
+                  }
+                }}
+                className="cursor-pointer"
+              >
                 <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: BLUE_DARK, fontWeight: 600 }} />
               </Bar>
             </BarChart>
@@ -1205,12 +1377,19 @@ function BacklogPage() {
                         endAngle={-270}
                         isAnimationActive={false}
                       >
-                        {dataTipoAtividade.map((_, i) => (
-                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        {dataTipoAtividade.map((d, i) => (
+                          <Cell
+                            key={i}
+                            fill={PIE_COLORS[i % PIE_COLORS.length]}
+                            onClick={() => {
+                              setFTipo((prev) => (prev === d.name ? "TODOS" : d.name));
+                            }}
+                            className="cursor-pointer"
+                          />
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(v: number, n: string) => [`${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`, n]}
+                        formatter={(v: number, n: string) => [`${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`, abbreviateAtividade(n)]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -1222,14 +1401,26 @@ function BacklogPage() {
                 <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
                   {dataTipoAtividade.map((d, i) => {
                     const pct = totalTipo ? Math.round((d.value / totalTipo) * 100) : 0;
+                    const isSelected = fTipo === d.name;
                     return (
-                      <li key={d.name} className="flex items-center gap-2 truncate">
-                        <span
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                        />
-                        <span className="truncate text-slate-700" title={d.name}>{d.name}</span>
-                        <span className="ml-auto shrink-0 font-semibold text-[#0b3a73]">{d.value} · {pct}%</span>
+                      <li key={d.name} className="truncate">
+                        <button
+                          type="button"
+                          onClick={() => setFTipo((prev) => (prev === d.name ? "TODOS" : d.name))}
+                          className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 p-1 rounded cursor-pointer transition-colors ${
+                            isSelected ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : "text-slate-750"
+                          }`}
+                          title={d.name}
+                        >
+                          <span
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                          />
+                          <span className="truncate">{d.displayName}</span>
+                          <span className="ml-auto shrink-0 text-[10px] font-bold text-slate-500">
+                            {d.value} ({pct}%)
+                          </span>
+                        </button>
                       </li>
                     );
                   })}
@@ -1247,7 +1438,17 @@ function BacklogPage() {
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="value" fill={BLUE_DARK} radius={[0, 4, 4, 0]}>
+              <Bar
+                dataKey="value"
+                fill={BLUE_DARK}
+                radius={[0, 4, 4, 0]}
+                onClick={(data) => {
+                  if (data && data.name) {
+                    setFCidade((prev) => (prev === data.name ? "TODAS" : data.name));
+                  }
+                }}
+                className="cursor-pointer"
+              >
                 <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: BLUE_DARK, fontWeight: 600 }} />
               </Bar>
             </BarChart>
@@ -1424,122 +1625,165 @@ function BacklogPage() {
                 onClick={generateRoute}
                 className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
               >
-                <RouteIcon className="h-4 w-4" /> Gerar Rota
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Resultado da rota */}
-      {generatedRoute && (
-        <div className="mb-4 overflow-hidden rounded-xl border-2 border-[#f59e0b] bg-gradient-to-br from-orange-50 to-white shadow-md">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200 bg-orange-100/50 px-4 py-3">
-            <div className="flex items-center gap-2 text-[#0b3a73]">
-              <RouteIcon className="h-5 w-5 text-[#f59e0b]" />
-              <div>
-                <div className="text-sm font-bold">Rota programada</div>
-                <div className="text-[11px] text-slate-600">
-                  {generatedRoute.totalOs} / {generatedRoute.limitConfig.max} O.S. em {generatedRoute.stops.length} paradas
-                  {generatedRoute.totalOs > generatedRoute.limitConfig.max &&
-                    ` (estouro de ${generatedRoute.totalOs - generatedRoute.limitConfig.max}, tolerância ${generatedRoute.limitConfig.tolerance})`}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-xs">
-              <div className="rounded bg-white px-2 py-1 shadow-sm">
-                <span className="text-slate-500">Distância:</span>{" "}
-                <span className="font-bold text-[#0b3a73]">{generatedRoute.totalKm.toFixed(1)} km</span>
-              </div>
-              <div className="rounded bg-white px-2 py-1 shadow-sm">
-                <span className="text-slate-500">Tempo est.:</span>{" "}
-                <span className="font-bold text-[#0b3a73]">~{generatedRoute.etaMin} min</span>
-              </div>
-              <button
-                onClick={exportRouteCSV}
-                className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white px-2 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb]"
-              >
-                <Download className="h-3 w-3" /> CSV
-              </button>
+        {/* Resultado da rota */}
+      {generatedRoutes.length > 0 && (
+        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
+          {/* Abas das rotas */}
+          <div className="flex flex-wrap border-b border-slate-100 bg-slate-50 px-2 pt-2 gap-1">
+            {generatedRoutes.map((route, rIdx) => {
+              const isActive = activeRouteTab === rIdx;
+              return (
+                <button
+                  key={rIdx}
+                  type="button"
+                  onClick={() => setActiveRouteTab(rIdx)}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[1px] cursor-pointer ${
+                    isActive
+                      ? "bg-white border-[#0b3a73] text-[#0b3a73]"
+                      : "text-slate-500 border-transparent hover:text-slate-850 hover:bg-white/40"
+                  }`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full inline-block shrink-0"
+                    style={{ backgroundColor: route.color || "#0b3a73" }}
+                  />
+                  Rota {rIdx + 1}
+                </button>
+              );
+            })}
+            <div className="ml-auto flex flex-wrap items-center gap-2 pb-2 pr-2">
               <button
                 onClick={copyRouteResumo}
-                className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1 rounded border border-slate-350 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
               >
-                <CopyIcon className="h-3 w-3" /> Copiar
+                <CopyIcon className="h-3.5 w-3.5" /> Copiar Todas (WhatsApp)
+              </button>
+              <button
+                onClick={() => exportRouteCSV()}
+                className="inline-flex items-center gap-1 rounded border border-slate-350 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5" /> Exportar Todas (CSV)
               </button>
               <button
                 onClick={clearRoute}
-                className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100"
+                className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 cursor-pointer"
               >
-                <X className="h-3 w-3" /> Limpar
+                <X className="h-3.5 w-3.5" /> Limpar
               </button>
             </div>
           </div>
 
-          <div className="grid gap-3 p-3 lg:grid-cols-2">
-            <div className="rounded border border-orange-100 bg-white p-2 text-xs">
-              <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73]">
-                <Flag className="h-3 w-3 text-[#f59e0b]" /> Ponto de partida:{" "}
-                <span className="font-normal text-slate-700">{generatedRoute.start.label}</span>
-              </div>
-              <ol className="space-y-1">
-                {generatedRoute.details.map((d) => (
-                  <li key={d.ordem} className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0b3a73] text-[11px] font-bold text-white">
-                          {d.ordem}
-                        </span>
-                        <div>
-                          <div className="font-semibold text-[#0b3a73]">{d.plantaShort}</div>
-                          <div className="text-[10px] text-slate-500">{d.cidade}</div>
-                        </div>
-                      </div>
-                      <div className="text-right text-[10px] text-slate-500">
-                        <div>+{d.distKm.toFixed(1)} km</div>
-                        <div className="text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
+          {/* Conteúdo da Rota Ativa */}
+          {(() => {
+            const activeRoute = generatedRoutes[activeRouteTab] || generatedRoutes[0];
+            if (!activeRoute) return null;
+            return (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-[#eaf3fb]/20 px-4 py-3">
+                  <div className="flex items-center gap-2 text-[#0b3a73]">
+                    <RouteIcon className="h-5 w-5" style={{ color: activeRoute.color || "#0b3a73" }} />
+                    <div>
+                      <div className="text-sm font-bold">Detalhes da Rota {activeRouteTab + 1}</div>
+                      <div className="text-[11px] text-slate-600">
+                        {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em {activeRoute.stops.length} paradas
+                        {activeRoute.totalOs > activeRoute.limitConfig.max &&
+                          ` (estouro de ${activeRoute.totalOs - activeRoute.limitConfig.max}, tolerância ${activeRoute.limitConfig.tolerance})`}
                       </div>
                     </div>
-                    <ul className="mt-1 ml-8 space-y-0.5">
-                      {d.oss.map((os) => (
-                        <li key={os.om} className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className="font-mono text-[#1f7ad6]">{os.om}</span>
-                          <span className="truncate">{os.r["TEXTO BREVE"]}</span>
-                          {os.slaStatus === "ATRASADO" && (
-                            <span className="ml-auto shrink-0 rounded bg-red-100 px-1 text-[9px] font-semibold text-red-700">
-                              {os.diasAberto}d
-                            </span>
-                          )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="rounded bg-white px-2 py-1 shadow-sm border border-slate-100">
+                      <span className="text-slate-500">Distância:</span>{" "}
+                      <span className="font-bold text-[#0b3a73]">{activeRoute.totalKm.toFixed(1)} km</span>
+                    </div>
+                    <div className="rounded bg-white px-2 py-1 shadow-sm border border-slate-100">
+                      <span className="text-slate-500">Tempo est.:</span>{" "}
+                      <span className="font-bold text-[#0b3a73]">~{activeRoute.etaMin} min</span>
+                    </div>
+                    <button
+                      onClick={() => exportRouteCSV(activeRouteTab)}
+                      className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] cursor-pointer"
+                    >
+                      <Download className="h-3 w-3" /> CSV Rota {activeRouteTab + 1}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 p-3 lg:grid-cols-2">
+                  <div className="rounded border border-slate-150 bg-white p-2 text-xs">
+                    <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73]">
+                      <Flag className="h-3.5 w-3.5" style={{ color: activeRoute.color || "#0b3a73" }} /> Ponto de partida:{" "}
+                      <span className="font-normal text-slate-700">{activeRoute.start.label}</span>
+                    </div>
+                    <ol className="space-y-1 max-h-[380px] overflow-auto pr-1">
+                      {activeRoute.details.map((d) => (
+                        <li key={d.ordem} className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: activeRoute.color || "#0b3a73" }}>
+                                {d.ordem}
+                              </span>
+                              <div>
+                                <div className="font-semibold text-[#0b3a73]">{d.plantaShort}</div>
+                                <div className="text-[10px] text-slate-500">{d.cidade}</div>
+                              </div>
+                            </div>
+                            <div className="text-right text-[10px] text-slate-500">
+                              <div>+{d.distKm.toFixed(1)} km</div>
+                              <div className="text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
+                            </div>
+                          </div>
+                          <ul className="mt-1 ml-8 space-y-0.5">
+                            {d.oss.map((os) => (
+                              <li key={os.om} className="flex items-center gap-2 text-[11px] text-slate-600">
+                                <span className="font-mono text-[#1f7ad6]">{os.om}</span>
+                                <span className="truncate">{os.r["TEXTO BREVE"]}</span>
+                                {os.slaStatus === "ATRASADO" && (
+                                  <span className="ml-auto shrink-0 rounded bg-red-100 px-1 text-[9px] font-semibold text-red-700">
+                                    {os.diasAberto}d
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         </li>
                       ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <div className="min-h-[300px] rounded border border-orange-100 bg-slate-100">
-              <div className="h-full min-h-[300px]" style={{ height: 400 }}>
-                {mounted ? (
-                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
-                    <BacklogMap
-                      markers={mapMarkers}
-                      onSelect={togglePlanta}
-                      selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
-                      fitSignal={mapFitSignal}
-                      route={generatedRoute}
-                    />
-                  </Suspense>
-                ) : null}
+                    </ol>
+                  </div>
+                  <div className="min-h-[300px] rounded border border-slate-150 bg-slate-100">
+                    <div className="h-full min-h-[300px]" style={{ height: 400 }}>
+                      {mounted ? (
+                        <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+                          <BacklogMap
+                            markers={mapMarkers}
+                            onSelect={togglePlanta}
+                            selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                            fitSignal={mapFitSignal}
+                            routes={[activeRoute]}
+                          />
+                        </Suspense>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 
       {/* Tabela */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 p-3 text-sm font-semibold text-[#0b3a73]">
-          O.S. filtradas ({sortedRows.length})
+        <div className="border-b border-slate-100 p-3 text-sm font-semibold text-[#0b3a73] flex items-center justify-between">
+          <span>O.S. filtradas ({sortedRows.length})</span>
+          <button
+            type="button"
+            onClick={() => setTableExpanded(true)}
+            className="inline-flex items-center gap-1 rounded border border-slate-350 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+            title="Expandir tabela"
+          >
+            <Maximize2 className="h-3.5 w-3.5" /> Expandir
+          </button>
         </div>
         <div className="max-h-[500px] overflow-auto">
           <table className="min-w-[900px] w-full text-left text-[13px]">
@@ -1560,6 +1804,7 @@ function BacklogPage() {
                     {label} {sortKey === k ? (sortDir === "asc" ? "▲" : "▼") : ""}
                   </th>
                 ))}
+                <th className="px-2 py-2 font-semibold">Elevatória</th>
                 <th className="px-2 py-2 font-semibold">SLA</th>
                 <th className="px-2 py-2 font-semibold">Resp.</th>
                 <th className="px-2 py-2 font-semibold">Equipe</th>
@@ -1568,11 +1813,32 @@ function BacklogPage() {
             <tbody>
               {sortedRows.map((e, i) => (
                 <tr key={`${e.om}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">{e.om}</td>
+                  <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(e.om);
+                        setCopiedOm(e.om);
+                        setTimeout(() => setCopiedOm(null), 1500);
+                      }}
+                      className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] font-bold text-left cursor-pointer flex items-center gap-1.5"
+                      title="Clique para copiar a O.S."
+                    >
+                      {e.om}
+                      {copiedOm === e.om && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
+                          Copiado!
+                        </span>
+                      )}
+                    </button>
+                  </td>
                   <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
                   <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
                   <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
-                  <td className="px-2 py-1">{e.r["Tipo de Atividade"]}</td>
+                  <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
+                  <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800">
+                    {getElevatoriaName(e.planta)}
+                  </td>
                   <td className="whitespace-nowrap px-2 py-1">
                     <span className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                       {e.slaStatus}
@@ -1586,6 +1852,83 @@ function BacklogPage() {
           </table>
         </div>
       </div>
+
+      {/* Dialog da Tabela Expandida */}
+      <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
+        <DialogContent className="max-w-7xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-2">
+            <DialogTitle className="text-[#0b3a73] font-bold">
+              Todas as O.S. Filtradas ({sortedRows.length})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto">
+            <table className="w-full text-left text-[13px]">
+              <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10">
+                <tr>
+                  {([
+                    ["om", "Ordem"],
+                    ["textoBreve", "Texto Breve"],
+                    ["planta", "Planta"],
+                    ["inicioSla", "Início SLA"],
+                    ["tipo", "Tipo de Atividade"],
+                  ] as Array<[SortKey, string]>).map(([k, label]) => (
+                    <th
+                      key={k}
+                      className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
+                      onClick={() => toggleSort(k)}
+                    >
+                      {label} {sortKey === k ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                    </th>
+                  ))}
+                  <th className="px-2 py-2 font-semibold">Elevatória</th>
+                  <th className="px-2 py-2 font-semibold">SLA</th>
+                  <th className="px-2 py-2 font-semibold">Resp.</th>
+                  <th className="px-2 py-2 font-semibold">Equipe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRows.map((e, i) => (
+                  <tr key={`${e.om}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(e.om);
+                          setCopiedOm(e.om);
+                          setTimeout(() => setCopiedOm(null), 1500);
+                        }}
+                        className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] font-bold text-left cursor-pointer flex items-center gap-1.5"
+                        title="Clique para copiar a O.S."
+                      >
+                        {e.om}
+                        {copiedOm === e.om && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
+                            Copiado!
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
+                    <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
+                    <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
+                    <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
+                    <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800">
+                      {getElevatoriaName(e.planta)}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1">
+                      <span className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                        {e.slaStatus}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.responsabilidade}</td>
+                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.equipe}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <input
         ref={fileInputRef}
