@@ -722,12 +722,15 @@ function BacklogPage() {
       )}
       <div style={{ height: heightPx, width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
         {mounted ? (
-          <BacklogMap
-            markers={mapMarkers}
-            onSelect={togglePlanta}
-            selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
-            fitSignal={mapFitSignal}
-          />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+            <BacklogMap
+              markers={mapMarkers}
+              onSelect={togglePlanta}
+              selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+              fitSignal={mapFitSignal}
+              route={generatedRoute}
+            />
+          </Suspense>
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-slate-400">
             Carregando mapa…
