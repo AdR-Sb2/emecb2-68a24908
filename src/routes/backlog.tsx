@@ -1,12 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Bar,
   BarChart,
   Cell,
   LabelList,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -31,10 +30,12 @@ import {
   Crosshair,
   Zap,
   TrendingUp,
+  Route as RouteIcon,
+  Flag,
 } from "lucide-react";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/backlog.json";
-import BacklogMap from "@/components/backlog-map";
+import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   computeEquipe,
@@ -42,6 +43,9 @@ import {
   type Equipe,
   type Responsabilidade,
 } from "@/data/responsabilidade-rules";
+
+// Leaflet importa `window` no topo → carrega só no cliente para evitar crash de SSR.
+const BacklogMap = lazy(() => import("@/components/backlog-map"));
 
 export const Route = createFileRoute("/backlog")({
   head: () => ({
