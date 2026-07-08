@@ -1022,6 +1022,13 @@ function BacklogPage() {
           >
             <Upload className="h-4 w-4" /> Importar bucket do Field
           </button>
+          <button
+            onClick={() => setRouteDialogOpen(true)}
+            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-gradient-to-r from-[#f59e0b] to-[#ef4444] px-3 py-2 text-[13px] font-semibold text-white shadow hover:opacity-95"
+            title="Gerar rota otimizada"
+          >
+            <RouteIcon className="h-4 w-4" /> Montar Rota
+          </button>
           {hasCustomData && (
             <button
               onClick={() => {
