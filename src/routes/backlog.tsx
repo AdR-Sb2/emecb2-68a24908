@@ -1,12 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Bar,
   BarChart,
   Cell,
   LabelList,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -31,10 +30,12 @@ import {
   Crosshair,
   Zap,
   TrendingUp,
+  Route as RouteIcon,
+  Flag,
 } from "lucide-react";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/backlog.json";
-import BacklogMap from "@/components/backlog-map";
+import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   computeEquipe,
@@ -42,6 +43,9 @@ import {
   type Equipe,
   type Responsabilidade,
 } from "@/data/responsabilidade-rules";
+
+// Leaflet importa `window` no topo → carrega só no cliente para evitar crash de SSR.
+const BacklogMap = lazy(() => import("@/components/backlog-map"));
 
 export const Route = createFileRoute("/backlog")({
   head: () => ({
@@ -683,6 +687,251 @@ function BacklogPage() {
     setOnlyLate(false); setOnlyEmerg(false); setFSlaBefore("");
   };
 
+  // ============================================================
+  // Route Builder — Montador Automático de Rota
+  // ============================================================
+  const DEFAULT_START_HINT = "PL-RJB-EAT1005";
+  const AVG_KMH = 38;
+  const URGENCY_WEIGHT_KM_PER_DAY = 0.35;
+  const findDefaultStart = () =>
+    enriched.find((e) => e.planta.toUpperCase().includes(DEFAULT_START_HINT))?.planta || "";
+
+  const allTipos = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.r["Tipo de Atividade"] || "").filter(Boolean))).sort(),
+    [enriched],
+  );
+  const allResps = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.responsabilidade))).sort(),
+    [enriched],
+  );
+  const allPlantas = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.planta).filter(Boolean))).sort(),
+    [enriched],
+  );
+  const allCidades = useMemo(
+    () => Array.from(new Set(enriched.map((e) => e.r.Cidade || "").filter(Boolean))).sort() as string[],
+    [enriched],
+  );
+
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
+  const [rbTipos, setRbTipos] = useState<string[]>([]);
+  const [rbResps, setRbResps] = useState<string[]>(["Baixada 2"]);
+  const [rbStart, setRbStart] = useState<string>("");
+  const [rbMaxStops, setRbMaxStops] = useState<number>(20);
+  const [rbTolerance, setRbTolerance] = useState<number>(3);
+  const [rbElevatorias, setRbElevatorias] = useState<string[]>([]);
+  const [rbCidades, setRbCidades] = useState<string[]>([]);
+  const [routeError, setRouteError] = useState<string>("");
+
+  useEffect(() => {
+    if (!rbStart && allPlantas.length) setRbStart(findDefaultStart() || allPlantas[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPlantas.length]);
+
+  type GeneratedRoute = {
+    start: RouteStart;
+    stops: RouteStop[];
+    details: Array<{
+      ordem: number;
+      planta: string;
+      plantaShort: string;
+      cidade: string;
+      distKm: number;
+      cumKm: number;
+      oss: Enriched[];
+      oldestFimSla: Date | null;
+    }>;
+    totalKm: number;
+    etaMin: number;
+    totalOs: number;
+    limitConfig: { max: number; tolerance: number };
+  };
+  const [generatedRoute, setGeneratedRoute] = useState<GeneratedRoute | null>(null);
+
+  function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+    const R = 6371;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  const generateRoute = () => {
+    setRouteError("");
+    if (!rbSlaBefore) { setRouteError("Informe a data/hora limite do Fim do SLA."); return; }
+    if (!rbStart) { setRouteError("Selecione o ponto de partida."); return; }
+    if (!rbMaxStops || rbMaxStops < 1) { setRouteError("Máximo de paradas deve ser ≥ 1."); return; }
+
+    const slaLimit = new Date(rbSlaBefore);
+    if (isNaN(slaLimit.getTime())) { setRouteError("Data/hora limite inválida."); return; }
+
+    // 1) candidatos
+    const candidates = enriched.filter((e) => {
+      if (!e.fimSla || e.fimSla >= slaLimit) return false;
+      if (rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || "")) return false;
+      if (rbResps.length && !rbResps.includes(e.responsabilidade)) return false;
+      if (rbElevatorias.length && !rbElevatorias.includes(e.planta)) return false;
+      if (rbCidades.length && !rbCidades.includes(e.r.Cidade || "")) return false;
+      if (e.lat === null || e.lon === null) return false;
+      return true;
+    });
+    if (!candidates.length) { setRouteError("Nenhuma O.S. atende aos critérios informados."); return; }
+
+    // 2) agrupa por planta
+    type Group = { planta: string; lat: number; lon: number; oss: Enriched[]; oldestFimSla: Date };
+    const groupMap = new Map<string, Group>();
+    for (const e of candidates) {
+      const cur = groupMap.get(e.planta);
+      if (!cur) {
+        groupMap.set(e.planta, {
+          planta: e.planta, lat: e.lat!, lon: e.lon!, oss: [e], oldestFimSla: e.fimSla!,
+        });
+      } else {
+        cur.oss.push(e);
+        if (e.fimSla! < cur.oldestFimSla) cur.oldestFimSla = e.fimSla!;
+      }
+    }
+    const groups = Array.from(groupMap.values());
+
+    // 3) ponto de partida
+    const startRow = enriched.find((e) => e.planta === rbStart && e.lat !== null && e.lon !== null);
+    if (!startRow) { setRouteError("Ponto de partida não possui coordenadas."); return; }
+    const startPt = { lat: startRow.lat!, lon: startRow.lon!, planta: rbStart };
+
+    // 4) Nearest-neighbor com urgência
+    const maxDaysAtraso = Math.max(
+      1,
+      ...groups.map((g) => Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000)),
+    );
+    const remaining = new Set(groups.map((g) => g.planta));
+    const orderedGroups: Group[] = [];
+    let cursor: { lat: number; lon: number } = startPt;
+    while (remaining.size) {
+      let best: Group | null = null;
+      let bestScore = Infinity;
+      for (const g of groups) {
+        if (!remaining.has(g.planta)) continue;
+        const d = haversineKm(cursor, g);
+        const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
+        const norm = days / maxDaysAtraso;
+        const score = d - URGENCY_WEIGHT_KM_PER_DAY * norm * 10;
+        if (score < bestScore) { bestScore = score; best = g; }
+      }
+      if (!best) break;
+      orderedGroups.push(best);
+      remaining.delete(best.planta);
+      cursor = { lat: best.lat, lon: best.lon };
+    }
+
+    // 5) Corte pelo máximo de paradas (com tolerância)
+    const chosen: Group[] = [];
+    let acc = 0;
+    for (const g of orderedGroups) {
+      if (acc >= rbMaxStops) break;
+      const next = acc + g.oss.length;
+      if (next <= rbMaxStops) {
+        chosen.push(g);
+        acc = next;
+      } else {
+        const overflow = next - rbMaxStops;
+        if (overflow <= rbTolerance) {
+          chosen.push(g);
+          acc = next;
+        }
+        break;
+      }
+    }
+    if (!chosen.length) { setRouteError("Máximo de paradas insuficiente até para o primeiro grupo."); return; }
+
+    // 6) monta stops + distâncias
+    let cumKm = 0;
+    let prev: { lat: number; lon: number } = startPt;
+    const details: GeneratedRoute["details"] = [];
+    const stops: RouteStop[] = [];
+    let totalOs = 0;
+    chosen.forEach((g, idx) => {
+      const d = haversineKm(prev, g);
+      cumKm += d;
+      const ordem = idx + 1;
+      details.push({
+        ordem,
+        planta: g.planta,
+        plantaShort: g.planta.split(" - ")[0] || g.planta,
+        cidade: g.oss[0]?.r.Cidade || "",
+        distKm: d,
+        cumKm,
+        oss: g.oss,
+        oldestFimSla: g.oldestFimSla,
+      });
+      stops.push({ planta: g.planta, lat: g.lat, lon: g.lon, ordem, osCount: g.oss.length });
+      totalOs += g.oss.length;
+      prev = { lat: g.lat, lon: g.lon };
+    });
+
+    const totalKm = cumKm;
+    const etaMin = Math.round((totalKm / AVG_KMH) * 60);
+
+    setGeneratedRoute({
+      start: { lat: startPt.lat, lon: startPt.lon, label: rbStart },
+      stops,
+      details,
+      totalKm,
+      etaMin,
+      totalOs,
+      limitConfig: { max: rbMaxStops, tolerance: rbTolerance },
+    });
+    setRouteDialogOpen(false);
+    setTimeout(() => setMapFitSignal((n) => n + 1), 100);
+  };
+
+  const clearRoute = () => setGeneratedRoute(null);
+
+  const exportRouteCSV = () => {
+    if (!generatedRoute) return;
+    const headers = ["Parada", "Planta", "Cidade", "Distância (km)", "Acumulado (km)", "Ordem", "Nota", "Fim SLA", "Prioridade", "Tipo", "TEXTO BREVE"];
+    const rows: string[][] = [];
+    for (const d of generatedRoute.details) {
+      for (const os of d.oss) {
+        rows.push([
+          String(d.ordem), d.planta, d.cidade,
+          d.distKm.toFixed(2), d.cumKm.toFixed(2),
+          os.om, os.r.NOTA ?? "", fmtDate(os.fimSla),
+          os.r.PRIORIDADE ?? "", os.r["Tipo de Atividade"] ?? "",
+          os.r["TEXTO BREVE"] ?? "",
+        ]);
+      }
+    }
+    const csv = [headers, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rota-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyRouteResumo = async () => {
+    if (!generatedRoute) return;
+    const lines = [
+      `🗺️ *Rota programada* — ${generatedRoute.totalOs} O.S. em ${generatedRoute.stops.length} paradas`,
+      `📏 ${generatedRoute.totalKm.toFixed(1)} km · ⏱️ ~${generatedRoute.etaMin} min de deslocamento`,
+      `🚩 Partida: ${generatedRoute.start.label.split(" - ")[0]}`,
+      "",
+      ...generatedRoute.details.map(
+        (d) => `${d.ordem}. ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`,
+      ),
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      alert("Rota copiada! Cole no WhatsApp.");
+    } catch { alert("Não foi possível copiar."); }
+  };
+
   const mapCard = (heightPx: number, showToolbar = true) => (
     <>
       {showToolbar && (
@@ -718,12 +967,15 @@ function BacklogPage() {
       )}
       <div style={{ height: heightPx, width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
         {mounted ? (
-          <BacklogMap
-            markers={mapMarkers}
-            onSelect={togglePlanta}
-            selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
-            fitSignal={mapFitSignal}
-          />
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+            <BacklogMap
+              markers={mapMarkers}
+              onSelect={togglePlanta}
+              selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+              fitSignal={mapFitSignal}
+              route={generatedRoute}
+            />
+          </Suspense>
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-slate-400">
             Carregando mapa…
@@ -769,6 +1021,13 @@ function BacklogPage() {
             className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
           >
             <Upload className="h-4 w-4" /> Importar bucket do Field
+          </button>
+          <button
+            onClick={() => setRouteDialogOpen(true)}
+            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-gradient-to-r from-[#f59e0b] to-[#ef4444] px-3 py-2 text-[13px] font-semibold text-white shadow hover:opacity-95"
+            title="Gerar rota otimizada"
+          >
+            <RouteIcon className="h-4 w-4" /> Montar Rota
           </button>
           {hasCustomData && (
             <button
@@ -926,17 +1185,58 @@ function BacklogPage() {
         {/* Pie tipo atividade */}
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="mb-2 text-sm font-semibold text-[#0b3a73]">O.S. por Tipo de Atividade</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={dataTipoAtividade} dataKey="value" nameKey="name" outerRadius={80} label={(e) => e.value}>
-                {dataTipoAtividade.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {(() => {
+            const totalTipo = dataTipoAtividade.reduce((s, d) => s + d.value, 0);
+            return (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+                <div className="relative sm:col-span-2" style={{ height: 200 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dataTipoAtividade}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={1}
+                        stroke="#fff"
+                        strokeWidth={2}
+                        startAngle={90}
+                        endAngle={-270}
+                        isAnimationActive={false}
+                      >
+                        {dataTipoAtividade.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number, n: string) => [`${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`, n]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total</div>
+                    <div className="text-2xl font-bold text-[#0b3a73]">{totalTipo}</div>
+                  </div>
+                </div>
+                <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
+                  {dataTipoAtividade.map((d, i) => {
+                    const pct = totalTipo ? Math.round((d.value / totalTipo) * 100) : 0;
+                    return (
+                      <li key={d.name} className="flex items-center gap-2 truncate">
+                        <span
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                        />
+                        <span className="truncate text-slate-700" title={d.name}>{d.name}</span>
+                        <span className="ml-auto shrink-0 font-semibold text-[#0b3a73]">{d.value} · {pct}%</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Cidade */}
@@ -1027,16 +1327,214 @@ function BacklogPage() {
           </div>
           <div style={{ height: "70vh", width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
             {mapOpen && mounted && (
-              <BacklogMap
-                markers={mapMarkers}
-                onSelect={togglePlanta}
-                selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
-                fitSignal={mapFitSignal}
-              />
+              <Suspense fallback={null}>
+                <BacklogMap
+                  markers={mapMarkers}
+                  onSelect={togglePlanta}
+                  selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                  fitSignal={mapFitSignal}
+                  route={generatedRoute}
+                />
+              </Suspense>
             )}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Route Builder — Dialog de configuração */}
+      <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <RouteIcon className="mr-1 inline h-4 w-4" /> Montar Rota Otimizada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 text-sm">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Fim SLA anterior a *</span>
+                <input
+                  type="datetime-local"
+                  value={rbSlaBefore}
+                  onChange={(e) => setRbSlaBefore(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+                <span className="text-[10px] text-slate-400">critério de corte e de urgência (mais antigo = mais prioritário)</span>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Ponto de partida *</span>
+                <select
+                  value={rbStart}
+                  onChange={(e) => setRbStart(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                >
+                  <option value="">Selecione…</option>
+                  {allPlantas.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <span className="text-[10px] text-slate-400">só origem do trajeto — não é atendida</span>
+              </label>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <MultiSelect label="Tipo de Atividade *" options={allTipos} value={rbTipos} onChange={setRbTipos} />
+              <MultiSelect label="Responsabilidade *" options={allResps} value={rbResps} onChange={setRbResps} />
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Máximo de paradas (O.S.) *</span>
+                <input
+                  type="number" min={1}
+                  value={rbMaxStops}
+                  onChange={(e) => setRbMaxStops(Number(e.target.value) || 0)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Tolerância de estouro (O.S.)</span>
+                <input
+                  type="number" min={0}
+                  value={rbTolerance}
+                  onChange={(e) => setRbTolerance(Number(e.target.value) || 0)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+                <span className="text-[10px] text-slate-400">um grupo é incluído inteiro se estourar até isso</span>
+              </label>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <MultiSelect label="Elevatórias (opcional)" options={allPlantas} value={rbElevatorias} onChange={setRbElevatorias} />
+              <MultiSelect label="Cidade (opcional)" options={allCidades} value={rbCidades} onChange={setRbCidades} />
+            </div>
+
+            {routeError && (
+              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {routeError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setRouteDialogOpen(false)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={generateRoute}
+                className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
+              >
+                <RouteIcon className="h-4 w-4" /> Gerar Rota
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resultado da rota */}
+      {generatedRoute && (
+        <div className="mb-4 overflow-hidden rounded-xl border-2 border-[#f59e0b] bg-gradient-to-br from-orange-50 to-white shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200 bg-orange-100/50 px-4 py-3">
+            <div className="flex items-center gap-2 text-[#0b3a73]">
+              <RouteIcon className="h-5 w-5 text-[#f59e0b]" />
+              <div>
+                <div className="text-sm font-bold">Rota programada</div>
+                <div className="text-[11px] text-slate-600">
+                  {generatedRoute.totalOs} / {generatedRoute.limitConfig.max} O.S. em {generatedRoute.stops.length} paradas
+                  {generatedRoute.totalOs > generatedRoute.limitConfig.max &&
+                    ` (estouro de ${generatedRoute.totalOs - generatedRoute.limitConfig.max}, tolerância ${generatedRoute.limitConfig.tolerance})`}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="rounded bg-white px-2 py-1 shadow-sm">
+                <span className="text-slate-500">Distância:</span>{" "}
+                <span className="font-bold text-[#0b3a73]">{generatedRoute.totalKm.toFixed(1)} km</span>
+              </div>
+              <div className="rounded bg-white px-2 py-1 shadow-sm">
+                <span className="text-slate-500">Tempo est.:</span>{" "}
+                <span className="font-bold text-[#0b3a73]">~{generatedRoute.etaMin} min</span>
+              </div>
+              <button
+                onClick={exportRouteCSV}
+                className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white px-2 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb]"
+              >
+                <Download className="h-3 w-3" /> CSV
+              </button>
+              <button
+                onClick={copyRouteResumo}
+                className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <CopyIcon className="h-3 w-3" /> Copiar
+              </button>
+              <button
+                onClick={clearRoute}
+                className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100"
+              >
+                <X className="h-3 w-3" /> Limpar
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 p-3 lg:grid-cols-2">
+            <div className="rounded border border-orange-100 bg-white p-2 text-xs">
+              <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73]">
+                <Flag className="h-3 w-3 text-[#f59e0b]" /> Ponto de partida:{" "}
+                <span className="font-normal text-slate-700">{generatedRoute.start.label}</span>
+              </div>
+              <ol className="space-y-1">
+                {generatedRoute.details.map((d) => (
+                  <li key={d.ordem} className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0b3a73] text-[11px] font-bold text-white">
+                          {d.ordem}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-[#0b3a73]">{d.plantaShort}</div>
+                          <div className="text-[10px] text-slate-500">{d.cidade}</div>
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-slate-500">
+                        <div>+{d.distKm.toFixed(1)} km</div>
+                        <div className="text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
+                      </div>
+                    </div>
+                    <ul className="mt-1 ml-8 space-y-0.5">
+                      {d.oss.map((os) => (
+                        <li key={os.om} className="flex items-center gap-2 text-[11px] text-slate-600">
+                          <span className="font-mono text-[#1f7ad6]">{os.om}</span>
+                          <span className="truncate">{os.r["TEXTO BREVE"]}</span>
+                          {os.slaStatus === "ATRASADO" && (
+                            <span className="ml-auto shrink-0 rounded bg-red-100 px-1 text-[9px] font-semibold text-red-700">
+                              {os.diasAberto}d
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="min-h-[300px] rounded border border-orange-100 bg-slate-100">
+              <div className="h-full min-h-[300px]" style={{ height: 400 }}>
+                {mounted ? (
+                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+                    <BacklogMap
+                      markers={mapMarkers}
+                      onSelect={togglePlanta}
+                      selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                      fitSignal={mapFitSignal}
+                      route={generatedRoute}
+                    />
+                  </Suspense>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
