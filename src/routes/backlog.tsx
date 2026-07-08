@@ -933,17 +933,58 @@ function BacklogPage() {
         {/* Pie tipo atividade */}
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="mb-2 text-sm font-semibold text-[#0b3a73]">O.S. por Tipo de Atividade</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={dataTipoAtividade} dataKey="value" nameKey="name" outerRadius={80} label={(e) => e.value}>
-                {dataTipoAtividade.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {(() => {
+            const totalTipo = dataTipoAtividade.reduce((s, d) => s + d.value, 0);
+            return (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+                <div className="relative sm:col-span-2" style={{ height: 200 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dataTipoAtividade}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={1}
+                        stroke="#fff"
+                        strokeWidth={2}
+                        startAngle={90}
+                        endAngle={-270}
+                        isAnimationActive={false}
+                      >
+                        {dataTipoAtividade.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number, n: string) => [`${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`, n]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total</div>
+                    <div className="text-2xl font-bold text-[#0b3a73]">{totalTipo}</div>
+                  </div>
+                </div>
+                <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
+                  {dataTipoAtividade.map((d, i) => {
+                    const pct = totalTipo ? Math.round((d.value / totalTipo) * 100) : 0;
+                    return (
+                      <li key={d.name} className="flex items-center gap-2 truncate">
+                        <span
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                        />
+                        <span className="truncate text-slate-700" title={d.name}>{d.name}</span>
+                        <span className="ml-auto shrink-0 font-semibold text-[#0b3a73]">{d.value} · {pct}%</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Cidade */}
