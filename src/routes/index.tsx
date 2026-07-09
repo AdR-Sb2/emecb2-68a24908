@@ -187,8 +187,8 @@ function Index() {
               <CardButton onClick={() => setSysOpen(true)} chave="sistemas" delay={1}>
                 <CardIcon chave="sistemas" icon={Boxes} />
                 <CardTitle>Sistemas</CardTitle>
-                <CardDesc>Hubs administrativo e operacional.</CardDesc>
-                <CardCta>Escolher sistema</CardCta>
+                <CardDesc>Hubs administrativos e operacionais.</CardDesc>
+                <CardCta>Escolher sistemas</CardCta>
               </CardButton>
             )}
 
