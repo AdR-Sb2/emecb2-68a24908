@@ -184,22 +184,24 @@ function Index() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => setSysOpen(true)}
-              className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
-                <Boxes className="h-6 w-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[#0b3a73]">Sistemas</h2>
-                <p className="text-sm text-slate-600">Hubs Administrativo e Operacional.</p>
-              </div>
-              <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
-                Escolher sistema <ArrowRight className="h-4 w-4" />
-              </span>
-            </button>
+            {hasPanel("sistemas") && (
+              <button
+                type="button"
+                onClick={() => setSysOpen(true)}
+                className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
+                  <Boxes className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#0b3a73]">Sistemas</h2>
+                  <p className="text-sm text-slate-600">Hubs Administrativo e Operacional.</p>
+                </div>
+                <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
+                  Escolher sistema <ArrowRight className="h-4 w-4" />
+                </span>
+              </button>
+            )}
 
             {hasPanel("relatorio_tecnico") && (
               <Link

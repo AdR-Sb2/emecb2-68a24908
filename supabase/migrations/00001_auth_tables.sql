@@ -67,6 +67,7 @@ INSERT INTO paineis (chave, nome_exibicao, descricao, icone) VALUES
   ('relatorio_planta',     'Relatório de Planta',          'Relatórios por planta',               'Building2'),
   ('verificacao_ia',       'Verificação com IA',           'Verificação de dados com IA',        'BrainCircuit'),
   ('ficha_elevatoria',     'Ficha da Elevatória',          'Ficha técnica de elevatórias',        'FileSpreadsheet'),
+  ('sistemas',             'Sistemas',                     'Hubs Administrativo e Operacional',   'Boxes'),
   ('admin',                'Painel Admin',                 'Administração do sistema',            'Shield')
 ON CONFLICT (chave) DO NOTHING;
 
