@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
+import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
 import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
 
@@ -132,7 +132,7 @@ function Index() {
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#003087] to-[#00AEEF] p-2 shadow-lg shadow-[#003087]/20">
               <img
-                src={logoAsset.url}
+                src={logoHeader}
                 alt="Águas do Rio"
                 className="h-10 w-auto object-contain drop-shadow-sm"
                 loading="eager"

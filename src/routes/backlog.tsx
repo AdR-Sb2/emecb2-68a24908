@@ -33,7 +33,7 @@ import {
   Route as RouteIcon,
   Flag,
 } from "lucide-react";
-import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
+import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
 import rawData from "@/data/backlog.json";
 import elevatoriasData from "@/data/elevatorias.json";
 import rawEquipeOverrides from "@/data/equipe-overrides.json";
@@ -1337,7 +1337,7 @@ function BacklogPage() {
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur">
               <img
-                src={logoAsset.url}
+                src={logoHeader}
                 alt="Águas do Rio - Eletromecânica"
                 className="h-12 w-auto object-contain sm:h-14"
                 width={1024}

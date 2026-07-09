@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
+import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
 import elevatorias from "@/data/elevatorias.json";
 
 export const Route = createFileRoute("/relatorio")({
@@ -879,7 +879,7 @@ function RelatorioPage() {
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur">
                 <img
-                  src={logoAsset.url}
+                  src={logoHeader}
                   alt="Águas do Rio - Eletromecânica"
                   className="h-12 w-auto object-contain sm:h-14"
                   width={1024}
