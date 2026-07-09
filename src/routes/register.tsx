@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { isUsingFallbackSupabaseConfig, supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { UserPlus, Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -159,6 +159,13 @@ function RegisterPage() {
               placeholder="••••••••"
             />
           </div>
+
+          {isUsingFallbackSupabaseConfig && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+              Este deploy não está recebendo as variáveis do Supabase do Lovable Cloud. Confirme
+              VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para o ambiente de produção/preview.
+            </div>
+          )}
 
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
