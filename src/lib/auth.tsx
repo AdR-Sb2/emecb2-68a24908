@@ -45,92 +45,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const requestId = ++profileRequestId.current;
     setProfileLoading(true);
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*, cargos!profiles_cargo_id_fkey(nome)")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (requestId !== profileRequestId.current) return;
-
-    if (data) {
-      setProfile({
-        ...data,
-        cargo_nome: (data.cargos as { nome: string } | null)?.nome ?? null,
-      } as Profile);
-      setProfileLoading(false);
-      return;
-    }
-
-    if (error && error.code !== "PGRST116") {
-      console.warn("Não foi possível carregar o perfil:", error.message);
-    }
-
-    if (attempt < 3) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      if (requestId !== profileRequestId.current) return;
-      return fetchProfile(userId, authUser, attempt + 1);
-    }
-
-    if (authUser) {
-      const nomeCompleto = String(
-        authUser.user_metadata?.nome_completo ?? authUser.user_metadata?.full_name ?? authUser.email ?? "",
-      );
-      const email = authUser.email ?? "";
-      const { data: createdProfile, error: upsertError } = await supabase
+    try {
+      const { data, error } = await supabase
         .from("profiles")
-        .upsert(
-          {
+        .select("*, cargos!profiles_cargo_id_fkey(nome)")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (requestId !== profileRequestId.current) return;
+
+      if (data) {
+        setProfile({
+          ...data,
+          cargo_nome: (data.cargos as { nome: string } | null)?.nome ?? null,
+        } as Profile);
+        setProfileLoading(false);
+        return;
+      }
+
+      if (error && error.code !== "PGRST116") {
+        console.warn("Não foi possível carregar o perfil:", error.message);
+      }
+
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        if (requestId !== profileRequestId.current) return;
+        return fetchProfile(userId, authUser, attempt + 1);
+      }
+
+      if (authUser) {
+        const nomeCompleto = String(
+          authUser.user_metadata?.nome_completo ?? authUser.user_metadata?.full_name ?? authUser.email ?? "",
+        );
+        const email = authUser.email ?? "";
+        const { data: createdProfile, error: upsertError } = await supabase
+          .from("profiles")
+          .upsert(
+            {
+              id: userId,
+              nome_completo: nomeCompleto,
+              email,
+              cargo_id: null,
+              status: "pendente",
+              criado_em: new Date().toISOString(),
+              ultimo_acesso: new Date().toISOString(),
+            },
+            { onConflict: "id" },
+          )
+          .select("*, cargos!profiles_cargo_id_fkey(nome)")
+          .maybeSingle();
+
+        if (requestId !== profileRequestId.current) return;
+
+        if (createdProfile && !upsertError) {
+          setProfile({
+            ...createdProfile,
+            cargo_nome: (createdProfile.cargos as { nome: string } | null)?.nome ?? null,
+          } as Profile);
+        } else {
+          setProfile({
             id: userId,
             nome_completo: nomeCompleto,
             email,
             cargo_id: null,
             status: "pendente",
-            criado_em: new Date().toISOString(),
-            ultimo_acesso: new Date().toISOString(),
-          },
-          { onConflict: "id" },
-        )
-        .select("*, cargos!profiles_cargo_id_fkey(nome)")
-        .maybeSingle();
-
-      if (requestId !== profileRequestId.current) return;
-
-      if (createdProfile && !upsertError) {
-        setProfile({
-          ...createdProfile,
-          cargo_nome: (createdProfile.cargos as { nome: string } | null)?.nome ?? null,
-        } as Profile);
+            criado_em: null,
+            ultimo_acesso: null,
+          });
+        }
       } else {
-        setProfile({
-          id: userId,
-          nome_completo: nomeCompleto,
-          email,
-          cargo_id: null,
-          status: "pendente",
-          criado_em: null,
-          ultimo_acesso: null,
-        });
+        setProfile(null);
       }
-    } else {
-      setProfile(null);
-    }
-    setProfileLoading(false);
-  };
-
-  useEffect(() => {
-    supabase.auth.getSession().then((result) => {
-      const s = result?.data?.session ?? null;
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        fetchProfile(s.user.id, s.user);
-      } else {
+      setProfileLoading(false);
+    } catch (error) {
+      console.warn("Erro ao carregar o perfil do usuário:", error);
+      if (requestId === profileRequestId.current) {
         setProfile(null);
         setProfileLoading(false);
       }
-      setLoading(false);
-    });
+    }
+  };
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const result = await supabase.auth.getSession();
+        const s = result?.data?.session ?? null;
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s?.user) {
+          await fetchProfile(s.user.id, s.user);
+        } else {
+          setProfile(null);
+          setProfileLoading(false);
+        }
+      } catch (error) {
+        console.warn("Erro ao inicializar a sessão do Supabase:", error);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setProfileLoading(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
 
     const sub = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
