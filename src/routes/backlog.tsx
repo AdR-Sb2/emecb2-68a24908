@@ -39,6 +39,7 @@ import elevatoriasData from "@/data/elevatorias.json";
 import rawEquipeOverrides from "@/data/equipe-overrides.json";
 import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase";
 import {
   computeEquipe,
   computeResponsabilidade,
@@ -466,16 +467,23 @@ function BacklogPage() {
       localStorage.setItem("equipeOverrides", JSON.stringify(equipeOverrides));
     } catch {}
   }, [equipeOverrides]);
-  // Tenta carregar do servidor (caso tenha persistido via API)
+  // Carrega overrides do Supabase (persiste pra todo mundo)
   useEffect(() => {
-    fetch("/api/equipe-override")
-      .then((r) => r.json())
-      .then((data: Record<string, string>) => {
-        if (Object.keys(data).length) {
-          setEquipeOverrides((prev) => ({ ...prev, ...data }) as Record<string, Equipe>);
+    supabase
+      .from("equipe_overrides")
+      .select("*")
+      .then(({ data, error }) => {
+        if (error) return;
+        if (data?.length) {
+          const map: Record<string, Equipe> = {};
+          data.forEach((row: { om: string; equipe: string }) => {
+            if (row.equipe === "EMEC" || row.equipe === "Automação") {
+              map[row.om] = row.equipe;
+            }
+          });
+          setEquipeOverrides((prev) => ({ ...prev, ...map }) as Record<string, Equipe>);
         }
-      })
-      .catch(() => {});
+      });
   }, []);
 
   const enriched = useMemo(
@@ -2511,11 +2519,10 @@ function BacklogPage() {
                         <button
                           onClick={() => {
                             setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }));
-                            fetch("/api/equipe-override", {
-                              method: "POST",
-                              headers: { "content-type": "application/json" },
-                              body: JSON.stringify({ om: e.om, equipe: "EMEC" }),
-                            }).catch(() => {});
+                            supabase.from("equipe_overrides").upsert(
+                              { om: e.om, equipe: "EMEC" },
+                              { ignoreDuplicates: false },
+                            ).then(({ error }) => error && console.warn("Falha ao salvar EMEC", error));
                           }}
                           className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
                         >
@@ -2524,11 +2531,10 @@ function BacklogPage() {
                         <button
                           onClick={() => {
                             setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }));
-                            fetch("/api/equipe-override", {
-                              method: "POST",
-                              headers: { "content-type": "application/json" },
-                              body: JSON.stringify({ om: e.om, equipe: "Automação" }),
-                            }).catch(() => {});
+                            supabase.from("equipe_overrides").upsert(
+                              { om: e.om, equipe: "Automação" },
+                              { ignoreDuplicates: false },
+                            ).then(({ error }) => error && console.warn("Falha ao salvar Automação", error));
                           }}
                           className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
                         >
@@ -2545,11 +2551,8 @@ function BacklogPage() {
                               delete next[e.om];
                               return next;
                             });
-                            fetch("/api/equipe-override", {
-                              method: "DELETE",
-                              headers: { "content-type": "application/json" },
-                              body: JSON.stringify({ om: e.om }),
-                            }).catch(() => {});
+                            supabase.from("equipe_overrides").delete().eq("om", e.om)
+                              .then(({ error }) => error && console.warn("Falha ao remover override", error));
                           }}
                           className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
                           title="Reverter ao cálculo automático"
@@ -2647,17 +2650,25 @@ function BacklogPage() {
                         <span className="inline-flex items-center gap-1">
                           <span className="text-slate-400">—</span>
                           <button
-                            onClick={() =>
-                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }))
-                            }
+                            onClick={() => {
+                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }));
+                              supabase.from("equipe_overrides").upsert(
+                                { om: e.om, equipe: "EMEC" },
+                                { ignoreDuplicates: false },
+                              ).then(({ error }) => error && console.warn("Falha ao salvar EMEC", error));
+                            }}
                             className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
                           >
                             EMEC
                           </button>
                           <button
-                            onClick={() =>
-                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }))
-                            }
+                            onClick={() => {
+                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }));
+                              supabase.from("equipe_overrides").upsert(
+                                { om: e.om, equipe: "Automação" },
+                                { ignoreDuplicates: false },
+                              ).then(({ error }) => error && console.warn("Falha ao salvar Automação", error));
+                            }}
                             className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
                           >
                             Automação
@@ -2667,13 +2678,15 @@ function BacklogPage() {
                         <span className="inline-flex items-center gap-1">
                           <span className="font-semibold text-[#0b3a73]">{e.equipe}</span>
                           <button
-                            onClick={() =>
+                            onClick={() => {
                               setEquipeOverrides((prev) => {
                                 const next = { ...prev };
                                 delete next[e.om];
                                 return next;
-                              })
-                            }
+                              });
+                              supabase.from("equipe_overrides").delete().eq("om", e.om)
+                                .then(({ error }) => error && console.warn("Falha ao remover override", error));
+                            }}
                             className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
                             title="Reverter ao cálculo automático"
                           >
