@@ -184,7 +184,7 @@ function RegisterPage() {
 
           <button
             type="submit"
-            disabled={!!supabaseConfigSummary.error || submitting}
+            disabled={submitting}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0ea5e9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0284c7] disabled:opacity-50 cursor-pointer"
           >
             {submitting ? (

@@ -17,25 +17,31 @@ const supabaseAnonKey = readEnv(
 
 const isLocalDev = import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
 
+const fallbackSupabaseUrl = "https://byxmnmebvqdxpzcuutak.supabase.co";
+const fallbackSupabaseAnonKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5eG1ubWVidnFkeHB6Y3V1dGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjM0OTAsImV4cCI6MjA5OTEzOTQ5MH0.TUDk4MlKXsrWz6VufIdQkoFH7RGwezgKSFeZ6nMwyQI";
+
 export const isUsingFallbackSupabaseConfig = !supabaseUrl || !supabaseAnonKey;
 
 export const supabaseConfigError =
   !supabaseUrl || !supabaseAnonKey
-    ? "Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no ambiente do Lovable Cloud para este deploy."
+    ? "Variáveis do Supabase não foram encontradas no ambiente atual; usando a configuração padrão do projeto."
     : null;
 
-const resolvedSupabaseUrl = supabaseUrl || (isLocalDev ? "https://byxmnmebvqdxpzcuutak.supabase.co" : "");
-const resolvedSupabaseAnonKey =
-  supabaseAnonKey || (isLocalDev ? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5eG1ubWVidnFkeHB6Y3V1dGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjM0OTAsImV4cCI6MjA5OTEzOTQ5MH0.TUDk4MlKXsrWz6VufIdQkoFH7RGwezgKSFeZ6nMwyQI" : "");
+const resolvedSupabaseUrl = supabaseUrl || fallbackSupabaseUrl;
+const resolvedSupabaseAnonKey = supabaseAnonKey || fallbackSupabaseAnonKey;
 
 export const supabaseConfigSummary = {
   url: resolvedSupabaseUrl,
   isUsingFallback: isUsingFallbackSupabaseConfig,
   error: supabaseConfigError,
+  source: supabaseUrl ? "env" : "fallback",
 };
 
-if (!resolvedSupabaseUrl || !resolvedSupabaseAnonKey) {
-  console.error(supabaseConfigError);
+if (isUsingFallbackSupabaseConfig && isLocalDev) {
+  console.warn(supabaseConfigError);
+} else if (isUsingFallbackSupabaseConfig) {
+  console.info(supabaseConfigError);
 }
 
 export const supabase = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
