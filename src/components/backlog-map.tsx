@@ -76,13 +76,13 @@ function startIcon() {
 export default function BacklogMap({
   markers,
   onSelect,
-  selectedPlanta,
+  selectedPlantas,
   fitSignal = 0,
   route,
 }: {
   markers: BacklogMarker[];
   onSelect: (planta: string) => void;
-  selectedPlanta?: string | null;
+  selectedPlantas?: string[];
   fitSignal?: number;
   route?: { start?: RouteStart; stops: RouteStop[] } | null;
 }) {
@@ -131,7 +131,7 @@ export default function BacklogMap({
       {markers.map((m) => {
         if (routePlantas.has(m.planta)) return null;
         const isEmerg = m.emerg > 0;
-        const isSelected = selectedPlanta === m.planta;
+        const isSelected = selectedPlantas?.includes(m.planta) ?? false;
         const stroke = isEmerg ? "#7f1d1d" : "#0b3a73";
         const fill = isEmerg ? "#ef4444" : "#1f7ad6";
         return (
@@ -157,7 +157,7 @@ export default function BacklogMap({
                   className="mt-1 text-[#1f7ad6] underline"
                   onClick={() => onSelect(m.planta)}
                 >
-                  {isSelected ? "Limpar filtro" : "Filtrar por essa planta"}
+                  {isSelected ? "Remover filtro" : "Filtrar por essa planta"}
                 </button>
               </div>
             </Popup>

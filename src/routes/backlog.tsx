@@ -454,7 +454,7 @@ function BacklogPage() {
   const enriched = useMemo(() => enrich(data, now), [data, now]);
 
   // ---------- filtros ----------
-  const [fPlanta, setFPlanta] = useState<string>("TODAS");
+  const [fPlantas, setFPlantas] = useState<string[]>([]);
   const [fResp, setFResp] = useState<string[]>(["Baixada 2"]);
   const [fStatus, setFStatus] = useState<string>("TODOS");
   const [fEquipe, setFEquipe] = useState<string>("TODAS");
@@ -485,7 +485,7 @@ function BacklogPage() {
   const applyFilters = (rows: Enriched[], skip?: FilterKey) => {
     const slaLimit = fSlaBefore ? new Date(fSlaBefore + "T00:00:00") : null;
     return rows.filter((e) => {
-      if (skip !== "planta" && fPlanta !== "TODAS" && e.planta !== fPlanta) return false;
+      if (skip !== "planta" && fPlantas.length && !fPlantas.includes(e.planta)) return false;
       if (skip !== "resp" && fResp.length && !fResp.includes(e.responsabilidade)) return false;
       if (
         skip !== "status" &&
@@ -508,7 +508,7 @@ function BacklogPage() {
     () => applyFilters(enriched),
     [
       enriched,
-      fPlanta,
+      fPlantas,
       fResp,
       fStatus,
       fEquipe,
@@ -535,7 +535,7 @@ function BacklogPage() {
   const OPT_RESP = useMemo(
     () => uniq(applyFilters(enriched, "resp").map((e) => e.responsabilidade)).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlantas, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_STATUS = useMemo(
     () =>
@@ -545,12 +545,12 @@ function BacklogPage() {
           .filter(Boolean),
       ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlantas, fResp, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_EQUIPE = useMemo(
     () => uniq(applyFilters(enriched, "equipe").map((e) => e.equipe)).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlantas, fResp, fStatus, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_CIDADE = useMemo(
     () =>
@@ -560,12 +560,12 @@ function BacklogPage() {
           .filter(Boolean),
       ).sort() as string[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fEquipe, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlantas, fResp, fStatus, fEquipe, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_FAIXA = useMemo(
     () => FAIXAS.filter((f) => applyFilters(enriched, "faixa").some((e) => e.faixa === f)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fTipo, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlantas, fResp, fStatus, fEquipe, fCidade, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_TIPO = useMemo(
     () =>
@@ -575,7 +575,7 @@ function BacklogPage() {
           .filter((x): x is string => x !== null),
       ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
+    [enriched, fPlantas, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
   );
 
   // ---------- KPIs ----------
@@ -654,8 +654,10 @@ function BacklogPage() {
     return Array.from(m.values());
   }, [filtered]);
 
-  // Toggle: clicar de novo na mesma planta desfaz o filtro.
-  const togglePlanta = (planta: string) => setFPlanta((cur) => (cur === planta ? "TODAS" : planta));
+  const togglePlanta = (planta: string) =>
+    setFPlantas((cur) =>
+      cur.includes(planta) ? cur.filter((p) => p !== planta) : [...cur, planta],
+    );
 
   // ---------- Ações recomendadas ----------
   const emergSemProgramacao = useMemo(
@@ -825,7 +827,7 @@ function BacklogPage() {
     if (!name) return;
     const v = {
       name,
-      fPlanta,
+      fPlantas,
       fResp,
       fStatus,
       fEquipe,
@@ -846,7 +848,7 @@ function BacklogPage() {
   const [savedViews, setSavedViews] = useState<
     Array<{
       name: string;
-      fPlanta: string;
+      fPlantas: string[];
       fResp: string[];
       fStatus: string;
       fEquipe: string;
@@ -868,7 +870,7 @@ function BacklogPage() {
   const loadView = (n: string) => {
     const v = savedViews.find((x) => x.name === n);
     if (!v) return;
-    setFPlanta(v.fPlanta);
+    setFPlantas(v.fPlantas);
     setFResp(v.fResp);
     setFStatus(v.fStatus);
     setFEquipe(v.fEquipe);
@@ -880,7 +882,7 @@ function BacklogPage() {
   };
 
   const clearAllFilters = () => {
-    setFPlanta("TODAS");
+    setFPlantas([]);
     setFResp([]);
     setFStatus("TODOS");
     setFEquipe("TODAS");
@@ -1248,12 +1250,12 @@ function BacklogPage() {
             <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
           </div>
           <div className="flex items-center gap-1">
-            {fPlanta !== "TODAS" && (
+            {fPlantas.length > 0 && (
               <button
-                onClick={() => setFPlanta("TODAS")}
+                onClick={() => setFPlantas([])}
                 className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
               >
-                Limpar planta
+                Limpar {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}
               </button>
             )}
             <button
@@ -1288,7 +1290,7 @@ function BacklogPage() {
             <BacklogMap
               markers={mapMarkers}
               onSelect={togglePlanta}
-              selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+              selectedPlantas={fPlantas}
               fitSignal={mapFitSignal}
               route={
                 generatedRoutes.length > 0
@@ -1460,12 +1462,11 @@ function BacklogPage() {
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Elevatória
             </label>
-            <ComboboxSearch
+            <MultiSelect
               label="Elevatória"
               options={OPT_PLANTA}
-              value={fPlanta}
-              onChange={setFPlanta}
-              allLabel="Todas"
+              value={fPlantas}
+              onChange={setFPlantas}
               hideInlineLabel
             />
           </div>
@@ -1618,10 +1619,11 @@ function BacklogPage() {
             </button>
           </div>
         </div>
-        {fPlanta !== "TODAS" && (
+        {fPlantas.length > 0 && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73]">
-            Filtrando por planta: <strong>{fPlanta}</strong>
-            <button type="button" onClick={() => setFPlanta("TODAS")} className="cursor-pointer">
+            <MapPin className="h-3 w-3" /> {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}{" "}
+            selecionada{fPlantas.length > 1 ? "s" : ""}
+            <button type="button" onClick={() => setFPlantas([])} className="cursor-pointer">
               <X className="h-3 w-3" />
             </button>
           </div>
@@ -1812,7 +1814,7 @@ function BacklogPage() {
               <li key={p.planta}>
                 <button
                   onClick={() => togglePlanta(p.planta)}
-                  className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlanta === p.planta ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100"}`}
+                  className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlantas.includes(p.planta) ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100"}`}
                 >
                   <span className="truncate font-medium text-[#0b3a73]">
                     {p.planta.split(" - ")[0]}
@@ -1835,12 +1837,12 @@ function BacklogPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-end gap-1 pb-2">
-            {fPlanta !== "TODAS" && (
+            {fPlantas.length > 0 && (
               <button
-                onClick={() => setFPlanta("TODAS")}
+                onClick={() => setFPlantas([])}
                 className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
               >
-                Limpar planta
+                Limpar {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}
               </button>
             )}
             <button
@@ -1859,7 +1861,7 @@ function BacklogPage() {
                 <BacklogMap
                   markers={mapMarkers}
                   onSelect={togglePlanta}
-                  selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                  selectedPlantas={fPlantas}
                   fitSignal={mapFitSignal}
                   route={
                     generatedRoutes.length > 0
@@ -1930,7 +1932,19 @@ function BacklogPage() {
               />
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Quantidade de rotas *</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={rbRouteCount}
+                  onChange={(e) => setRbRouteCount(Math.max(1, Number(e.target.value) || 1))}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                />
+                <span className="text-[10px] text-slate-400">divide as O.S. entre N rotas</span>
+              </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-slate-600">
                   Máximo de paradas (O.S.) *
@@ -2156,7 +2170,7 @@ function BacklogPage() {
                           <BacklogMap
                             markers={mapMarkers}
                             onSelect={togglePlanta}
-                            selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
+                            selectedPlantas={fPlantas}
                             fitSignal={mapFitSignal}
                             route={activeRoute}
                           />
