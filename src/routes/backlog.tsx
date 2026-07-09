@@ -1349,8 +1349,8 @@ function BacklogPage() {
           const d = haversineKm(cursor, g);
           const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
           const norm = days / maxDaysAtraso;
-          // Penaliza saltos muito longos (> 15 km) exponencialmente
-          const hopPenalty = d > 15 ? (d - 15) * 2 : 0;
+          // Penaliza severamente saltos > 10 km (inadmissível)
+          const hopPenalty = d > 10 ? (d - 10) * 100 : 0;
           // Urgência conta muito pouco no score (máximo ~0.5 km de desconto)
           const urgencyDiscount = norm * 0.5;
           const score = d + hopPenalty - urgencyDiscount;
