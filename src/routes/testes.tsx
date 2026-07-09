@@ -462,17 +462,17 @@ function TestesPage() {
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-8 shrink-0 items-center justify-center rounded-2xl">
+            <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
               <img
                 src={logoHeader}
                 alt="Águas do Rio - Eletromecânica"
-                className="h-8 w-auto object-contain sm:h-8"
+                className="h-14 w-auto object-contain"
                 loading="eager"
               />
             </div>
             <div className="min-w-0 text-white">
-              <p className="truncate text-base font-semibold">Águas do Rio</p>
-              <p className="truncate text-xs text-cyan-50/90">Eletromecânica · Testes e aferições</p>
+              <p className="truncate text-lg font-semibold">Águas do Rio</p>
+              <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Testes e aferições</p>
             </div>
           </div>
           <Link
