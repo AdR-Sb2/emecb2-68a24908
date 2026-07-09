@@ -978,6 +978,25 @@ function BacklogPage() {
   const [rbCidades, setRbCidades] = useState<string[]>([]);
   const [rbRouteCount, setRbRouteCount] = useState<number>(1);
   const [routeError, setRouteError] = useState<string>("");
+  const [rbEquipe, setRbEquipe] = useState<string>("TODAS");
+  const [rbUseIndividualConfig, setRbUseIndividualConfig] = useState(false);
+  const [rbRouteConfigs, setRbRouteConfigs] = useState<
+    Array<{ equipe: string; cidades: string[]; maxStops: number }>
+  >([]);
+
+  // Sincroniza rbRouteConfigs com rbRouteCount
+  useEffect(() => {
+    setRbRouteConfigs((prev) => {
+      const next = [...prev];
+      while (next.length < rbRouteCount) {
+        next.push({ equipe: "TODAS", cidades: [], maxStops: rbMaxStops });
+      }
+      while (next.length > rbRouteCount) {
+        next.pop();
+      }
+      return next;
+    });
+  }, [rbRouteCount, rbMaxStops]);
 
   useEffect(() => {
     if (!rbStart && allPlantas.length) setRbStart(findDefaultStart() || allPlantas[0]);
@@ -2103,7 +2122,7 @@ function BacklogPage() {
             </button>
           </div>
           <div
-            style={{ height: "70vh", width: "100%" }}
+            style={{ height: "85vh", width: "100%" }}
             className="overflow-hidden rounded-md bg-slate-100"
           >
             {mapOpen && mounted && (
@@ -2514,8 +2533,8 @@ function BacklogPage() {
                       ))}
                     </ol>
                   </div>
-                  <div className="min-h-[300px] rounded border border-slate-150 bg-slate-100">
-                    <div className="h-full min-h-[300px]" style={{ height: 400 }}>
+                  <div className="min-h-[500px] rounded border border-slate-150 bg-slate-100">
+                    <div className="h-full min-h-[500px]" style={{ height: 500 }}>
                       {mounted ? (
                         <Suspense
                           fallback={
