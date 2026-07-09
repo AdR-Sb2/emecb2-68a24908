@@ -354,9 +354,21 @@ export const EQUIP_AUTOMACAO: string[] = [
   "MACROMED VAZÃO ULTRASSÔNICO",
   "MACROMED VAZÃO ELETROMAGNÉTICO INSERÇÃO",
   "MACROMED VAZÃO ELETROMAGNÉTICO",
+  "MACROMEDIDOR DE VAZÃO ELETROMAGNÉTICO",
   "PAINEL DE AUTOMAÇÃO",
   "IHM",
   "TRANSMISSOR DE NÍVEL",
+].map(normStr);
+
+// Descr. equipamento que contém (prefixo/substring) → EMEC
+export const EQUIP_EMEC_CONTAINS: string[] = [
+  "PAINEL ELÉTRICO",
+  "VÁLVULA",
+].map(normStr);
+
+// Descr. equipamento que contém (prefixo/substring) → Automação
+export const EQUIP_AUTOMACAO_CONTAINS: string[] = [
+  "MACROMED",
 ].map(normStr);
 
 // Ordens que forçam Equipe = "Automação"
@@ -433,6 +445,9 @@ export function computeEquipe(row: {
   if (!desc) return "Não analisado";
   if (EQUIP_EMEC.includes(desc)) return "EMEC";
   if (EQUIP_AUTOMACAO.includes(desc)) return "Automação";
+  // Verifica por substring (prefixo/contém)
+  if (EQUIP_EMEC_CONTAINS.some((p) => desc.includes(p))) return "EMEC";
+  if (EQUIP_AUTOMACAO_CONTAINS.some((p) => desc.includes(p))) return "Automação";
   // Debug: descrição não bateu com nenhuma lista.
   if (typeof console !== "undefined") {
     console.warn(
