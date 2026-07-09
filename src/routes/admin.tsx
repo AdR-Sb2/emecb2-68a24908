@@ -15,7 +15,7 @@ import {
   Save,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseConfigSummary } from "../lib/supabase";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -71,6 +71,10 @@ function AdminPage() {
 
   useEffect(() => {
     if (loading) return;
+    if (!supabaseConfigSummary.isConfigured) {
+      navigate({ to: "/login", replace: true });
+      return;
+    }
     if (!user) {
       navigate({ to: "/login", replace: true });
       return;
@@ -83,7 +87,7 @@ function AdminPage() {
   }, [user, profile, loading, navigate]);
 
   const checkAdminAccess = async () => {
-    if (!profile?.cargo_id) {
+    if (!supabaseConfigSummary.isConfigured || !profile?.cargo_id) {
       navigate({ to: "/", replace: true });
       return;
     }
@@ -98,6 +102,10 @@ function AdminPage() {
   };
 
   const loadData = async () => {
+    if (!supabaseConfigSummary.isConfigured) {
+      setLoadingData(false);
+      return;
+    }
     setLoadingData(true);
     const [profilesRes, cargosRes, paineisRes, cpRes] = await Promise.all([
       supabase.from("profiles").select("*").order("criado_em", { ascending: false }),

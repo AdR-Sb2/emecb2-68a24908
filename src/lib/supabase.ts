@@ -16,38 +16,34 @@ const supabaseAnonKey = readEnv(
 );
 
 const isLocalDev = import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 
-const fallbackSupabaseUrl = "https://byxmnmebvqdxpzcuutak.supabase.co";
-const fallbackSupabaseAnonKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5eG1ubWVidnFkeHB6Y3V1dGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjM0OTAsImV4cCI6MjA5OTEzOTQ5MH0.TUDk4MlKXsrWz6VufIdQkoFH7RGwezgKSFeZ6nMwyQI";
+export const supabaseConfigError = hasSupabaseConfig
+  ? null
+  : "As variáveis do Supabase não foram configuradas para esta implantação. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Lovable Cloud para que o login funcione corretamente.";
 
-export const isUsingFallbackSupabaseConfig = !supabaseUrl || !supabaseAnonKey;
-
-export const supabaseConfigError =
-  !supabaseUrl || !supabaseAnonKey
-    ? "Variáveis do Supabase não foram encontradas no ambiente atual; usando a configuração padrão do projeto."
-    : null;
-
-const resolvedSupabaseUrl = supabaseUrl || fallbackSupabaseUrl;
-const resolvedSupabaseAnonKey = supabaseAnonKey || fallbackSupabaseAnonKey;
+const resolvedSupabaseUrl = supabaseUrl ?? "";
+const resolvedSupabaseAnonKey = supabaseAnonKey ?? "";
 
 export const supabaseConfigSummary = {
   url: resolvedSupabaseUrl,
-  isUsingFallback: isUsingFallbackSupabaseConfig,
+  isConfigured: hasSupabaseConfig,
   error: supabaseConfigError,
-  source: supabaseUrl ? "env" : "fallback",
+  source: supabaseUrl ? "env" : "missing",
 };
 
-if (isUsingFallbackSupabaseConfig && isLocalDev) {
+if (!hasSupabaseConfig && isLocalDev) {
   console.warn(supabaseConfigError);
-} else if (isUsingFallbackSupabaseConfig) {
+} else if (!hasSupabaseConfig) {
   console.info(supabaseConfigError);
 }
 
-export const supabase = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+export const supabase = hasSupabaseConfig
+  ? createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : ({} as any);

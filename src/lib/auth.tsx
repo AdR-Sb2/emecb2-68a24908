@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { supabase } from "./supabase";
+import { supabase, supabaseConfigSummary } from "./supabase";
 import type { User, Session } from "@supabase/supabase-js";
 
 export type Profile = {
@@ -44,6 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, authUser: User | null = null, attempt = 0) => {
     const requestId = ++profileRequestId.current;
     setProfileLoading(true);
+
+    if (!supabaseConfigSummary.isConfigured) {
+      if (requestId === profileRequestId.current) {
+        setProfile(null);
+        setProfileLoading(false);
+      }
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -128,6 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initializeAuth = async () => {
+      if (!supabaseConfigSummary.isConfigured) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setProfileLoading(false);
+        setLoading(false);
+        return;
+      }
+
       try {
         const result = await supabase.auth.getSession();
         const s = result?.data?.session ?? null;
@@ -152,7 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeAuth();
 
-    const sub = supabase.auth.onAuthStateChange((_event, s) => {
+    if (!supabaseConfigSummary.isConfigured) return;
+
+    const sub = supabase.auth.onAuthStateChange((_: string, s: Session | null) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
@@ -167,6 +186,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    if (!supabaseConfigSummary.isConfigured) {
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

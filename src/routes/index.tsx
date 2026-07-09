@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import { useAuth } from "../lib/auth";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseConfigSummary } from "../lib/supabase";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -97,7 +97,7 @@ function Index() {
   }, [user, profile, loading, navigate]);
 
   useEffect(() => {
-    if (!profile?.cargo_id) {
+    if (!supabaseConfigSummary.isConfigured || !profile?.cargo_id) {
       setLoadingPaineis(false);
       return;
     }
@@ -107,7 +107,7 @@ function Index() {
         .select("painel_id, paineis!inner(chave, nome_exibicao, descricao, icone)")
         .eq("cargo_id", profile.cargo_id);
       if (data) {
-        setPaineis(data.map((r) => r.paineis as unknown as Painel));
+        setPaineis(data.map((r: { paineis: unknown }) => r.paineis as unknown as Painel));
       }
       setLoadingPaineis(false);
     })();
