@@ -462,11 +462,11 @@ function TestesPage() {
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl p-2">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl p-2">
               <img
                 src={logoHeader}
                 alt="Águas do Rio - Eletromecânica"
-                className="h-8 w-auto object-contain sm:h-10"
+                className="h-24 w-auto object-contain sm:h-28"
                 loading="eager"
               />
             </div>
