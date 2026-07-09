@@ -118,26 +118,26 @@ function Index() {
   const hasPanel = (chave: string) => paineis.some((p) => p.chave === chave);
   const canAdmin = hasPanel("admin");
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#eaf3fb] via-slate-50 to-[#dbeaf7]">
+    <div className="min-h-screen bg-[#f0f4f8]">
       <style>{animations}</style>
 
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-gray-200 bg-white px-4 md:px-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between bg-white px-4 md:px-6 shadow-[0_1px_4px_rgba(0,0,0,0.08)]">
+        <div className="flex items-center gap-3">
           <img
             src={logoAsset.url}
             alt="Águas do Rio"
-            className="h-12 w-auto object-contain"
+            className="h-10 w-auto object-contain"
             loading="eager"
           />
-          <span className="hidden text-sm font-bold text-[#0b3a73] md:inline">ELETROMECÂNICA</span>
+          <div className="h-6 w-px bg-slate-300" />
+          <span className="text-base font-bold text-[#003087]">ELETROMECÂNICA</span>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <User className="h-3.5 w-3.5" />
-            <span className="font-medium">{profile?.nome_completo}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5" style={{ fontSize: 13 }}>
+            <span className="font-medium text-[#64748b]">{profile?.nome_completo}</span>
             {profile?.cargo_nome && (
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+              <span className="rounded bg-[#e8f0fe] px-2 py-0.5 text-xs font-medium text-[#003087]">
                 {profile.cargo_nome}
               </span>
             )}
@@ -145,14 +145,14 @@ function Index() {
           {canAdmin && (
             <Link
               to="/admin"
-              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 active:scale-95"
+              className="inline-flex items-center gap-1 rounded bg-[#003087] px-2.5 py-1 text-xs font-medium text-white transition hover:opacity-90 active:scale-95"
             >
               <Shield className="h-3 w-3" /> Admin
             </Link>
           )}
           <button
             onClick={signOut}
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-red-500 active:scale-95 cursor-pointer"
+            className="inline-flex items-center justify-center p-1.5 text-[#64748b] transition hover:text-red-500 active:scale-95 cursor-pointer"
             title="Sair"
           >
             <LogOut className="h-4 w-4" />
@@ -161,12 +161,6 @@ function Index() {
       </header>
 
       <div className="mx-auto max-w-5xl px-4 pt-8 md:px-6 md:pt-12">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-[#0b3a73] md:text-3xl">Hub Eletromecânica</h1>
-          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
-            Escolha o que você quer acessar.
-          </p>
-        </div>
 
         {/* Loading */}
         {loadingPaineis ? (
