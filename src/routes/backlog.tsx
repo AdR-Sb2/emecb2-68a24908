@@ -946,8 +946,24 @@ function BacklogPage() {
 
   const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
 
-  // Cascade filters for the "Montar Rota" dialog — each dropdown only shows options
-  // compatible with the current selection in the other dropdowns.
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
+  const [rbTipos, setRbTipos] = useState<string[]>([]);
+  const [rbResps, setRbResps] = useState<string[]>(["Baixada 2"]);
+  const [rbStart, setRbStart] = useState<string>("");
+  const [rbMaxStops, setRbMaxStops] = useState<number>(20);
+  const [rbTolerance, setRbTolerance] = useState<number>(3);
+  const [rbElevatorias, setRbElevatorias] = useState<string[]>([]);
+  const [rbCidades, setRbCidades] = useState<string[]>([]);
+  const [rbRouteCount, setRbRouteCount] = useState<number>(1);
+  const [routeError, setRouteError] = useState<string>("");
+
+  useEffect(() => {
+    if (!rbStart && allPlantas.length) setRbStart(findDefaultStart() || allPlantas[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPlantas.length]);
+
+  // Cascade filters for Montar Rota dialog — cada dropdown só mostra opções compatíveis
   type RbFilterKey = "tipo" | "resp" | "elevatoria" | "cidade";
   const applyRbFilters = (rows: Enriched[], skip?: RbFilterKey) => {
     const slaLimit = rbSlaBefore ? new Date(rbSlaBefore) : null;
@@ -958,11 +974,7 @@ function BacklogPage() {
         return false;
       if (skip !== "resp" && rbResps.length && !rbResps.includes(e.responsabilidade))
         return false;
-      if (
-        skip !== "elevatoria" &&
-        rbElevatorias.length &&
-        !rbElevatorias.includes(e.planta)
-      )
+      if (skip !== "elevatoria" && rbElevatorias.length && !rbElevatorias.includes(e.planta))
         return false;
       if (skip !== "cidade" && rbCidades.length && !rbCidades.includes(e.r.Cidade || ""))
         return false;
@@ -1011,23 +1023,6 @@ function BacklogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enriched, rbTipos, rbResps, rbElevatorias, rbSlaBefore],
   );
-
-  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
-  const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
-  const [rbTipos, setRbTipos] = useState<string[]>([]);
-  const [rbResps, setRbResps] = useState<string[]>(["Baixada 2"]);
-  const [rbStart, setRbStart] = useState<string>("");
-  const [rbMaxStops, setRbMaxStops] = useState<number>(20);
-  const [rbTolerance, setRbTolerance] = useState<number>(3);
-  const [rbElevatorias, setRbElevatorias] = useState<string[]>([]);
-  const [rbCidades, setRbCidades] = useState<string[]>([]);
-  const [rbRouteCount, setRbRouteCount] = useState<number>(1);
-  const [routeError, setRouteError] = useState<string>("");
-
-  useEffect(() => {
-    if (!rbStart && allPlantas.length) setRbStart(findDefaultStart() || allPlantas[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPlantas.length]);
 
   type GeneratedRoute = {
     start: RouteStart;
