@@ -121,38 +121,34 @@ function Index() {
     <div className="min-h-screen bg-[#f0f4f8]">
       <style>{animations}</style>
 
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between bg-white px-4 md:px-6 shadow-[0_1px_4px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between bg-gradient-to-r from-[#003087] to-[#00AEEF] px-4 md:px-6 shadow-[0_1px_4px_rgba(0,0,0,0.08)]">
+        <div className="flex items-center">
           <img
             src={logoAsset.url}
             alt="Águas do Rio"
             className="h-10 w-auto object-contain"
             loading="eager"
           />
-          <div className="h-6 w-px bg-slate-300" />
-          <span className="text-base font-bold text-[#003087]">ELETROMECÂNICA</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5" style={{ fontSize: 13 }}>
-            <span className="font-medium text-[#64748b]">{profile?.nome_completo}</span>
-            {profile?.cargo_nome && (
-              <span className="rounded bg-[#e8f0fe] px-2 py-0.5 text-xs font-medium text-[#003087]">
-                {profile.cargo_nome}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-white">{profile?.nome_completo}</span>
+          {profile?.cargo_nome && (
+            <span className="rounded-full bg-white/20 px-[10px] py-[2px] text-xs font-medium text-white">
+              {profile.cargo_nome}
+            </span>
+          )}
           {canAdmin && (
             <Link
               to="/admin"
-              className="inline-flex items-center gap-1 rounded bg-[#003087] px-2.5 py-1 text-xs font-medium text-white transition hover:opacity-90 active:scale-95"
+              className="inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 text-xs font-medium text-[#003087] transition hover:opacity-90 active:scale-95"
             >
               <Shield className="h-3 w-3" /> Admin
             </Link>
           )}
           <button
             onClick={signOut}
-            className="inline-flex items-center justify-center p-1.5 text-[#64748b] transition hover:text-red-500 active:scale-95 cursor-pointer"
+            className="inline-flex items-center justify-center p-1 text-white transition hover:opacity-80 active:scale-95 cursor-pointer"
             title="Sair"
           >
             <LogOut className="h-4 w-4" />
