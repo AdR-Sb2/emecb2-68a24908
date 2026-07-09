@@ -462,7 +462,7 @@ function TestesPage() {
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/95 p-2 shadow-sm backdrop-blur">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 p-2 shadow-sm backdrop-blur">
               <img
                 src={logoHeader}
                 alt="Águas do Rio - Eletromecânica"
