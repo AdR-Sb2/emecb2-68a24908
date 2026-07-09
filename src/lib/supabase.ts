@@ -16,34 +16,36 @@ const supabaseAnonKey = readEnv(
 );
 
 const isLocalDev = import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
+const fallbackSupabaseUrl = "https://byxmnmebvqdxpzcuutak.supabase.co";
+const fallbackSupabaseAnonKey = "sb_publishable_ltY4BfcrdlBw91KH5BHfgg_ZHDurfuZ";
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
+const shouldUseFallback = !hasSupabaseConfig;
+
+const resolvedSupabaseUrl = supabaseUrl ?? fallbackSupabaseUrl;
+const resolvedSupabaseAnonKey = supabaseAnonKey ?? fallbackSupabaseAnonKey;
 
 export const supabaseConfigError = hasSupabaseConfig
   ? null
-  : "As variáveis do Supabase não foram configuradas para esta implantação. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Lovable Cloud para que o login funcione corretamente.";
-
-const resolvedSupabaseUrl = supabaseUrl ?? "";
-const resolvedSupabaseAnonKey = supabaseAnonKey ?? "";
+  : "As variáveis do Supabase não foram encontradas no ambiente atual; usando a configuração pública do projeto para manter o login funcionando.";
 
 export const supabaseConfigSummary = {
   url: resolvedSupabaseUrl,
-  isConfigured: hasSupabaseConfig,
+  isConfigured: true,
   error: supabaseConfigError,
-  source: supabaseUrl ? "env" : "missing",
+  source: hasSupabaseConfig ? "env" : "fallback",
+  isUsingFallback: shouldUseFallback,
 };
 
-if (!hasSupabaseConfig && isLocalDev) {
+if (shouldUseFallback && isLocalDev) {
   console.warn(supabaseConfigError);
-} else if (!hasSupabaseConfig) {
+} else if (shouldUseFallback) {
   console.info(supabaseConfigError);
 }
 
-export const supabase = hasSupabaseConfig
-  ? createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : ({} as any);
+export const supabase = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
