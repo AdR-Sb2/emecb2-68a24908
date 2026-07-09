@@ -130,11 +130,11 @@ function Index() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] text-white shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-24 shrink-0 items-center justify-center rounded-2xl">
+            <div className="flex h-8 shrink-0 items-center justify-center rounded-2xl">
               <img
                 src={logoHeader}
                 alt="Águas do Rio"
-                className="h-24 w-auto object-contain"
+                className="h-8 w-auto object-contain"
                 loading="eager"
               />
             </div>
