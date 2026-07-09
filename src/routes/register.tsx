@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { UserPlus, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/register")({
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile, loading: authLoading, profileLoading } = useAuth();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,10 +20,27 @@ function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) {
-    navigate({ to: "/", replace: true });
-    return null;
+  useEffect(() => {
+    if (success || authLoading || profileLoading || !user) return;
+
+    if (profile?.status === "pendente") {
+      navigate({ to: "/pending", replace: true });
+    } else if (profile?.status === "bloqueado") {
+      navigate({ to: "/bloqueado", replace: true });
+    } else {
+      navigate({ to: "/", replace: true });
+    }
+  }, [authLoading, navigate, profile, profileLoading, success, user]);
+
+  if (authLoading || profileLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0ea5e9]" />
+      </div>
+    );
   }
+
+  if (user && !success) return null;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,10 +58,11 @@ function RegisterPage() {
       return;
     }
     setSubmitting(true);
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { nome_completo: nome } },
+      options: { data: { nome_completo: nome }, emailRedirectTo: redirectTo },
     });
     setSubmitting(false);
     if (err) {

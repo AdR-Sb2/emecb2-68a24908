@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "./supabase";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -18,6 +18,7 @@ type AuthContextType = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  profileLoading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   profile: null,
   loading: true,
+  profileLoading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -36,21 +38,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const profileRequestId = useRef(0);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+  const fetchProfile = async (userId: string, authUser: User | null = null, attempt = 0) => {
+    const requestId = ++profileRequestId.current;
+    setProfileLoading(true);
+
+    const { data, error } = await supabase
       .from("profiles")
       .select("*, cargos!profiles_cargo_id_fkey(nome)")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
+
+    if (requestId !== profileRequestId.current) return;
+
     if (data) {
       setProfile({
         ...data,
         cargo_nome: (data.cargos as { nome: string } | null)?.nome ?? null,
       } as Profile);
+      setProfileLoading(false);
+      return;
+    }
+
+    if (error && error.code !== "PGRST116") {
+      console.warn("Não foi possível carregar o perfil:", error.message);
+    }
+
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      if (requestId !== profileRequestId.current) return;
+      return fetchProfile(userId, authUser, attempt + 1);
+    }
+
+    if (authUser) {
+      setProfile({
+        id: userId,
+        nome_completo:
+          String(authUser.user_metadata?.nome_completo ?? authUser.user_metadata?.full_name ?? authUser.email ?? ""),
+        email: authUser.email ?? "",
+        cargo_id: null,
+        status: "pendente",
+        criado_em: null,
+        ultimo_acesso: null,
+      });
     } else {
       setProfile(null);
     }
+    setProfileLoading(false);
   };
 
   useEffect(() => {
@@ -58,14 +94,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const s = result?.data?.session ?? null;
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
+      if (s?.user) {
+        fetchProfile(s.user.id, s.user);
+      } else {
+        setProfile(null);
+        setProfileLoading(false);
+      }
       setLoading(false);
     });
 
     const sub = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) fetchProfile(s.user.id);
+      if (s?.user) {
+        fetchProfile(s.user.id, s.user);
+      } else {
+        setProfile(null);
+        setProfileLoading(false);
+      }
     });
 
     return () => sub?.data?.subscription?.unsubscribe?.();
@@ -76,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setProfileLoading(false);
   };
 
   return (
@@ -85,8 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         loading,
+        profileLoading,
         signOut,
-        refreshProfile: () => (user ? fetchProfile(user.id) : Promise.resolve()),
+        refreshProfile: () => (user ? fetchProfile(user.id, user) : Promise.resolve()),
       }}
     >
       {children}

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { LogIn, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -10,22 +10,34 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, profileLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (authLoading) return null;
+  useEffect(() => {
+    if (authLoading || profileLoading || !user) return;
 
-  // Already logged in
-  if (user && profile) {
-    if (profile.status === "pendente") navigate({ to: "/pending", replace: true });
-    else if (profile.status === "bloqueado") navigate({ to: "/bloqueado", replace: true });
-    else navigate({ to: "/", replace: true });
-    return null;
+    if (profile?.status === "pendente") {
+      navigate({ to: "/pending", replace: true });
+    } else if (profile?.status === "bloqueado") {
+      navigate({ to: "/bloqueado", replace: true });
+    } else {
+      navigate({ to: "/", replace: true });
+    }
+  }, [authLoading, navigate, profile, profileLoading, user]);
+
+  if (authLoading || profileLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0ea5e9]" />
+      </div>
+    );
   }
+
+  if (user) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +121,10 @@ function LoginPage() {
           </Link>
           <span className="mx-2">·</span>
           <button
-            onClick={() => supabase.auth.resetPasswordForEmail(email)}
+            onClick={() => {
+              const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
+              supabase.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
+            }}
             className="text-[#0ea5e9] hover:underline cursor-pointer bg-transparent border-none text-sm"
           >
             Esqueci minha senha
