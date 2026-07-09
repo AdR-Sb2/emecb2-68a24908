@@ -263,7 +263,7 @@ function enrich(rows: Row[], now: Date): Enriched[] {
   });
 }
 
-// ---------- multi-select simples ----------
+  // ---------- multi-select simples ----------
 function MultiSelect({
   label,
   options,
@@ -946,6 +946,72 @@ function BacklogPage() {
 
   const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
 
+  // Cascade filters for the "Montar Rota" dialog — each dropdown only shows options
+  // compatible with the current selection in the other dropdowns.
+  type RbFilterKey = "tipo" | "resp" | "elevatoria" | "cidade";
+  const applyRbFilters = (rows: Enriched[], skip?: RbFilterKey) => {
+    const slaLimit = rbSlaBefore ? new Date(rbSlaBefore) : null;
+    return rows.filter((e) => {
+      if (slaLimit && (!e.fimSla || e.fimSla >= slaLimit)) return false;
+      if (e.lat === null || e.lon === null) return false;
+      if (skip !== "tipo" && rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || ""))
+        return false;
+      if (skip !== "resp" && rbResps.length && !rbResps.includes(e.responsabilidade))
+        return false;
+      if (
+        skip !== "elevatoria" &&
+        rbElevatorias.length &&
+        !rbElevatorias.includes(e.planta)
+      )
+        return false;
+      if (skip !== "cidade" && rbCidades.length && !rbCidades.includes(e.r.Cidade || ""))
+        return false;
+      return true;
+    });
+  };
+  const rbOptTipos = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          applyRbFilters(enriched, "tipo")
+            .map((e) => e.r["Tipo de Atividade"] || "")
+            .filter(Boolean),
+        ),
+      ).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, rbResps, rbElevatorias, rbCidades, rbSlaBefore],
+  );
+  const rbOptResps = useMemo(
+    () =>
+      Array.from(new Set(applyRbFilters(enriched, "resp").map((e) => e.responsabilidade))).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, rbTipos, rbElevatorias, rbCidades, rbSlaBefore],
+  );
+  const rbOptElevatorias = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          applyRbFilters(enriched, "elevatoria")
+            .map((e) => e.planta)
+            .filter(Boolean),
+        ),
+      ).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, rbTipos, rbResps, rbCidades, rbSlaBefore],
+  );
+  const rbOptCidades = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          applyRbFilters(enriched, "cidade")
+            .map((e) => e.r.Cidade || "")
+            .filter(Boolean),
+        ),
+      ).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched, rbTipos, rbResps, rbElevatorias, rbSlaBefore],
+  );
+
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
   const [rbTipos, setRbTipos] = useState<string[]>([]);
@@ -993,6 +1059,138 @@ function BacklogPage() {
       Math.sin(dLat / 2) ** 2 +
       Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  // Multi-route optimization: tenta trocar paradas entre rotas pra reduzir distância total
+  function optimizeRoutes(routes: GeneratedRoute[]): GeneratedRoute[] {
+    if (routes.length < 2) return routes;
+    let improved = true;
+    let iterations = 0;
+    const MAX_ITER = 20;
+    while (improved && iterations < MAX_ITER) {
+      improved = false;
+      iterations++;
+      for (let i = 0; i < routes.length; i++) {
+        for (let j = i + 1; j < routes.length; j++) {
+          const ri = routes[i];
+          const rj = routes[j];
+          if (ri.details.length < 1 || rj.details.length < 1) continue;
+
+          const iFurthestIdx = ri.details.length - 1;
+          for (let jIdx = 0; jIdx < rj.details.length; jIdx++) {
+            const stopI = ri.details[iFurthestIdx];
+            const stopJ = rj.details[jIdx];
+
+            const origDistI = stopI.distKm;
+            const origDistJ = stopJ.distKm;
+
+            const prevForJinI = ri.details.length > 1
+              ? haversineKm(
+                  { lat: ri.details[ri.details.length - 2].oss[0].lat!, lon: ri.details[ri.details.length - 2].oss[0].lon! },
+                  { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! },
+                )
+              : haversineKm(ri.start, { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! });
+            const prevForIinJ = jIdx > 0
+              ? haversineKm(
+                  { lat: rj.details[jIdx - 1].oss[0].lat!, lon: rj.details[jIdx - 1].oss[0].lon! },
+                  { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! },
+                )
+              : haversineKm(rj.start, { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! });
+            const nextForIinJ = jIdx < rj.details.length - 1
+              ? haversineKm(
+                  { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! },
+                  { lat: rj.details[jIdx + 1].oss[0].lat!, lon: rj.details[jIdx + 1].oss[0].lon! },
+                )
+              : 0;
+
+            const newDistJ = prevForIinJ + nextForIinJ;
+            const totalOrig = origDistI + origDistJ;
+            const totalNew = prevForJinI + newDistJ;
+
+            if (totalNew < totalOrig - 0.5) {
+              // Recalculate distances properly for new route I
+              const newDetailsI = ri.details.slice(0, -1).map((d) => ({ ...d }));
+              const lastPrev = newDetailsI.length > 0
+                ? { lat: newDetailsI[newDetailsI.length - 1].oss[0].lat!, lon: newDetailsI[newDetailsI.length - 1].oss[0].lon! }
+                : ri.start;
+              const dToJ = haversineKm(lastPrev, { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! });
+              newDetailsI.push({
+                ...stopJ,
+                ordem: newDetailsI.length + 1,
+                distKm: dToJ,
+                cumKm: (newDetailsI.length > 0 ? newDetailsI[newDetailsI.length - 1].cumKm : 0) + dToJ,
+              });
+
+              // Recalculate distances for new route J
+              const newDetailsJ: GeneratedRoute["details"] = [];
+              for (let k = 0; k < rj.details.length; k++) {
+                if (k === jIdx) {
+                  const prev = newDetailsJ.length > 0
+                    ? { lat: newDetailsJ[newDetailsJ.length - 1].oss[0].lat!, lon: newDetailsJ[newDetailsJ.length - 1].oss[0].lon! }
+                    : rj.start;
+                  const d = haversineKm(prev, { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! });
+                  newDetailsJ.push({
+                    ...stopI,
+                    ordem: k + 1,
+                    distKm: d,
+                    cumKm: (newDetailsJ.length > 0 ? newDetailsJ[newDetailsJ.length - 1].cumKm : 0) + d,
+                  });
+                } else {
+                  const prev = newDetailsJ.length > 0
+                    ? { lat: newDetailsJ[newDetailsJ.length - 1].oss[0].lat!, lon: newDetailsJ[newDetailsJ.length - 1].oss[0].lon! }
+                    : rj.start;
+                  const d = haversineKm(prev, { lat: rj.details[k].oss[0].lat!, lon: rj.details[k].oss[0].lon! });
+                  newDetailsJ.push({
+                    ...rj.details[k],
+                    ordem: k + 1,
+                    distKm: d,
+                    cumKm: (newDetailsJ.length > 0 ? newDetailsJ[newDetailsJ.length - 1].cumKm : 0) + d,
+                  });
+                }
+              }
+
+              const cumI = newDetailsI.reduce((s, d) => s + d.distKm, 0);
+              const cumJ = newDetailsJ.reduce((s, d) => s + d.distKm, 0);
+
+              const stopsI: RouteStop[] = newDetailsI.map((d) => ({
+                planta: d.planta,
+                lat: d.oss[0].lat!,
+                lon: d.oss[0].lon!,
+                ordem: d.ordem,
+                osCount: d.oss.length,
+              }));
+              const stopsJ: RouteStop[] = newDetailsJ.map((d) => ({
+                planta: d.planta,
+                lat: d.oss[0].lat!,
+                lon: d.oss[0].lon!,
+                ordem: d.ordem,
+                osCount: d.oss.length,
+              }));
+
+              routes[i] = {
+                ...ri,
+                details: newDetailsI,
+                stops: stopsI,
+                totalKm: cumI,
+                etaMin: Math.round((cumI / AVG_KMH) * 60),
+              };
+              routes[j] = {
+                ...rj,
+                details: newDetailsJ,
+                stops: stopsJ,
+                totalKm: cumJ,
+                etaMin: Math.round((cumJ / AVG_KMH) * 60),
+              };
+              improved = true;
+              break;
+            }
+          }
+          if (improved) break;
+        }
+        if (improved) break;
+      }
+    }
+    return routes;
   }
 
   const generateRoute = () => {
@@ -1078,7 +1276,7 @@ function BacklogPage() {
       const groups = Array.from(groupMap.values());
       if (!groups.length) break;
 
-      // 4) Nearest-neighbor com urgência
+      // 4) Nearest-neighbor — prioridade é a distância, urgência é desempate
       const maxDaysAtraso = Math.max(
         1,
         ...groups.map((g) =>
@@ -1097,7 +1295,11 @@ function BacklogPage() {
           const d = haversineKm(cursor, g);
           const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
           const norm = days / maxDaysAtraso;
-          const score = d - URGENCY_WEIGHT_KM_PER_DAY * norm * 10;
+          // Penaliza saltos muito longos (> 15 km) exponencialmente
+          const hopPenalty = d > 15 ? (d - 15) * 2 : 0;
+          // Urgência conta muito pouco no score (máximo ~0.5 km de desconto)
+          const urgencyDiscount = norm * 0.5;
+          const score = d + hopPenalty - urgencyDiscount;
           if (score < bestScore) {
             bestScore = score;
             best = g;
@@ -1176,7 +1378,10 @@ function BacklogPage() {
       return;
     }
 
-    setGeneratedRoutes(routesList);
+    // Otimização entre rotas: tenta trocar paradas entre rotas pra reduzir distância total
+    const optimized = optimizeRoutes(routesList);
+
+    setGeneratedRoutes(optimized);
     setRouteDialogOpen(false);
     setTimeout(() => setMapFitSignal((n) => n + 1), 100);
   };
@@ -1949,13 +2154,13 @@ function BacklogPage() {
             <div className="grid gap-2 sm:grid-cols-2">
               <MultiSelect
                 label="Tipo de Atividade *"
-                options={allTipos}
+                options={rbOptTipos}
                 value={rbTipos}
                 onChange={setRbTipos}
               />
               <MultiSelect
                 label="Responsabilidade *"
-                options={allResps}
+                options={rbOptResps}
                 value={rbResps}
                 onChange={setRbResps}
               />
@@ -2006,13 +2211,13 @@ function BacklogPage() {
             <div className="grid gap-2 sm:grid-cols-2">
               <MultiSelect
                 label="Elevatórias (opcional)"
-                options={allPlantas}
+                options={rbOptElevatorias}
                 value={rbElevatorias}
                 onChange={setRbElevatorias}
               />
               <MultiSelect
                 label="Cidade (opcional)"
-                options={allCidades}
+                options={rbOptCidades}
                 value={rbCidades}
                 onChange={setRbCidades}
               />
