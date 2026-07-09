@@ -73,16 +73,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (authUser) {
-      setProfile({
-        id: userId,
-        nome_completo:
-          String(authUser.user_metadata?.nome_completo ?? authUser.user_metadata?.full_name ?? authUser.email ?? ""),
-        email: authUser.email ?? "",
-        cargo_id: null,
-        status: "pendente",
-        criado_em: null,
-        ultimo_acesso: null,
-      });
+      const nomeCompleto = String(
+        authUser.user_metadata?.nome_completo ?? authUser.user_metadata?.full_name ?? authUser.email ?? "",
+      );
+      const email = authUser.email ?? "";
+      const { data: createdProfile, error: upsertError } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: userId,
+            nome_completo: nomeCompleto,
+            email,
+            cargo_id: null,
+            status: "pendente",
+            criado_em: new Date().toISOString(),
+            ultimo_acesso: new Date().toISOString(),
+          },
+          { onConflict: "id" },
+        )
+        .select("*, cargos!profiles_cargo_id_fkey(nome)")
+        .maybeSingle();
+
+      if (requestId !== profileRequestId.current) return;
+
+      if (createdProfile && !upsertError) {
+        setProfile({
+          ...createdProfile,
+          cargo_nome: (createdProfile.cargos as { nome: string } | null)?.nome ?? null,
+        } as Profile);
+      } else {
+        setProfile({
+          id: userId,
+          nome_completo: nomeCompleto,
+          email,
+          cargo_id: null,
+          status: "pendente",
+          criado_em: null,
+          ultimo_acesso: null,
+        });
+      }
     } else {
       setProfile(null);
     }
