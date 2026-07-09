@@ -14,6 +14,7 @@ import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as EstoqueRouteImport } from './routes/estoque'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BloqueadoRouteImport } from './routes/bloqueado'
 import { Route as BacklogRouteImport } from './routes/backlog'
@@ -44,6 +45,11 @@ const PendingRoute = PendingRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueRoute = EstoqueRouteImport.update({
+  id: '/estoque',
+  path: '/estoque',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
+  '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
+  '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
+  '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/backlog'
     | '/bloqueado'
     | '/dashboard'
+    | '/estoque'
     | '/login'
     | '/pending'
     | '/register'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/backlog'
     | '/bloqueado'
     | '/dashboard'
+    | '/estoque'
     | '/login'
     | '/pending'
     | '/register'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/backlog'
     | '/bloqueado'
     | '/dashboard'
+    | '/estoque'
     | '/login'
     | '/pending'
     | '/register'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   BacklogRoute: typeof BacklogRoute
   BloqueadoRoute: typeof BloqueadoRoute
   DashboardRoute: typeof DashboardRoute
+  EstoqueRoute: typeof EstoqueRoute
   LoginRoute: typeof LoginRoute
   PendingRoute: typeof PendingRoute
   RegisterRoute: typeof RegisterRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque': {
+      id: '/estoque'
+      path: '/estoque'
+      fullPath: '/estoque'
+      preLoaderRoute: typeof EstoqueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   BacklogRoute: BacklogRoute,
   BloqueadoRoute: BloqueadoRoute,
   DashboardRoute: DashboardRoute,
+  EstoqueRoute: EstoqueRoute,
   LoginRoute: LoginRoute,
   PendingRoute: PendingRoute,
   RegisterRoute: RegisterRoute,

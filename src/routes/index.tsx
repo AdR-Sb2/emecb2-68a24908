@@ -11,6 +11,7 @@ import {
   LogOut,
   Loader2,
   User,
+  Package,
 } from "lucide-react";
 import {
   Dialog,
@@ -222,8 +223,13 @@ function Index() {
               </CardLink>
             )}
 
-            {/* Em breve — sempre visível, mas desabilitado */}
-            <CardDisabled delay={4} />
+            {/* Estoque */}
+            <CardLink to="/estoque" chave="backlog" delay={4}>
+              <CardIcon chave="backlog" icon={Package} />
+              <CardTitle>Almoxarifado</CardTitle>
+              <CardDesc>Estoque de materiais, entrada/saída, compras e pedidos.</CardDesc>
+              <CardCta>Abrir estoque</CardCta>
+            </CardLink>
           </div>
         )}
 
