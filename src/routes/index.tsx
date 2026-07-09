@@ -118,28 +118,26 @@ function Index() {
   const hasPanel = (chave: string) => paineis.some((p) => p.chave === chave);
   const canAdmin = hasPanel("admin");
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#eaf3fb] via-slate-50 to-[#dbeaf7] p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#eaf3fb] via-slate-50 to-[#dbeaf7]">
       <style>{animations}</style>
 
-      {/* Header: logo à esquerda, itens do usuário à direita */}
-      <div className="mb-6 flex w-full items-center justify-between gap-3">
-        {/* Logo */}
-        <div className="flex items-center">
+      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-gray-200 bg-white px-4 md:px-6 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+        <div className="flex items-center gap-2">
           <img
             src={logoAsset.url}
-            alt="Águas do Rio - Eletromecânica"
-            className="h-10 w-auto object-contain md:h-12"
+            alt="Águas do Rio"
+            className="h-12 w-auto object-contain"
             loading="eager"
           />
+          <span className="hidden text-sm font-bold text-[#0b3a73] md:inline">ELETROMECÂNICA</span>
         </div>
 
-        {/* User area */}
         <div className="flex items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <User className="h-4 w-4" />
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <User className="h-3.5 w-3.5" />
             <span className="font-medium">{profile?.nome_completo}</span>
             {profile?.cargo_nome && (
-              <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                 {profile.cargo_nome}
               </span>
             )}
@@ -147,21 +145,22 @@ function Index() {
           {canAdmin && (
             <Link
               to="/admin"
-              className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6]"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-100 active:scale-95"
             >
-              <Shield className="h-3.5 w-3.5" /> Admin
+              <Shield className="h-3 w-3" /> Admin
             </Link>
           )}
           <button
             onClick={signOut}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+            className="inline-flex items-center justify-center rounded-md border border-slate-300 p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-red-500 active:scale-95 cursor-pointer"
+            title="Sair"
           >
-            <LogOut className="h-3.5 w-3.5" /> Sair
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl px-4 pt-8 md:px-6 md:pt-12">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-[#0b3a73] md:text-3xl">Hub Eletromecânica</h1>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
