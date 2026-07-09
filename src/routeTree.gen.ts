@@ -11,9 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TestesRouteImport } from './routes/testes'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as PendingRouteImport } from './routes/pending'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as BloqueadoRouteImport } from './routes/bloqueado'
 import { Route as BacklogRouteImport } from './routes/backlog'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiEquipeOverrideRouteImport } from './routes/api/equipe-override'
 
 const TestesRoute = TestesRouteImport.update({
   id: '/testes',
@@ -25,9 +31,29 @@ const RelatorioRoute = RelatorioRouteImport.update({
   path: '/relatorio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendingRoute = PendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BloqueadoRoute = BloqueadoRouteImport.update({
+  id: '/bloqueado',
+  path: '/bloqueado',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BacklogRoute = BacklogRouteImport.update({
@@ -35,48 +61,116 @@ const BacklogRoute = BacklogRouteImport.update({
   path: '/backlog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEquipeOverrideRoute = ApiEquipeOverrideRouteImport.update({
+  id: '/api/equipe-override',
+  path: '/api/equipe-override',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/backlog': typeof BacklogRoute
+  '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
+  '/pending': typeof PendingRoute
+  '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
+  '/api/equipe-override': typeof ApiEquipeOverrideRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/backlog': typeof BacklogRoute
+  '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
+  '/pending': typeof PendingRoute
+  '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
+  '/api/equipe-override': typeof ApiEquipeOverrideRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/backlog': typeof BacklogRoute
+  '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
+  '/pending': typeof PendingRoute
+  '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
+  '/api/equipe-override': typeof ApiEquipeOverrideRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/backlog' | '/dashboard' | '/relatorio' | '/testes'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/backlog'
+    | '/bloqueado'
+    | '/dashboard'
+    | '/login'
+    | '/pending'
+    | '/register'
+    | '/relatorio'
+    | '/testes'
+    | '/api/equipe-override'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/backlog' | '/dashboard' | '/relatorio' | '/testes'
-  id: '__root__' | '/' | '/backlog' | '/dashboard' | '/relatorio' | '/testes'
+  to:
+    | '/'
+    | '/admin'
+    | '/backlog'
+    | '/bloqueado'
+    | '/dashboard'
+    | '/login'
+    | '/pending'
+    | '/register'
+    | '/relatorio'
+    | '/testes'
+    | '/api/equipe-override'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/backlog'
+    | '/bloqueado'
+    | '/dashboard'
+    | '/login'
+    | '/pending'
+    | '/register'
+    | '/relatorio'
+    | '/testes'
+    | '/api/equipe-override'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   BacklogRoute: typeof BacklogRoute
+  BloqueadoRoute: typeof BloqueadoRoute
   DashboardRoute: typeof DashboardRoute
+  LoginRoute: typeof LoginRoute
+  PendingRoute: typeof PendingRoute
+  RegisterRoute: typeof RegisterRoute
   RelatorioRoute: typeof RelatorioRoute
   TestesRoute: typeof TestesRoute
+  ApiEquipeOverrideRoute: typeof ApiEquipeOverrideRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -95,11 +189,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RelatorioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pending': {
+      id: '/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bloqueado': {
+      id: '/bloqueado'
+      path: '/bloqueado'
+      fullPath: '/bloqueado'
+      preLoaderRoute: typeof BloqueadoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/backlog': {
@@ -109,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BacklogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -116,15 +245,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/equipe-override': {
+      id: '/api/equipe-override'
+      path: '/api/equipe-override'
+      fullPath: '/api/equipe-override'
+      preLoaderRoute: typeof ApiEquipeOverrideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   BacklogRoute: BacklogRoute,
+  BloqueadoRoute: BloqueadoRoute,
   DashboardRoute: DashboardRoute,
+  LoginRoute: LoginRoute,
+  PendingRoute: PendingRoute,
+  RegisterRoute: RegisterRoute,
   RelatorioRoute: RelatorioRoute,
   TestesRoute: TestesRoute,
+  ApiEquipeOverrideRoute: ApiEquipeOverrideRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

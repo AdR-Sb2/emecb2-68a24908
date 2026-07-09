@@ -361,15 +361,15 @@ export const EQUIP_AUTOMACAO: string[] = [
 ].map(normStr);
 
 // Descr. equipamento que contém (prefixo/substring) → EMEC
-export const EQUIP_EMEC_CONTAINS: string[] = [
-  "PAINEL ELÉTRICO",
-  "VÁLVULA",
-].map(normStr);
+export const EQUIP_EMEC_CONTAINS: string[] = ["PAINEL ELÉTRICO", "VÁLVULA"].map(normStr);
 
 // Descr. equipamento que contém (prefixo/substring) → Automação
-export const EQUIP_AUTOMACAO_CONTAINS: string[] = [
-  "MACROMED",
-].map(normStr);
+export const EQUIP_AUTOMACAO_CONTAINS: string[] = ["MACROMED"].map(normStr);
+
+// Ordens que forçam Equipe = "EMEC"
+export const OM_EQUIPE_EMEC: string[] = [
+  // Colar aqui a lista extra.
+];
 
 // Ordens que forçam Equipe = "Automação"
 export const OM_EQUIPE_AUTOMACAO: string[] = [
@@ -440,6 +440,7 @@ export function computeEquipe(row: {
 }): Equipe {
   if (row.responsabilidade !== "Baixada 2") return "Sem equipamento";
   const om = normOM(row.om);
+  if (OM_EQUIPE_EMEC.includes(om)) return "EMEC";
   if (OM_EQUIPE_AUTOMACAO.includes(om)) return "Automação";
   const desc = normStr(row.descricaoEquipamento);
   if (!desc) return "Não analisado";

@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Boxes,
@@ -7,6 +7,10 @@ import {
   FileText,
   ClipboardList,
   MoreHorizontal,
+  Shield,
+  LogOut,
+  User,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -16,14 +20,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
+import { useAuth } from "../lib/auth";
+import { supabase } from "../lib/supabase";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Águas do Rio · Eletromecânica" },
       { name: "description", content: "Hub de dashboards e sistemas da Eletromecânica." },
-      { property: "og:title", content: "Águas do Rio · Eletromecânica" },
-      { property: "og:description", content: "Hub de dashboards e sistemas da Eletromecânica." },
     ],
   }),
   component: Index,
@@ -32,12 +36,104 @@ export const Route = createFileRoute("/")({
 const SISTEMAS_OPERACIONAL_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/";
 const SISTEMAS_ADMINISTRATIVO_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/adm/adm.html";
 
+type Painel = {
+  chave: string;
+  nome_exibicao: string;
+  descricao: string;
+  icone: string;
+};
+
+const ICON_MAP: Record<string, typeof LayoutDashboard> = {
+  LayoutDashboard,
+  Boxes,
+  ArrowRight,
+  FileText,
+  MoreHorizontal,
+  Shield,
+  User,
+  FlaskConical: LayoutDashboard,
+  Cpu: LayoutDashboard,
+  BrainCircuit: LayoutDashboard,
+  FileSpreadsheet: FileText,
+  Building2: Boxes,
+};
+
 function Index() {
+  const navigate = useNavigate();
+  const { user, profile, loading, signOut } = useAuth();
+  const [paineis, setPaineis] = useState<Painel[]>([]);
+  const [loadingPaineis, setLoadingPaineis] = useState(true);
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      navigate({ to: "/login", replace: true });
+      return;
+    }
+    if (profile?.status === "pendente") {
+      navigate({ to: "/pending", replace: true });
+      return;
+    }
+    if (profile?.status === "bloqueado") {
+      navigate({ to: "/bloqueado", replace: true });
+      return;
+    }
+  }, [user, profile, loading, navigate]);
+
+  useEffect(() => {
+    if (!profile?.cargo_id) {
+      setLoadingPaineis(false);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("cargo_paineis")
+        .select("painel_id, paineis!inner(chave, nome_exibicao, descricao, icone)")
+        .eq("cargo_id", profile.cargo_id);
+      if (data) {
+        setPaineis(data.map((r) => r.paineis as unknown as Painel));
+      }
+      setLoadingPaineis(false);
+    })();
+  }, [profile?.cargo_id]);
+
+  if (loading) return null;
+
+  const hasPanel = (chave: string) => paineis.some((p) => p.chave === chave);
+
+  const canAdmin = hasPanel("admin");
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#eaf3fb] via-slate-50 to-[#dbeaf7] p-4 md:p-6">
+      {/* Header com usuário */}
+      <div className="mx-auto mb-4 flex max-w-5xl items-center justify-end gap-3">
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <User className="h-4 w-4" />
+          <span className="font-medium">{profile?.nome_completo}</span>
+          {profile?.cargo_nome && (
+            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+              {profile.cargo_nome}
+            </span>
+          )}
+        </div>
+        {canAdmin && (
+          <Link
+            to="/admin"
+            className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6]"
+          >
+            <Shield className="h-3.5 w-3.5" /> Admin
+          </Link>
+        )}
+        <button
+          onClick={signOut}
+          className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Sair
+        </button>
+      </div>
+
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 overflow-hidden rounded-md shadow">
           <img
@@ -57,88 +153,108 @@ function Index() {
           </p>
         </div>
 
-        <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <button
-            type="button"
-            onClick={() => setDashOpen(true)}
-            className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
-              <LayoutDashboard className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-[#0b3a73]">Dashboard</h2>
-              <p className="text-sm text-slate-600">Painéis de automação, testes e medições.</p>
-            </div>
-            <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
-              Escolher painel <ArrowRight className="h-4 w-4" />
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSysOpen(true)}
-            className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
-              <Boxes className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-[#0b3a73]">Sistemas</h2>
-              <p className="text-sm text-slate-600">Hubs Administrativo e Operacional.</p>
-            </div>
-            <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
-              Escolher sistema <ArrowRight className="h-4 w-4" />
-            </span>
-          </button>
-
-          <Link
-            to="/relatorio"
-            className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
-              <FileText className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-[#0b3a73]">Relatório</h2>
-              <p className="text-sm text-slate-600">Técnico e de Planta/Unidade para WhatsApp.</p>
-            </div>
-            <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
-              Abrir relatórios <ArrowRight className="h-4 w-4" />
-            </span>
-          </Link>
-
-          <Link
-            to="/backlog"
-            className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
-              <ClipboardList className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-[#0b3a73]">Backlog BI</h2>
-              <p className="text-sm text-slate-600">
-                O.S. do Field/SAP: SLA, mapa e programação semanal.
-              </p>
-            </div>
-            <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
-              Abrir backlog <ArrowRight className="h-4 w-4" />
-            </span>
-          </Link>
-
-          <div className="group relative flex cursor-default flex-col items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-left shadow-sm">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
-              <MoreHorizontal className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-400">Outros Sistemas</h2>
-              <p className="text-sm text-slate-400">Novos módulos serão adicionados aqui.</p>
-            </div>
-            <span className="mt-auto inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
-              Em breve
-            </span>
+        {loadingPaineis ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-[#1f7ad6]" />
           </div>
-        </div>
+        ) : paineis.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-12 text-center">
+            <p className="text-sm text-slate-500">
+              Nenhum painel liberado para seu cargo ainda. Fale com o administrador.
+            </p>
+          </div>
+        ) : (
+          <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {(hasPanel("dashboard_automacao") || hasPanel("dashboard_testes")) && (
+              <button
+                type="button"
+                onClick={() => setDashOpen(true)}
+                className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
+                  <LayoutDashboard className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#0b3a73]">Dashboard</h2>
+                  <p className="text-sm text-slate-600">Painéis de automação, testes e medições.</p>
+                </div>
+                <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
+                  Escolher painel <ArrowRight className="h-4 w-4" />
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSysOpen(true)}
+              className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
+                <Boxes className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#0b3a73]">Sistemas</h2>
+                <p className="text-sm text-slate-600">Hubs Administrativo e Operacional.</p>
+              </div>
+              <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
+                Escolher sistema <ArrowRight className="h-4 w-4" />
+              </span>
+            </button>
+
+            {hasPanel("relatorio_tecnico") && (
+              <Link
+                to="/relatorio"
+                className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#0b3a73]">Relatório</h2>
+                  <p className="text-sm text-slate-600">
+                    Técnico e de Planta/Unidade para WhatsApp.
+                  </p>
+                </div>
+                <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
+                  Abrir relatórios <ArrowRight className="h-4 w-4" />
+                </span>
+              </Link>
+            )}
+
+            {hasPanel("dashboard_os") && (
+              <Link
+                to="/backlog"
+                className="group flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-lg"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#1f7ad6]/10 text-[#0b3a73]">
+                  <ClipboardList className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#0b3a73]">Backlog BI</h2>
+                  <p className="text-sm text-slate-600">
+                    O.S. do Field/SAP: SLA, mapa e programação semanal.
+                  </p>
+                </div>
+                <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
+                  Abrir backlog <ArrowRight className="h-4 w-4" />
+                </span>
+              </Link>
+            )}
+
+            <div className="group relative flex cursor-default flex-col items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-left shadow-sm">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                <MoreHorizontal className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-400">Outros Sistemas</h2>
+                <p className="text-sm text-slate-400">Novos módulos serão adicionados aqui.</p>
+              </div>
+              <span className="mt-auto inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                Em breve
+              </span>
+            </div>
+          </div>
+        )}
 
         <p className="mt-8 text-center text-xs text-slate-500">Águas do Rio · Eletromecânica</p>
       </div>
@@ -150,33 +266,36 @@ function Index() {
             <DialogDescription>Qual painel você quer abrir?</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <Link
-              to="/dashboard"
-              onClick={() => setDashOpen(false)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
-            >
-              <div>
-                <div className="font-semibold text-[#0b3a73]">Automação</div>
-                <div className="text-xs text-slate-500">
-                  Elevatórias · sensores · CLP/PCP · ELIPSE
+            {hasPanel("dashboard_automacao") && (
+              <Link
+                to="/dashboard"
+                onClick={() => setDashOpen(false)}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
+              >
+                <div>
+                  <div className="font-semibold text-[#0b3a73]">Automação</div>
+                  <div className="text-xs text-slate-500">
+                    Elevatórias · sensores · CLP/PCP · ELIPSE
+                  </div>
                 </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
-            </Link>
-
-            <Link
-              to="/testes"
-              onClick={() => setDashOpen(false)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
-            >
-              <div>
-                <div className="font-semibold text-[#0b3a73]">Testes & Aferições</div>
-                <div className="text-xs text-slate-500">
-                  Serviços · equipes · parâmetros · impossibilidade
+                <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+              </Link>
+            )}
+            {hasPanel("dashboard_testes") && (
+              <Link
+                to="/testes"
+                onClick={() => setDashOpen(false)}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
+              >
+                <div>
+                  <div className="font-semibold text-[#0b3a73]">Testes & Aferições</div>
+                  <div className="text-xs text-slate-500">
+                    Serviços · equipes · parâmetros · impossibilidade
+                  </div>
                 </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
-            </Link>
+                <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+              </Link>
+            )}
           </div>
         </DialogContent>
       </Dialog>

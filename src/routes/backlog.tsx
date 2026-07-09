@@ -36,6 +36,7 @@ import {
 import logoAsset from "@/assets/logo-eletromecanica.png.asset.json";
 import rawData from "@/data/backlog.json";
 import elevatoriasData from "@/data/elevatorias.json";
+import rawEquipeOverrides from "@/data/equipe-overrides.json";
 import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -83,6 +84,7 @@ type Row = {
 };
 
 const DATA = rawData as unknown as Row[];
+const EQUIPE_OVERRIDES = rawEquipeOverrides as Record<string, string>;
 
 const plantaToElevatoriaMap = new Map<string, string>();
 (elevatoriasData as Array<{ PLANTA: string | null; ELEVATORIAS: string | null }>).forEach(
@@ -451,7 +453,26 @@ function BacklogPage() {
     return () => clearInterval(id);
   }, [autoRefresh]);
 
-  const enriched = useMemo(() => enrich(data, now), [data, now]);
+  const [equipeOverrides, setEquipeOverrides] = useState<Record<string, Equipe>>(
+    () => EQUIPE_OVERRIDES as Record<string, Equipe>,
+  );
+  useEffect(() => {
+    fetch("/api/equipe-override")
+      .then((r) => r.json())
+      .then((data: Record<string, string>) =>
+        setEquipeOverrides((prev) => ({ ...prev, ...data }) as Record<string, Equipe>),
+      )
+      .catch(() => {});
+  }, []);
+
+  const enriched = useMemo(
+    () =>
+      enrich(data, now).map((e) => {
+        const override = equipeOverrides[e.om];
+        return override ? { ...e, equipe: override } : e;
+      }),
+    [data, now, equipeOverrides],
+  );
 
   // ---------- filtros ----------
   const [fPlantas, setFPlantas] = useState<string[]>([]);
@@ -2262,7 +2283,63 @@ function BacklogPage() {
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.responsabilidade}</td>
-                  <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.equipe}</td>
+                  <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                    {e.responsabilidade === "Baixada 2" && e.equipe === "Não analisado" ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-slate-400">—</span>
+                        <button
+                          onClick={() => {
+                            setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }));
+                            fetch("/api/equipe-override", {
+                              method: "POST",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ om: e.om, equipe: "EMEC" }),
+                            }).catch(() => {});
+                          }}
+                          className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
+                        >
+                          EMEC
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }));
+                            fetch("/api/equipe-override", {
+                              method: "POST",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ om: e.om, equipe: "Automação" }),
+                            }).catch(() => {});
+                          }}
+                          className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
+                        >
+                          Automação
+                        </button>
+                      </span>
+                    ) : equipeOverrides[e.om] ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="font-semibold text-[#0b3a73]">{e.equipe}</span>
+                        <button
+                          onClick={() => {
+                            setEquipeOverrides((prev) => {
+                              const next = { ...prev };
+                              delete next[e.om];
+                              return next;
+                            });
+                            fetch("/api/equipe-override", {
+                              method: "DELETE",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ om: e.om }),
+                            }).catch(() => {});
+                          }}
+                          className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
+                          title="Reverter ao cálculo automático"
+                        >
+                          ↺
+                        </button>
+                      </span>
+                    ) : (
+                      <span>{e.equipe}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -2344,7 +2421,48 @@ function BacklogPage() {
                     <td className="whitespace-nowrap px-2 py-1 text-[12px]">
                       {e.responsabilidade}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.equipe}</td>
+                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                      {e.responsabilidade === "Baixada 2" && e.equipe === "Não analisado" ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-slate-400">—</span>
+                          <button
+                            onClick={() =>
+                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }))
+                            }
+                            className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
+                          >
+                            EMEC
+                          </button>
+                          <button
+                            onClick={() =>
+                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }))
+                            }
+                            className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
+                          >
+                            Automação
+                          </button>
+                        </span>
+                      ) : equipeOverrides[e.om] ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="font-semibold text-[#0b3a73]">{e.equipe}</span>
+                          <button
+                            onClick={() =>
+                              setEquipeOverrides((prev) => {
+                                const next = { ...prev };
+                                delete next[e.om];
+                                return next;
+                              })
+                            }
+                            className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
+                            title="Reverter ao cálculo automático"
+                          >
+                            ↺
+                          </button>
+                        </span>
+                      ) : (
+                        <span>{e.equipe}</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
