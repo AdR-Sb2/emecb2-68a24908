@@ -2386,6 +2386,113 @@ function BacklogPage() {
                               <div>+{d.distKm.toFixed(1)} km</div>
                               <div className="text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
                             </div>
+                            <div className="flex items-center gap-1 ml-2">
+                              <button
+                                onClick={() => {
+                                  const routes = [...generatedRoutes];
+                                  const r = { ...routes[activeRouteTab] };
+                                  const idx = r.details.findIndex((x) => x.planta === d.planta);
+                                  if (idx === -1) return;
+                                  const newDetails = r.details.filter((_, i) => i !== idx);
+                                  const newStops = r.stops.filter((_, i) => i !== idx);
+                                  // Recalculate cumulative distances
+                                  let cumKm = 0;
+                                  let prev = activeRoute.start;
+                                  const recalcDetails = newDetails.map((x, i) => {
+                                    const dist = i === 0
+                                      ? haversineKm(prev, { lat: x.oss[0].lat!, lon: x.oss[0].lon! })
+                                      : haversineKm(
+                                          { lat: newDetails[i - 1].oss[0].lat!, lon: newDetails[i - 1].oss[0].lon! },
+                                          { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
+                                        );
+                                    cumKm += dist;
+                                    return { ...x, ordem: i + 1, distKm: dist, cumKm };
+                                  });
+                                  const totalKm = cumKm;
+                                  routes[activeRouteTab] = {
+                                    ...r,
+                                    details: recalcDetails,
+                                    stops: newStops.map((s, i) => ({ ...s, ordem: i + 1 })),
+                                    totalKm,
+                                    etaMin: Math.round((totalKm / AVG_KMH) * 60),
+                                  };
+                                  setGeneratedRoutes(routes);
+                                }}
+                                className="rounded bg-red-50 px-1 py-0.5 text-[10px] text-red-600 hover:bg-red-100 cursor-pointer"
+                                title="Remover elevatória desta rota"
+                              >
+                                ✕
+                              </button>
+                              {generatedRoutes.length > 1 && (
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    const targetIdx = Number(e.target.value);
+                                    if (isNaN(targetIdx) || targetIdx === activeRouteTab) return;
+                                    const routes = [...generatedRoutes];
+                                    // Remove from current route
+                                    const src = { ...routes[activeRouteTab] };
+                                    const idx = src.details.findIndex((x) => x.planta === d.planta);
+                                    if (idx === -1) return;
+                                    const movedDetail = src.details[idx];
+                                    src.details = src.details.filter((_, i) => i !== idx);
+                                    src.stops = src.stops.filter((_, i) => i !== idx);
+                                    // Recalc source route
+                                    let cumKm = 0;
+                                    let prev = activeRoute.start;
+                                    src.details = src.details.map((x, i) => {
+                                      const dist = i === 0
+                                        ? haversineKm(prev, { lat: x.oss[0].lat!, lon: x.oss[0].lon! })
+                                        : haversineKm(
+                                            { lat: src.details[i - 1].oss[0].lat!, lon: src.details[i - 1].oss[0].lon! },
+                                            { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
+                                          );
+                                      cumKm += dist;
+                                      return { ...x, ordem: i + 1, distKm: dist, cumKm };
+                                    });
+                                    src.totalKm = cumKm;
+                                    src.etaMin = Math.round((cumKm / AVG_KMH) * 60);
+                                    src.stops = src.stops.map((s, i) => ({ ...s, ordem: i + 1 }));
+
+                                    // Add to target route at the end
+                                    const tgt = { ...routes[targetIdx] };
+                                    const tgtPrev = tgt.details.length > 0
+                                      ? { lat: tgt.details[tgt.details.length - 1].oss[0].lat!, lon: tgt.details[tgt.details.length - 1].oss[0].lon! }
+                                      : tgt.start;
+                                    const distToNew = haversineKm(tgtPrev, { lat: movedDetail.oss[0].lat!, lon: movedDetail.oss[0].lon! });
+                                    const newDetail = {
+                                      ...movedDetail,
+                                      ordem: tgt.details.length + 1,
+                                      distKm: distToNew,
+                                      cumKm: (tgt.details.length > 0 ? tgt.details[tgt.details.length - 1].cumKm : 0) + distToNew,
+                                    };
+                                    tgt.details = [...tgt.details, newDetail];
+                                    tgt.stops = [
+                                      ...tgt.stops,
+                                      { planta: movedDetail.planta, lat: movedDetail.oss[0].lat!, lon: movedDetail.oss[0].lon!, ordem: tgt.stops.length + 1, osCount: movedDetail.oss.length },
+                                    ];
+                                    tgt.totalKm = tgt.details.reduce((s, x) => s + x.distKm, 0);
+                                    tgt.etaMin = Math.round((tgt.totalKm / AVG_KMH) * 60);
+
+                                    routes[activeRouteTab] = src;
+                                    routes[targetIdx] = tgt;
+                                    setGeneratedRoutes(routes);
+                                    setActiveRouteTab(targetIdx);
+                                  }}
+                                  className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-600 cursor-pointer"
+                                  title="Transferir para outra rota"
+                                >
+                                  <option value="">→</option>
+                                  {generatedRoutes.map((_, ri) =>
+                                    ri !== activeRouteTab ? (
+                                      <option key={ri} value={ri}>
+                                        Rota {ri + 1}
+                                      </option>
+                                    ) : null,
+                                  )}
+                                </select>
+                              )}
+                            </div>
                           </div>
                           <ul className="mt-1 ml-8 space-y-0.5">
                             {d.oss.map((os) => (
