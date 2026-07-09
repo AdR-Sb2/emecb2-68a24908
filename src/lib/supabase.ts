@@ -8,19 +8,31 @@ const readEnv = (...keys: string[]) => {
   return undefined;
 };
 
-const supabaseUrl =
-  readEnv("VITE_SUPABASE_URL", "SUPABASE_URL", "PUBLIC_SUPABASE_URL") ||
-  "https://byxmnmebvqdxpzcuutak.supabase.co";
+const supabaseUrl = readEnv("VITE_SUPABASE_URL", "SUPABASE_URL", "PUBLIC_SUPABASE_URL");
+const supabaseAnonKey = readEnv(
+  "VITE_SUPABASE_ANON_KEY",
+  "SUPABASE_ANON_KEY",
+  "PUBLIC_SUPABASE_ANON_KEY",
+);
 
-const supabaseAnonKey =
-  readEnv("VITE_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY") ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5eG1ubWVidnFkeHB6Y3V1dGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjM0OTAsImV4cCI6MjA5OTEzOTQ5MH0.TUDk4MlKXsrWz6VufIdQkoFH7RGwezgKSFeZ6nMwyQI";
+const isLocalDev = import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
 
-export const isUsingFallbackSupabaseConfig =
-  !readEnv("VITE_SUPABASE_URL", "SUPABASE_URL", "PUBLIC_SUPABASE_URL") ||
-  !readEnv("VITE_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY");
+export const isUsingFallbackSupabaseConfig = !supabaseUrl || !supabaseAnonKey;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabaseConfigError =
+  !supabaseUrl || !supabaseAnonKey
+    ? "Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no ambiente do Lovable Cloud para este deploy."
+    : null;
+
+const resolvedSupabaseUrl = supabaseUrl || (isLocalDev ? "https://byxmnmebvqdxpzcuutak.supabase.co" : "");
+const resolvedSupabaseAnonKey =
+  supabaseAnonKey || (isLocalDev ? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5eG1ubWVidnFkeHB6Y3V1dGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjM0OTAsImV4cCI6MjA5OTEzOTQ5MH0.TUDk4MlKXsrWz6VufIdQkoFH7RGwezgKSFeZ6nMwyQI" : "");
+
+if (!resolvedSupabaseUrl || !resolvedSupabaseAnonKey) {
+  console.error(supabaseConfigError);
+}
+
+export const supabase = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
