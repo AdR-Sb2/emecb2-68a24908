@@ -127,28 +127,28 @@ function Index() {
     <div className="min-h-screen bg-[#f0f4f8]">
       <style>{animations}</style>
 
-      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/95 shadow-[0_12px_35px_-20px_rgba(0,0,0,0.35)] backdrop-blur">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#003087] to-[#00AEEF] p-2 shadow-lg shadow-[#003087]/20">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] text-white shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/95 p-2 shadow-lg shadow-black/10">
               <img
                 src={logoHeader}
                 alt="Águas do Rio"
-                className="h-10 w-auto object-contain drop-shadow-sm"
+                className="h-9 w-auto object-contain"
                 loading="eager"
               />
             </div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-semibold text-[#0b3a73]">Águas do Rio</p>
-              <p className="text-xs text-slate-500">Eletromecânica · Hub operacional</p>
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold tracking-[0.02em]">Águas do Rio</p>
+              <p className="truncate text-xs text-cyan-50/90">Eletromecânica · Hub operacional</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 md:flex">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <div className="hidden items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm backdrop-blur-sm sm:flex">
               <span className="font-medium">{profile?.nome_completo}</span>
               {profile?.cargo_nome && (
-                <span className="rounded-full bg-[#003087]/10 px-2 py-0.5 text-[11px] font-semibold text-[#003087]">
+                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-cyan-50">
                   {profile.cargo_nome}
                 </span>
               )}
@@ -156,14 +156,14 @@ function Index() {
             {canAdmin && (
               <Link
                 to="/admin"
-                className="inline-flex items-center gap-1 rounded-full border border-[#003087]/15 bg-[#003087]/5 px-3 py-1.5 text-xs font-semibold text-[#003087] transition hover:bg-[#003087]/10 active:scale-95"
+                className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15 active:scale-95"
               >
                 <Shield className="h-3.5 w-3.5" /> Admin
               </Link>
             )}
             <button
               onClick={signOut}
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 hover:text-[#003087] active:scale-95"
+              className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/15 active:scale-95"
               title="Sair"
             >
               <LogOut className="h-4 w-4" />

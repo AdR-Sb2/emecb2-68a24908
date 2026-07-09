@@ -459,22 +459,22 @@ function TestesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="relative mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur">
+      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/95 p-2 shadow-sm backdrop-blur">
               <img
                 src={logoHeader}
                 alt="Águas do Rio - Eletromecânica"
-                className="h-12 w-auto object-contain sm:h-14"
+                className="h-8 w-auto object-contain sm:h-10"
                 width={1024}
                 height={160}
                 loading="eager"
               />
             </div>
-            <div className="hidden text-white sm:block">
-              <p className="text-base font-semibold">Águas do Rio</p>
-              <p className="text-xs text-white/80">Eletromecânica · Testes e aferições</p>
+            <div className="min-w-0 text-white">
+              <p className="truncate text-base font-semibold">Águas do Rio</p>
+              <p className="truncate text-xs text-cyan-50/90">Eletromecânica · Testes e aferições</p>
             </div>
           </div>
           <Link
