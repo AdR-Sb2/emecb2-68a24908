@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { isUsingFallbackSupabaseConfig, supabase } from "../lib/supabase";
+import { supabase, supabaseConfigSummary } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { UserPlus, Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -57,6 +57,11 @@ function RegisterPage() {
       setError("A senha deve ter no mínimo 6 caracteres.");
       return;
     }
+    if (supabaseConfigSummary.error) {
+      setError(supabaseConfigSummary.error);
+      return;
+    }
+
     setSubmitting(true);
     const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
     const { error: err } = await supabase.auth.signUp({
@@ -160,12 +165,16 @@ function RegisterPage() {
             />
           </div>
 
-          {isUsingFallbackSupabaseConfig && (
+          {supabaseConfigSummary.error && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
-              Este deploy não está recebendo as variáveis do Supabase do Lovable Cloud. Confirme
-              VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para o ambiente de produção/preview.
+              {supabaseConfigSummary.error}
             </div>
           )}
+
+          <div className="rounded-lg border border-[#334155] bg-[#0f172a]/80 px-3 py-2 text-xs text-[#94a3b8]">
+            <div className="font-medium text-[#e2e8f0]">Supabase ativo</div>
+            <div className="mt-1 break-all">{supabaseConfigSummary.url || "não configurado"}</div>
+          </div>
 
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
@@ -175,7 +184,7 @@ function RegisterPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={!!supabaseConfigSummary.error || submitting}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0ea5e9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0284c7] disabled:opacity-50 cursor-pointer"
           >
             {submitting ? (

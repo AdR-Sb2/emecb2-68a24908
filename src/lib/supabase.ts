@@ -28,6 +28,12 @@ const resolvedSupabaseUrl = supabaseUrl || (isLocalDev ? "https://byxmnmebvqdxpz
 const resolvedSupabaseAnonKey =
   supabaseAnonKey || (isLocalDev ? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5eG1ubWVidnFkeHB6Y3V1dGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjM0OTAsImV4cCI6MjA5OTEzOTQ5MH0.TUDk4MlKXsrWz6VufIdQkoFH7RGwezgKSFeZ6nMwyQI" : "");
 
+export const supabaseConfigSummary = {
+  url: resolvedSupabaseUrl,
+  isUsingFallback: isUsingFallbackSupabaseConfig,
+  error: supabaseConfigError,
+};
+
 if (!resolvedSupabaseUrl || !resolvedSupabaseAnonKey) {
   console.error(supabaseConfigError);
 }
