@@ -127,38 +127,48 @@ function Index() {
     <div className="min-h-screen bg-[#f0f4f8]">
       <style>{animations}</style>
 
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between bg-gradient-to-r from-[#003087] to-[#00AEEF] px-4 md:px-6 shadow-[0_1px_4px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center">
-          <img
-            src={logoAsset.url}
-            alt="Águas do Rio"
-            className="h-10 w-auto object-contain"
-            loading="eager"
-          />
-        </div>
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/95 shadow-[0_12px_35px_-20px_rgba(0,0,0,0.35)] backdrop-blur">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 md:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#003087] to-[#00AEEF] p-2 shadow-lg shadow-[#003087]/20">
+              <img
+                src={logoAsset.url}
+                alt="Águas do Rio"
+                className="h-10 w-auto object-contain drop-shadow-sm"
+                loading="eager"
+              />
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-sm font-semibold text-[#0b3a73]">Águas do Rio</p>
+              <p className="text-xs text-slate-500">Eletromecânica · Hub operacional</p>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-white">{profile?.nome_completo}</span>
-          {profile?.cargo_nome && (
-            <span className="rounded-full bg-white/20 px-[10px] py-[2px] text-xs font-medium text-white">
-              {profile.cargo_nome}
-            </span>
-          )}
-          {canAdmin && (
-            <Link
-              to="/admin"
-              className="inline-flex items-center gap-1 rounded bg-white px-2.5 py-1 text-xs font-medium text-[#003087] transition hover:opacity-90 active:scale-95"
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 md:flex">
+              <span className="font-medium">{profile?.nome_completo}</span>
+              {profile?.cargo_nome && (
+                <span className="rounded-full bg-[#003087]/10 px-2 py-0.5 text-[11px] font-semibold text-[#003087]">
+                  {profile.cargo_nome}
+                </span>
+              )}
+            </div>
+            {canAdmin && (
+              <Link
+                to="/admin"
+                className="inline-flex items-center gap-1 rounded-full border border-[#003087]/15 bg-[#003087]/5 px-3 py-1.5 text-xs font-semibold text-[#003087] transition hover:bg-[#003087]/10 active:scale-95"
+              >
+                <Shield className="h-3.5 w-3.5" /> Admin
+              </Link>
+            )}
+            <button
+              onClick={signOut}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 hover:text-[#003087] active:scale-95"
+              title="Sair"
             >
-              <Shield className="h-3 w-3" /> Admin
-            </Link>
-          )}
-          <button
-            onClick={signOut}
-            className="inline-flex items-center justify-center p-1 text-white transition hover:opacity-80 active:scale-95 cursor-pointer"
-            title="Sair"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 

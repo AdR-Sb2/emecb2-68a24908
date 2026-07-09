@@ -874,23 +874,33 @@ function RelatorioPage() {
       <Toaster richColors position="top-right" />
       <div className="mx-auto max-w-5xl p-4 md:p-6">
         {/* Header com logo — mesmo padrão do dashboard */}
-        <div className="relative mb-4 overflow-hidden rounded-md shadow">
-          <img
-            src={logoAsset.url}
-            alt="Águas do Rio - Eletromecânica"
-            className="w-full object-cover"
-            width={1024}
-            height={160}
-            loading="eager"
-          />
-          <Link
-            to="/"
-            title="Voltar ao Hub"
-            aria-label="Voltar ao Hub"
-            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
-          >
-            <Home className="h-4 w-4" />
-          </Link>
+        <div className="relative mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur">
+                <img
+                  src={logoAsset.url}
+                  alt="Águas do Rio - Eletromecânica"
+                  className="h-12 w-auto object-contain sm:h-14"
+                  width={1024}
+                  height={160}
+                  loading="eager"
+                />
+              </div>
+              <div className="hidden text-white sm:block">
+                <p className="text-base font-semibold">Águas do Rio</p>
+                <p className="text-xs text-white/80">Eletromecânica · Relatórios e comunicação</p>
+              </div>
+            </div>
+            <Link
+              to="/"
+              title="Voltar ao Hub"
+              aria-label="Voltar ao Hub"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
+            >
+              <Home className="h-5 w-5 sm:h-4 sm:w-4" />
+            </Link>
+          </div>
         </div>
 
         {/* Título + tabs */}

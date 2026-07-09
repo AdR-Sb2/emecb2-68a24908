@@ -459,23 +459,33 @@ function TestesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="relative mb-4 overflow-hidden rounded-md shadow">
-        <img
-          src={logoAsset.url}
-          alt="Águas do Rio - Eletromecânica"
-          className="h-20 w-full object-cover object-center sm:h-auto"
-          width={1024}
-          height={160}
-          loading="eager"
-        />
-        <Link
-          to="/"
-          title="Voltar ao Hub"
-          aria-label="Voltar ao Hub"
-          className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:bg-white hover:scale-105 sm:h-9 sm:w-9 sm:right-3 sm:top-3"
-        >
-          <Home className="h-5 w-5 sm:h-4 sm:w-4" />
-        </Link>
+      <div className="relative mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-white/95 p-2 shadow-sm backdrop-blur">
+              <img
+                src={logoAsset.url}
+                alt="Águas do Rio - Eletromecânica"
+                className="h-12 w-auto object-contain sm:h-14"
+                width={1024}
+                height={160}
+                loading="eager"
+              />
+            </div>
+            <div className="hidden text-white sm:block">
+              <p className="text-base font-semibold">Águas do Rio</p>
+              <p className="text-xs text-white/80">Eletromecânica · Testes e aferições</p>
+            </div>
+          </div>
+          <Link
+            to="/"
+            title="Voltar ao Hub"
+            aria-label="Voltar ao Hub"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
+          >
+            <Home className="h-5 w-5 sm:h-4 sm:w-4" />
+          </Link>
+        </div>
       </div>
       <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg">
         Testes & Aferições de Ativos
