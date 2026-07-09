@@ -39,6 +39,7 @@ import elevatoriasData from "@/data/elevatorias.json";
 import rawEquipeOverrides from "@/data/equipe-overrides.json";
 import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import {
   computeEquipe,
@@ -1253,13 +1254,16 @@ function BacklogPage() {
       return;
     }
 
-    // 1) candidatos
+    // 1) candidatos (filtros globais)
     const candidates = enriched.filter((e) => {
       if (!e.fimSla || e.fimSla >= slaLimit) return false;
       if (rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || "")) return false;
       if (rbResps.length && !rbResps.includes(e.responsabilidade)) return false;
       if (rbElevatorias.length && !rbElevatorias.includes(e.planta)) return false;
-      if (rbCidades.length && !rbCidades.includes(e.r.Cidade || "")) return false;
+      if (!rbUseIndividualConfig) {
+        if (rbCidades.length && !rbCidades.includes(e.r.Cidade || "")) return false;
+        if (rbEquipe !== "TODAS" && e.equipe !== rbEquipe) return false;
+      }
       if (e.lat === null || e.lon === null) return false;
       return true;
     });
@@ -1280,9 +1284,24 @@ function BacklogPage() {
     const visitedPlantas = new Set<string>();
 
     for (let rIdx = 0; rIdx < rbRouteCount; rIdx++) {
+      const routeCfg = rbUseIndividualConfig ? rbRouteConfigs[rIdx] : null;
+      const routeMaxStops = routeCfg?.maxStops ?? rbMaxStops;
+
       // Candidatos ainda não visitados
-      const activeCandidates = candidates.filter((e) => !visitedPlantas.has(e.planta));
-      if (!activeCandidates.length) break;
+      let routeCandidates = candidates.filter((e) => !visitedPlantas.has(e.planta));
+
+      // Filtros individuais por rota
+      if (routeCfg) {
+        routeCandidates = routeCandidates.filter((e) => {
+          if (routeCfg.equipe !== "TODAS" && e.equipe !== routeCfg.equipe) return false;
+          if (routeCfg.cidades.length && !routeCfg.cidades.includes(e.r.Cidade || "")) return false;
+          return true;
+        });
+      }
+
+      if (!routeCandidates.length) continue;
+
+      const activeCandidates = routeCandidates;
 
       // 3) agrupa por planta
       type Group = {
@@ -1350,13 +1369,13 @@ function BacklogPage() {
       const chosen: Group[] = [];
       let acc = 0;
       for (const g of orderedGroups) {
-        if (acc >= rbMaxStops) break;
+        if (acc >= routeMaxStops) break;
         const next = acc + g.oss.length;
-        if (next <= rbMaxStops) {
+        if (next <= routeMaxStops) {
           chosen.push(g);
           acc = next;
         } else {
-          const overflow = next - rbMaxStops;
+          const overflow = next - routeMaxStops;
           if (overflow <= rbTolerance) {
             chosen.push(g);
             acc = next;
@@ -1403,7 +1422,7 @@ function BacklogPage() {
         totalKm,
         etaMin,
         totalOs,
-        limitConfig: { max: rbMaxStops, tolerance: rbTolerance },
+        limitConfig: { max: routeMaxStops, tolerance: rbTolerance },
         color: ROUTE_COLORS[rIdx % ROUTE_COLORS.length],
       });
     }
@@ -2250,13 +2269,119 @@ function BacklogPage() {
                 value={rbElevatorias}
                 onChange={setRbElevatorias}
               />
-              <MultiSelect
-                label="Cidade (opcional)"
-                options={rbOptCidades}
-                value={rbCidades}
-                onChange={setRbCidades}
-              />
+              {!rbUseIndividualConfig && (
+                <MultiSelect
+                  label="Cidade (opcional)"
+                  options={rbOptCidades}
+                  value={rbCidades}
+                  onChange={setRbCidades}
+                />
+              )}
             </div>
+
+            {!rbUseIndividualConfig && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-slate-600">Equipe</span>
+                  <select
+                    value={rbEquipe}
+                    onChange={(e) => setRbEquipe(e.target.value)}
+                    className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                  >
+                    <option value="TODAS">Todas</option>
+                    <option value="EMEC">EMEC</option>
+                    <option value="Automação">Automação</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {rbRouteCount > 1 && (
+              <div className="flex items-center gap-2 pt-1">
+                <Switch
+                  checked={rbUseIndividualConfig}
+                  onCheckedChange={setRbUseIndividualConfig}
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  Configuração individual por rota
+                </span>
+              </div>
+            )}
+
+            {rbUseIndividualConfig && rbRouteCount > 1 && (
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <span className="text-xs font-semibold text-slate-500">
+                  Configurações de cada rota
+                </span>
+                {rbRouteConfigs.map((cfg, idx) => (
+                  <div
+                    key={idx}
+                    className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-4"
+                  >
+                    <span className="text-xs font-bold text-[#0b3a73] flex items-center">
+                      Rota {idx + 1}
+                    </span>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold text-slate-500">Equipe</span>
+                      <select
+                        value={cfg.equipe}
+                        onChange={(e) => {
+                          const next = [...rbRouteConfigs];
+                          next[idx] = { ...next[idx], equipe: e.target.value };
+                          setRbRouteConfigs(next);
+                        }}
+                        className="min-h-9 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm"
+                      >
+                        <option value="TODAS">Todas</option>
+                        <option value="EMEC">EMEC</option>
+                        <option value="Automação">Automação</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold text-slate-500">Cidade</span>
+                      <select
+                        value={cfg.cidades[0] || ""}
+                        onChange={(e) => {
+                          const next = [...rbRouteConfigs];
+                          next[idx] = {
+                            ...next[idx],
+                            cidades: e.target.value ? [e.target.value] : [],
+                          };
+                          setRbRouteConfigs(next);
+                        }}
+                        className="min-h-9 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm"
+                      >
+                        <option value="">Todas</option>
+                        {allCidades.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        Max paradas
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={cfg.maxStops}
+                        onChange={(e) => {
+                          const next = [...rbRouteConfigs];
+                          next[idx] = {
+                            ...next[idx],
+                            maxStops: Number(e.target.value) || 0,
+                          };
+                          setRbRouteConfigs(next);
+                        }}
+                        className="min-h-9 rounded-md border border-slate-300 px-2 text-[13px] shadow-sm"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {routeError && (
               <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -2639,55 +2764,53 @@ function BacklogPage() {
                   </td>
                   <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.responsabilidade}</td>
                   <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                    {e.responsabilidade === "Baixada 2" && e.equipe === "Não analisado" ? (
+                    {e.responsabilidade === "Baixada 2" ? (
                       <span className="inline-flex items-center gap-1">
-                        <span className="text-slate-400">—</span>
-                        <button
-                          onClick={() => {
-                            setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }));
+                        <select
+                          value={e.equipe === "Não analisado" ? "" : e.equipe}
+                          onChange={(ev) => {
+                            const val = ev.target.value;
+                            if (!val) return;
+                            setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
                             supabase.from("equipe_overrides").upsert(
-                              { om: e.om, equipe: "EMEC" },
+                              { om: e.om, equipe: val },
                               { ignoreDuplicates: false },
-                            ).then(({ error }) => error && console.warn("Falha ao salvar EMEC", error));
+                            ).then(({ error }) => error && console.warn("Falha ao salvar", error));
                           }}
-                          className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
+                          className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
+                            e.equipe === "EMEC"
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : e.equipe === "Automação"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-slate-200 bg-white text-slate-400"
+                          }`}
                         >
-                          EMEC
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }));
-                            supabase.from("equipe_overrides").upsert(
-                              { om: e.om, equipe: "Automação" },
-                              { ignoreDuplicates: false },
-                            ).then(({ error }) => error && console.warn("Falha ao salvar Automação", error));
-                          }}
-                          className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
-                        >
-                          Automação
-                        </button>
-                      </span>
-                    ) : equipeOverrides[e.om] ? (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="font-semibold text-[#0b3a73]">{e.equipe}</span>
-                        <button
-                          onClick={() => {
-                            setEquipeOverrides((prev) => {
-                              const next = { ...prev };
-                              delete next[e.om];
-                              return next;
-                            });
-                            supabase.from("equipe_overrides").delete().eq("om", e.om)
-                              .then(({ error }) => error && console.warn("Falha ao remover override", error));
-                          }}
-                          className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
-                          title="Reverter ao cálculo automático"
-                        >
-                          ↺
-                        </button>
+                          <option value="" disabled>
+                            {e.equipe === "Não analisado" ? "Selecionar…" : e.equipe}
+                          </option>
+                          <option value="EMEC">EMEC</option>
+                          <option value="Automação">Automação</option>
+                        </select>
+                        {equipeOverrides[e.om] && (
+                          <button
+                            onClick={() => {
+                              setEquipeOverrides((prev) => {
+                                const next = { ...prev };
+                                delete next[e.om];
+                                return next;
+                              });
+                              supabase.from("equipe_overrides").delete().eq("om", e.om)
+                                .then(({ error }) => error && console.warn("Falha ao remover override", error));
+                            }}
+                            className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
+                            title="Reverter ao cálculo automático"
+                          >
+                            ↺
+                          </button>
+                        )}
                       </span>
                     ) : (
-                      <span>{e.equipe}</span>
+                      <span className="text-slate-500">{e.equipe}</span>
                     )}
                   </td>
                 </tr>
@@ -2772,55 +2895,53 @@ function BacklogPage() {
                       {e.responsabilidade}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                      {e.responsabilidade === "Baixada 2" && e.equipe === "Não analisado" ? (
+                      {e.responsabilidade === "Baixada 2" ? (
                         <span className="inline-flex items-center gap-1">
-                          <span className="text-slate-400">—</span>
-                          <button
-                            onClick={() => {
-                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "EMEC" }));
+                          <select
+                            value={e.equipe === "Não analisado" ? "" : e.equipe}
+                            onChange={(ev) => {
+                              const val = ev.target.value;
+                              if (!val) return;
+                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
                               supabase.from("equipe_overrides").upsert(
-                                { om: e.om, equipe: "EMEC" },
+                                { om: e.om, equipe: val },
                                 { ignoreDuplicates: false },
-                              ).then(({ error }) => error && console.warn("Falha ao salvar EMEC", error));
+                              ).then(({ error }) => error && console.warn("Falha ao salvar", error));
                             }}
-                            className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
+                            className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
+                              e.equipe === "EMEC"
+                                ? "border-blue-200 bg-blue-50 text-blue-700"
+                                : e.equipe === "Automação"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border-slate-200 bg-white text-slate-400"
+                            }`}
                           >
-                            EMEC
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: "Automação" }));
-                              supabase.from("equipe_overrides").upsert(
-                                { om: e.om, equipe: "Automação" },
-                                { ignoreDuplicates: false },
-                              ).then(({ error }) => error && console.warn("Falha ao salvar Automação", error));
-                            }}
-                            className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
-                          >
-                            Automação
-                          </button>
-                        </span>
-                      ) : equipeOverrides[e.om] ? (
-                        <span className="inline-flex items-center gap-1">
-                          <span className="font-semibold text-[#0b3a73]">{e.equipe}</span>
-                          <button
-                            onClick={() => {
-                              setEquipeOverrides((prev) => {
-                                const next = { ...prev };
-                                delete next[e.om];
-                                return next;
-                              });
-                              supabase.from("equipe_overrides").delete().eq("om", e.om)
-                                .then(({ error }) => error && console.warn("Falha ao remover override", error));
-                            }}
-                            className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
-                            title="Reverter ao cálculo automático"
-                          >
-                            ↺
-                          </button>
+                            <option value="" disabled>
+                              {e.equipe === "Não analisado" ? "Selecionar…" : e.equipe}
+                            </option>
+                            <option value="EMEC">EMEC</option>
+                            <option value="Automação">Automação</option>
+                          </select>
+                          {equipeOverrides[e.om] && (
+                            <button
+                              onClick={() => {
+                                setEquipeOverrides((prev) => {
+                                  const next = { ...prev };
+                                  delete next[e.om];
+                                  return next;
+                                });
+                                supabase.from("equipe_overrides").delete().eq("om", e.om)
+                                  .then(({ error }) => error && console.warn("Falha ao remover override", error));
+                              }}
+                              className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
+                              title="Reverter ao cálculo automático"
+                            >
+                              ↺
+                            </button>
+                          )}
                         </span>
                       ) : (
-                        <span>{e.equipe}</span>
+                        <span className="text-slate-500">{e.equipe}</span>
                       )}
                     </td>
                   </tr>
