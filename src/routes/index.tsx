@@ -10,6 +10,7 @@ import {
   Shield,
   LogOut,
   Loader2,
+  User,
 } from "lucide-react";
 import {
   Dialog,
@@ -42,15 +43,7 @@ type Painel = {
   icone: string;
 };
 
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
+
 
 const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = {
   dashboard: { bg: "bg-blue-100", icon: "text-blue-600", ring: "hover:ring-blue-300" },
@@ -85,7 +78,7 @@ function Index() {
   const [loadingPaineis, setLoadingPaineis] = useState(true);
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  
 
   useEffect(() => {
     if (loading) return;
@@ -120,89 +113,58 @@ function Index() {
     })();
   }, [profile?.cargo_id]);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   if (loading) return null;
 
   const hasPanel = (chave: string) => paineis.some((p) => p.chave === chave);
   const canAdmin = hasPanel("admin");
-  const initials = getInitials(profile?.nome_completo || "");
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#dce9f5] via-white to-[#eaf1f8]">
+    <div className="min-h-screen bg-gradient-to-br from-[#eaf3fb] via-slate-50 to-[#dbeaf7] p-4 md:p-6">
       <style>{animations}</style>
 
-      {/* ===== HEADER FIXO ===== */}
-      <header
-        className={`sticky top-0 z-50 transition-shadow duration-300 ${
-          scrolled ? "shadow-md bg-white/95 backdrop-blur-sm" : "bg-white/80"
-        }`}
-      >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6">
-          {/* Logo / título */}
-          <div className="flex items-center gap-3">
-            <img
-              src={logoAsset.url}
-              alt="Águas do Rio"
-              className="h-8 w-auto object-contain md:h-10"
-            />
-            <span className="hidden text-sm font-bold text-[#0b3a73] md:inline">
-              Hub Eletromecânica
-            </span>
-          </div>
-
-          {/* User area */}
-          <div className="flex items-center gap-2 md:gap-3">
-            {/* Avatar + nome/cargo (mobile: só avatar) */}
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0b3a73] text-xs font-bold text-white shadow-sm md:h-10 md:w-10 md:text-sm">
-                {initials || <LogOut className="h-4 w-4" />}
-              </div>
-              <div className="hidden min-w-0 md:block">
-                <p className="truncate text-sm font-semibold text-[#0b3a73] leading-tight">
-                  {profile?.nome_completo}
-                </p>
-                {profile?.cargo_nome && (
-                  <p className="truncate text-[11px] font-medium text-slate-500 leading-tight">
-                    {profile.cargo_nome}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {canAdmin && (
-              <Link
-                to="/admin"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b3a73] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#1f7ad6] active:scale-95"
-              >
-                <Shield className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Admin</span>
-              </Link>
-            )}
-
-            <button
-              onClick={signOut}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-red-600 active:scale-95"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
-          </div>
+      {/* Header: logo à esquerda, itens do usuário à direita */}
+      <div className="mb-6 flex w-full items-center justify-between gap-3">
+        {/* Logo */}
+        <div className="flex items-center">
+          <img
+            src={logoAsset.url}
+            alt="Águas do Rio - Eletromecânica"
+            className="h-10 w-auto object-contain md:h-12"
+            loading="eager"
+          />
         </div>
-      </header>
 
-      {/* ===== CONTEÚDO ===== */}
-      <main className="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl flex-col px-4 py-8 md:px-6 md:py-12">
-        {/* Título da página */}
-        <div className="mb-8 text-center md:mb-10">
-          <h1 className="text-2xl font-bold tracking-tight text-[#0b3a73] md:text-3xl">
-            Hub Eletromecânica
-          </h1>
-          <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-500">
+        {/* User area */}
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <User className="h-4 w-4" />
+            <span className="font-medium">{profile?.nome_completo}</span>
+            {profile?.cargo_nome && (
+              <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                {profile.cargo_nome}
+              </span>
+            )}
+          </div>
+          {canAdmin && (
+            <Link
+              to="/admin"
+              className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6]"
+            >
+              <Shield className="h-3.5 w-3.5" /> Admin
+            </Link>
+          )}
+          <button
+            onClick={signOut}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Sair
+          </button>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-[#0b3a73] md:text-3xl">Hub Eletromecânica</h1>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
             Escolha o que você quer acessar.
           </p>
         </div>
@@ -272,7 +234,7 @@ function Index() {
         <p className="mt-10 text-center text-xs text-slate-400 md:mt-16">
           Águas do Rio · Eletromecânica
         </p>
-      </main>
+      </div>
 
       {/* ===== DIALOG: DASHBOARDS ===== */}
       <Dialog open={dashOpen} onOpenChange={setDashOpen}>
