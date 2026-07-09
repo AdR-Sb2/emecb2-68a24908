@@ -48,8 +48,7 @@ function RegisterPage() {
     });
     setSubmitting(false);
     if (err) {
-      if (err.message.includes("already registered")) setError("Este e-mail já está cadastrado.");
-      else setError(err.message);
+      setError(JSON.stringify(err, null, 2));
     } else {
       setSuccess(true);
     }
