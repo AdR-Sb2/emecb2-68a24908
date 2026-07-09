@@ -227,8 +227,6 @@ function DashboardPage() {
                 src={logoHeader}
                 alt="Águas do Rio - Eletromecânica"
                 className="h-8 w-auto object-contain sm:h-10"
-                width={1024}
-                height={160}
                 loading="eager"
               />
             </div>
