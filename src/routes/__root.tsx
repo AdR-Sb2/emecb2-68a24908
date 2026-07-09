@@ -87,8 +87,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Lovable App" },
       { name: "twitter:description", content: "Dados técnicos da automação baixada 2" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1573a860-0616-4756-8a0a-4ad166a22c57/id-preview-7b8474dd--84b154f8-f134-4ce8-8eb2-fd9dd6586681.lovable.app-1782407674054.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1573a860-0616-4756-8a0a-4ad166a22c57/id-preview-7b8474dd--84b154f8-f134-4ce8-8eb2-fd9dd6586681.lovable.app-1782407674054.png" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1573a860-0616-4756-8a0a-4ad166a22c57/id-preview-7b8474dd--84b154f8-f134-4ce8-8eb2-fd9dd6586681.lovable.app-1782407674054.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1573a860-0616-4756-8a0a-4ad166a22c57/id-preview-7b8474dd--84b154f8-f134-4ce8-8eb2-fd9dd6586681.lovable.app-1782407674054.png",
+      },
     ],
     links: [
       {

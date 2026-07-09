@@ -1,5 +1,13 @@
 import { useEffect, useMemo } from "react";
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import {
+  CircleMarker,
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 
 export type BacklogMarker = {
@@ -80,22 +88,24 @@ export default function BacklogMap({
 }) {
   const { minC, maxC } = useMemo(() => {
     if (!markers.length) return { minC: 1, maxC: 1 };
-    let mn = Infinity, mx = -Infinity;
-    for (const m of markers) { if (m.count < mn) mn = m.count; if (m.count > mx) mx = m.count; }
+    let mn = Infinity,
+      mx = -Infinity;
+    for (const m of markers) {
+      if (m.count < mn) mn = m.count;
+      if (m.count > mx) mx = m.count;
+    }
     return { minC: mn, maxC: mx };
   }, [markers]);
 
   const radiusFor = (count: number) => {
-    const MIN = 6, MAX = 20;
+    const MIN = 6,
+      MAX = 20;
     if (maxC <= minC) return MIN + (MAX - MIN) / 2;
     const norm = (Math.sqrt(count) - Math.sqrt(minC)) / (Math.sqrt(maxC) - Math.sqrt(minC));
     return MIN + norm * (MAX - MIN);
   };
 
-  const routePlantas = useMemo(
-    () => new Set((route?.stops || []).map((s) => s.planta)),
-    [route],
-  );
+  const routePlantas = useMemo(() => new Set((route?.stops || []).map((s) => s.planta)), [route]);
 
   const polylinePts: Array<[number, number]> = useMemo(() => {
     if (!route?.stops?.length) return [];
@@ -113,7 +123,7 @@ export default function BacklogMap({
       scrollWheelZoom
     >
       <TileLayer
-        attribution='&copy; OpenStreetMap'
+        attribution="&copy; OpenStreetMap"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitBoundsController markers={markers} route={route} fitSignal={fitSignal} />

@@ -103,24 +103,22 @@ function DashboardPage() {
 
   const rows = useMemo(
     () =>
-      data.filter(
-        (d) => {
-          if (tipo !== "TODOS" && d.TIPO !== tipo) return false;
-          if (municipio !== "TODOS" && d.MUNICIPIO !== municipio) return false;
-          if (aguardandoFilter !== "TODOS") {
-            const isAguardando =
-              (d["TEM CLP?"] === "SIM" || d["TEM SENSOR?"] === "SIM") && d.ELIPSE !== "SIM";
-            if (aguardandoFilter === "SIM" && !isAguardando) return false;
-            if (aguardandoFilter === "NAO" && isAguardando) return false;
-          }
-          if (sensorFilter !== "TODOS") {
-            const has = d["TEM SENSOR?"] === "SIM";
-            if (sensorFilter === "SIM" && !has) return false;
-            if (sensorFilter === "NAO" && has) return false;
-          }
-          return true;
-        },
-      ),
+      data.filter((d) => {
+        if (tipo !== "TODOS" && d.TIPO !== tipo) return false;
+        if (municipio !== "TODOS" && d.MUNICIPIO !== municipio) return false;
+        if (aguardandoFilter !== "TODOS") {
+          const isAguardando =
+            (d["TEM CLP?"] === "SIM" || d["TEM SENSOR?"] === "SIM") && d.ELIPSE !== "SIM";
+          if (aguardandoFilter === "SIM" && !isAguardando) return false;
+          if (aguardandoFilter === "NAO" && isAguardando) return false;
+        }
+        if (sensorFilter !== "TODOS") {
+          const has = d["TEM SENSOR?"] === "SIM";
+          if (sensorFilter === "SIM" && !has) return false;
+          if (sensorFilter === "NAO" && has) return false;
+        }
+        return true;
+      }),
     [data, tipo, municipio, aguardandoFilter, sensorFilter],
   );
 
@@ -128,12 +126,7 @@ function DashboardPage() {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      [
-        r.ELEVATORIAS,
-        r.PLANTA,
-        r.MUNICIPIO,
-        r["TIPO CONSTRUTIVO DA ELEVATORIA"],
-      ]
+      [r.ELEVATORIAS, r.PLANTA, r.MUNICIPIO, r["TIPO CONSTRUTIVO DA ELEVATORIA"]]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
@@ -280,19 +273,38 @@ function DashboardPage() {
         <div className="grid gap-3 border-t border-slate-100 p-3">
           {[
             { label: "TIPO", value: tipo, set: setTipo, opts: ["TODOS", ...TIPOS] },
-            { label: "MUNICÍPIO", value: municipio, set: setMunicipio, opts: ["TODOS", ...MUNICIPIOS] },
-            { label: "AGUARDANDO COMISSIONAMENTO", value: aguardandoFilter, set: setAguardandoFilter, opts: ["TODOS", "SIM", "NAO"] },
-            { label: "TEM SENSOR?", value: sensorFilter, set: setSensorFilter, opts: ["TODOS", "SIM", "NAO"] },
+            {
+              label: "MUNICÍPIO",
+              value: municipio,
+              set: setMunicipio,
+              opts: ["TODOS", ...MUNICIPIOS],
+            },
+            {
+              label: "AGUARDANDO COMISSIONAMENTO",
+              value: aguardandoFilter,
+              set: setAguardandoFilter,
+              opts: ["TODOS", "SIM", "NAO"],
+            },
+            {
+              label: "TEM SENSOR?",
+              value: sensorFilter,
+              set: setSensorFilter,
+              opts: ["TODOS", "SIM", "NAO"],
+            },
           ].map((f) => (
             <div key={f.label} className="flex flex-col gap-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">{f.label}</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                {f.label}
+              </label>
               <select
                 value={f.value}
                 onChange={(e) => f.set(e.target.value)}
                 className="min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-base shadow-sm"
               >
                 {f.opts.map((o) => (
-                  <option key={o} value={o}>{o === "TODOS" ? "Todos" : o === "NAO" ? "Não" : o === "SIM" ? "Sim" : o}</option>
+                  <option key={o} value={o}>
+                    {o === "TODOS" ? "Todos" : o === "NAO" ? "Não" : o === "SIM" ? "Sim" : o}
+                  </option>
                 ))}
               </select>
             </div>
@@ -490,68 +502,70 @@ function DashboardPage() {
               Mostrando {tableRows.length} de {data.length} ativos
             </div>
             <div className={`${tableExpanded ? "max-h-[70vh]" : "max-h-[360px]"} overflow-auto`}>
-            <table className="w-full min-w-[720px] text-left text-xs">
-              <thead className="sticky top-0 bg-slate-100 text-slate-700">
-                <tr>
-                  <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5">Elevatória</th>
-                  <th className="px-2 py-1.5">Planta</th>
-                  <th className="px-2 py-1.5">Município</th>
-                  <th className="px-2 py-1.5">Construção</th>
-                  <th className="px-2 py-1.5">CLP</th>
-                  <th className="px-2 py-1.5">PCP</th>
-                  <th className="px-2 py-1.5">Sens.</th>
-                  <th className="px-2 py-1.5">Elipse</th>
-                  <th className="px-2 py-1.5">Sensor?</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableRows.map((r, i) => (
-                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="sticky left-0 z-10 bg-white px-2 py-1 shadow-[1px_0_0_rgba(0,0,0,0.05)]">{r.ELEVATORIAS}</td>
-                    <td className="px-2 py-1">{r.PLANTA}</td>
-                    <td className="px-2 py-1">{r.MUNICIPIO}</td>
-                    <td className="px-2 py-1">{r["TIPO CONSTRUTIVO DA ELEVATORIA"]}</td>
-                    <td className="px-2 py-1">{r["TEM CLP?"] ?? ""}</td>
-                    <td className="px-2 py-1">{r["TEM PCP?"] ?? ""}</td>
-                    <td className="px-2 py-1">{r.SENSORES ?? ""}</td>
-                    <td className="px-2 py-1">{r.ELIPSE ?? ""}</td>
-                    <td className="px-2 py-1">{r["TEM SENSOR?"] ?? ""}</td>
+              <table className="w-full min-w-[720px] text-left text-xs">
+                <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                  <tr>
+                    <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5">Elevatória</th>
+                    <th className="px-2 py-1.5">Planta</th>
+                    <th className="px-2 py-1.5">Município</th>
+                    <th className="px-2 py-1.5">Construção</th>
+                    <th className="px-2 py-1.5">CLP</th>
+                    <th className="px-2 py-1.5">PCP</th>
+                    <th className="px-2 py-1.5">Sens.</th>
+                    <th className="px-2 py-1.5">Elipse</th>
+                    <th className="px-2 py-1.5">Sensor?</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {tableRows.map((r, i) => (
+                    <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                      <td className="sticky left-0 z-10 bg-white px-2 py-1 shadow-[1px_0_0_rgba(0,0,0,0.05)]">
+                        {r.ELEVATORIAS}
+                      </td>
+                      <td className="px-2 py-1">{r.PLANTA}</td>
+                      <td className="px-2 py-1">{r.MUNICIPIO}</td>
+                      <td className="px-2 py-1">{r["TIPO CONSTRUTIVO DA ELEVATORIA"]}</td>
+                      <td className="px-2 py-1">{r["TEM CLP?"] ?? ""}</td>
+                      <td className="px-2 py-1">{r["TEM PCP?"] ?? ""}</td>
+                      <td className="px-2 py-1">{r.SENSORES ?? ""}</td>
+                      <td className="px-2 py-1">{r.ELIPSE ?? ""}</td>
+                      <td className="px-2 py-1">{r["TEM SENSOR?"] ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
         {!tableExpanded && (
-        <Card title="Relação de elevatórias com CLP/PCP por cidade (%)">
-          <ResponsiveContainer width="100%" height={Math.max(340, clpPorCidade.length * 28)}>
-            <BarChart
-              data={clpPorCidade}
-              layout="vertical"
-              margin={{ left: 10, right: 50, top: 10, bottom: 10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis
-                type="number"
-                domain={[0, 100]}
-                ticks={[0, 25, 50, 75, 100]}
-                tickFormatter={(v) => `${v}%`}
-              />
-              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => `${v}%`} />
-              <Bar dataKey="pct" fill={BLUE}>
-                <LabelList
-                  dataKey="pct"
-                  position="right"
-                  formatter={(v: number) => `${v}%`}
-                  style={{ fontSize: 13, fontWeight: 700, fill: "#0b3a73" }}
+          <Card title="Relação de elevatórias com CLP/PCP por cidade (%)">
+            <ResponsiveContainer width="100%" height={Math.max(340, clpPorCidade.length * 28)}>
+              <BarChart
+                data={clpPorCidade}
+                layout="vertical"
+                margin={{ left: 10, right: 50, top: 10, bottom: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis
+                  type="number"
+                  domain={[0, 100]}
+                  ticks={[0, 25, 50, 75, 100]}
+                  tickFormatter={(v) => `${v}%`}
                 />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: number) => `${v}%`} />
+                <Bar dataKey="pct" fill={BLUE}>
+                  <LabelList
+                    dataKey="pct"
+                    position="right"
+                    formatter={(v: number) => `${v}%`}
+                    style={{ fontSize: 13, fontWeight: 700, fill: "#0b3a73" }}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
         )}
       </div>
 
@@ -641,7 +655,9 @@ function Kpi({
               style={{ width: `${Math.min(100, progress.pct)}%` }}
             />
           </div>
-          <div className="mt-0.5 text-[11px] font-medium text-slate-500">Meta: {progress.meta}%</div>
+          <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+            Meta: {progress.meta}%
+          </div>
         </div>
       )}
     </div>

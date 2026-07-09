@@ -66,8 +66,18 @@ const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
 
 const MONTH_LABELS = [
-  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
 ];
 
 type SortMode = "az" | "za" | "desc" | "asc";
@@ -165,25 +175,22 @@ function TestesPage() {
 
   const TIPOS = useMemo(
     () =>
-      (Array.from(new Set(data.map((d) => d["Tipo de Serviço"]).filter(Boolean))) as string[]).sort((a, b) =>
-        a.localeCompare(b, "pt-BR"),
+      (Array.from(new Set(data.map((d) => d["Tipo de Serviço"]).filter(Boolean))) as string[]).sort(
+        (a, b) => a.localeCompare(b, "pt-BR"),
       ),
     [data],
   );
-  const GRUPOS = useMemo(
-    () => {
-      const nonEmpty = Array.from(
-        new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)),
-      ).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[];
-      const hasEmpty = data.some((d) => !d.Grupo);
-      return hasEmpty ? [...nonEmpty, "__VAZIO__"] : nonEmpty;
-    },
-    [data],
-  );
+  const GRUPOS = useMemo(() => {
+    const nonEmpty = Array.from(
+      new Set(data.map((d) => (d.Grupo ? String(d.Grupo) : null)).filter(Boolean)),
+    ).sort((a, b) => String(a).localeCompare(String(b), "pt-BR", { numeric: true })) as string[];
+    const hasEmpty = data.some((d) => !d.Grupo);
+    return hasEmpty ? [...nonEmpty, "__VAZIO__"] : nonEmpty;
+  }, [data]);
   const ELEVS = useMemo(
     () =>
-      (Array.from(new Set(data.map((d) => d.Elevatória).filter(Boolean))) as string[]).sort((a, b) =>
-        a.localeCompare(b, "pt-BR"),
+      (Array.from(new Set(data.map((d) => d.Elevatória).filter(Boolean))) as string[]).sort(
+        (a, b) => a.localeCompare(b, "pt-BR"),
       ),
     [data],
   );
@@ -470,7 +477,9 @@ function TestesPage() {
           <Home className="h-5 w-5 sm:h-4 sm:w-4" />
         </Link>
       </div>
-      <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg">Testes & Aferições de Ativos</h1>
+      <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg">
+        Testes & Aferições de Ativos
+      </h1>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <Kpi label="Total de Testes" value={total} />
@@ -486,7 +495,13 @@ function TestesPage() {
           <span className="text-xs text-slate-400">toque para expandir</span>
         </summary>
         <div className="flex flex-col gap-3 border-t border-slate-100 p-3">
-          <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} block />
+          <FilterSelect
+            label="TIPO DE SERVIÇO"
+            value={tipo}
+            onChange={setTipo}
+            options={TIPOS}
+            block
+          />
           <FilterSelect
             label="GRUPO"
             value={grupo}
@@ -495,13 +510,44 @@ function TestesPage() {
             renderOption={(v) => (v === "__VAZIO__" ? "(Vazio)" : v)}
             block
           />
-          <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." block />
-          <FilterSelect label="MÊS INICIAL" value={mesIni} onChange={setMesIni} options={MESES_DISPONIVEIS} renderOption={labelMes} block />
-          <FilterSelect label="MÊS FINAL" value={mesFim} onChange={setMesFim} options={MESES_DISPONIVEIS} renderOption={labelMes} block />
-          {(tipo !== "TODOS" || grupo !== "TODOS" || elev !== "TODOS" || mesIni !== "TODOS" || mesFim !== "TODOS") && (
+          <SearchableSelect
+            label="ELEVATÓRIA"
+            value={elev}
+            onChange={setElev}
+            options={ELEVS}
+            placeholder="Buscar elevatória..."
+            block
+          />
+          <FilterSelect
+            label="MÊS INICIAL"
+            value={mesIni}
+            onChange={setMesIni}
+            options={MESES_DISPONIVEIS}
+            renderOption={labelMes}
+            block
+          />
+          <FilterSelect
+            label="MÊS FINAL"
+            value={mesFim}
+            onChange={setMesFim}
+            options={MESES_DISPONIVEIS}
+            renderOption={labelMes}
+            block
+          />
+          {(tipo !== "TODOS" ||
+            grupo !== "TODOS" ||
+            elev !== "TODOS" ||
+            mesIni !== "TODOS" ||
+            mesFim !== "TODOS") && (
             <button
               type="button"
-              onClick={() => { setTipo("TODOS"); setGrupo("TODOS"); setElev("TODOS"); setMesIni("TODOS"); setMesFim("TODOS"); }}
+              onClick={() => {
+                setTipo("TODOS");
+                setGrupo("TODOS");
+                setElev("TODOS");
+                setMesIni("TODOS");
+                setMesFim("TODOS");
+              }}
               className="min-h-11 rounded border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
             >
               Limpar filtros
@@ -519,7 +565,13 @@ function TestesPage() {
           options={GRUPOS}
           renderOption={(v) => (v === "__VAZIO__" ? "(Vazio)" : v)}
         />
-        <SearchableSelect label="ELEVATÓRIA" value={elev} onChange={setElev} options={ELEVS} placeholder="Buscar elevatória..." />
+        <SearchableSelect
+          label="ELEVATÓRIA"
+          value={elev}
+          onChange={setElev}
+          options={ELEVS}
+          placeholder="Buscar elevatória..."
+        />
         <FilterSelect
           label="MÊS INICIAL"
           value={mesIni}
@@ -624,7 +676,9 @@ function TestesPage() {
               />
             </LineChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-[10px] text-slate-400">Clique em um ponto para filtrar pelo mês.</p>
+          <p className="mt-1 text-[10px] text-slate-400">
+            Clique em um ponto para filtrar pelo mês.
+          </p>
         </Card>
         <MetricEvolutionChart
           className="lg:col-span-3"
@@ -641,7 +695,9 @@ function TestesPage() {
             type="button"
             onClick={() => setHydroTab("eletrica")}
             className={`rounded px-4 py-1.5 text-sm font-medium transition ${
-              hydroTab === "eletrica" ? "bg-[#0b3a73] text-white shadow" : "text-slate-600 hover:text-[#0b3a73]"
+              hydroTab === "eletrica"
+                ? "bg-[#0b3a73] text-white shadow"
+                : "text-slate-600 hover:text-[#0b3a73]"
             }`}
           >
             ⚡ Elétrica
@@ -650,7 +706,9 @@ function TestesPage() {
             type="button"
             onClick={() => setHydroTab("hidraulica")}
             className={`rounded px-4 py-1.5 text-sm font-medium transition ${
-              hydroTab === "hidraulica" ? "bg-[#0b3a73] text-white shadow" : "text-slate-600 hover:text-[#0b3a73]"
+              hydroTab === "hidraulica"
+                ? "bg-[#0b3a73] text-white shadow"
+                : "text-slate-600 hover:text-[#0b3a73]"
             }`}
           >
             💧 Hidráulica
@@ -660,10 +718,26 @@ function TestesPage() {
         {hydroTab === "eletrica" ? (
           <div className="animate-in fade-in duration-200">
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Kpi label="Média de Tensão (BT)" value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"} hint="≤ 300 V" />
-              <Kpi label="Média de Tensão (MT)" value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"} hint="≥ 380 V" />
-              <Kpi label="Média de Corrente (BT)" value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"} hint="≤ 300 V" />
-              <Kpi label="Média de Corrente (MT)" value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"} hint="≥ 380 V" />
+              <Kpi
+                label="Média de Tensão (BT)"
+                value={mediaTensaoBT !== null ? `${mediaTensaoBT} V` : "—"}
+                hint="≤ 300 V"
+              />
+              <Kpi
+                label="Média de Tensão (MT)"
+                value={mediaTensaoMT !== null ? `${mediaTensaoMT} V` : "—"}
+                hint="≥ 380 V"
+              />
+              <Kpi
+                label="Média de Corrente (BT)"
+                value={mediaCorrenteBT !== null ? `${mediaCorrenteBT} A` : "—"}
+                hint="≤ 300 V"
+              />
+              <Kpi
+                label="Média de Corrente (MT)"
+                value={mediaCorrenteMT !== null ? `${mediaCorrenteMT} A` : "—"}
+                hint="≥ 380 V"
+              />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <ScrollChart
@@ -673,7 +747,11 @@ function TestesPage() {
                 activeName={crossElev}
                 onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
                 onExpand={() =>
-                  setZoomChart({ title: "Média de Tensão por Elevatória — BT", data: tensaoBTPorElev, unit: "V" })
+                  setZoomChart({
+                    title: "Média de Tensão por Elevatória — BT",
+                    data: tensaoBTPorElev,
+                    unit: "V",
+                  })
                 }
               />
               <ScrollChart
@@ -683,7 +761,11 @@ function TestesPage() {
                 activeName={crossElev}
                 onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
                 onExpand={() =>
-                  setZoomChart({ title: "Média de Tensão por Elevatória — MT", data: tensaoMTPorElev, unit: "V" })
+                  setZoomChart({
+                    title: "Média de Tensão por Elevatória — MT",
+                    data: tensaoMTPorElev,
+                    unit: "V",
+                  })
                 }
               />
               <ScrollChart
@@ -693,7 +775,11 @@ function TestesPage() {
                 activeName={crossElev}
                 onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
                 onExpand={() =>
-                  setZoomChart({ title: "Média de Corrente por Elevatória — BT", data: correnteBTPorElev, unit: "A" })
+                  setZoomChart({
+                    title: "Média de Corrente por Elevatória — BT",
+                    data: correnteBTPorElev,
+                    unit: "A",
+                  })
                 }
               />
               <ScrollChart
@@ -703,7 +789,11 @@ function TestesPage() {
                 activeName={crossElev}
                 onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
                 onExpand={() =>
-                  setZoomChart({ title: "Média de Corrente por Elevatória — MT", data: correnteMTPorElev, unit: "A" })
+                  setZoomChart({
+                    title: "Média de Corrente por Elevatória — MT",
+                    data: correnteMTPorElev,
+                    unit: "A",
+                  })
                 }
               />
             </div>
@@ -711,23 +801,44 @@ function TestesPage() {
         ) : (
           <div className="animate-in fade-in duration-200">
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Kpi label="Média de Recalque" value={mediaRecalque !== null ? `${mediaRecalque} mca` : "—"} hint="pressão de saída" />
-              <Kpi label="Média de Retaguarda" value={mediaRetaguarda !== null ? `${mediaRetaguarda} mca` : "—"} hint="pressão de entrada" />
-              <Kpi label="Média Recalque SHUTOFF" value={mediaRecalqueSO !== null ? `${mediaRecalqueSO} mca` : "—"} hint="pressão fechada" />
-              <Kpi label="Média Retaguarda SHUTOFF" value={mediaRetaguardaSO !== null ? `${mediaRetaguardaSO} mca` : "—"} hint="pressão fechada" />
+              <Kpi
+                label="Média de Recalque"
+                value={mediaRecalque !== null ? `${mediaRecalque} mca` : "—"}
+                hint="pressão de saída"
+              />
+              <Kpi
+                label="Média de Retaguarda"
+                value={mediaRetaguarda !== null ? `${mediaRetaguarda} mca` : "—"}
+                hint="pressão de entrada"
+              />
+              <Kpi
+                label="Média Recalque SHUTOFF"
+                value={mediaRecalqueSO !== null ? `${mediaRecalqueSO} mca` : "—"}
+                hint="pressão fechada"
+              />
+              <Kpi
+                label="Média Retaguarda SHUTOFF"
+                value={mediaRetaguardaSO !== null ? `${mediaRetaguardaSO} mca` : "—"}
+                hint="pressão fechada"
+              />
             </div>
             {obstrCount > 0 && (
               <button
                 type="button"
                 onClick={() => setObstrOnly((v) => !v)}
-                title={obstrOnly ? "Remover filtro de obstrução" : "Filtrar apenas registros com obstrução"}
+                title={
+                  obstrOnly
+                    ? "Remover filtro de obstrução"
+                    : "Filtrar apenas registros com obstrução"
+                }
                 className={`mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition ${
                   obstrOnly
                     ? "border-amber-500 bg-amber-500 text-white shadow"
                     : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
                 }`}
               >
-                ⚠ {obstrCount} registro{obstrCount > 1 ? "s" : ""} com obstrução / impossibilidade de aferir recalque ou retaguarda
+                ⚠ {obstrCount} registro{obstrCount > 1 ? "s" : ""} com obstrução / impossibilidade
+                de aferir recalque ou retaguarda
                 {obstrOnly && <X className="h-3 w-3" />}
               </button>
             )}
@@ -739,7 +850,11 @@ function TestesPage() {
                 activeName={crossElev}
                 onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
                 onExpand={() =>
-                  setZoomChart({ title: "Média de Recalque por Elevatória", data: recalquePorElev, unit: "mca" })
+                  setZoomChart({
+                    title: "Média de Recalque por Elevatória",
+                    data: recalquePorElev,
+                    unit: "mca",
+                  })
                 }
               />
               <ScrollChart
@@ -749,7 +864,11 @@ function TestesPage() {
                 activeName={crossElev}
                 onBarClick={(name) => setCrossElev((cur) => (cur === name ? null : name))}
                 onExpand={() =>
-                  setZoomChart({ title: "Média de Retaguarda por Elevatória", data: retaguardaPorElev, unit: "mca" })
+                  setZoomChart({
+                    title: "Média de Retaguarda por Elevatória",
+                    data: retaguardaPorElev,
+                    unit: "mca",
+                  })
                 }
               />
             </div>
@@ -812,7 +931,10 @@ function TestesPage() {
               {tableRows.map((r, i) => {
                 const rowKey = `${r.Id ?? "row"}-${i}`;
                 return (
-                  <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
+                  <tr
+                    key={rowKey}
+                    className="border-t border-slate-100 hover:bg-slate-50 align-top"
+                  >
                     <td className="sticky left-0 z-10 bg-white px-2 py-1 whitespace-nowrap shadow-[1px_0_0_rgba(0,0,0,0.05)]">
                       {fmtDate(r["Data do Teste"])}
                     </td>
@@ -900,7 +1022,9 @@ function TestesPage() {
       <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
         <DialogContent className="max-w-[95vw]">
           <DialogHeader>
-            <DialogTitle>Registros — {tableRows.length} de {data.length} testes</DialogTitle>
+            <DialogTitle>
+              Registros — {tableRows.length} de {data.length} testes
+            </DialogTitle>
           </DialogHeader>
           <div className="max-h-[80vh] overflow-auto">
             <table className="w-full text-left text-xs">
@@ -923,10 +1047,11 @@ function TestesPage() {
                 {tableRows.map((r, i) => {
                   const rowKey = `exp-${r.Id ?? "row"}-${i}`;
                   return (
-                    <tr key={rowKey} className="border-t border-slate-100 hover:bg-slate-50 align-top">
-                      <td className="px-2 py-1 whitespace-nowrap">
-                        {fmtDate(r["Data do Teste"])}
-                      </td>
+                    <tr
+                      key={rowKey}
+                      className="border-t border-slate-100 hover:bg-slate-50 align-top"
+                    >
+                      <td className="px-2 py-1 whitespace-nowrap">{fmtDate(r["Data do Teste"])}</td>
                       <td className="px-2 py-1">{r.Elevatória}</td>
                       <td className="px-2 py-1">{r.Grupo}</td>
                       <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
@@ -966,7 +1091,9 @@ function FilterSelect({
 }) {
   return (
     <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">
+        {label}
+      </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -1068,7 +1195,9 @@ function SearchableSelect({
   const display = value === "TODOS" ? "Todos" : value;
   return (
     <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">
+        {label}
+      </label>
       <div ref={ref} className={`relative ${block ? "w-full" : ""}`}>
         <button
           type="button"
@@ -1078,7 +1207,9 @@ function SearchableSelect({
           {display}
         </button>
         {open && (
-          <div className={`absolute z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-lg ${block ? "w-full" : "w-[300px]"}`}>
+          <div
+            className={`absolute z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-lg ${block ? "w-full" : "w-[300px]"}`}
+          >
             <input
               autoFocus
               type="text"
@@ -1133,10 +1264,7 @@ function labelMes(yyyymm: string) {
   return `${MONTH_LABELS[m - 1]}/${String(y).slice(2)}`;
 }
 
-function sortChartData(
-  data: { name: string; media: number; testes: number }[],
-  mode: SortMode,
-) {
+function sortChartData(data: { name: string; media: number; testes: number }[], mode: SortMode) {
   const arr = [...data];
   switch (mode) {
     case "az":
@@ -1228,10 +1356,20 @@ function ScrollChart({
         <div className="max-h-[360px] overflow-y-auto pr-1">
           <div style={{ height: innerHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sorted} layout="vertical" margin={{ left: 0, right: 60, top: 4, bottom: 4 }}>
+              <BarChart
+                data={sorted}
+                layout="vertical"
+                margin={{ left: 0, right: 60, top: 4, bottom: 4 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" width={260} tick={{ fontSize: 11 }} interval={0} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={260}
+                  tick={{ fontSize: 11 }}
+                  interval={0}
+                />
                 <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
                 <Bar
                   dataKey="media"
@@ -1309,10 +1447,20 @@ function ExpandedBarChart({
       <div className="max-h-[75vh] overflow-y-auto pr-1">
         <div style={{ height: innerHeight }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sorted} layout="vertical" margin={{ left: 10, right: 70, top: 4, bottom: 4 }}>
+            <BarChart
+              data={sorted}
+              layout="vertical"
+              margin={{ left: 10, right: 70, top: 4, bottom: 4 }}
+            >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="name" width={260} tick={{ fontSize: 12 }} interval={0} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={260}
+                tick={{ fontSize: 12 }}
+                interval={0}
+              />
               <Tooltip formatter={(v: number) => [`${v} ${unit}`, "Média"]} />
               <Bar
                 dataKey="media"
@@ -1351,7 +1499,15 @@ function ExpandedBarChart({
   );
 }
 
-function Card({ title, className, children }: { title: string; className?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
       <h2 className="mb-2 text-sm font-semibold text-slate-700">{title}</h2>
@@ -1375,7 +1531,6 @@ function MetricEvolutionChart({
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const selected = METRIC_ORDER.filter((m) => metrics.includes(m));
-
 
   // Agrupar unidades → yAxisIds (máx 2 eixos)
   const units = Array.from(new Set(selected.map((m) => METRIC_META[m].unit)));
@@ -1447,7 +1602,8 @@ function MetricEvolutionChart({
       {!elevName ? (
         <div className="flex h-[240px] items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50 text-center text-xs text-slate-500">
           Selecione uma elevatória (no filtro ou clicando em uma barra) para ver a
-          <br />evolução de métricas técnicas.
+          <br />
+          evolução de métricas técnicas.
         </div>
       ) : series.length === 0 ? (
         <div className="flex h-[240px] items-center justify-center text-xs text-slate-400">
@@ -1517,7 +1673,9 @@ function MetricEvolutionChart({
             </LineChart>
           </ResponsiveContainer>
           <div className="mt-1 space-y-0.5 text-[10px] text-slate-400">
-            <p>{series.length} ponto{series.length > 1 ? "s" : ""}</p>
+            <p>
+              {series.length} ponto{series.length > 1 ? "s" : ""}
+            </p>
             {multiUnitWarn && (
               <p className="text-amber-600">
                 Métricas com unidades diferentes agrupadas por eixo (máx 2 eixos exibidos).

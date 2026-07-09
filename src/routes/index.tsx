@@ -1,6 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { LayoutDashboard, Boxes, ArrowRight, FileText, ClipboardList, MoreHorizontal } from "lucide-react";
+import {
+  LayoutDashboard,
+  Boxes,
+  ArrowRight,
+  FileText,
+  ClipboardList,
+  MoreHorizontal,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -61,9 +68,7 @@ function Index() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-[#0b3a73]">Dashboard</h2>
-              <p className="text-sm text-slate-600">
-                Painéis de automação, testes e medições.
-              </p>
+              <p className="text-sm text-slate-600">Painéis de automação, testes e medições.</p>
             </div>
             <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
               Escolher painel <ArrowRight className="h-4 w-4" />
@@ -80,9 +85,7 @@ function Index() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-[#0b3a73]">Sistemas</h2>
-              <p className="text-sm text-slate-600">
-                Hubs Administrativo e Operacional.
-              </p>
+              <p className="text-sm text-slate-600">Hubs Administrativo e Operacional.</p>
             </div>
             <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
               Escolher sistema <ArrowRight className="h-4 w-4" />
@@ -98,9 +101,7 @@ function Index() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-[#0b3a73]">Relatório</h2>
-              <p className="text-sm text-slate-600">
-                Técnico e de Planta/Unidade para WhatsApp.
-              </p>
+              <p className="text-sm text-slate-600">Técnico e de Planta/Unidade para WhatsApp.</p>
             </div>
             <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-[#1f7ad6] opacity-0 transition group-hover:opacity-100">
               Abrir relatórios <ArrowRight className="h-4 w-4" />
@@ -125,17 +126,13 @@ function Index() {
             </span>
           </Link>
 
-          <div
-            className="group relative flex cursor-default flex-col items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-left shadow-sm"
-          >
+          <div className="group relative flex cursor-default flex-col items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white/60 p-6 text-left shadow-sm">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
               <MoreHorizontal className="h-6 w-6" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-400">Outros Sistemas</h2>
-              <p className="text-sm text-slate-400">
-                Novos módulos serão adicionados aqui.
-              </p>
+              <p className="text-sm text-slate-400">Novos módulos serão adicionados aqui.</p>
             </div>
             <span className="mt-auto inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
               Em breve
@@ -143,9 +140,7 @@ function Index() {
           </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-slate-500">
-          Águas do Rio · Eletromecânica
-        </p>
+        <p className="mt-8 text-center text-xs text-slate-500">Águas do Rio · Eletromecânica</p>
       </div>
 
       <Dialog open={dashOpen} onOpenChange={setDashOpen}>

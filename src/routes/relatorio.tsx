@@ -32,10 +32,15 @@ export const Route = createFileRoute("/relatorio")({
 });
 
 // URL do Apps Script publicado como Web App (deixe vazio se ainda não configurado).
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_0vMqu4tYfotpxaz5o7YTuzO6z3SUxOwum942JogrkiV8U186Ta3AqGo9R_TuWqX5sQ/exec";
+const APPS_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbz_0vMqu4tYfotpxaz5o7YTuzO6z3SUxOwum942JogrkiV8U186Ta3AqGo9R_TuWqX5sQ/exec";
 
 // Elevatórias com regra de recalque duplo (JK Velho / JK Novo) + retaguarda pré-preenchida
-const DUPLO_RECALQUE: Array<{ match: (tag: string, nome: string) => boolean; labels: [string, string]; retaguardaDefault: string }> = [
+const DUPLO_RECALQUE: Array<{
+  match: (tag: string, nome: string) => boolean;
+  labels: [string, string];
+  retaguardaDefault: string;
+}> = [
   {
     match: (tag, nome) => tag.includes("0746") || nome.toUpperCase().includes("JK"),
     labels: ["JK Velho (mca)", "JK Novo (mca)"],
@@ -78,7 +83,9 @@ function fallbackCopy(text: string): boolean {
   let ok = false;
   try {
     ok = document.execCommand("copy");
-  } catch { ok = false; }
+  } catch {
+    ok = false;
+  }
   document.body.removeChild(ta);
   return ok;
 }
@@ -151,19 +158,27 @@ function useLookup() {
     }
   };
 
-  return { query, setQuery, unidade, setUnidade, planta, setPlanta, municipio, setMunicipio, found, buscar };
+  return {
+    query,
+    setQuery,
+    unidade,
+    setUnidade,
+    planta,
+    setPlanta,
+    municipio,
+    setMunicipio,
+    found,
+    buscar,
+  };
 }
 
 /* ---------------- shared UI ---------------- */
 
 const inputCls =
   "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 disabled:bg-slate-50";
-const labelCls =
-  "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600";
-const cardCls =
-  "rounded-md border border-slate-200 bg-white p-4 shadow-sm md:p-5";
-const sectionTitleCls =
-  "mb-3 flex items-center gap-2 text-sm font-semibold text-[#0b3a73]";
+const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600";
+const cardCls = "rounded-md border border-slate-200 bg-white p-4 shadow-sm md:p-5";
+const sectionTitleCls = "mb-3 flex items-center gap-2 text-sm font-semibold text-[#0b3a73]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -174,7 +189,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+function SectionTitle({
+  icon: Icon,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
   return (
     <h2 className={sectionTitleCls}>
       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#1f7ad6]/10 text-[#1f7ad6]">
@@ -217,13 +238,25 @@ function IdentificacaoBlock(l: ReturnType<typeof useLookup>) {
       )}
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Field label="Unidade">
-          <input className={inputCls} value={l.unidade} onChange={(e) => l.setUnidade(e.target.value)} />
+          <input
+            className={inputCls}
+            value={l.unidade}
+            onChange={(e) => l.setUnidade(e.target.value)}
+          />
         </Field>
         <Field label="Planta">
-          <input className={inputCls} value={l.planta} onChange={(e) => l.setPlanta(e.target.value)} />
+          <input
+            className={inputCls}
+            value={l.planta}
+            onChange={(e) => l.setPlanta(e.target.value)}
+          />
         </Field>
         <Field label="Município">
-          <input className={inputCls} value={l.municipio} onChange={(e) => l.setMunicipio(e.target.value)} />
+          <input
+            className={inputCls}
+            value={l.municipio}
+            onChange={(e) => l.setMunicipio(e.target.value)}
+          />
         </Field>
       </div>
     </section>
@@ -282,7 +315,6 @@ function RelatorioTecnico() {
 
   useEffect(() => {
     if (excecao && !retaguarda) setRetaguarda(excecao.retaguardaDefault);
-     
   }, [excecao]);
 
   useEffect(() => {
@@ -319,8 +351,12 @@ function RelatorioTecnico() {
     lines.push(`💧 *Parâmetros Hidráulicos (Operação)*`);
     lines.push(`• Retaguarda: ${withMCA(retaguarda) || "-"}`);
     if (excecao) {
-      lines.push(`• Recalque ${excecao.labels[0].replace(" (mca)", "")}: ${withMCA(recalqueA) || "-"}`);
-      lines.push(`• Recalque ${excecao.labels[1].replace(" (mca)", "")}: ${withMCA(recalqueB) || "-"}`);
+      lines.push(
+        `• Recalque ${excecao.labels[0].replace(" (mca)", "")}: ${withMCA(recalqueA) || "-"}`,
+      );
+      lines.push(
+        `• Recalque ${excecao.labels[1].replace(" (mca)", "")}: ${withMCA(recalqueB) || "-"}`,
+      );
     } else {
       lines.push(`• Recalque: ${withMCA(recalque) || "-"}`);
     }
@@ -335,9 +371,15 @@ function RelatorioTecnico() {
     lines.push(`• Serviço Executado: ${servExec || "-"}`);
     if (obs) lines.push(`• Observações: ${obs}`);
     const chk = (v: boolean) => (v ? "(x)" : "( )");
-    lines.push(`• Na Chegada: Ligado ${chk(naChegada === "Ligado")} Desligado ${chk(naChegada === "Desligado")}`);
-    lines.push(`• Na Saída: Ligado ${chk(naSaida === "Ligado")} Desligado ${chk(naSaida === "Desligado")}`);
-    lines.push(`• Status: Manual ${chk(status === "Manual")} Automático ${chk(status === "Automático")}`);
+    lines.push(
+      `• Na Chegada: Ligado ${chk(naChegada === "Ligado")} Desligado ${chk(naChegada === "Desligado")}`,
+    );
+    lines.push(
+      `• Na Saída: Ligado ${chk(naSaida === "Ligado")} Desligado ${chk(naSaida === "Desligado")}`,
+    );
+    lines.push(
+      `• Status: Manual ${chk(status === "Manual")} Automático ${chk(status === "Automático")}`,
+    );
     lines.push(``);
     lines.push(`👷 *Colaboradores:*`);
     const nomes = colab
@@ -413,7 +455,10 @@ function RelatorioTecnico() {
         </div>
         <div className="space-y-4">
           {grupos.map((g, i) => (
-            <div key={i} className="rounded-md border border-slate-200 bg-slate-50/60 p-3 transition hover:border-[#1f7ad6]/40">
+            <div
+              key={i}
+              className="rounded-md border border-slate-200 bg-slate-50/60 p-3 transition hover:border-[#1f7ad6]/40"
+            >
               <div className="mb-3 flex items-center gap-2">
                 <span className="inline-flex h-6 items-center rounded-full bg-[#0b3a73] px-2 text-[11px] font-bold uppercase tracking-wider text-white">
                   Grupo {i + 1}
@@ -426,22 +471,46 @@ function RelatorioTecnico() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Contatora / Soft / Inversor">
-                  <input className={inputCls} value={g.contatora} onChange={(e) => updGrupo(i, { contatora: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={g.contatora}
+                    onChange={(e) => updGrupo(i, { contatora: e.target.value })}
+                  />
                 </Field>
                 <Field label="RPM">
-                  <input className={inputCls} value={g.rpm} onChange={(e) => updGrupo(i, { rpm: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={g.rpm}
+                    onChange={(e) => updGrupo(i, { rpm: e.target.value })}
+                  />
                 </Field>
                 <Field label="Potência">
-                  <input className={inputCls} value={g.potencia} onChange={(e) => updGrupo(i, { potencia: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={g.potencia}
+                    onChange={(e) => updGrupo(i, { potencia: e.target.value })}
+                  />
                 </Field>
                 <Field label="Tensão FF">
-                  <input className={inputCls} value={g.tensao} onChange={(e) => updGrupo(i, { tensao: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={g.tensao}
+                    onChange={(e) => updGrupo(i, { tensao: e.target.value })}
+                  />
                 </Field>
                 <Field label="Corrente (Operação)">
-                  <input className={inputCls} value={g.corrente} onChange={(e) => updGrupo(i, { corrente: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={g.corrente}
+                    onChange={(e) => updGrupo(i, { corrente: e.target.value })}
+                  />
                 </Field>
                 <Field label="Corrente Shutoff">
-                  <input className={inputCls} value={g.correnteShutoff} onChange={(e) => updGrupo(i, { correnteShutoff: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={g.correnteShutoff}
+                    onChange={(e) => updGrupo(i, { correnteShutoff: e.target.value })}
+                  />
                 </Field>
               </div>
             </div>
@@ -453,20 +522,36 @@ function RelatorioTecnico() {
         <SectionTitle icon={Droplets}>Parâmetros Hidráulicos (Operação)</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Retaguarda (mca)">
-            <input className={inputCls} value={retaguarda} onChange={(e) => setRetaguarda(e.target.value)} />
+            <input
+              className={inputCls}
+              value={retaguarda}
+              onChange={(e) => setRetaguarda(e.target.value)}
+            />
           </Field>
           {excecao ? (
             <>
               <Field label={excecao.labels[0]}>
-                <input className={inputCls} value={recalqueA} onChange={(e) => setRecalqueA(e.target.value)} />
+                <input
+                  className={inputCls}
+                  value={recalqueA}
+                  onChange={(e) => setRecalqueA(e.target.value)}
+                />
               </Field>
               <Field label={excecao.labels[1]}>
-                <input className={inputCls} value={recalqueB} onChange={(e) => setRecalqueB(e.target.value)} />
+                <input
+                  className={inputCls}
+                  value={recalqueB}
+                  onChange={(e) => setRecalqueB(e.target.value)}
+                />
               </Field>
             </>
           ) : (
             <Field label="Recalque (mca)">
-              <input className={inputCls} value={recalque} onChange={(e) => setRecalque(e.target.value)} />
+              <input
+                className={inputCls}
+                value={recalque}
+                onChange={(e) => setRecalque(e.target.value)}
+              />
             </Field>
           )}
         </div>
@@ -476,10 +561,18 @@ function RelatorioTecnico() {
         <SectionTitle icon={Gauge}>Teste em Shutoff (Válvula Fechada)</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Retaguarda Shutoff (mca)">
-            <input className={inputCls} value={retShutoff} onChange={(e) => setRetShutoff(e.target.value)} />
+            <input
+              className={inputCls}
+              value={retShutoff}
+              onChange={(e) => setRetShutoff(e.target.value)}
+            />
           </Field>
           <Field label="Recalque Shutoff (mca)">
-            <input className={inputCls} value={recShutoff} onChange={(e) => setRecShutoff(e.target.value)} />
+            <input
+              className={inputCls}
+              value={recShutoff}
+              onChange={(e) => setRecShutoff(e.target.value)}
+            />
           </Field>
         </div>
       </section>
@@ -488,44 +581,77 @@ function RelatorioTecnico() {
         <SectionTitle icon={Wrench}>Execução do Serviço</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Tipo de Serviço">
-            <select className={inputCls} value={tipoServ} onChange={(e) => setTipoServ(e.target.value as "Preventiva" | "Corretiva")}>
+            <select
+              className={inputCls}
+              value={tipoServ}
+              onChange={(e) => setTipoServ(e.target.value as "Preventiva" | "Corretiva")}
+            >
               <option>Preventiva</option>
               <option>Corretiva</option>
             </select>
           </Field>
           {tipoServ === "Corretiva" && (
             <Field label="Número da O.S.">
-              <input className={inputCls} value={numOS} onChange={(e) => setNumOS(e.target.value)} />
+              <input
+                className={inputCls}
+                value={numOS}
+                onChange={(e) => setNumOS(e.target.value)}
+              />
             </Field>
           )}
           <Field label="Na Chegada">
-            <select className={inputCls} value={naChegada} onChange={(e) => setNaChegada(e.target.value as "Ligado" | "Desligado")}>
+            <select
+              className={inputCls}
+              value={naChegada}
+              onChange={(e) => setNaChegada(e.target.value as "Ligado" | "Desligado")}
+            >
               <option>Ligado</option>
               <option>Desligado</option>
             </select>
           </Field>
           <Field label="Na Saída">
-            <select className={inputCls} value={naSaida} onChange={(e) => setNaSaida(e.target.value as "Ligado" | "Desligado")}>
+            <select
+              className={inputCls}
+              value={naSaida}
+              onChange={(e) => setNaSaida(e.target.value as "Ligado" | "Desligado")}
+            >
               <option>Ligado</option>
               <option>Desligado</option>
             </select>
           </Field>
           <Field label="Status">
-            <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value as "Manual" | "Automático")}>
+            <select
+              className={inputCls}
+              value={status}
+              onChange={(e) => setStatus(e.target.value as "Manual" | "Automático")}
+            >
               <option>Automático</option>
               <option>Manual</option>
             </select>
           </Field>
           <Field label="Colaboradores (separar por , ou /)">
-            <input className={inputCls} value={colab} onChange={(e) => setColab(e.target.value)} placeholder="João, Maria / Pedro" />
+            <input
+              className={inputCls}
+              value={colab}
+              onChange={(e) => setColab(e.target.value)}
+              placeholder="João, Maria / Pedro"
+            />
           </Field>
         </div>
         <div className="mt-3 grid gap-3">
           <Field label="Serviço Executado">
-            <textarea className={inputCls + " min-h-[90px]"} value={servExec} onChange={(e) => setServExec(e.target.value)} />
+            <textarea
+              className={inputCls + " min-h-[90px]"}
+              value={servExec}
+              onChange={(e) => setServExec(e.target.value)}
+            />
           </Field>
           <Field label="Observações">
-            <textarea className={inputCls + " min-h-[70px]"} value={obs} onChange={(e) => setObs(e.target.value)} />
+            <textarea
+              className={inputCls + " min-h-[70px]"}
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+            />
           </Field>
         </div>
       </section>
@@ -541,7 +667,11 @@ const OP_ESTRUTURA = ["Excelente", "Bom", "Regular", "Crítico", "Outros"];
 const OP_VAZAMENTOS = ["Nenhum detectado", "Pequeno vazamento", "Vazamento crítico", "Outros"];
 const OP_CERCAS = ["Conforme", "Sem cadeado-Portão aberto", "Sinais de invasão", "Outros"];
 const OP_ILUMINACAO = ["100% Operacional", "Lâmpadas queimadas", "Sem iluminação", "Outros"];
-const OP_STATUS = ["Operando em Condições Normais ✅", "Operando com Restrições ⚠️", "Paralisada ❌"];
+const OP_STATUS = [
+  "Operando em Condições Normais ✅",
+  "Operando com Restrições ⚠️",
+  "Paralisada ❌",
+];
 
 function outrosLabel(v: string) {
   return v === "Outros" ? "Outros (Ver parecer técnico abaixo) ⚠️" : v;
@@ -622,13 +752,25 @@ function RelatorioPlanta() {
         <SectionTitle icon={Building2}>Condições da Infraestrutura</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Estrutura Civil/Prédio">
-            <select className={inputCls} value={estrutura} onChange={(e) => setEstrutura(e.target.value)}>
-              {OP_ESTRUTURA.map((o) => <option key={o}>{o}</option>)}
+            <select
+              className={inputCls}
+              value={estrutura}
+              onChange={(e) => setEstrutura(e.target.value)}
+            >
+              {OP_ESTRUTURA.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </Field>
           <Field label="Vazamentos/Infiltrações">
-            <select className={inputCls} value={vazamentos} onChange={(e) => setVazamentos(e.target.value)}>
-              {OP_VAZAMENTOS.map((o) => <option key={o}>{o}</option>)}
+            <select
+              className={inputCls}
+              value={vazamentos}
+              onChange={(e) => setVazamentos(e.target.value)}
+            >
+              {OP_VAZAMENTOS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </Field>
         </div>
@@ -639,12 +781,20 @@ function RelatorioPlanta() {
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Cercas, Portões e Cadeados">
             <select className={inputCls} value={cercas} onChange={(e) => setCercas(e.target.value)}>
-              {OP_CERCAS.map((o) => <option key={o}>{o}</option>)}
+              {OP_CERCAS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </Field>
           <Field label="Iluminação">
-            <select className={inputCls} value={iluminacao} onChange={(e) => setIluminacao(e.target.value)}>
-              {OP_ILUMINACAO.map((o) => <option key={o}>{o}</option>)}
+            <select
+              className={inputCls}
+              value={iluminacao}
+              onChange={(e) => setIluminacao(e.target.value)}
+            >
+              {OP_ILUMINACAO.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </Field>
         </div>
@@ -654,18 +804,37 @@ function RelatorioPlanta() {
         <SectionTitle icon={BarChart3}>Resumo da Situação Geral</SectionTitle>
         <div className="grid gap-3">
           <Field label="Status Operacional da Unidade">
-            <select className={inputCls} value={statusGeral} onChange={(e) => setStatusGeral(e.target.value)}>
-              {OP_STATUS.map((o) => <option key={o}>{o}</option>)}
+            <select
+              className={inputCls}
+              value={statusGeral}
+              onChange={(e) => setStatusGeral(e.target.value)}
+            >
+              {OP_STATUS.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
             </select>
           </Field>
           <Field label="Parecer Técnico">
-            <textarea className={inputCls + " min-h-[100px]"} value={parecer} onChange={(e) => setParecer(e.target.value)} />
+            <textarea
+              className={inputCls + " min-h-[100px]"}
+              value={parecer}
+              onChange={(e) => setParecer(e.target.value)}
+            />
           </Field>
           <Field label="Necessidades/Pendências Críticas">
-            <textarea className={inputCls + " min-h-[70px]"} value={necessidades} onChange={(e) => setNecessidades(e.target.value)} placeholder="Nenhuma pendência crítica" />
+            <textarea
+              className={inputCls + " min-h-[70px]"}
+              value={necessidades}
+              onChange={(e) => setNecessidades(e.target.value)}
+              placeholder="Nenhuma pendência crítica"
+            />
           </Field>
           <Field label="Técnico/Responsável pela Inspeção">
-            <input className={inputCls} value={responsavel} onChange={(e) => setResponsavel(e.target.value)} />
+            <input
+              className={inputCls}
+              value={responsavel}
+              onChange={(e) => setResponsavel(e.target.value)}
+            />
           </Field>
         </div>
       </section>
@@ -731,9 +900,7 @@ function RelatorioPage() {
               <FileText className="h-5 w-5" />
             </span>
             <div>
-              <h1 className="text-lg font-bold text-[#0b3a73] md:text-xl">
-                Geração de Relatórios
-              </h1>
+              <h1 className="text-lg font-bold text-[#0b3a73] md:text-xl">Geração de Relatórios</h1>
               <p className="text-xs text-slate-500 md:text-sm">
                 Técnico e de Planta/Unidade · pronto para WhatsApp e planilha
               </p>

@@ -54,8 +54,7 @@ export const Route = createFileRoute("/backlog")({
       { title: "Eletromecânica · Backlog BI" },
       {
         name: "description",
-        content:
-          "Backlog de Ordens de Manutenção (Field/SAP) com SLA, mapa e programação semanal.",
+        content: "Backlog de Ordens de Manutenção (Field/SAP) com SLA, mapa e programação semanal.",
       },
     ],
   }),
@@ -86,11 +85,13 @@ type Row = {
 const DATA = rawData as unknown as Row[];
 
 const plantaToElevatoriaMap = new Map<string, string>();
-(elevatoriasData as Array<{ PLANTA: string | null; ELEVATORIAS: string | null }>).forEach((item) => {
-  if (item.PLANTA) {
-    plantaToElevatoriaMap.set(item.PLANTA.trim().toUpperCase(), item.ELEVATORIAS || "");
-  }
-});
+(elevatoriasData as Array<{ PLANTA: string | null; ELEVATORIAS: string | null }>).forEach(
+  (item) => {
+    if (item.PLANTA) {
+      plantaToElevatoriaMap.set(item.PLANTA.trim().toUpperCase(), item.ELEVATORIAS || "");
+    }
+  },
+);
 
 export function getElevatoriaName(plantaStr: string | null | undefined): string {
   if (!plantaStr) return "—";
@@ -289,7 +290,11 @@ function MultiSelect({
         <span className="truncate">
           {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500">{label}:</span>}
           <span className="font-medium text-slate-800">
-            {value.length === 0 ? "Todos" : value.length === 1 ? value[0] : `${value.length} selecionados`}
+            {value.length === 0
+              ? "Todos"
+              : value.length === 1
+                ? value[0]
+                : `${value.length} selecionados`}
           </span>
         </span>
         <Filter className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
@@ -338,9 +343,7 @@ function ComboboxSearch({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const filtered = q
-    ? options.filter((o) => o.toLowerCase().includes(q.toLowerCase()))
-    : options;
+  const filtered = q ? options.filter((o) => o.toLowerCase().includes(q.toLowerCase())) : options;
   const selectedLabel = value === "TODAS" ? allLabel : value;
   return (
     <div className="relative">
@@ -357,7 +360,13 @@ function ComboboxSearch({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); setQ(""); }} />
+          <div
+            className="fixed inset-0 z-30"
+            onClick={() => {
+              setOpen(false);
+              setQ("");
+            }}
+          />
           <div className="absolute z-40 mt-1 w-full min-w-[260px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
             <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1">
               <Search className="h-4 w-4 text-slate-400" />
@@ -376,7 +385,11 @@ function ComboboxSearch({
             </div>
             <div className="max-h-72 overflow-auto p-1">
               <button
-                onClick={() => { onChange("TODAS"); setOpen(false); setQ(""); }}
+                onClick={() => {
+                  onChange("TODAS");
+                  setOpen(false);
+                  setQ("");
+                }}
                 className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${value === "TODAS" ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : ""}`}
               >
                 {allLabel}
@@ -387,7 +400,11 @@ function ComboboxSearch({
               {filtered.map((o) => (
                 <button
                   key={o}
-                  onClick={() => { onChange(o); setOpen(false); setQ(""); }}
+                  onClick={() => {
+                    onChange(o);
+                    setOpen(false);
+                    setQ("");
+                  }}
                   className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${value === o ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : ""}`}
                 >
                   {o}
@@ -454,28 +471,64 @@ function BacklogPage() {
   const [copiedOm, setCopiedOm] = useState<string | null>(null);
 
   // ---------- filtro em cascata: cada dropdown considera os demais filtros ----------
-  type FilterKey = "planta" | "resp" | "status" | "equipe" | "cidade" | "faixa" | "late" | "emerg" | "sla" | "tipo";
+  type FilterKey =
+    | "planta"
+    | "resp"
+    | "status"
+    | "equipe"
+    | "cidade"
+    | "faixa"
+    | "late"
+    | "emerg"
+    | "sla"
+    | "tipo";
   const applyFilters = (rows: Enriched[], skip?: FilterKey) => {
     const slaLimit = fSlaBefore ? new Date(fSlaBefore + "T00:00:00") : null;
     return rows.filter((e) => {
       if (skip !== "planta" && fPlanta !== "TODAS" && e.planta !== fPlanta) return false;
       if (skip !== "resp" && fResp.length && !fResp.includes(e.responsabilidade)) return false;
-      if (skip !== "status" && fStatus !== "TODOS" && (e.r["Status da Atividade"] || "").trim() !== fStatus) return false;
+      if (
+        skip !== "status" &&
+        fStatus !== "TODOS" &&
+        (e.r["Status da Atividade"] || "").trim() !== fStatus
+      )
+        return false;
       if (skip !== "equipe" && fEquipe !== "TODAS" && e.equipe !== fEquipe) return false;
       if (skip !== "cidade" && fCidade !== "TODAS" && e.r.Cidade !== fCidade) return false;
       if (skip !== "faixa" && fFaixa !== "TODAS" && e.faixa !== fFaixa) return false;
       if (skip !== "tipo" && fTipo !== "TODOS" && e.r["Tipo de Atividade"] !== fTipo) return false;
       if (skip !== "late" && onlyLate && e.slaStatus !== "ATRASADO") return false;
-      if (skip !== "emerg" && onlyEmerg && (e.r.PRIORIDADE || "").toUpperCase() !== "EMERGÊNCIA") return false;
+      if (skip !== "emerg" && onlyEmerg && (e.r.PRIORIDADE || "").toUpperCase() !== "EMERGÊNCIA")
+        return false;
       if (skip !== "sla" && slaLimit && e.fimSla && e.fimSla >= slaLimit) return false;
       return true;
     });
   };
-  const filtered = useMemo(() => applyFilters(enriched), [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore]);
+  const filtered = useMemo(
+    () => applyFilters(enriched),
+    [
+      enriched,
+      fPlanta,
+      fResp,
+      fStatus,
+      fEquipe,
+      fCidade,
+      fFaixa,
+      fTipo,
+      onlyLate,
+      onlyEmerg,
+      fSlaBefore,
+    ],
+  );
 
   const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
   const OPT_PLANTA = useMemo(
-    () => uniq(applyFilters(enriched, "planta").map((e) => e.planta).filter(Boolean)).sort(),
+    () =>
+      uniq(
+        applyFilters(enriched, "planta")
+          .map((e) => e.planta)
+          .filter(Boolean),
+      ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enriched, fResp, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
@@ -485,11 +538,12 @@ function BacklogPage() {
     [enriched, fPlanta, fStatus, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_STATUS = useMemo(
-    () => uniq(
-      applyFilters(enriched, "status")
-        .map((e) => (e.r["Status da Atividade"] || "").trim())
-        .filter(Boolean),
-    ).sort(),
+    () =>
+      uniq(
+        applyFilters(enriched, "status")
+          .map((e) => (e.r["Status da Atividade"] || "").trim())
+          .filter(Boolean),
+      ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enriched, fPlanta, fResp, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
@@ -499,7 +553,12 @@ function BacklogPage() {
     [enriched, fPlanta, fResp, fStatus, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_CIDADE = useMemo(
-    () => uniq(applyFilters(enriched, "cidade").map((e) => e.r.Cidade).filter(Boolean)).sort() as string[],
+    () =>
+      uniq(
+        applyFilters(enriched, "cidade")
+          .map((e) => e.r.Cidade)
+          .filter(Boolean),
+      ).sort() as string[],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enriched, fPlanta, fResp, fStatus, fEquipe, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
@@ -509,7 +568,12 @@ function BacklogPage() {
     [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
   const OPT_TIPO = useMemo(
-    () => uniq(applyFilters(enriched, "tipo").map((e) => e.r["Tipo de Atividade"]).filter(Boolean)).sort(),
+    () =>
+      uniq(
+        applyFilters(enriched, "tipo")
+          .map((e) => e.r["Tipo de Atividade"])
+          .filter((x): x is string => x !== null),
+      ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enriched, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore],
   );
@@ -517,7 +581,9 @@ function BacklogPage() {
   // ---------- KPIs ----------
   const kTotal = filtered.length;
   const kLate = filtered.filter((e) => e.slaStatus === "ATRASADO").length;
-  const kEmerg = filtered.filter((e) => (e.r.PRIORIDADE || "").toUpperCase() === "EMERGÊNCIA").length;
+  const kEmerg = filtered.filter(
+    (e) => (e.r.PRIORIDADE || "").toUpperCase() === "EMERGÊNCIA",
+  ).length;
   const kPct = kTotal ? Math.round((kLate / kTotal) * 100) : 0;
 
   // ---------- charts data ----------
@@ -559,11 +625,16 @@ function BacklogPage() {
 
   // ---------- mapa: 1 marker por PLANTA única ----------
   const mapMarkers = useMemo(() => {
-    const m = new Map<string, { lat: number; lon: number; planta: string; count: number; late: number; emerg: number }>();
+    const m = new Map<
+      string,
+      { lat: number; lon: number; planta: string; count: number; late: number; emerg: number }
+    >();
     for (const e of filtered) {
       if (e.lat === null || e.lon === null) continue;
       const key = e.planta;
-      const isEmerg = (e.r["Tipo de Atividade"] || "").toUpperCase().includes("MANUTENÇÃO CORRETIVA EMERGENCIAL");
+      const isEmerg = (e.r["Tipo de Atividade"] || "")
+        .toUpperCase()
+        .includes("MANUTENÇÃO CORRETIVA EMERGENCIAL");
       const cur = m.get(key);
       if (cur) {
         cur.count += 1;
@@ -584,20 +655,22 @@ function BacklogPage() {
   }, [filtered]);
 
   // Toggle: clicar de novo na mesma planta desfaz o filtro.
-  const togglePlanta = (planta: string) =>
-    setFPlanta((cur) => (cur === planta ? "TODAS" : planta));
+  const togglePlanta = (planta: string) => setFPlanta((cur) => (cur === planta ? "TODAS" : planta));
 
   // ---------- Ações recomendadas ----------
   const emergSemProgramacao = useMemo(
-    () => filtered.filter(
-      (e) => (e.r.PRIORIDADE || "").toUpperCase() === "EMERGÊNCIA"
-        && (e.r["Status da Atividade"] || "").toLowerCase().includes("pendente"),
-    ).length,
+    () =>
+      filtered.filter(
+        (e) =>
+          (e.r.PRIORIDADE || "").toUpperCase() === "EMERGÊNCIA" &&
+          (e.r["Status da Atividade"] || "").toLowerCase().includes("pendente"),
+      ).length,
     [filtered],
   );
   const topPlantasBacklog = useMemo(() => {
     const m = new Map<string, number>();
-    for (const e of filtered) if (e.faixa === "15+ dias") m.set(e.planta, (m.get(e.planta) || 0) + 1);
+    for (const e of filtered)
+      if (e.faixa === "15+ dias") m.set(e.planta, (m.get(e.planta) || 0) + 1);
     return Array.from(m.entries())
       .map(([planta, count]) => ({ planta, count }))
       .sort((a, b) => b.count - a.count)
@@ -619,17 +692,25 @@ function BacklogPage() {
       let bv: string | number = "";
       switch (sortKey) {
         case "om":
-          av = a.om; bv = b.om; break;
+          av = a.om;
+          bv = b.om;
+          break;
         case "textoBreve":
-          av = a.r["TEXTO BREVE"] || ""; bv = b.r["TEXTO BREVE"] || ""; break;
+          av = a.r["TEXTO BREVE"] || "";
+          bv = b.r["TEXTO BREVE"] || "";
+          break;
         case "planta":
-          av = a.planta; bv = b.planta; break;
+          av = a.planta;
+          bv = b.planta;
+          break;
         case "inicioSla":
           av = a.inicioSla ? a.inicioSla.getTime() : 0;
           bv = b.inicioSla ? b.inicioSla.getTime() : 0;
           break;
         case "tipo":
-          av = a.r["Tipo de Atividade"] || ""; bv = b.r["Tipo de Atividade"] || ""; break;
+          av = a.r["Tipo de Atividade"] || "";
+          bv = b.r["Tipo de Atividade"] || "";
+          break;
       }
       if (av < bv) return sortDir === "asc" ? -1 : 1;
       if (av > bv) return sortDir === "asc" ? 1 : -1;
@@ -639,7 +720,10 @@ function BacklogPage() {
   }, [filtered, sortKey, sortDir]);
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else { setSortKey(k); setSortDir("asc"); }
+    else {
+      setSortKey(k);
+      setSortDir("asc");
+    }
   };
 
   // ---------- upload ----------
@@ -649,7 +733,10 @@ function BacklogPage() {
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (!json.length) { alert("Planilha vazia ou inválida."); return; }
+      if (!json.length) {
+        alert("Planilha vazia ou inválida.");
+        return;
+      }
       const norm = json.map((r) => {
         const out: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(r)) {
@@ -669,12 +756,37 @@ function BacklogPage() {
 
   // ---------- exportar CSV ----------
   const exportCSV = () => {
-    const headers = ["Ordem", "Nota", "Planta", "Cidade", "Prioridade", "Status", "Tipo", "Início SLA", "Fim SLA", "Dias Aberto", "SLA", "Responsabilidade", "Equipe", "TEXTO BREVE"];
+    const headers = [
+      "Ordem",
+      "Nota",
+      "Planta",
+      "Cidade",
+      "Prioridade",
+      "Status",
+      "Tipo",
+      "Início SLA",
+      "Fim SLA",
+      "Dias Aberto",
+      "SLA",
+      "Responsabilidade",
+      "Equipe",
+      "TEXTO BREVE",
+    ];
     const rows = sortedRows.map((e) => [
-      e.om, e.r.NOTA ?? "", e.planta, e.r.Cidade ?? "", e.r.PRIORIDADE ?? "",
-      e.r["Status da Atividade"] ?? "", e.r["Tipo de Atividade"] ?? "",
-      fmtDate(e.inicioSla), fmtDate(e.fimSla), String(e.diasAberto),
-      e.slaStatus, e.responsabilidade, e.equipe, e.r["TEXTO BREVE"] ?? "",
+      e.om,
+      e.r.NOTA ?? "",
+      e.planta,
+      e.r.Cidade ?? "",
+      e.r.PRIORIDADE ?? "",
+      e.r["Status da Atividade"] ?? "",
+      e.r["Tipo de Atividade"] ?? "",
+      fmtDate(e.inicioSla),
+      fmtDate(e.fimSla),
+      String(e.diasAberto),
+      e.slaStatus,
+      e.responsabilidade,
+      e.equipe,
+      e.r["TEXTO BREVE"] ?? "",
     ]);
     const csv = [headers, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
@@ -695,7 +807,10 @@ function BacklogPage() {
       `Atrasadas: ${kLate} (${kPct}%)\n` +
       `Emergenciais: ${kEmerg}\n\n` +
       `Por faixa:\n${dataFaixa.map((d) => `• ${d.name}: ${d.value}`).join("\n")}\n\n` +
-      `Top cidades:\n${dataCidade.slice(0, 5).map((d) => `• ${d.name}: ${d.value}`).join("\n")}`;
+      `Top cidades:\n${dataCidade
+        .slice(0, 5)
+        .map((d) => `• ${d.name}: ${d.value}`)
+        .join("\n")}`;
     try {
       await navigator.clipboard.writeText(txt);
       alert("Resumo copiado! Cole no WhatsApp.");
@@ -708,33 +823,72 @@ function BacklogPage() {
   const saveView = () => {
     const name = prompt("Nome da view:");
     if (!name) return;
-    const v = { name, fPlanta, fResp, fStatus, fEquipe, fCidade, fFaixa, onlyLate, onlyEmerg, fSlaBefore };
+    const v = {
+      name,
+      fPlanta,
+      fResp,
+      fStatus,
+      fEquipe,
+      fCidade,
+      fFaixa,
+      onlyLate,
+      onlyEmerg,
+      fSlaBefore,
+    };
     const raw = localStorage.getItem(VIEW_STORAGE_KEY);
     const list: Array<typeof v> = raw ? JSON.parse(raw) : [];
     const idx = list.findIndex((x) => x.name === name);
-    if (idx >= 0) list[idx] = v; else list.push(v);
+    if (idx >= 0) list[idx] = v;
+    else list.push(v);
     localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(list));
     alert("View salva.");
   };
-  const [savedViews, setSavedViews] = useState<Array<{ name: string; fPlanta: string; fResp: string[]; fStatus: string; fEquipe: string; fCidade: string; fFaixa: string; onlyLate: boolean; onlyEmerg: boolean; fSlaBefore: string }>>([]);
+  const [savedViews, setSavedViews] = useState<
+    Array<{
+      name: string;
+      fPlanta: string;
+      fResp: string[];
+      fStatus: string;
+      fEquipe: string;
+      fCidade: string;
+      fFaixa: string;
+      onlyLate: boolean;
+      onlyEmerg: boolean;
+      fSlaBefore: string;
+    }>
+  >([]);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(VIEW_STORAGE_KEY);
       if (raw) setSavedViews(JSON.parse(raw));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [now]);
   const loadView = (n: string) => {
     const v = savedViews.find((x) => x.name === n);
     if (!v) return;
-    setFPlanta(v.fPlanta); setFResp(v.fResp); setFStatus(v.fStatus);
-    setFEquipe(v.fEquipe); setFCidade(v.fCidade); setFFaixa(v.fFaixa);
-    setOnlyLate(v.onlyLate); setOnlyEmerg(v.onlyEmerg); setFSlaBefore(v.fSlaBefore);
+    setFPlanta(v.fPlanta);
+    setFResp(v.fResp);
+    setFStatus(v.fStatus);
+    setFEquipe(v.fEquipe);
+    setFCidade(v.fCidade);
+    setFFaixa(v.fFaixa);
+    setOnlyLate(v.onlyLate);
+    setOnlyEmerg(v.onlyEmerg);
+    setFSlaBefore(v.fSlaBefore);
   };
 
   const clearAllFilters = () => {
-    setFPlanta("TODAS"); setFResp([]); setFStatus("TODOS");
-    setFEquipe("TODAS"); setFCidade("TODAS"); setFFaixa("TODAS");
-    setOnlyLate(false); setOnlyEmerg(false); setFSlaBefore("");
+    setFPlanta("TODAS");
+    setFResp([]);
+    setFStatus("TODOS");
+    setFEquipe("TODAS");
+    setFCidade("TODAS");
+    setFFaixa("TODAS");
+    setOnlyLate(false);
+    setOnlyEmerg(false);
+    setFSlaBefore("");
   };
 
   // ============================================================
@@ -747,7 +901,10 @@ function BacklogPage() {
     enriched.find((e) => e.planta.toUpperCase().includes(DEFAULT_START_HINT))?.planta || "";
 
   const allTipos = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.r["Tipo de Atividade"] || "").filter(Boolean))).sort(),
+    () =>
+      Array.from(
+        new Set(enriched.map((e) => e.r["Tipo de Atividade"] || "").filter(Boolean)),
+      ).sort(),
     [enriched],
   );
   const allResps = useMemo(
@@ -759,7 +916,8 @@ function BacklogPage() {
     [enriched],
   );
   const allCidades = useMemo(
-    () => Array.from(new Set(enriched.map((e) => e.r.Cidade || "").filter(Boolean))).sort() as string[],
+    () =>
+      Array.from(new Set(enriched.map((e) => e.r.Cidade || "").filter(Boolean))).sort() as string[],
     [enriched],
   );
 
@@ -808,19 +966,36 @@ function BacklogPage() {
     const toRad = (x: number) => (x * Math.PI) / 180;
     const dLat = toRad(b.lat - a.lat);
     const dLon = toRad(b.lon - a.lon);
-    const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    const s =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(s));
   }
 
   const generateRoute = () => {
     setRouteError("");
-    if (!rbSlaBefore) { setRouteError("Informe a data/hora limite do Fim do SLA."); return; }
-    if (!rbStart) { setRouteError("Selecione o ponto de partida."); return; }
-    if (!rbMaxStops || rbMaxStops < 1) { setRouteError("Máximo de paradas deve ser ≥ 1."); return; }
-    if (rbRouteCount < 1) { setRouteError("Quantidade de rotas deve ser no mínimo 1."); return; }
+    if (!rbSlaBefore) {
+      setRouteError("Informe a data/hora limite do Fim do SLA.");
+      return;
+    }
+    if (!rbStart) {
+      setRouteError("Selecione o ponto de partida.");
+      return;
+    }
+    if (!rbMaxStops || rbMaxStops < 1) {
+      setRouteError("Máximo de paradas deve ser ≥ 1.");
+      return;
+    }
+    if (rbRouteCount < 1) {
+      setRouteError("Quantidade de rotas deve ser no mínimo 1.");
+      return;
+    }
 
     const slaLimit = new Date(rbSlaBefore);
-    if (isNaN(slaLimit.getTime())) { setRouteError("Data/hora limite inválida."); return; }
+    if (isNaN(slaLimit.getTime())) {
+      setRouteError("Data/hora limite inválida.");
+      return;
+    }
 
     // 1) candidatos
     const candidates = enriched.filter((e) => {
@@ -832,11 +1007,17 @@ function BacklogPage() {
       if (e.lat === null || e.lon === null) return false;
       return true;
     });
-    if (!candidates.length) { setRouteError("Nenhuma O.S. atende aos critérios informados."); return; }
+    if (!candidates.length) {
+      setRouteError("Nenhuma O.S. atende aos critérios informados.");
+      return;
+    }
 
     // 2) ponto de partida
     const startRow = enriched.find((e) => e.planta === rbStart && e.lat !== null && e.lon !== null);
-    if (!startRow) { setRouteError("Ponto de partida não possui coordenadas."); return; }
+    if (!startRow) {
+      setRouteError("Ponto de partida não possui coordenadas.");
+      return;
+    }
     const startPt = { lat: startRow.lat!, lon: startRow.lon!, planta: rbStart };
 
     const routesList: GeneratedRoute[] = [];
@@ -848,13 +1029,23 @@ function BacklogPage() {
       if (!activeCandidates.length) break;
 
       // 3) agrupa por planta
-      type Group = { planta: string; lat: number; lon: number; oss: Enriched[]; oldestFimSla: Date };
+      type Group = {
+        planta: string;
+        lat: number;
+        lon: number;
+        oss: Enriched[];
+        oldestFimSla: Date;
+      };
       const groupMap = new Map<string, Group>();
       for (const e of activeCandidates) {
         const cur = groupMap.get(e.planta);
         if (!cur) {
           groupMap.set(e.planta, {
-            planta: e.planta, lat: e.lat!, lon: e.lon!, oss: [e], oldestFimSla: e.fimSla!,
+            planta: e.planta,
+            lat: e.lat!,
+            lon: e.lon!,
+            oss: [e],
+            oldestFimSla: e.fimSla!,
           });
         } else {
           cur.oss.push(e);
@@ -867,12 +1058,14 @@ function BacklogPage() {
       // 4) Nearest-neighbor com urgência
       const maxDaysAtraso = Math.max(
         1,
-        ...groups.map((g) => Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000)),
+        ...groups.map((g) =>
+          Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000),
+        ),
       );
       const remaining = new Set(groups.map((g) => g.planta));
       const orderedGroups: Group[] = [];
       let cursor: { lat: number; lon: number } = startPt;
-      
+
       while (remaining.size) {
         let best: Group | null = null;
         let bestScore = Infinity;
@@ -882,7 +1075,10 @@ function BacklogPage() {
           const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
           const norm = days / maxDaysAtraso;
           const score = d - URGENCY_WEIGHT_KM_PER_DAY * norm * 10;
-          if (score < bestScore) { bestScore = score; best = g; }
+          if (score < bestScore) {
+            bestScore = score;
+            best = g;
+          }
         }
         if (!best) break;
         orderedGroups.push(best);
@@ -916,7 +1112,7 @@ function BacklogPage() {
       const details: GeneratedRoute["details"] = [];
       const stops: RouteStop[] = [];
       let totalOs = 0;
-      
+
       chosen.forEach((g, idx) => {
         visitedPlantas.add(g.planta); // Marca planta como visitada nesta rota
         const d = haversineKm(prev, g);
@@ -952,7 +1148,10 @@ function BacklogPage() {
       });
     }
 
-    if (!routesList.length) { setRouteError("Nenhuma rota pôde ser gerada com as O.S. restantes."); return; }
+    if (!routesList.length) {
+      setRouteError("Nenhuma rota pôde ser gerada com as O.S. restantes.");
+      return;
+    }
 
     setGeneratedRoutes(routesList);
     setRouteDialogOpen(false);
@@ -963,19 +1162,38 @@ function BacklogPage() {
 
   const exportRouteCSV = (routeIdx?: number) => {
     if (!generatedRoutes.length) return;
-    const headers = ["Rota", "Parada", "Planta", "Cidade", "Distância (km)", "Acumulado (km)", "Ordem", "Nota", "Fim SLA", "Prioridade", "Tipo", "TEXTO BREVE"];
+    const headers = [
+      "Rota",
+      "Parada",
+      "Planta",
+      "Cidade",
+      "Distância (km)",
+      "Acumulado (km)",
+      "Ordem",
+      "Nota",
+      "Fim SLA",
+      "Prioridade",
+      "Tipo",
+      "TEXTO BREVE",
+    ];
     const rows: string[][] = [];
-    
+
     generatedRoutes.forEach((route, rIdx) => {
       if (routeIdx !== undefined && routeIdx !== rIdx) return;
       for (const d of route.details) {
         for (const os of d.oss) {
           rows.push([
             `Rota ${rIdx + 1}`,
-            String(d.ordem), d.planta, d.cidade,
-            d.distKm.toFixed(2), d.cumKm.toFixed(2),
-            os.om, os.r.NOTA ?? "", fmtDate(os.fimSla),
-            os.r.PRIORIDADE ?? "", os.r["Tipo de Atividade"] ?? "",
+            String(d.ordem),
+            d.planta,
+            d.cidade,
+            d.distKm.toFixed(2),
+            d.cumKm.toFixed(2),
+            os.om,
+            os.r.NOTA ?? "",
+            fmtDate(os.fimSla),
+            os.r.PRIORIDADE ?? "",
+            os.r["Tipo de Atividade"] ?? "",
             os.r["TEXTO BREVE"] ?? "",
           ]);
         }
@@ -998,7 +1216,7 @@ function BacklogPage() {
     if (!generatedRoutes.length) return;
     const lines = [
       `🗺️ *Programação de Rotas* — ${generatedRoutes.reduce((acc, r) => acc + r.totalOs, 0)} O.S. no total`,
-      ""
+      "",
     ];
 
     generatedRoutes.forEach((route, rIdx) => {
@@ -1007,16 +1225,19 @@ function BacklogPage() {
         `📏 ${route.totalKm.toFixed(1)} km · ⏱️ ~${route.etaMin} min de deslocamento`,
         `🚩 Partida: ${route.start.label.split(" - ")[0]}`,
         ...route.details.map(
-          (d) => `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`
+          (d) =>
+            `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`,
         ),
-        ""
+        "",
       );
     });
 
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
       alert("Resumo de todas as rotas copiado! Cole no WhatsApp.");
-    } catch { alert("Não foi possível copiar."); }
+    } catch {
+      alert("Não foi possível copiar.");
+    }
   };
 
   const mapCard = (heightPx: number, showToolbar = true) => (
@@ -1052,15 +1273,28 @@ function BacklogPage() {
           </div>
         </div>
       )}
-      <div style={{ height: heightPx, width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
+      <div
+        style={{ height: heightPx, width: "100%" }}
+        className="overflow-hidden rounded-md bg-slate-100"
+      >
         {mounted ? (
-          <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                Carregando mapa…
+              </div>
+            }
+          >
             <BacklogMap
               markers={mapMarkers}
               onSelect={togglePlanta}
               selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
               fitSignal={mapFitSignal}
-              routes={generatedRoutes}
+              route={
+                generatedRoutes.length > 0
+                  ? generatedRoutes[activeRouteTab] || generatedRoutes[0]
+                  : undefined
+              }
             />
           </Suspense>
         ) : (
@@ -1147,7 +1381,11 @@ function BacklogPage() {
             Salvar view
           </button>
           <label className="inline-flex items-center gap-2 text-xs text-slate-600">
-            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
             Auto-refresh SLA
           </label>
         </div>
@@ -1159,7 +1397,9 @@ function BacklogPage() {
           onClick={clearAllFilters}
           className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-md"
         >
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">O.S. no bucket</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            O.S. no bucket
+          </div>
           <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{kTotal}</div>
           <div className="text-[11px] text-slate-400">clique para limpar filtros</div>
         </button>
@@ -1188,7 +1428,9 @@ function BacklogPage() {
           )}
         </button>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">% SLA Atrasado</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            % SLA Atrasado
+          </div>
           <div className="mt-1 text-3xl font-bold text-[#1f7ad6]">{kPct}%</div>
           <div className="mt-2 h-2 w-full rounded-full bg-slate-100">
             <div
@@ -1211,79 +1453,130 @@ function BacklogPage() {
           </span>
           <span>{showFilters ? "ocultar" : "mostrar"}</span>
         </button>
-        <div className={`${showFilters ? "grid" : "hidden"} gap-4 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`}>
+        <div
+          className={`${showFilters ? "grid" : "hidden"} gap-4 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`}
+        >
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Elevatória</label>
-            <ComboboxSearch label="Elevatória" options={OPT_PLANTA} value={fPlanta} onChange={setFPlanta} allLabel="Todas" hideInlineLabel />
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Elevatória
+            </label>
+            <ComboboxSearch
+              label="Elevatória"
+              options={OPT_PLANTA}
+              value={fPlanta}
+              onChange={setFPlanta}
+              allLabel="Todas"
+              hideInlineLabel
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Responsabilidade</label>
-            <MultiSelect label="Responsabilidade" options={OPT_RESP} value={fResp} onChange={setFResp} hideInlineLabel />
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Responsabilidade
+            </label>
+            <MultiSelect
+              label="Responsabilidade"
+              options={OPT_RESP}
+              value={fResp}
+              onChange={setFResp}
+              hideInlineLabel
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Status
+            </label>
             <select
               value={fStatus}
               onChange={(e) => setFStatus(e.target.value)}
               className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODOS">Todos</option>
-              {OPT_STATUS.map((p) => <option key={p} value={p}>{p}</option>)}
+              {OPT_STATUS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipe</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Equipe
+            </label>
             <select
               value={fEquipe}
               onChange={(e) => setFEquipe(e.target.value)}
               className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODAS">Todas</option>
-              {OPT_EQUIPE.map((p) => <option key={p} value={p}>{p}</option>)}
+              {OPT_EQUIPE.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Cidade</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Cidade
+            </label>
             <select
               value={fCidade}
               onChange={(e) => setFCidade(e.target.value)}
               className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODAS">Todas</option>
-              {OPT_CIDADE.map((p) => <option key={p} value={p}>{p}</option>)}
+              {OPT_CIDADE.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tipo de Atividade</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Tipo de Atividade
+            </label>
             <select
               value={fTipo}
               onChange={(e) => setFTipo(e.target.value)}
               className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODOS">Todos</option>
-              {OPT_TIPO.map((p) => <option key={p} value={p}>{abbreviateAtividade(p)}</option>)}
+              {OPT_TIPO.map((p) => (
+                <option key={p} value={p}>
+                  {abbreviateAtividade(p)}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Tempo Aberto</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Tempo Aberto
+            </label>
             <select
               value={fFaixa}
               onChange={(e) => setFFaixa(e.target.value)}
               className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODAS">Todas as faixas</option>
-              {OPT_FAIXA.map((p) => <option key={p} value={p}>{p}</option>)}
+              {OPT_FAIXA.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Fim SLA anterior a</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Fim SLA anterior a
+            </label>
             <div className="relative flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 shadow-sm">
               <Clock className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
               <input
@@ -1297,14 +1590,20 @@ function BacklogPage() {
 
           {savedViews.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Views Salvas</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Views Salvas
+              </label>
               <select
                 onChange={(e) => e.target.value && loadView(e.target.value)}
                 className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
                 defaultValue=""
               >
                 <option value="">Escolha uma view…</option>
-                {savedViews.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+                {savedViews.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.name}
+                  </option>
+                ))}
               </select>
             </div>
           )}
@@ -1322,7 +1621,9 @@ function BacklogPage() {
         {fPlanta !== "TODAS" && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73]">
             Filtrando por planta: <strong>{fPlanta}</strong>
-            <button type="button" onClick={() => setFPlanta("TODAS")} className="cursor-pointer"><X className="h-3 w-3" /></button>
+            <button type="button" onClick={() => setFPlanta("TODAS")} className="cursor-pointer">
+              <X className="h-3 w-3" />
+            </button>
           </div>
         )}
       </div>
@@ -1331,7 +1632,9 @@ function BacklogPage() {
       <div className="mb-4 grid gap-3 lg:grid-cols-3">
         {/* Faixa */}
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">Backlog por Tempo em Aberto</div>
+          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">
+            Backlog por Tempo em Aberto
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dataFaixa} layout="vertical" margin={{ left: 10, right: 30 }}>
               <XAxis type="number" hide />
@@ -1348,7 +1651,11 @@ function BacklogPage() {
                 }}
                 className="cursor-pointer"
               >
-                <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: BLUE_DARK, fontWeight: 600 }} />
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  style={{ fontSize: 12, fill: BLUE_DARK, fontWeight: 600 }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -1356,7 +1663,9 @@ function BacklogPage() {
 
         {/* Pie tipo atividade */}
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">O.S. por Tipo de Atividade</div>
+          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">
+            O.S. por Tipo de Atividade
+          </div>
           {(() => {
             const totalTipo = dataTipoAtividade.reduce((s, d) => s + d.value, 0);
             return (
@@ -1389,12 +1698,17 @@ function BacklogPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(v: number, n: string) => [`${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`, abbreviateAtividade(n)]}
+                        formatter={(v: number, n: string) => [
+                          `${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`,
+                          abbreviateAtividade(n),
+                        ]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Total
+                    </div>
                     <div className="text-2xl font-bold text-[#0b3a73]">{totalTipo}</div>
                   </div>
                 </div>
@@ -1408,7 +1722,9 @@ function BacklogPage() {
                           type="button"
                           onClick={() => setFTipo((prev) => (prev === d.name ? "TODOS" : d.name))}
                           className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 p-1 rounded cursor-pointer transition-colors ${
-                            isSelected ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : "text-slate-750"
+                            isSelected
+                              ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]"
+                              : "text-slate-750"
                           }`}
                           title={d.name}
                         >
@@ -1449,7 +1765,11 @@ function BacklogPage() {
                 }}
                 className="cursor-pointer"
               >
-                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: BLUE_DARK, fontWeight: 600 }} />
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  style={{ fontSize: 11, fill: BLUE_DARK, fontWeight: 600 }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -1472,7 +1792,9 @@ function BacklogPage() {
             className="mb-3 flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-left transition hover:border-red-400 hover:bg-red-100"
           >
             <div>
-              <div className="text-[11px] font-semibold uppercase text-red-700">Emergenciais pendentes</div>
+              <div className="text-[11px] font-semibold uppercase text-red-700">
+                Emergenciais pendentes
+              </div>
               <div className="text-2xl font-bold text-red-600">{emergSemProgramacao}</div>
               <div className="text-[10px] text-red-500">clique para filtrar</div>
             </div>
@@ -1492,7 +1814,9 @@ function BacklogPage() {
                   onClick={() => togglePlanta(p.planta)}
                   className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlanta === p.planta ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100"}`}
                 >
-                  <span className="truncate font-medium text-[#0b3a73]">{p.planta.split(" - ")[0]}</span>
+                  <span className="truncate font-medium text-[#0b3a73]">
+                    {p.planta.split(" - ")[0]}
+                  </span>
                   <span className="ml-2 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
                     {p.count} O.S.
                   </span>
@@ -1526,7 +1850,10 @@ function BacklogPage() {
               <Crosshair className="h-3.5 w-3.5" /> Centralizar
             </button>
           </div>
-          <div style={{ height: "70vh", width: "100%" }} className="overflow-hidden rounded-md bg-slate-100">
+          <div
+            style={{ height: "70vh", width: "100%" }}
+            className="overflow-hidden rounded-md bg-slate-100"
+          >
             {mapOpen && mounted && (
               <Suspense fallback={null}>
                 <BacklogMap
@@ -1534,7 +1861,11 @@ function BacklogPage() {
                   onSelect={togglePlanta}
                   selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
                   fitSignal={mapFitSignal}
-                  route={generatedRoute}
+                  route={
+                    generatedRoutes.length > 0
+                      ? generatedRoutes[activeRouteTab] || generatedRoutes[0]
+                      : undefined
+                  }
                 />
               </Suspense>
             )}
@@ -1560,7 +1891,9 @@ function BacklogPage() {
                   onChange={(e) => setRbSlaBefore(e.target.value)}
                   className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
                 />
-                <span className="text-[10px] text-slate-400">critério de corte e de urgência (mais antigo = mais prioritário)</span>
+                <span className="text-[10px] text-slate-400">
+                  critério de corte e de urgência (mais antigo = mais prioritário)
+                </span>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-slate-600">Ponto de partida *</span>
@@ -1570,42 +1903,76 @@ function BacklogPage() {
                   className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
                 >
                   <option value="">Selecione…</option>
-                  {allPlantas.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {allPlantas.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
                 </select>
-                <span className="text-[10px] text-slate-400">só origem do trajeto — não é atendida</span>
+                <span className="text-[10px] text-slate-400">
+                  só origem do trajeto — não é atendida
+                </span>
               </label>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
-              <MultiSelect label="Tipo de Atividade *" options={allTipos} value={rbTipos} onChange={setRbTipos} />
-              <MultiSelect label="Responsabilidade *" options={allResps} value={rbResps} onChange={setRbResps} />
+              <MultiSelect
+                label="Tipo de Atividade *"
+                options={allTipos}
+                value={rbTipos}
+                onChange={setRbTipos}
+              />
+              <MultiSelect
+                label="Responsabilidade *"
+                options={allResps}
+                value={rbResps}
+                onChange={setRbResps}
+              />
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Máximo de paradas (O.S.) *</span>
+                <span className="text-xs font-semibold text-slate-600">
+                  Máximo de paradas (O.S.) *
+                </span>
                 <input
-                  type="number" min={1}
+                  type="number"
+                  min={1}
                   value={rbMaxStops}
                   onChange={(e) => setRbMaxStops(Number(e.target.value) || 0)}
                   className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Tolerância de estouro (O.S.)</span>
+                <span className="text-xs font-semibold text-slate-600">
+                  Tolerância de estouro (O.S.)
+                </span>
                 <input
-                  type="number" min={0}
+                  type="number"
+                  min={0}
                   value={rbTolerance}
                   onChange={(e) => setRbTolerance(Number(e.target.value) || 0)}
                   className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
                 />
-                <span className="text-[10px] text-slate-400">um grupo é incluído inteiro se estourar até isso</span>
+                <span className="text-[10px] text-slate-400">
+                  um grupo é incluído inteiro se estourar até isso
+                </span>
               </label>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
-              <MultiSelect label="Elevatórias (opcional)" options={allPlantas} value={rbElevatorias} onChange={setRbElevatorias} />
-              <MultiSelect label="Cidade (opcional)" options={allCidades} value={rbCidades} onChange={setRbCidades} />
+              <MultiSelect
+                label="Elevatórias (opcional)"
+                options={allPlantas}
+                value={rbElevatorias}
+                onChange={setRbElevatorias}
+              />
+              <MultiSelect
+                label="Cidade (opcional)"
+                options={allCidades}
+                value={rbCidades}
+                onChange={setRbCidades}
+              />
             </div>
 
             {routeError && (
@@ -1625,7 +1992,14 @@ function BacklogPage() {
                 onClick={generateRoute}
                 className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
               >
-        {/* Resultado da rota */}
+                <RouteIcon className="h-4 w-4" /> Gerar Rota
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resultado da rota */}
       {generatedRoutes.length > 0 && (
         <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
           {/* Abas das rotas */}
@@ -1681,11 +2055,15 @@ function BacklogPage() {
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-[#eaf3fb]/20 px-4 py-3">
                   <div className="flex items-center gap-2 text-[#0b3a73]">
-                    <RouteIcon className="h-5 w-5" style={{ color: activeRoute.color || "#0b3a73" }} />
+                    <RouteIcon
+                      className="h-5 w-5"
+                      style={{ color: activeRoute.color || "#0b3a73" }}
+                    />
                     <div>
                       <div className="text-sm font-bold">Detalhes da Rota {activeRouteTab + 1}</div>
                       <div className="text-[11px] text-slate-600">
-                        {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em {activeRoute.stops.length} paradas
+                        {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em{" "}
+                        {activeRoute.stops.length} paradas
                         {activeRoute.totalOs > activeRoute.limitConfig.max &&
                           ` (estouro de ${activeRoute.totalOs - activeRoute.limitConfig.max}, tolerância ${activeRoute.limitConfig.tolerance})`}
                       </div>
@@ -1694,7 +2072,9 @@ function BacklogPage() {
                   <div className="flex items-center gap-3 text-xs">
                     <div className="rounded bg-white px-2 py-1 shadow-sm border border-slate-100">
                       <span className="text-slate-500">Distância:</span>{" "}
-                      <span className="font-bold text-[#0b3a73]">{activeRoute.totalKm.toFixed(1)} km</span>
+                      <span className="font-bold text-[#0b3a73]">
+                        {activeRoute.totalKm.toFixed(1)} km
+                      </span>
                     </div>
                     <div className="rounded bg-white px-2 py-1 shadow-sm border border-slate-100">
                       <span className="text-slate-500">Tempo est.:</span>{" "}
@@ -1712,15 +2092,25 @@ function BacklogPage() {
                 <div className="grid gap-3 p-3 lg:grid-cols-2">
                   <div className="rounded border border-slate-150 bg-white p-2 text-xs">
                     <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73]">
-                      <Flag className="h-3.5 w-3.5" style={{ color: activeRoute.color || "#0b3a73" }} /> Ponto de partida:{" "}
+                      <Flag
+                        className="h-3.5 w-3.5"
+                        style={{ color: activeRoute.color || "#0b3a73" }}
+                      />{" "}
+                      Ponto de partida:{" "}
                       <span className="font-normal text-slate-700">{activeRoute.start.label}</span>
                     </div>
                     <ol className="space-y-1 max-h-[380px] overflow-auto pr-1">
                       {activeRoute.details.map((d) => (
-                        <li key={d.ordem} className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]">
+                        <li
+                          key={d.ordem}
+                          className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]"
+                        >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: activeRoute.color || "#0b3a73" }}>
+                              <span
+                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                                style={{ backgroundColor: activeRoute.color || "#0b3a73" }}
+                              >
                                 {d.ordem}
                               </span>
                               <div>
@@ -1735,7 +2125,10 @@ function BacklogPage() {
                           </div>
                           <ul className="mt-1 ml-8 space-y-0.5">
                             {d.oss.map((os) => (
-                              <li key={os.om} className="flex items-center gap-2 text-[11px] text-slate-600">
+                              <li
+                                key={os.om}
+                                className="flex items-center gap-2 text-[11px] text-slate-600"
+                              >
                                 <span className="font-mono text-[#1f7ad6]">{os.om}</span>
                                 <span className="truncate">{os.r["TEXTO BREVE"]}</span>
                                 {os.slaStatus === "ATRASADO" && (
@@ -1753,13 +2146,19 @@ function BacklogPage() {
                   <div className="min-h-[300px] rounded border border-slate-150 bg-slate-100">
                     <div className="h-full min-h-[300px]" style={{ height: 400 }}>
                       {mounted ? (
-                        <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-slate-400">Carregando mapa…</div>}>
+                        <Suspense
+                          fallback={
+                            <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                              Carregando mapa…
+                            </div>
+                          }
+                        >
                           <BacklogMap
                             markers={mapMarkers}
                             onSelect={togglePlanta}
                             selectedPlanta={fPlanta === "TODAS" ? null : fPlanta}
                             fitSignal={mapFitSignal}
-                            routes={[activeRoute]}
+                            route={activeRoute}
                           />
                         </Suspense>
                       ) : null}
@@ -1789,13 +2188,15 @@ function BacklogPage() {
           <table className="min-w-[900px] w-full text-left text-[13px]">
             <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73]">
               <tr>
-                {([
-                  ["om", "Ordem"],
-                  ["textoBreve", "Texto Breve"],
-                  ["planta", "Planta"],
-                  ["inicioSla", "Início SLA"],
-                  ["tipo", "Tipo de Atividade"],
-                ] as Array<[SortKey, string]>).map(([k, label]) => (
+                {(
+                  [
+                    ["om", "Ordem"],
+                    ["textoBreve", "Texto Breve"],
+                    ["planta", "Planta"],
+                    ["inicioSla", "Início SLA"],
+                    ["tipo", "Tipo de Atividade"],
+                  ] as Array<[SortKey, string]>
+                ).map(([k, label]) => (
                   <th
                     key={k}
                     className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
@@ -1840,7 +2241,9 @@ function BacklogPage() {
                     {getElevatoriaName(e.planta)}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1">
-                    <span className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                    <span
+                      className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                    >
                       {e.slaStatus}
                     </span>
                   </td>
@@ -1865,13 +2268,15 @@ function BacklogPage() {
             <table className="w-full text-left text-[13px]">
               <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10">
                 <tr>
-                  {([
-                    ["om", "Ordem"],
-                    ["textoBreve", "Texto Breve"],
-                    ["planta", "Planta"],
-                    ["inicioSla", "Início SLA"],
-                    ["tipo", "Tipo de Atividade"],
-                  ] as Array<[SortKey, string]>).map(([k, label]) => (
+                  {(
+                    [
+                      ["om", "Ordem"],
+                      ["textoBreve", "Texto Breve"],
+                      ["planta", "Planta"],
+                      ["inicioSla", "Início SLA"],
+                      ["tipo", "Tipo de Atividade"],
+                    ] as Array<[SortKey, string]>
+                  ).map(([k, label]) => (
                     <th
                       key={k}
                       className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
@@ -1916,11 +2321,15 @@ function BacklogPage() {
                       {getElevatoriaName(e.planta)}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1">
-                      <span className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      <span
+                        className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                      >
                         {e.slaStatus}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.responsabilidade}</td>
+                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                      {e.responsabilidade}
+                    </td>
                     <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.equipe}</td>
                   </tr>
                 ))}
