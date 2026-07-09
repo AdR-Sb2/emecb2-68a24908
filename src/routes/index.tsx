@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
+import logoHeader from "@/assets/logo-branca.png";
 import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
 

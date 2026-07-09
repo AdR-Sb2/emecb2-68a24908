@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
+import logoHeader from "@/assets/logo-branca.png";
 import elevatorias from "@/data/elevatorias.json";
 
 export const Route = createFileRoute("/relatorio")({

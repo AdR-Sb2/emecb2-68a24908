@@ -33,7 +33,7 @@ import {
   Route as RouteIcon,
   Flag,
 } from "lucide-react";
-import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
+import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/backlog.json";
 import elevatoriasData from "@/data/elevatorias.json";
 import rawEquipeOverrides from "@/data/equipe-overrides.json";

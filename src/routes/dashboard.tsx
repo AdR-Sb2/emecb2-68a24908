@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import logoHeader from "@/assets/logo-branca-1-180x55 (1).png";
+import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/elevatorias.json";
 import { Home, SlidersHorizontal } from "lucide-react";
 
