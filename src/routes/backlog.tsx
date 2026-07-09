@@ -453,15 +453,28 @@ function BacklogPage() {
     return () => clearInterval(id);
   }, [autoRefresh]);
 
-  const [equipeOverrides, setEquipeOverrides] = useState<Record<string, Equipe>>(
-    () => EQUIPE_OVERRIDES as Record<string, Equipe>,
-  );
+  const [equipeOverrides, setEquipeOverrides] = useState<Record<string, Equipe>>(() => {
+    try {
+      const stored = localStorage.getItem("equipeOverrides");
+      if (stored) return JSON.parse(stored) as Record<string, Equipe>;
+    } catch {}
+    return EQUIPE_OVERRIDES as Record<string, Equipe>;
+  });
+  // Persiste no localStorage sempre que mudar
+  useEffect(() => {
+    try {
+      localStorage.setItem("equipeOverrides", JSON.stringify(equipeOverrides));
+    } catch {}
+  }, [equipeOverrides]);
+  // Tenta carregar do servidor (caso tenha persistido via API)
   useEffect(() => {
     fetch("/api/equipe-override")
       .then((r) => r.json())
-      .then((data: Record<string, string>) =>
-        setEquipeOverrides((prev) => ({ ...prev, ...data }) as Record<string, Equipe>),
-      )
+      .then((data: Record<string, string>) => {
+        if (Object.keys(data).length) {
+          setEquipeOverrides((prev) => ({ ...prev, ...data }) as Record<string, Equipe>);
+        }
+      })
       .catch(() => {});
   }, []);
 
