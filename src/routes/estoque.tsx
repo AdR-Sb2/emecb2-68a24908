@@ -168,7 +168,8 @@ function EstoquePage() {
   ]);
 
   const kpis = useMemo(() => {
-    const criticos = materiaisComStatus.filter((m) => m._status === "critico");
+    const semEstoque = materiaisComStatus.filter((m) => m._status === "sem_estoque");
+    const baixo = materiaisComStatus.filter((m) => m._status === "baixo");
     const atencao = materiaisComStatus.filter((m) => m._status === "atencao");
     const total = materiais.length;
     const valorTotal = materiais.reduce((s, m) => s + m.saldo_atual * m.custo_unitario, 0);
@@ -178,7 +179,7 @@ function EstoquePage() {
       const movs = movimentacoes.filter((mv) => mv.cod_sap === m.cod_sap);
       return movs.length === 0 || new Date(movs[0].data) < tresMesesAtras;
     });
-    return { criticos, atencao, total, valorTotal, parados };
+    return { semEstoque, baixo, atencao, total, valorTotal, parados };
   }, [materiaisComStatus, materiais, movimentacoes]);
 
   const truncar = (s: string, max: number) =>
@@ -229,7 +230,9 @@ function EstoquePage() {
   );
 
   const itensCriticosSemPedido = useMemo(() => {
-    const criticos = materiaisComStatus.filter((m) => m._status === "critico");
+    const criticos = materiaisComStatus.filter(
+      (m) => m._status === "sem_estoque" || m._status === "baixo",
+    );
     const pedidosAbertos = new Set(
       compras.filter((c) => c.status !== "Entregue").map((c) => c.cod_sap),
     );
@@ -500,10 +503,16 @@ function EstoquePage() {
   // --- Renderizações ---
   const Semaforo = ({ saldo, minimo }: { saldo: number; minimo: number }) => {
     const s = getStatusEstoque(saldo, minimo);
-    if (s === "critico")
+    if (s === "sem_estoque")
       return (
-        <span className="inline-flex items-center gap-1 text-red-600 font-bold">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Crítico
+        <span className="inline-flex items-center gap-1 text-red-700 font-bold">
+          <span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Sem Estoque
+        </span>
+      );
+    if (s === "baixo")
+      return (
+        <span className="inline-flex items-center gap-1 text-orange-600 font-bold">
+          <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Baixo Estoque
         </span>
       );
     if (s === "atencao")
@@ -1368,13 +1377,20 @@ function EstoquePage() {
       ) : aba === "estoque" ? (
         <>
           {/* KPIs */}
-          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-6">
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-600">
-                <AlertTriangle className="h-3 w-3" /> Críticos
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-700">
+                <AlertTriangle className="h-3 w-3" /> Crítico (Sem Estoque)
               </div>
-              <div className="mt-1 text-3xl font-bold text-red-600">{kpis.criticos.length}</div>
-              <div className="text-[11px] text-red-500">itens abaixo do mínimo</div>
+              <div className="mt-1 text-3xl font-bold text-red-700">{kpis.semEstoque.length}</div>
+              <div className="text-[11px] text-red-500">ruptura total, saldo = 0</div>
+            </div>
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-orange-600">
+                <AlertTriangle className="h-3 w-3" /> Baixo Estoque
+              </div>
+              <div className="mt-1 text-3xl font-bold text-orange-600">{kpis.baixo.length}</div>
+              <div className="text-[11px] text-orange-500">abaixo do mínimo, mas &gt; 0</div>
             </div>
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-600">
@@ -1518,7 +1534,8 @@ function EstoquePage() {
                 className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
               >
                 <option value="TODAS">Todos status</option>
-                <option value="critico">Crítico</option>
+                <option value="sem_estoque">Sem Estoque</option>
+                <option value="baixo">Baixo Estoque</option>
                 <option value="atencao">Atenção</option>
                 <option value="normal">Normal</option>
               </select>
@@ -1599,7 +1616,7 @@ function EstoquePage() {
                         </Badge>
                       </td>
                       <td
-                        className={`whitespace-nowrap px-2 py-1.5 font-bold text-base ${m.saldo_atual <= m.estoque_minimo ? "text-red-600" : m.saldo_atual <= m.estoque_minimo * 1.2 ? "text-amber-600" : "text-emerald-600"}`}
+                        className={`whitespace-nowrap px-2 py-1.5 font-bold text-base ${m.saldo_atual === 0 ? "text-red-700" : m.saldo_atual <= m.estoque_minimo ? "text-orange-600" : m.saldo_atual <= m.estoque_minimo * 1.2 ? "text-amber-600" : "text-emerald-600"}`}
                       >
                         {m.saldo_atual}{" "}
                         <span className="text-[10px] font-normal text-slate-400">

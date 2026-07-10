@@ -95,13 +95,14 @@ export interface Compra {
   criado_em: string;
 }
 
-export type StatusEstoque = "normal" | "atencao" | "critico";
+export type StatusEstoque = "normal" | "atencao" | "baixo" | "sem_estoque";
 
 export function getStatusEstoque(
   saldo: number,
   minimo: number,
 ): StatusEstoque {
-  if (saldo <= minimo) return "critico";
+  if (saldo === 0) return "sem_estoque";
+  if (saldo <= minimo) return "baixo";
   if (saldo <= minimo * 1.2) return "atencao";
   return "normal";
 }
@@ -111,7 +112,8 @@ export function getStatusCor(
   minimo: number,
 ): string {
   const s = getStatusEstoque(saldo, minimo);
-  if (s === "critico") return "text-red-600 bg-red-50 border-red-200";
+  if (s === "sem_estoque") return "text-red-700 bg-red-100 border-red-300";
+  if (s === "baixo") return "text-orange-600 bg-orange-50 border-orange-200";
   if (s === "atencao") return "text-amber-600 bg-amber-50 border-amber-200";
   return "text-emerald-600 bg-emerald-50 border-emerald-200";
 }
