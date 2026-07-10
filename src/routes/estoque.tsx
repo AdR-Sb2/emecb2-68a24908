@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Box,
   BarChart3,
+  List,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
@@ -46,6 +47,8 @@ import {
   Compra,
   CategoriaMaterial,
   StatusCompra,
+  TipoMovimentacao,
+  OrigemMovimentacao,
   CATEGORIAS,
   CATEGORIA_LABEL,
   STATUS_COMPRA_CORES,
@@ -77,7 +80,7 @@ const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
 
 function EstoquePage() {
   const { user, profile } = useAuth();
-  const [aba, setAba] = useState<"estoque" | "compras">("estoque");
+  const [aba, setAba] = useState<"estoque" | "compras" | "registros">("estoque");
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
@@ -106,7 +109,7 @@ function EstoquePage() {
     try {
       const [matRes, movRes, compRes] = await Promise.all([
         supabase.from("materiais").select("*").order("cod_sap"),
-        supabase.from("movimentacoes").select("*").order("data", { ascending: false }).limit(500),
+        supabase.from("movimentacoes").select("*").order("data", { ascending: false }).limit(5000),
         supabase.from("compras").select("*").order("data_solicitacao", { ascending: false }),
       ]);
       if (matRes.data) setMateriais(matRes.data as Material[]);
@@ -884,6 +887,244 @@ function EstoquePage() {
     );
   };
 
+  const AbaRegistros = ({
+    movimentacoes: movs,
+    materiais: mats,
+  }: {
+    movimentacoes: Movimentacao[];
+    materiais: Material[];
+  }) => {
+    const [filtroTipo, setFiltroTipo] = useState<TipoMovimentacao | "TODAS">("TODAS");
+    const [filtroOrigem, setFiltroOrigem] = useState<OrigemMovimentacao | "TODAS">("TODAS");
+    const [dataInicio, setDataInicio] = useState("");
+    const [dataFim, setDataFim] = useState("");
+    const [search, setSearch] = useState("");
+    const [destinoFilter, setDestinoFilter] = useState("");
+    const [page, setPage] = useState(0);
+    const pageSize = 50;
+
+    const filtered = useMemo(() => {
+      let list = [...movs];
+      if (filtroTipo !== "TODAS") list = list.filter((m) => m.tipo === filtroTipo);
+      if (filtroOrigem !== "TODAS") list = list.filter((m) => m.origem === filtroOrigem);
+      if (dataInicio) list = list.filter((m) => new Date(m.data) >= new Date(dataInicio));
+      if (dataFim) {
+        const fim = new Date(dataFim);
+        fim.setDate(fim.getDate() + 1);
+        list = list.filter((m) => new Date(m.data) < fim);
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        list = list.filter(
+          (m) =>
+            m.cod_sap.toLowerCase().includes(q) ||
+            mats.find((mat) => mat.cod_sap === m.cod_sap)?.descricao.toLowerCase().includes(q),
+        );
+      }
+      if (destinoFilter) {
+        const q = destinoFilter.toLowerCase();
+        list = list.filter((m) => m.destino.toLowerCase().includes(q));
+      }
+      list.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      return list;
+    }, [movs, filtroTipo, filtroOrigem, dataInicio, dataFim, search, destinoFilter, mats]);
+
+    const totalPages = Math.ceil(filtered.length / pageSize);
+    const paginated = filtered.slice(page * pageSize, (page + 1) * pageSize);
+
+    useEffect(() => setPage(0), [filtroTipo, filtroOrigem, search, destinoFilter]);
+
+    const destinos = useMemo(() => {
+      const set = new Set<string>();
+      movs.forEach((m) => { if (m.destino) set.add(m.destino); });
+      return [...set].sort();
+    }, [movs]);
+
+    return (
+      <div>
+        {/* Filtros */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value as TipoMovimentacao | "TODAS")}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+          >
+            <option value="TODAS">Todos os tipos</option>
+            <option value="ENTRADA">Entrada</option>
+            <option value="SAIDA">Saída</option>
+            <option value="AJUSTE">Ajuste</option>
+          </select>
+          <select
+            value={filtroOrigem}
+            onChange={(e) => setFiltroOrigem(e.target.value as OrigemMovimentacao | "TODAS")}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+          >
+            <option value="TODAS">Todas origens</option>
+            <option value="SISTEMA">Sistema</option>
+            <option value="HISTORICO_PLANILHA">Histórico</option>
+          </select>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar código ou descrição..."
+            className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm placeholder:text-slate-400"
+          />
+          <select
+            value={destinoFilter}
+            onChange={(e) => setDestinoFilter(e.target.value)}
+            className="max-w-40 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+          >
+            <option value="">Todos destinos</option>
+            {destinos.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={dataInicio}
+            onChange={(e) => setDataInicio(e.target.value)}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            title="Data inicial"
+          />
+          <span className="text-[11px] text-slate-400">até</span>
+          <input
+            type="date"
+            value={dataFim}
+            onChange={(e) => setDataFim(e.target.value)}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            title="Data final"
+          />
+          <span className="ml-auto text-[12px] text-slate-400">
+            {filtered.length} registro{filtered.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {/* Tabela */}
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <th className="px-3 py-2">Data</th>
+                <th className="px-3 py-2">Cód. SAP</th>
+                <th className="px-3 py-2">Descrição</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Qtd</th>
+                <th className="px-3 py-2">Destino</th>
+                <th className="px-3 py-2">Solicitante/Resp.</th>
+                <th className="px-3 py-2">Origem</th>
+                <th className="px-3 py-2">Observação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center text-slate-400">
+                    Nenhum registro encontrado.
+                  </td>
+                </tr>
+              )}
+              {paginated.map((m) => {
+                const mat = mats.find((mat) => mat.cod_sap === m.cod_sap);
+                return (
+                  <tr
+                    key={m.id}
+                    className="border-b border-slate-100 transition hover:bg-slate-50"
+                  >
+                    <td className="whitespace-nowrap px-3 py-2 text-slate-500">
+                      {new Date(m.data).toLocaleDateString("pt-BR")}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[#0b3a73]">
+                      {m.cod_sap}
+                    </td>
+                    <td className="max-w-56 truncate px-3 py-2 text-slate-700">
+                      {mat?.descricao || m.cod_sap}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          m.tipo === "ENTRADA"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : m.tipo === "SAIDA"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {m.tipo === "ENTRADA" ? "Entrada" : m.tipo === "SAIDA" ? "Saída" : "Ajuste"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 font-semibold">
+                      <span
+                        className={
+                          m.tipo === "ENTRADA"
+                            ? "text-emerald-600"
+                            : m.tipo === "SAIDA"
+                              ? "text-red-600"
+                              : "text-amber-600"
+                        }
+                      >
+                        {m.tipo === "AJUSTE"
+                          ? m.quantidade
+                          : m.tipo === "ENTRADA"
+                            ? `+${m.quantidade}`
+                            : `-${m.quantidade}`}
+                      </span>
+                    </td>
+                    <td className="max-w-28 truncate px-3 py-2 text-slate-600">
+                      {m.destino || "—"}
+                    </td>
+                    <td className="max-w-28 truncate px-3 py-2 text-slate-600">
+                      {m.solicitante || m.responsavel || "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          m.origem === "SISTEMA"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {m.origem === "SISTEMA" ? "Sistema" : "Histórico"}
+                      </span>
+                    </td>
+                    <td className="max-w-40 truncate px-3 py-2 text-slate-400">
+                      {m.observacao || "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="mt-3 flex items-center justify-between text-[13px] text-slate-500">
+            <span>
+              Página {page + 1} de {totalPages}
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[13px] font-semibold transition hover:bg-slate-100 disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                disabled={page >= totalPages - 1}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[13px] font-semibold transition hover:bg-slate-100 disabled:opacity-40"
+              >
+                Próximo
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const HistoricoMaterial = ({ material }: { material: Material }) => {
     const movs = movimentacoes.filter((m) => m.cod_sap === material.cod_sap);
     return (
@@ -929,9 +1170,20 @@ function EstoquePage() {
                 </span>
                 <span className="text-slate-500">{m.destino && `→ ${m.destino}`}</span>
               </div>
-              <div className="text-right text-[11px] text-slate-400">
-                <div>{new Date(m.data).toLocaleDateString("pt-BR")}</div>
-                {m.responsavel && <div>{m.responsavel}</div>}
+              <div className="flex items-center gap-2 text-right text-[11px] text-slate-400">
+                <span
+                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+                    m.origem === "SISTEMA"
+                      ? "bg-blue-100 text-blue-600"
+                      : "bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  {m.origem === "SISTEMA" ? "Sistema" : "Hist."}
+                </span>
+                <div>
+                  <div>{new Date(m.data).toLocaleDateString("pt-BR")}</div>
+                  {m.responsavel && <div>{m.responsavel}</div>}
+                </div>
               </div>
             </div>
           ))}
@@ -990,6 +1242,16 @@ function EstoquePage() {
             }`}
           >
             <ShoppingCart className="h-4 w-4" /> Compras
+          </button>
+          <button
+            onClick={() => setAba("registros")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+              aba === "registros"
+                ? "bg-[#0b3a73] text-white shadow"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <List className="h-4 w-4" /> Registros
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1337,7 +1599,7 @@ function EstoquePage() {
             </div>
           </div>
         </>
-      ) : (
+      ) : aba === "compras" ? (
         /* ---------- ABA COMPRAS ---------- */
         <>
           {/* KPIs Compras */}
@@ -1467,6 +1729,12 @@ function EstoquePage() {
             )}
           </div>
         </>
+      ) : (
+        /* ---------- ABA REGISTROS ---------- */
+        <AbaRegistros
+          movimentacoes={movimentacoes}
+          materiais={materiais}
+        />
       )}
 
       {/* Dialogs */}

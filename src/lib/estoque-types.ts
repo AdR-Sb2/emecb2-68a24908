@@ -25,6 +25,7 @@ export const CATEGORIA_LABEL: Record<CategoriaMaterial, string> = {
 };
 
 export type TipoMovimentacao = "ENTRADA" | "SAIDA" | "AJUSTE";
+export type OrigemMovimentacao = "HISTORICO_PLANILHA" | "SISTEMA";
 
 export type StatusCompra =
   | "Solicitado"
@@ -72,6 +73,9 @@ export interface Movimentacao {
   motivo_ajuste: string;
   criado_por: string;
   criado_em: string;
+  origem: OrigemMovimentacao;
+  afeta_saldo: boolean;
+  divergencia_cod_sap: boolean;
 }
 
 export interface Compra {
