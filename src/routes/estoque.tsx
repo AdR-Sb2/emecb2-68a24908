@@ -434,39 +434,66 @@ function EstoquePage() {
     placeholder?: string;
   }) => {
     const [open, setOpen] = useState(false);
-    const filtered = search
+    const [query, setQuery] = useState("");
+
+    const normalize = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+    const filtered = query
       ? materiais.filter(
           (m) =>
-            m.cod_sap.toLowerCase().includes(search.toLowerCase()) ||
-            m.descricao.toLowerCase().includes(search.toLowerCase()),
+            normalize(m.cod_sap).includes(normalize(query)) ||
+            normalize(m.descricao).includes(normalize(query)),
         )
-      : materiais;
+      : [];
+
+    const MAX = 8;
+    const shown = filtered.slice(0, MAX);
+    const remaining = filtered.length - MAX;
+
     const selected = materiais.find((m) => m.cod_sap === value);
     return (
       <div className="relative">
         <input
-          value={selected ? `${selected.cod_sap} - ${selected.descricao}` : value}
+          value={
+            selected && !open
+              ? `${selected.cod_sap} - ${selected.descricao}`
+              : query
+          }
           onChange={(e) => {
-            setSearch(e.target.value);
+            setQuery(e.target.value);
             setOpen(true);
-            onChange("");
+            if (!e.target.value) {
+              onChange("");
+            }
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            if (!selected) setQuery("");
+          }}
+          onBlur={() => {
+            if (!selected) setQuery("");
+          }}
           placeholder={placeholder}
           className="min-h-11 w-full rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
         />
         {open && (
           <>
-            <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-            <div className="absolute z-40 mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
-              {filtered.slice(0, 20).map((m) => (
+            <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); setQuery(""); }} />
+            <div className="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+              {query && shown.length === 0 && (
+                <div className="px-2 py-3 text-center text-sm text-slate-400">
+                  Nenhum material encontrado
+                </div>
+              )}
+              {shown.map((m) => (
                 <button
                   key={m.cod_sap}
                   type="button"
                   onClick={() => {
                     onChange(m.cod_sap);
                     setOpen(false);
-                    setSearch("");
+                    setQuery("");
                   }}
                   className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${value === m.cod_sap ? "bg-blue-50" : ""}`}
                 >
@@ -477,6 +504,11 @@ function EstoquePage() {
                   </span>
                 </button>
               ))}
+              {remaining > 0 && (
+                <div className="border-t border-slate-100 px-2 py-1.5 text-center text-xs text-slate-400">
+                  +{remaining} resultado{remaining > 1 ? "s" : ""}, refine sua busca
+                </div>
+              )}
             </div>
           </>
         )}
