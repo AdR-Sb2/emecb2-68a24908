@@ -208,7 +208,14 @@ function EstoquePage() {
     const now = new Date();
     const mesPassado = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     movimentacoes
-      .filter((m) => m.tipo === "SAIDA" && m.destino && m.data && new Date(m.data) >= mesPassado)
+      .filter(
+        (m) =>
+          m.tipo === "SAIDA" &&
+          m.destino &&
+          m.destino.toUpperCase() !== "AJUSTE" &&
+          m.data &&
+          new Date(m.data) >= mesPassado,
+      )
       .forEach((m) => {
         destinos.set(m.destino, (destinos.get(m.destino) || 0) + m.quantidade);
       });
@@ -217,6 +224,25 @@ function EstoquePage() {
       .slice(0, 5)
       .map(([destino, qtd]) => ({ destino: truncar(destino, 25), qtd, destinoCompleto: destino }));
   }, [movimentacoes]);
+
+  const ajustesMes = useMemo(() => {
+    const now = new Date();
+    const mesPassado = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    return movimentacoes.filter(
+      (m) => m.tipo === "AJUSTE" && m.data && new Date(m.data) >= mesPassado,
+    );
+  }, [movimentacoes]);
+
+  const ajustesPorMotivo = useMemo(() => {
+    const motivos = new Map<string, number>();
+    ajustesMes.forEach((m) => {
+      const key = m.motivo_ajuste || "Sem motivo";
+      motivos.set(key, (motivos.get(key) || 0) + 1);
+    });
+    return Array.from(motivos.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([motivo, qtd]) => ({ motivo: truncar(motivo, 40), qtd, motivoCompleto: motivo }));
+  }, [ajustesMes]);
 
   // --- Compras computed ---
   const comprasComAtraso = useMemo(
@@ -733,15 +759,25 @@ function EstoquePage() {
     );
   };
 
+  const MOTIVOS_AJUSTE = [
+    "Retirada não registrada (contagem física divergente)",
+    "Erro de contagem anterior",
+    "Material danificado/descartado",
+    "Outro",
+  ] as const;
+
   const FormAjuste = () => {
     const [selected, setSelected] = useState<Material | null>(null);
     const [qtdNova, setQtdNova] = useState(0);
-    const [motivo, setMotivo] = useState("");
+    const [motivoOpcao, setMotivoOpcao] = useState("");
+    const [motivoOutro, setMotivoOutro] = useState("");
     const [saving, setSaving] = useState(false);
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const valido = selected !== null && qtdNova >= 0 && motivo.trim().length > 0;
+    const motivoFinal = motivoOpcao === "Outro" ? motivoOutro.trim() : motivoOpcao;
+    const valido =
+      selected !== null && qtdNova >= 0 && motivoOpcao.length > 0 && (motivoOpcao !== "Outro" || motivoOutro.trim().length > 0);
     const diff = selected !== null ? qtdNova - selected.saldo_atual : 0;
 
     const handleSalvar = async () => {
@@ -751,7 +787,7 @@ function EstoquePage() {
         cod_sap: selected.cod_sap,
         tipo: "AJUSTE",
         quantidade: diff,
-        motivo_ajuste: motivo.trim(),
+        motivo_ajuste: motivoFinal,
         criado_por: user?.email || "",
       });
       if (error) {
@@ -809,12 +845,26 @@ function EstoquePage() {
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Motivo do ajuste *</span>
-          <textarea
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm"
-            placeholder="Ex: Inventário físico, correção de erro de lançamento..."
-          />
+          <select
+            value={motivoOpcao}
+            onChange={(e) => setMotivoOpcao(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+          >
+            <option value="">Selecione o motivo...</option>
+            {MOTIVOS_AJUSTE.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          {motivoOpcao === "Outro" && (
+            <input
+              value={motivoOutro}
+              onChange={(e) => setMotivoOutro(e.target.value)}
+              placeholder="Descreva o motivo..."
+              className="mt-1 min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          )}
         </label>
         <button
           onClick={handleSalvar}
@@ -1492,6 +1542,42 @@ function EstoquePage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Ajustes do Mês */}
+          <div className="mb-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-[#0b3a73]">
+                  <Edit3 className="mr-1 inline h-4 w-4" /> Ajustes do Mês
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 text-3xl font-bold text-amber-600">
+                  {ajustesMes.length}
+                </div>
+                {ajustesPorMotivo.length === 0 ? (
+                  <p className="text-sm text-slate-400">Nenhum ajuste no período.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {ajustesPorMotivo.map((item) => (
+                      <div
+                        key={item.motivo}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span
+                          className="truncate text-slate-600"
+                          title={item.motivoCompleto}
+                        >
+                          {item.motivo}
+                        </span>
+                        <span className="font-semibold text-slate-800">{item.qtd}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
