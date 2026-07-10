@@ -100,7 +100,9 @@ function EstoquePage() {
   const [filtroStatus, setFiltroStatus] = useState<StatusEstoque | "TODAS">("TODAS");
   const [filtroCritico, setFiltroCritico] = useState(false);
   const [filtroElevatoria, setFiltroElevatoria] = useState("");
-  const [metricaDestino, setMetricaDestino] = useState<"movimentacoes" | "quantidade">("movimentacoes");
+  const [metricaDestino, setMetricaDestino] = useState<"movimentacoes" | "quantidade">(
+    "movimentacoes",
+  );
   const [filtroCategoriaDestino, setFiltroCategoriaDestino] = useState<string>("TODAS");
   const [sortKey, setSortKey] = useState<string>("cod_sap");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -108,6 +110,13 @@ function EstoquePage() {
   const [dialogMov, setDialogMov] = useState<"entrada" | "saida" | "ajuste" | null>(null);
   const [dialogHistorico, setDialogHistorico] = useState(false);
   const [dialogCompra, setDialogCompra] = useState(false);
+  const [dialogDataRetirada, setDialogDataRetirada] = useState<number | null>(null);
+  const [dataRetiradaInput, setDataRetiradaInput] = useState("");
+  const [filtroStatusCompra, setFiltroStatusCompra] = useState<string>("TODOS");
+  const [filtroCompradorCompra, setFiltroCompradorCompra] = useState<string>("TODOS");
+  const [filtroChegou, setFiltroChegou] = useState<"TODOS" | "sim" | "nao">("TODOS");
+  const [filtroRetirado, setFiltroRetirado] = useState<"TODOS" | "sim" | "nao">("TODOS");
+  const [filtroFila, setFiltroFila] = useState<"TODOS" | "sim" | "nao">("TODOS");
   const [dialogImportar, setDialogImportar] = useState(false);
   const [dialogCategorias, setDialogCategorias] = useState(false);
   const [dialogMaterial, setDialogMaterial] = useState(false);
@@ -161,7 +170,7 @@ function EstoquePage() {
         supabase.from("materiais").select("*, categorias(id, nome, ativo)").order("cod_sap"),
         supabase.from("categorias").select("*").order("nome"),
         supabase.from("movimentacoes").select("*").order("data", { ascending: false }).limit(5000),
-        supabase.from("compras").select("*").order("data_solicitacao", { ascending: false }),
+        supabase.from("compras").select("*").order("dt_criacao_rc", { ascending: false }),
       ]);
       if (matRes.data) setMateriais(matRes.data as Material[]);
       if (catRes.data) setCategorias(catRes.data as Categoria[]);
@@ -234,8 +243,7 @@ function EstoquePage() {
     return { semEstoque, baixo, atencao, total, valorTotal, parados };
   }, [materiaisComStatus, materiais, movimentacoes]);
 
-  const truncar = (s: string, max: number) =>
-    s.length > max ? s.slice(0, max) + "…" : s;
+  const truncar = (s: string, max: number) => (s.length > max ? s.slice(0, max) + "…" : s);
 
   const topConsumidos = useMemo(() => {
     const consumo = new Map<string, number>();
@@ -251,7 +259,12 @@ function EstoquePage() {
       .slice(0, 5)
       .map(([cod_sap, qtd]) => {
         const mat = materiais.find((m) => m.cod_sap === cod_sap);
-        return { cod_sap, descricao: truncar(mat?.descricao || cod_sap, 30), qtd, descricaoCompleta: mat?.descricao || cod_sap };
+        return {
+          cod_sap,
+          descricao: truncar(mat?.descricao || cod_sap, 30),
+          qtd,
+          descricaoCompleta: mat?.descricao || cod_sap,
+        };
       });
   }, [movimentacoes, materiais]);
 
@@ -282,7 +295,11 @@ function EstoquePage() {
       return Array.from(destinos.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
-        .map(([destino, qtd]) => ({ destino: truncar(destino, 25), qtd, destinoCompleto: destino }));
+        .map(([destino, qtd]) => ({
+          destino: truncar(destino, 25),
+          qtd,
+          destinoCompleto: destino,
+        }));
     } else {
       const grupos = new Map<string, { nome: string; unidade: string; qtd: number }>();
       movs.forEach((m) => {
@@ -330,9 +347,9 @@ function EstoquePage() {
   const comprasComAtraso = useMemo(
     () =>
       compras.filter((c) => {
-        if (c.status === "Entregue") return false;
-        if (!c.data_prevista_entrega) return false;
-        return new Date(c.data_prevista_entrega) < new Date();
+        if (c.foi_retirado) return false;
+        if (!c.dt_remessa_pedido) return false;
+        return new Date(c.dt_remessa_pedido) < new Date();
       }),
     [compras],
   );
@@ -341,25 +358,95 @@ function EstoquePage() {
     const criticos = materiaisComStatus.filter(
       (m) => m._status === "sem_estoque" || m._status === "baixo",
     );
-    const pedidosAbertos = new Set(
-      compras.filter((c) => c.status !== "Entregue").map((c) => c.cod_sap),
-    );
+    const pedidosAbertos = new Set(compras.filter((c) => !c.foi_retirado).map((c) => c.cod_sap));
     return criticos.filter((m) => !pedidosAbertos.has(m.cod_sap));
   }, [materiaisComStatus, compras]);
 
   const comprasPorStatus = useMemo(() => {
-    const map: Record<string, Compra[]> = {
-      Solicitado: [],
-      Aprovado: [],
-      Comprado: [],
-      "A Caminho": [],
-      Entregue: [],
-    };
+    const map: Record<string, Compra[]> = {};
     compras.forEach((c) => {
-      if (map[c.status]) map[c.status].push(c);
+      const s = c.status_geral || "Sem status";
+      if (!map[s]) map[s] = [];
+      map[s].push(c);
     });
     return map;
   }, [compras]);
+
+  const compradoresCompra = useMemo(
+    () => Array.from(new Set(compras.map((c) => c.comprador_cotacao).filter(Boolean))).sort(),
+    [compras],
+  );
+
+  const comprasFiltradas = useMemo(() => {
+    return compras.filter((c) => {
+      if (filtroStatusCompra !== "TODOS" && c.status_geral !== filtroStatusCompra) return false;
+      if (filtroCompradorCompra !== "TODOS" && c.comprador_cotacao !== filtroCompradorCompra)
+        return false;
+      if (filtroChegou === "sim" && !c.chegou) return false;
+      if (filtroChegou === "nao" && c.chegou) return false;
+      if (filtroRetirado === "sim" && !c.foi_retirado) return false;
+      if (filtroRetirado === "nao" && c.foi_retirado) return false;
+      if (filtroFila === "sim" && !c.rc_em_fila) return false;
+      if (filtroFila === "nao" && c.rc_em_fila) return false;
+      return true;
+    });
+  }, [
+    compras,
+    filtroStatusCompra,
+    filtroCompradorCompra,
+    filtroChegou,
+    filtroRetirado,
+    filtroFila,
+  ]);
+
+  const handleToggleChegou = async (id: number, current: boolean) => {
+    const { error } = await supabase.from("compras").update({ chegou: !current }).eq("id", id);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    await carregarDados();
+  };
+
+  const handleToggleFoiRetirado = async (id: number, current: boolean, afeta_saldo: boolean) => {
+    if (!current) {
+      setDialogDataRetirada(id);
+      setDataRetiradaInput(new Date().toISOString().split("T")[0]);
+      return;
+    }
+    const { error } = await supabase
+      .from("compras")
+      .update({ foi_retirado: false, data_retirado: null })
+      .eq("id", id);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    await carregarDados();
+  };
+
+  const confirmarRetirada = async () => {
+    if (!dialogDataRetirada) return;
+    const { error } = await supabase
+      .from("compras")
+      .update({
+        foi_retirado: true,
+        data_retirado: dataRetiradaInput || null,
+      })
+      .eq("id", dialogDataRetirada);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    const reg = compras.find((c) => c.id === dialogDataRetirada);
+    if (reg?.afeta_saldo) {
+      toast.success("Compra marcada como retirada! Entrada automática no estoque registrada.");
+    } else {
+      toast.success("Compra marcada como retirada (histórico, sem efeito no estoque).");
+    }
+    setDialogDataRetirada(null);
+    await carregarDados();
+  };
 
   const elevatoriaOptions = useMemo(
     () => Array.from(new Set(materiais.map((m) => m.vinculo_elevatoria).filter(Boolean))).sort(),
@@ -381,9 +468,8 @@ function EstoquePage() {
     setDialogCompra(false);
   };
 
-  const handleCompraStatus = async (id: number, status: StatusCompra) => {
-    const update: Partial<Compra> = { status };
-    if (status === "Entregue") update.data_entrega_real = new Date().toISOString().split("T")[0];
+  const handleCompraStatus = async (id: number, status_geral: StatusCompra) => {
+    const update: Partial<Compra> = { status_geral };
     const { error } = await supabase.from("compras").update(update).eq("id", id);
     if (error) {
       toast.error("Erro: " + error.message);
@@ -393,10 +479,7 @@ function EstoquePage() {
     toast.success("Status atualizado!");
   };
 
-  const categoriasAtivas = useMemo(
-    () => categorias.filter((c) => c.ativo),
-    [categorias],
-  );
+  const categoriasAtivas = useMemo(() => categorias.filter((c) => c.ativo), [categorias]);
 
   const resolverCategoriaId = (valor: string): number | null => {
     const v = valor.trim().toLowerCase();
@@ -521,9 +604,7 @@ function EstoquePage() {
       return;
     }
     setMateriais((prev) =>
-      prev.map((mat) =>
-        mat.cod_sap === m.cod_sap ? { ...mat, material_critico: novo } : mat,
-      ),
+      prev.map((mat) => (mat.cod_sap === m.cod_sap ? { ...mat, material_critico: novo } : mat)),
     );
   };
 
@@ -537,9 +618,7 @@ function EstoquePage() {
       return;
     }
     setMateriais((prev) =>
-      prev.map((mat) =>
-        mat.cod_sap === cod_sap ? { ...mat, estoque_minimo: valor } : mat,
-      ),
+      prev.map((mat) => (mat.cod_sap === cod_sap ? { ...mat, estoque_minimo: valor } : mat)),
     );
     toast.success("Mínimo atualizado!");
   };
@@ -567,7 +646,10 @@ function EstoquePage() {
     const [query, setQuery] = useState("");
 
     const normalize = (s: string) =>
-      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
 
     const filtered = query
       ? materiais.filter(
@@ -602,7 +684,13 @@ function EstoquePage() {
         />
         {open && (
           <>
-            <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); if (!value) setQuery(""); }} />
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => {
+                setOpen(false);
+                if (!value) setQuery("");
+              }}
+            />
             <div className="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
               {!query && (
                 <div className="px-2 py-3 text-center text-sm text-slate-400">
@@ -703,7 +791,9 @@ function EstoquePage() {
         return;
       }
       await carregarDados();
-      toast.success(`Entrada registrada! Novo saldo: ${selected.saldo_atual + qtd} ${selected.unidade_medida}`);
+      toast.success(
+        `Entrada registrada! Novo saldo: ${selected.saldo_atual + qtd} ${selected.unidade_medida}`,
+      );
       setDialogMov(null);
     };
 
@@ -775,7 +865,13 @@ function EstoquePage() {
     const inputRef = useRef<HTMLInputElement>(null);
 
     const saldoInsuficiente = selected !== null && qtd > selected.saldo_atual;
-    const valido = selected !== null && qtd > 0 && destino.trim().length > 0 && solicitante.trim().length > 0 && resp.trim().length > 0 && !saldoInsuficiente;
+    const valido =
+      selected !== null &&
+      qtd > 0 &&
+      destino.trim().length > 0 &&
+      solicitante.trim().length > 0 &&
+      resp.trim().length > 0 &&
+      !saldoInsuficiente;
 
     const handleSalvar = async () => {
       if (!valido || !selected || saving) return;
@@ -796,7 +892,9 @@ function EstoquePage() {
         return;
       }
       await carregarDados();
-      toast.success(`Saída registrada! Novo saldo: ${selected.saldo_atual - qtd} ${selected.unidade_medida}`);
+      toast.success(
+        `Saída registrada! Novo saldo: ${selected.saldo_atual - qtd} ${selected.unidade_medida}`,
+      );
       setDialogMov(null);
     };
 
@@ -814,7 +912,8 @@ function EstoquePage() {
           />
           {selected && (
             <span className="text-[10px] text-slate-400">
-              Saldo disponível: {selected.saldo_atual} {selected.unidade_medida} | Mínimo: {selected.estoque_minimo}
+              Saldo disponível: {selected.saldo_atual} {selected.unidade_medida} | Mínimo:{" "}
+              {selected.estoque_minimo}
             </span>
           )}
         </label>
@@ -897,7 +996,10 @@ function EstoquePage() {
 
     const motivoFinal = motivoOpcao === "Outro" ? motivoOutro.trim() : motivoOpcao;
     const valido =
-      selected !== null && qtdNova >= 0 && motivoOpcao.length > 0 && (motivoOpcao !== "Outro" || motivoOutro.trim().length > 0);
+      selected !== null &&
+      qtdNova >= 0 &&
+      motivoOpcao.length > 0 &&
+      (motivoOpcao !== "Outro" || motivoOutro.trim().length > 0);
     const diff = selected !== null ? qtdNova - selected.saldo_atual : 0;
 
     const handleSalvar = async () => {
@@ -916,7 +1018,9 @@ function EstoquePage() {
         return;
       }
       await carregarDados();
-      toast.success(`Saldo ajustado de ${selected.saldo_atual} para ${qtdNova} ${selected.unidade_medida} (diferença: ${diff > 0 ? "+" : ""}${diff})`);
+      toast.success(
+        `Saldo ajustado de ${selected.saldo_atual} para ${qtdNova} ${selected.unidade_medida} (diferença: ${diff > 0 ? "+" : ""}${diff})`,
+      );
       setDialogMov(null);
     };
 
@@ -940,7 +1044,9 @@ function EstoquePage() {
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-slate-600">Saldo atual no sistema:</span>
-              <span className="text-lg font-bold">{selected.saldo_atual} {selected.unidade_medida}</span>
+              <span className="text-lg font-bold">
+                {selected.saldo_atual} {selected.unidade_medida}
+              </span>
             </div>
             <div className="mt-1 text-[11px] text-slate-400">{selected.descricao}</div>
           </div>
@@ -956,7 +1062,9 @@ function EstoquePage() {
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
           />
           {selected && (
-            <span className={`text-[11px] ${diff !== 0 ? "font-semibold text-amber-600" : "text-slate-400"}`}>
+            <span
+              className={`text-[11px] ${diff !== 0 ? "font-semibold text-amber-600" : "text-slate-400"}`}
+            >
               {diff === 0
                 ? "Sem alteração"
                 : `Diferença: ${diff > 0 ? "+" : ""}${diff} ${selected.unidade_medida} (${diff > 0 ? "aumento" : "redução"})`}
@@ -1000,8 +1108,9 @@ function EstoquePage() {
   const FormNovaCompra = () => {
     const [selected, setSelected] = useState<Material | null>(null);
     const [qtd, setQtd] = useState(1);
-    const [fornecedor, setFornecedor] = useState("");
-    const [dataPrev, setDataPrev] = useState("");
+    const [deposito, setDeposito] = useState("DP98");
+    const [previsaoUso, setPrevisaoUso] = useState("");
+    const [solicitante, setSolicitante] = useState("");
     const [obs, setObs] = useState("");
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1009,7 +1118,9 @@ function EstoquePage() {
 
     const sugestao = useMemo(() => {
       if (!selected) return 0;
-      const saidas = movimentacoes.filter((m) => m.cod_sap === selected.cod_sap && m.tipo === "SAIDA");
+      const saidas = movimentacoes.filter(
+        (m) => m.cod_sap === selected.cod_sap && m.tipo === "SAIDA",
+      );
       if (saidas.length < 2) return 0;
       const total = saidas.reduce((s, m) => s + m.quantidade, 0);
       const meses = Math.max(
@@ -1046,37 +1157,50 @@ function EstoquePage() {
             </div>
           )}
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">
-            Quantidade solicitada{" "}
-            {sugestao > 0 && (
-              <span className="text-blue-500 font-normal">(sugestão: {sugestao})</span>
-            )}
-          </span>
-          <input
-            ref={qtdRef}
-            type="number"
-            min={1}
-            value={qtd}
-            onChange={(e) => setQtd(Number(e.target.value) || 0)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
-          />
-        </label>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Fornecedor</span>
+            <span className="text-xs font-semibold text-slate-600">
+              Quantidade solicitada{" "}
+              {sugestao > 0 && (
+                <span className="text-blue-500 font-normal">(sugestão: {sugestao})</span>
+              )}
+            </span>
             <input
-              value={fornecedor}
-              onChange={(e) => setFornecedor(e.target.value)}
+              ref={qtdRef}
+              type="number"
+              min={1}
+              value={qtd}
+              onChange={(e) => setQtd(Number(e.target.value) || 0)}
               className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Data prevista entrega</span>
+            <span className="text-xs font-semibold text-slate-600">Depósito destino</span>
+            <select
+              value={deposito}
+              onChange={(e) => setDeposito(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+            >
+              <option value="DP98">DP98</option>
+              <option value="DP96">DP96</option>
+            </select>
+          </label>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Solicitante</span>
             <input
-              type="date"
-              value={dataPrev}
-              onChange={(e) => setDataPrev(e.target.value)}
+              value={solicitante}
+              onChange={(e) => setSolicitante(e.target.value)}
+              placeholder={profile?.nome_completo || user?.email || ""}
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Previsão de uso</span>
+            <input
+              value={previsaoUso}
+              onChange={(e) => setPrevisaoUso(e.target.value)}
               className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
             />
           </label>
@@ -1095,11 +1219,14 @@ function EstoquePage() {
             qtd > 0 &&
             handleNovaCompra({
               cod_sap: selected.cod_sap,
-              quantidade_solicitada: qtd,
-              fornecedor,
-              data_prevista_entrega: dataPrev || null,
+              descricao_material: selected.descricao,
+              qtde_rc: qtd,
+              deposito_rc: deposito,
+              previsao_uso: previsaoUso,
+              solicitante: solicitante || profile?.nome_completo || user?.email || "",
               observacao: obs,
-              solicitante: profile?.nome_completo || user?.email || "",
+              rc_em_fila: true,
+              afeta_saldo: true,
             })
           }
           disabled={!selected || qtd <= 0}
@@ -1115,8 +1242,10 @@ function EstoquePage() {
     const [codSap, setCodSap] = useState("");
     const [descricao, setDescricao] = useState("");
     const [unidade, setUnidade] = useState("UN");
-    const [categoriaId, setCategoriaId] = useState(
-      () => String(categoriasAtivas.find((c) => c.nome === "Outros")?.id ?? categoriasAtivas[0]?.id ?? ""),
+    const [categoriaId, setCategoriaId] = useState(() =>
+      String(
+        categoriasAtivas.find((c) => c.nome === "Outros")?.id ?? categoriasAtivas[0]?.id ?? "",
+      ),
     );
     const [fabricante, setFabricante] = useState("");
     const [local, setLocal] = useState("");
@@ -1249,11 +1378,7 @@ function EstoquePage() {
           />
         </label>
         <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={critico}
-            onChange={(e) => setCritico(e.target.checked)}
-          />
+          <input type="checkbox" checked={critico} onChange={(e) => setCritico(e.target.checked)} />
           <Star className="h-3.5 w-3.5 text-amber-500" /> Material crítico
         </label>
         <button
@@ -1433,9 +1558,7 @@ function EstoquePage() {
     const codsNaCategoria = useMemo(() => {
       if (filtroCategoriaGrafico === "TODAS") return null;
       return new Set(
-        mats
-          .filter((m) => String(m.categoria_id) === filtroCategoriaGrafico)
-          .map((m) => m.cod_sap),
+        mats.filter((m) => String(m.categoria_id) === filtroCategoriaGrafico).map((m) => m.cod_sap),
       );
     }, [mats, filtroCategoriaGrafico]);
 
@@ -1478,8 +1601,7 @@ function EstoquePage() {
     }, [movsGrafico, ultimos12Meses]);
 
     const dadosSaldoLinha = useMemo(() => {
-      const cods =
-        codsNaCategoria ?? new Set(mats.map((m) => m.cod_sap));
+      const cods = codsNaCategoria ?? new Set(mats.map((m) => m.cod_sap));
       const matsFiltrados = mats.filter((m) => cods.has(m.cod_sap));
       const saldos = new Map(matsFiltrados.map((m) => [m.cod_sap, m.saldo_atual]));
 
@@ -1580,7 +1702,10 @@ function EstoquePage() {
         list = list.filter(
           (m) =>
             m.cod_sap.toLowerCase().includes(q) ||
-            mats.find((mat) => mat.cod_sap === m.cod_sap)?.descricao.toLowerCase().includes(q),
+            mats
+              .find((mat) => mat.cod_sap === m.cod_sap)
+              ?.descricao.toLowerCase()
+              .includes(q),
         );
       }
       if (destinoFilter) {
@@ -1602,7 +1727,9 @@ function EstoquePage() {
 
     const destinos = useMemo(() => {
       const set = new Set<string>();
-      movs.forEach((m) => { if (m.destino) set.add(m.destino); });
+      movs.forEach((m) => {
+        if (m.destino) set.add(m.destino);
+      });
       return [...set].sort();
     }, [movs]);
 
@@ -1683,7 +1810,10 @@ function EstoquePage() {
               <CardContent className="pb-3">
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dadosSaldoLinha} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <LineChart
+                      data={dadosSaldoLinha}
+                      margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} width={40} />
@@ -1717,8 +1847,20 @@ function EstoquePage() {
                     <YAxis tick={{ fontSize: 10 }} width={40} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="entradas" name="Entradas" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="saidas" name="Saídas" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar
+                      dataKey="entradas"
+                      name="Entradas"
+                      stackId="a"
+                      fill="#10b981"
+                      radius={[0, 0, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="saidas"
+                      name="Saídas"
+                      stackId="a"
+                      fill="#ef4444"
+                      radius={[4, 4, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1761,7 +1903,9 @@ function EstoquePage() {
           >
             <option value="">Todos destinos</option>
             {destinos.map((d) => (
-              <option key={d} value={d}>{d}</option>
+              <option key={d} value={d}>
+                {d}
+              </option>
             ))}
           </select>
           <input
@@ -1811,14 +1955,13 @@ function EstoquePage() {
               {paginated.map((m) => {
                 const mat = mats.find((mat) => mat.cod_sap === m.cod_sap);
                 return (
-                  <tr
-                    key={m.id}
-                    className="border-b border-slate-100 transition hover:bg-slate-50"
-                  >
+                  <tr key={m.id} className="border-b border-slate-100 transition hover:bg-slate-50">
                     <td className="whitespace-nowrap px-3 py-2 text-slate-500">
-                      {m.data
-                        ? new Date(m.data).toLocaleDateString("pt-BR")
-                        : <span className="italic text-slate-400">Não informada</span>}
+                      {m.data ? (
+                        new Date(m.data).toLocaleDateString("pt-BR")
+                      ) : (
+                        <span className="italic text-slate-400">Não informada</span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[#0b3a73]">
                       {m.cod_sap}
@@ -1921,10 +2064,8 @@ function EstoquePage() {
       });
 
     const tipoIcon = (tipo: TipoMovimentacao) => {
-      if (tipo === "ENTRADA")
-        return { bg: "bg-emerald-500", symbol: "+", label: "Entrada" };
-      if (tipo === "SAIDA")
-        return { bg: "bg-red-500", symbol: "−", label: "Saída" };
+      if (tipo === "ENTRADA") return { bg: "bg-emerald-500", symbol: "+", label: "Entrada" };
+      if (tipo === "SAIDA") return { bg: "bg-red-500", symbol: "−", label: "Saída" };
       return { bg: "bg-orange-500", symbol: "~", label: "Ajuste" };
     };
 
@@ -2297,9 +2438,10 @@ function EstoquePage() {
                       />
                       <Tooltip
                         formatter={(value: number) => `${value} un`}
-                        labelFormatter={(_l: string, payload: { payload?: { descricaoCompleta?: string } }[]) =>
-                          payload?.[0]?.payload?.descricaoCompleta || _l
-                        }
+                        labelFormatter={(
+                          _l: string,
+                          payload: { payload?: { descricaoCompleta?: string } }[],
+                        ) => payload?.[0]?.payload?.descricaoCompleta || _l}
                       />
                       <Bar dataKey="qtd" fill="#0b3a73" radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -2317,7 +2459,9 @@ function EstoquePage() {
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <select
                     value={metricaDestino}
-                    onChange={(e) => setMetricaDestino(e.target.value as "movimentacoes" | "quantidade")}
+                    onChange={(e) =>
+                      setMetricaDestino(e.target.value as "movimentacoes" | "quantidade")
+                    }
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] shadow-sm"
                   >
                     <option value="movimentacoes">Movimentações</option>
@@ -2336,7 +2480,9 @@ function EstoquePage() {
                     ))}
                   </select>
                   <span className="text-[11px] text-slate-400">
-                    {metricaDestino === "movimentacoes" ? "contagem de saídas" : "soma de quantidades"}
+                    {metricaDestino === "movimentacoes"
+                      ? "contagem de saídas"
+                      : "soma de quantidades"}
                   </span>
                 </div>
                 <div className="h-64">
@@ -2356,11 +2502,14 @@ function EstoquePage() {
                       />
                       <Tooltip
                         formatter={(value: number) =>
-                          metricaDestino === "movimentacoes" ? `${value} movimentações` : `${value} unidades`
+                          metricaDestino === "movimentacoes"
+                            ? `${value} movimentações`
+                            : `${value} unidades`
                         }
-                        labelFormatter={(_l: string, payload: { payload?: { destinoCompleto?: string } }[]) =>
-                          payload?.[0]?.payload?.destinoCompleto || _l
-                        }
+                        labelFormatter={(
+                          _l: string,
+                          payload: { payload?: { destinoCompleto?: string } }[],
+                        ) => payload?.[0]?.payload?.destinoCompleto || _l}
                       />
                       <Bar
                         dataKey="qtd"
@@ -2383,22 +2532,14 @@ function EstoquePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="mb-4 text-3xl font-bold text-amber-600">
-                  {ajustesMes.length}
-                </div>
+                <div className="mb-4 text-3xl font-bold text-amber-600">{ajustesMes.length}</div>
                 {ajustesPorMotivo.length === 0 ? (
                   <p className="text-sm text-slate-400">Nenhum ajuste no período.</p>
                 ) : (
                   <div className="space-y-2">
                     {ajustesPorMotivo.map((item) => (
-                      <div
-                        key={item.motivo}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <span
-                          className="truncate text-slate-600"
-                          title={item.motivoCompleto}
-                        >
+                      <div key={item.motivo} className="flex items-center justify-between text-sm">
+                        <span className="truncate text-slate-600" title={item.motivoCompleto}>
                           {item.motivo}
                         </span>
                         <span className="font-semibold text-slate-800">{item.qtd}</span>
@@ -2651,6 +2792,15 @@ function EstoquePage() {
         <>
           {/* KPIs Compras */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-blue-600">
+                <ShoppingCart className="h-3 w-3" /> RC em Fila
+              </div>
+              <div className="mt-1 text-3xl font-bold text-blue-600">
+                {compras.filter((c) => c.rc_em_fila).length}
+              </div>
+              <div className="text-[11px] text-blue-500">solicitações pendentes</div>
+            </div>
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-600">
                 <AlertTriangle className="h-3 w-3" /> Críticos sem pedido
@@ -2660,6 +2810,15 @@ function EstoquePage() {
               </div>
               <div className="text-[11px] text-red-500">itens críticos sem compra</div>
             </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-600">
+                <Package className="h-3 w-3" /> Aguardando retirada
+              </div>
+              <div className="mt-1 text-3xl font-bold text-amber-600">
+                {compras.filter((c) => c.chegou && !c.foi_retirado).length}
+              </div>
+              <div className="text-[11px] text-amber-500">chegou, não retirado</div>
+            </div>
             <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-orange-600">
                 <Clock className="h-3 w-3" /> Atrasados
@@ -2667,122 +2826,176 @@ function EstoquePage() {
               <div className="mt-1 text-3xl font-bold text-orange-600">
                 {comprasComAtraso.length}
               </div>
-              <div className="text-[11px] text-orange-500">pedidos com data vencida</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <ShoppingCart className="h-3 w-3" /> Total Pedidos
-              </div>
-              <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{compras.length}</div>
-              <div className="text-[11px] text-slate-400">todos os pedidos</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <CheckCircle2 className="h-3 w-3" /> Entregues
-              </div>
-              <div className="mt-1 text-3xl font-bold text-emerald-600">
-                {compras.filter((c) => c.status === "Entregue").length}
-              </div>
-              <div className="text-[11px] text-slate-400">pedidos entregues</div>
+              <div className="text-[11px] text-orange-500">remessa vencida</div>
             </div>
           </div>
 
-          {/* Kanban por status */}
-          <div className="grid gap-3 sm:grid-cols-5">
-            {(Object.entries(comprasPorStatus) as [StatusCompra, Compra[]][]).map(
-              ([status, lista]) => (
-                <div key={status} className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <div
-                    className={`rounded-t-xl px-3 py-2 text-xs font-bold uppercase tracking-wide ${STATUS_COMPRA_CORES[status]}`}
-                  >
-                    {status} <span className="ml-1 font-normal">({lista.length})</span>
-                  </div>
-                  <div className="max-h-[500px] space-y-1.5 overflow-auto p-2">
-                    {lista.length === 0 && (
-                      <p className="py-4 text-center text-[11px] text-slate-400">Nenhum</p>
-                    )}
-                    {lista.map((c) => {
-                      const mat = materiais.find((m) => m.cod_sap === c.cod_sap);
-                      const diasAtraso =
-                        c.data_prevista_entrega && c.status !== "Entregue"
-                          ? Math.ceil(
-                              (Date.now() - new Date(c.data_prevista_entrega).getTime()) / 86400000,
-                            )
-                          : 0;
-                      return (
-                        <div
-                          key={c.id}
-                          className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-[12px]"
-                        >
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="font-mono font-bold text-[#1f7ad6]">{c.cod_sap}</span>
-                            <span className="font-bold">{c.quantidade_solicitada}</span>
-                          </div>
-                          <p className="truncate text-slate-600">{mat?.descricao || c.cod_sap}</p>
-                          {c.fornecedor && (
-                            <p className="text-[11px] text-slate-400">Fornecedor: {c.fornecedor}</p>
-                          )}
-                          {c.data_prevista_entrega && (
-                            <p
-                              className={`text-[11px] ${diasAtraso > 0 ? "text-red-500 font-semibold" : "text-slate-400"}`}
-                            >
-                              Prevista:{" "}
-                              {new Date(c.data_prevista_entrega).toLocaleDateString("pt-BR")}
-                              {diasAtraso > 0 && ` (${diasAtraso}d atraso)`}
-                            </p>
-                          )}
-                          {c.status !== "Entregue" && permissoes.gerenciarCompras && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {status === "Solicitado" && (
-                                <button
-                                  onClick={() => handleCompraStatus(c.id, "Aprovado")}
-                                  className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"
-                                >
-                                  Aprovar
-                                </button>
-                              )}
-                              {status === "Aprovado" && (
-                                <button
-                                  onClick={() => handleCompraStatus(c.id, "Comprado")}
-                                  className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 hover:bg-purple-200 cursor-pointer"
-                                >
-                                  Comprar
-                                </button>
-                              )}
-                              {status === "Comprado" && (
-                                <button
-                                  onClick={() => handleCompraStatus(c.id, "A Caminho")}
-                                  className="rounded bg-cyan-100 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700 hover:bg-cyan-200 cursor-pointer"
-                                >
-                                  <Truck className="mr-0.5 inline h-3 w-3" /> A Caminho
-                                </button>
-                              )}
-                              {["Comprado", "A Caminho"].includes(status) && (
-                                <button
-                                  onClick={() => handleCompraStatus(c.id, "Entregue")}
-                                  className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
-                                >
-                                  <CheckCircle2 className="mr-0.5 inline h-3 w-3" /> Entregue
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ),
-            )}
+          {/* Filtros */}
+          <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <select
+              value={filtroStatusCompra}
+              onChange={(e) => setFiltroStatusCompra(e.target.value)}
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+            >
+              <option value="TODOS">Todos os status</option>
+              {Object.keys(comprasPorStatus)
+                .sort()
+                .map((s) => (
+                  <option key={s} value={s}>
+                    {s} ({comprasPorStatus[s].length})
+                  </option>
+                ))}
+            </select>
+            <select
+              value={filtroCompradorCompra}
+              onChange={(e) => setFiltroCompradorCompra(e.target.value)}
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+            >
+              <option value="TODOS">Todos os compradores</option>
+              {compradoresCompra.map((c) => (
+                <option key={c} value={c!}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroChegou}
+              onChange={(e) => setFiltroChegou(e.target.value as typeof filtroChegou)}
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+            >
+              <option value="TODOS">Chegou: Todos</option>
+              <option value="sim">Chegou: Sim</option>
+              <option value="nao">Chegou: Não</option>
+            </select>
+            <select
+              value={filtroRetirado}
+              onChange={(e) => setFiltroRetirado(e.target.value as typeof filtroRetirado)}
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+            >
+              <option value="TODOS">Retirado: Todos</option>
+              <option value="sim">Retirado: Sim</option>
+              <option value="nao">Retirado: Não</option>
+            </select>
+            <select
+              value={filtroFila}
+              onChange={(e) => setFiltroFila(e.target.value as typeof filtroFila)}
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+            >
+              <option value="TODOS">Fila: Todos</option>
+              <option value="sim">Em fila: Sim</option>
+              <option value="nao">Em fila: Não</option>
+            </select>
+            <span className="self-center text-[11px] text-slate-400">
+              {comprasFiltradas.length} de {compras.length} registros
+            </span>
+          </div>
+
+          {/* Tabela de Compras */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-2 py-2">Requisição</th>
+                  <th className="px-2 py-2">Item</th>
+                  <th className="px-2 py-2">Cód. SAP</th>
+                  <th className="px-2 py-2">Descrição</th>
+                  <th className="px-2 py-2 text-right">Qtde</th>
+                  <th className="px-2 py-2">Status Geral</th>
+                  <th className="px-2 py-2">Fornecedor</th>
+                  <th className="px-2 py-2 text-center">Chegou?</th>
+                  <th className="px-2 py-2 text-center">Retirado?</th>
+                  <th className="px-2 py-2 text-right">Dias aberto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comprasFiltradas.map((c) => {
+                  const diasAberto =
+                    !c.foi_retirado && c.dt_criacao_rc
+                      ? Math.floor((Date.now() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
+                      : null;
+                  return (
+                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-2 py-1.5 font-mono text-[#1f7ad6]">
+                        {c.requisicao || "—"}
+                      </td>
+                      <td className="px-2 py-1.5">{c.item_rc || "—"}</td>
+                      <td className="px-2 py-1.5 font-mono font-bold">{c.cod_sap || "—"}</td>
+                      <td className="max-w-[200px] truncate px-2 py-1.5 text-slate-600">
+                        {c.descricao_material || "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-bold">{c.qtde_rc ?? "—"}</td>
+                      <td className="px-2 py-1.5">
+                        {c.status_geral && (
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COMPRA_CORES[c.status_geral] || "bg-slate-100 text-slate-600"}`}
+                          >
+                            {c.status_geral}
+                          </span>
+                        )}
+                      </td>
+                      <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-500">
+                        {c.fornecedor || "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {permissoes.gerenciarCompras ? (
+                          <input
+                            type="checkbox"
+                            checked={c.chegou}
+                            onChange={() => handleToggleChegou(c.id, c.chegou)}
+                            className="cursor-pointer"
+                          />
+                        ) : (
+                          <span>{c.chegou ? "✓" : "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {permissoes.gerenciarCompras ? (
+                          <input
+                            type="checkbox"
+                            checked={c.foi_retirado}
+                            onChange={() =>
+                              handleToggleFoiRetirado(c.id, c.foi_retirado, c.afeta_saldo)
+                            }
+                            className="cursor-pointer"
+                          />
+                        ) : (
+                          <span>{c.foi_retirado ? "✓" : "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        {diasAberto !== null ? (
+                          <span
+                            className={
+                              diasAberto > 30
+                                ? "font-bold text-red-600"
+                                : diasAberto > 15
+                                  ? "text-orange-500"
+                                  : "text-slate-500"
+                            }
+                          >
+                            {diasAberto}d
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {comprasFiltradas.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="py-8 text-center text-slate-400">
+                      Nenhuma compra encontrada com os filtros selecionados.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </>
       ) : (
         /* ---------- ABA REGISTROS ---------- */
-        <AbaRegistros
-          movimentacoes={movimentacoes}
-          materiais={materiais}
-          categorias={categorias}
-        />
+        <AbaRegistros movimentacoes={movimentacoes} materiais={materiais} categorias={categorias} />
       )}
 
       {/* Dialogs */}
@@ -2838,6 +3051,54 @@ function EstoquePage() {
             </DialogTitle>
           </DialogHeader>
           <FormNovaCompra />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={dialogDataRetirada !== null}
+        onOpenChange={(o) => {
+          if (!o) setDialogDataRetirada(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <CheckCircle2 className="mr-1 inline h-4 w-4" /> Confirmar Retirada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 text-sm">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-slate-600">Data da retirada</span>
+              <input
+                type="date"
+                value={dataRetiradaInput}
+                onChange={(e) => setDataRetiradaInput(e.target.value)}
+                className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              />
+            </label>
+            {(() => {
+              const reg = compras.find((c) => c.id === dialogDataRetirada);
+              if (reg?.afeta_saldo) {
+                return (
+                  <p className="rounded-md bg-emerald-50 p-2 text-[12px] text-emerald-700">
+                    Esta compra afeta o estoque. Uma entrada automática será registrada ao
+                    confirmar.
+                  </p>
+                );
+              }
+              return (
+                <p className="rounded-md bg-slate-50 p-2 text-[12px] text-slate-500">
+                  Esta é uma compra importada (histórico). Nenhuma entrada no estoque será gerada.
+                </p>
+              );
+            })()}
+            <button
+              onClick={confirmarRetirada}
+              className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6]"
+            >
+              Confirmar Retirada
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 
