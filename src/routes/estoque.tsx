@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   Home,
@@ -59,6 +59,7 @@ import {
   getCategoriaNome,
   StatusEstoque,
 } from "@/lib/estoque-types";
+import { getPermissoesEstoque } from "@/lib/estoque-permissoes";
 import {
   BarChart,
   Bar,
@@ -86,7 +87,8 @@ export const Route = createFileRoute("/estoque")({
 const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
 
 function EstoquePage() {
-  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const { user, profile, loading: authLoading } = useAuth();
   const [aba, setAba] = useState<"estoque" | "compras" | "registros">("estoque");
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -113,9 +115,43 @@ function EstoquePage() {
   const [editandoValor, setEditandoValor] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const podeEditar =
-    profile?.cargo_nome === "Supervisor" || profile?.cargo_nome === "Administrador";
-  const podeAprovar = podeEditar;
+  const permissoes = useMemo(
+    () => getPermissoesEstoque(profile?.cargo_nome),
+    [profile?.cargo_nome],
+  );
+  const [acessoVerificado, setAcessoVerificado] = useState(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || profile?.status !== "ativo") {
+      navigate({ to: "/login", replace: true });
+      return;
+    }
+    if (!profile?.cargo_id) {
+      navigate({ to: "/", replace: true });
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("cargo_paineis")
+        .select("paineis!inner(chave)")
+        .eq("cargo_id", profile.cargo_id)
+        .eq("paineis.chave", "estoque")
+        .maybeSingle();
+      if (!data || !permissoes.acessarModulo) {
+        navigate({ to: "/", replace: true });
+        return;
+      }
+      setAcessoVerificado(true);
+    })();
+  }, [authLoading, user, profile, navigate, permissoes.acessarModulo]);
+
+  useEffect(() => {
+    if (!acessoVerificado) return;
+    if (!permissoes.solicitarCompra && aba === "compras") {
+      setAba("estoque");
+    }
+  }, [acessoVerificado, permissoes.solicitarCompra, aba]);
 
   // --- Carregar dados ---
   const carregarDados = async () => {
@@ -138,8 +174,9 @@ function EstoquePage() {
   };
 
   useEffect(() => {
+    if (!acessoVerificado) return;
     carregarDados();
-  }, []);
+  }, [acessoVerificado]);
 
   // --- Computed ---
   const materiaisComStatus = useMemo(
@@ -2087,7 +2124,7 @@ function EstoquePage() {
               aba === "compras"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100"
-            }`}
+            } ${!permissoes.solicitarCompra ? "hidden" : ""}`}
           >
             <ShoppingCart className="h-4 w-4" /> Compras
           </button>
@@ -2105,55 +2142,65 @@ function EstoquePage() {
         <div className="flex flex-wrap items-center gap-2">
           {aba === "estoque" && (
             <>
-              <button
-                onClick={() => setDialogMov("entrada")}
-                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 shadow"
-              >
-                <Plus className="h-4 w-4" /> Entrada
-              </button>
-              <button
-                onClick={() => setDialogMov("saida")}
-                className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-red-700 shadow"
-              >
-                <Minus className="h-4 w-4" /> Saída
-              </button>
-              <button
-                onClick={() => setDialogMov("ajuste")}
-                className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-amber-700 shadow"
-              >
-                <Edit3 className="h-4 w-4" /> Ajuste
-              </button>
-              <button
-                onClick={exportarCSV}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
-              >
-                <Download className="h-4 w-4" /> Exportar
-              </button>
-              <button
-                onClick={() => setDialogImportar(true)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
-              >
-                <Upload className="h-4 w-4" /> Importar
-              </button>
-              {podeEditar && (
-                <>
-                  <button
-                    onClick={() => setDialogMaterial(true)}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
-                  >
-                    <Plus className="h-4 w-4" /> Novo Material
-                  </button>
-                  <button
-                    onClick={() => setDialogCategorias(true)}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
-                  >
-                    <Settings className="h-4 w-4" /> Gerenciar Categorias
-                  </button>
-                </>
+              {permissoes.registrarEntrada && (
+                <button
+                  onClick={() => setDialogMov("entrada")}
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 shadow"
+                >
+                  <Plus className="h-4 w-4" /> Entrada
+                </button>
+              )}
+              {permissoes.registrarSaida && (
+                <button
+                  onClick={() => setDialogMov("saida")}
+                  className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-red-700 shadow"
+                >
+                  <Minus className="h-4 w-4" /> Saída
+                </button>
+              )}
+              {permissoes.registrarAjuste && (
+                <button
+                  onClick={() => setDialogMov("ajuste")}
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-amber-700 shadow"
+                >
+                  <Edit3 className="h-4 w-4" /> Ajuste
+                </button>
+              )}
+              {permissoes.exportar && (
+                <button
+                  onClick={exportarCSV}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                >
+                  <Download className="h-4 w-4" /> Exportar
+                </button>
+              )}
+              {permissoes.importar && (
+                <button
+                  onClick={() => setDialogImportar(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                >
+                  <Upload className="h-4 w-4" /> Importar
+                </button>
+              )}
+              {permissoes.cadastrarMaterial && (
+                <button
+                  onClick={() => setDialogMaterial(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                >
+                  <Plus className="h-4 w-4" /> Novo Material
+                </button>
+              )}
+              {permissoes.gerenciarCategorias && (
+                <button
+                  onClick={() => setDialogCategorias(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                >
+                  <Settings className="h-4 w-4" /> Gerenciar Categorias
+                </button>
               )}
             </>
           )}
-          {aba === "compras" && (
+          {aba === "compras" && permissoes.solicitarCompra && (
             <button
               onClick={() => setDialogCompra(true)}
               className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] shadow"
@@ -2170,7 +2217,7 @@ function EstoquePage() {
         </div>
       </div>
 
-      {loading ? (
+      {loading || !acessoVerificado ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Carregando...
         </div>
@@ -2491,7 +2538,7 @@ function EstoquePage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5">
-                        {editandoMinimo === m.cod_sap ? (
+                        {permissoes.editarConfigMaterial && editandoMinimo === m.cod_sap ? (
                           <input
                             type="number"
                             value={editandoValor}
@@ -2510,7 +2557,7 @@ function EstoquePage() {
                             className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-[13px] text-slate-700"
                             autoFocus
                           />
-                        ) : (
+                        ) : permissoes.editarConfigMaterial ? (
                           <button
                             onClick={() => iniciarEdicaoMinimo(m.cod_sap, m.estoque_minimo)}
                             className="cursor-pointer rounded px-1 py-0.5 text-slate-600 hover:bg-slate-100 hover:text-[#0b3a73]"
@@ -2518,6 +2565,8 @@ function EstoquePage() {
                           >
                             {m.estoque_minimo}
                           </button>
+                        ) : (
+                          <span className="text-slate-600">{m.estoque_minimo}</span>
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-slate-600">{m.fabricante}</td>
@@ -2527,40 +2576,50 @@ function EstoquePage() {
                         <Semaforo saldo={m.saldo_atual} minimo={m.estoque_minimo} />
                       </td>
                       <td className="px-2 py-1.5">
-                        <button
-                          onClick={() => toggleCritico(m)}
-                          className="cursor-pointer"
-                          title={m.material_critico ? "Remover crítico" : "Marcar como crítico"}
-                        >
-                          {m.material_critico ? (
-                            <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                          ) : (
-                            <Star className="h-4 w-4 text-slate-300 hover:text-amber-400" />
-                          )}
-                        </button>
+                        {permissoes.editarConfigMaterial ? (
+                          <button
+                            onClick={() => toggleCritico(m)}
+                            className="cursor-pointer"
+                            title={m.material_critico ? "Remover crítico" : "Marcar como crítico"}
+                          >
+                            {m.material_critico ? (
+                              <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                            ) : (
+                              <Star className="h-4 w-4 text-slate-300 hover:text-amber-400" />
+                            )}
+                          </button>
+                        ) : m.material_critico ? (
+                          <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        ) : (
+                          <Star className="h-4 w-4 text-slate-300" />
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5">
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setMaterialSelecionado(m);
-                              setDialogMov("entrada");
-                            }}
-                            className="rounded bg-emerald-100 px-1.5 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
-                            title="Entrada"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setMaterialSelecionado(m);
-                              setDialogMov("saida");
-                            }}
-                            className="rounded bg-red-100 px-1.5 py-1 text-[10px] font-bold text-red-700 hover:bg-red-200 cursor-pointer"
-                            title="Saída"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
+                          {permissoes.registrarEntrada && (
+                            <button
+                              onClick={() => {
+                                setMaterialSelecionado(m);
+                                setDialogMov("entrada");
+                              }}
+                              className="rounded bg-emerald-100 px-1.5 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200 cursor-pointer"
+                              title="Entrada"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          )}
+                          {permissoes.registrarSaida && (
+                            <button
+                              onClick={() => {
+                                setMaterialSelecionado(m);
+                                setDialogMov("saida");
+                              }}
+                              className="rounded bg-red-100 px-1.5 py-1 text-[10px] font-bold text-red-700 hover:bg-red-200 cursor-pointer"
+                              title="Saída"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setMaterialSelecionado(m);
@@ -2672,9 +2731,9 @@ function EstoquePage() {
                               {diasAtraso > 0 && ` (${diasAtraso}d atraso)`}
                             </p>
                           )}
-                          {c.status !== "Entregue" && (
+                          {c.status !== "Entregue" && permissoes.gerenciarCompras && (
                             <div className="mt-1.5 flex flex-wrap gap-1">
-                              {status === "Solicitado" && podeAprovar && (
+                              {status === "Solicitado" && (
                                 <button
                                   onClick={() => handleCompraStatus(c.id, "Aprovado")}
                                   className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200 cursor-pointer"

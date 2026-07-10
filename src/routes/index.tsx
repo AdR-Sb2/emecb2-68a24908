@@ -51,9 +51,11 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   sistemas: { bg: "bg-emerald-100", icon: "text-emerald-600", ring: "hover:ring-emerald-300" },
   relatorio: { bg: "bg-amber-100", icon: "text-amber-600", ring: "hover:ring-amber-300" },
   backlog: { bg: "bg-violet-100", icon: "text-violet-600", ring: "hover:ring-violet-300" },
+  estoque: { bg: "bg-cyan-100", icon: "text-cyan-600", ring: "hover:ring-cyan-300" },
 };
 
 function getCardColor(chave: string) {
+  if (chave === "estoque") return CARD_COLORS.estoque;
   if (chave.startsWith("dashboard")) return CARD_COLORS.dashboard;
   if (chave.startsWith("sistemas")) return CARD_COLORS.sistemas;
   if (chave.startsWith("relatorio")) return CARD_COLORS.relatorio;
@@ -122,7 +124,8 @@ function Index() {
   const shouldShowSistema = hasPanel("sistemas") || hasFallbackPanels;
   const shouldShowRelatorio = hasPanel("relatorio_tecnico") || hasFallbackPanels;
   const shouldShowBacklog = hasPanel("dashboard_os") || hasFallbackPanels;
-  const canAdmin = hasPanel("admin") || profile?.cargo_id === 1 || profile?.email?.toLowerCase() === "admin@gmail.com";
+  const shouldShowEstoque = hasPanel("estoque");
+  const canAdmin = hasPanel("admin");
 
   return (
     <div className="min-h-screen bg-[#f0f4f8]">
@@ -224,12 +227,14 @@ function Index() {
             )}
 
             {/* Estoque */}
-            <CardLink to="/estoque" chave="backlog" delay={4}>
-              <CardIcon chave="backlog" icon={Package} />
-              <CardTitle>Almoxarifado</CardTitle>
-              <CardDesc>Estoque de materiais, entrada/saída, compras e pedidos.</CardDesc>
-              <CardCta>Abrir estoque</CardCta>
-            </CardLink>
+            {shouldShowEstoque && (
+              <CardLink to="/estoque" chave="estoque" delay={4}>
+                <CardIcon chave="estoque" icon={Package} />
+                <CardTitle>Almoxarifado</CardTitle>
+                <CardDesc>Estoque de materiais, entrada/saída, compras e pedidos.</CardDesc>
+                <CardCta>Abrir estoque</CardCta>
+              </CardLink>
+            )}
           </div>
         )}
 
