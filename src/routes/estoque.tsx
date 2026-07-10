@@ -30,6 +30,7 @@ import {
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -247,90 +248,17 @@ function EstoquePage() {
   );
 
   // --- Ações ---
-  const handleEntrada = async (
-    cod_sap: string,
-    quantidade: number,
-    responsavel: string,
-    obs: string,
-  ) => {
-    const { error } = await supabase.from("movimentacoes").insert({
-      cod_sap,
-      tipo: "ENTRADA",
-      quantidade,
-      responsavel,
-      observacao: obs,
-      criado_por: user?.email || "",
-    });
-    if (error) {
-      alert("Erro: " + error.message);
-      return;
-    }
-    await carregarDados();
-    setDialogMov(null);
-  };
-
-  const handleSaida = async (
-    cod_sap: string,
-    quantidade: number,
-    destino: string,
-    solicitante: string,
-    responsavel: string,
-    obs: string,
-  ) => {
-    const material = materiais.find((m) => m.cod_sap === cod_sap);
-    if (!material) return;
-    if (material.saldo_atual < quantidade) {
-      alert(`Saldo insuficiente! Saldo atual: ${material.saldo_atual}`);
-      return;
-    }
-    const { error } = await supabase.from("movimentacoes").insert({
-      cod_sap,
-      tipo: "SAIDA",
-      quantidade,
-      destino,
-      solicitante,
-      responsavel,
-      observacao: obs,
-      criado_por: user?.email || "",
-    });
-    if (error) {
-      alert("Erro: " + error.message);
-      return;
-    }
-    await carregarDados();
-    setDialogMov(null);
-  };
-
-  const handleAjuste = async (cod_sap: string, quantidadeNova: number, motivo: string) => {
-    if (!motivo) {
-      alert("Motivo do ajuste é obrigatório!");
-      return;
-    }
-    const { error } = await supabase.from("movimentacoes").insert({
-      cod_sap,
-      tipo: "AJUSTE",
-      quantidade: quantidadeNova,
-      motivo_ajuste: motivo,
-      criado_por: user?.email || "",
-    });
-    if (error) {
-      alert("Erro: " + error.message);
-      return;
-    }
-    await carregarDados();
-    setDialogMov(null);
-  };
-
   const handleNovaCompra = async (data: Partial<Compra>) => {
     const { error } = await supabase.from("compras").insert({
       ...data,
       criado_por: user?.email || "",
     });
     if (error) {
-      alert("Erro: " + error.message);
+      toast.error("Erro ao criar pedido: " + error.message);
       return;
     }
     await carregarDados();
+    toast.success("Pedido de compra criado!");
     setDialogCompra(false);
   };
 
@@ -339,10 +267,11 @@ function EstoquePage() {
     if (status === "Entregue") update.data_entrega_real = new Date().toISOString().split("T")[0];
     const { error } = await supabase.from("compras").update(update).eq("id", id);
     if (error) {
-      alert("Erro: " + error.message);
+      toast.error("Erro: " + error.message);
       return;
     }
     await carregarDados();
+    toast.success("Status atualizado!");
   };
 
   const handleImportarCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,7 +311,7 @@ function EstoquePage() {
       );
       if (!error) importados++;
     }
-    alert(`${importados} materiais importados/atualizados com sucesso!`);
+    toast.success(`${importados} materiais importados/atualizados com sucesso!`);
     await carregarDados();
     setDialogImportar(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -427,11 +356,15 @@ function EstoquePage() {
   const AutoCompleteMaterial = ({
     value,
     onChange,
+    onSelect,
     placeholder = "Buscar material...",
+    inputRef,
   }: {
-    value: string;
-    onChange: (v: string) => void;
+    value: Material | null;
+    onChange: (m: Material | null) => void;
+    onSelect?: () => void;
     placeholder?: string;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
   }) => {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -451,36 +384,34 @@ function EstoquePage() {
     const shown = filtered.slice(0, MAX);
     const remaining = filtered.length - MAX;
 
-    const selected = materiais.find((m) => m.cod_sap === value);
+    const displayText = value ? `${value.cod_sap} - ${value.descricao}` : "";
+
     return (
       <div className="relative">
         <input
-          value={
-            selected && !open
-              ? `${selected.cod_sap} - ${selected.descricao}`
-              : query
-          }
+          ref={inputRef}
+          value={open ? query : displayText}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
-            if (!e.target.value) {
-              onChange("");
-            }
+            if (value) onChange(null);
           }}
           onFocus={() => {
             setOpen(true);
-            if (!selected) setQuery("");
-          }}
-          onBlur={() => {
-            if (!selected) setQuery("");
+            setQuery(displayText || "");
           }}
           placeholder={placeholder}
           className="min-h-11 w-full rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
         />
         {open && (
           <>
-            <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); setQuery(""); }} />
+            <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); if (!value) setQuery(""); }} />
             <div className="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+              {!query && (
+                <div className="px-2 py-3 text-center text-sm text-slate-400">
+                  Digite para buscar...
+                </div>
+              )}
               {query && shown.length === 0 && (
                 <div className="px-2 py-3 text-center text-sm text-slate-400">
                   Nenhum material encontrado
@@ -490,12 +421,14 @@ function EstoquePage() {
                 <button
                   key={m.cod_sap}
                   type="button"
-                  onClick={() => {
-                    onChange(m.cod_sap);
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(m);
                     setOpen(false);
-                    setQuery("");
+                    setQuery(`${m.cod_sap} - ${m.descricao}`);
+                    onSelect?.();
                   }}
-                  className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${value === m.cod_sap ? "bg-blue-50" : ""}`}
+                  className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${value?.cod_sap === m.cod_sap ? "bg-blue-50" : ""}`}
                 >
                   <span className="font-mono text-[#1f7ad6]">{m.cod_sap}</span>
                   <span className="truncate text-slate-600">{m.descricao}</span>
@@ -540,25 +473,59 @@ function EstoquePage() {
 
   // --- Formulários em Dialog ---
   const FormEntrada = () => {
-    const [cod, setCod] = useState("");
+    const [selected, setSelected] = useState<Material | null>(null);
     const [qtd, setQtd] = useState(1);
     const [resp, setResp] = useState("");
     const [obs, setObs] = useState("");
-    const mat = materiais.find((m) => m.cod_sap === cod);
+    const [saving, setSaving] = useState(false);
+    const qtdRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const valido = selected !== null && qtd > 0 && resp.trim().length > 0;
+
+    const handleSalvar = async () => {
+      if (!valido || !selected || saving) return;
+      setSaving(true);
+      const { error } = await supabase.from("movimentacoes").insert({
+        cod_sap: selected.cod_sap,
+        tipo: "ENTRADA",
+        quantidade: qtd,
+        responsavel: resp.trim(),
+        observacao: obs.trim(),
+        criado_por: user?.email || "",
+      });
+      if (error) {
+        toast.error("Erro ao registrar entrada: " + error.message);
+        setSaving(false);
+        return;
+      }
+      await carregarDados();
+      toast.success(`Entrada registrada! Novo saldo: ${selected.saldo_atual + qtd} ${selected.unidade_medida}`);
+      setDialogMov(null);
+    };
+
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Material *</span>
-          <AutoCompleteMaterial value={cod} onChange={setCod} />
-          {mat && (
+          <AutoCompleteMaterial
+            value={selected}
+            onChange={(m) => {
+              setSelected(m);
+              if (m) setTimeout(() => qtdRef.current?.focus(), 0);
+            }}
+            inputRef={inputRef}
+          />
+          {selected && (
             <span className="text-[10px] text-slate-400">
-              Saldo atual: {mat.saldo_atual} {mat.unidade_medida}
+              Saldo atual: {selected.saldo_atual} {selected.unidade_medida}
             </span>
           )}
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Quantidade *</span>
           <input
+            ref={qtdRef}
             type="number"
             min={1}
             value={qtd}
@@ -567,7 +534,7 @@ function EstoquePage() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Quem recebeu</span>
+          <span className="text-xs font-semibold text-slate-600">Quem recebeu *</span>
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}
@@ -583,45 +550,87 @@ function EstoquePage() {
           />
         </label>
         <button
-          onClick={() => cod && qtd > 0 && handleEntrada(cod, qtd, resp, obs)}
-          disabled={!cod || qtd <= 0}
+          onClick={handleSalvar}
+          disabled={!valido || saving}
           className="rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
-          Registrar Entrada
+          {saving ? "Salvando..." : "Registrar Entrada"}
         </button>
       </div>
     );
   };
 
   const FormSaida = () => {
-    const [cod, setCod] = useState("");
+    const [selected, setSelected] = useState<Material | null>(null);
     const [qtd, setQtd] = useState(1);
     const [destino, setDestino] = useState("");
     const [solicitante, setSolicitante] = useState("");
     const [resp, setResp] = useState("");
     const [obs, setObs] = useState("");
-    const mat = materiais.find((m) => m.cod_sap === cod);
+    const [saving, setSaving] = useState(false);
+    const qtdRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const saldoInsuficiente = selected !== null && qtd > selected.saldo_atual;
+    const valido = selected !== null && qtd > 0 && destino.trim().length > 0 && solicitante.trim().length > 0 && resp.trim().length > 0 && !saldoInsuficiente;
+
+    const handleSalvar = async () => {
+      if (!valido || !selected || saving) return;
+      setSaving(true);
+      const { error } = await supabase.from("movimentacoes").insert({
+        cod_sap: selected.cod_sap,
+        tipo: "SAIDA",
+        quantidade: qtd,
+        destino: destino.trim(),
+        solicitante: solicitante.trim(),
+        responsavel: resp.trim(),
+        observacao: obs.trim(),
+        criado_por: user?.email || "",
+      });
+      if (error) {
+        toast.error("Erro ao registrar saída: " + error.message);
+        setSaving(false);
+        return;
+      }
+      await carregarDados();
+      toast.success(`Saída registrada! Novo saldo: ${selected.saldo_atual - qtd} ${selected.unidade_medida}`);
+      setDialogMov(null);
+    };
+
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Material *</span>
-          <AutoCompleteMaterial value={cod} onChange={setCod} />
-          {mat && (
+          <AutoCompleteMaterial
+            value={selected}
+            onChange={(m) => {
+              setSelected(m);
+              if (m) setTimeout(() => qtdRef.current?.focus(), 0);
+            }}
+            inputRef={inputRef}
+          />
+          {selected && (
             <span className="text-[10px] text-slate-400">
-              Saldo atual: {mat.saldo_atual} {mat.unidade_medida} | Mínimo: {mat.estoque_minimo}
+              Saldo disponível: {selected.saldo_atual} {selected.unidade_medida} | Mínimo: {selected.estoque_minimo}
             </span>
           )}
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Quantidade *</span>
           <input
+            ref={qtdRef}
             type="number"
             min={1}
-            max={mat?.saldo_atual || 1}
+            max={selected?.saldo_atual || 1}
             value={qtd}
             onChange={(e) => setQtd(Number(e.target.value) || 0)}
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
           />
+          {saldoInsuficiente && (
+            <span className="text-[11px] font-semibold text-red-600">
+              Saldo insuficiente: disponível {selected!.saldo_atual}, solicitado {qtd}
+            </span>
+          )}
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Destino (elevatória/local) *</span>
@@ -633,7 +642,7 @@ function EstoquePage() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Solicitante</span>
+          <span className="text-xs font-semibold text-slate-600">Solicitante *</span>
           <input
             value={solicitante}
             onChange={(e) => setSolicitante(e.target.value)}
@@ -641,7 +650,7 @@ function EstoquePage() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Responsável pela saída</span>
+          <span className="text-xs font-semibold text-slate-600">Responsável pela saída *</span>
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}
@@ -657,45 +666,89 @@ function EstoquePage() {
           />
         </label>
         <button
-          onClick={() =>
-            cod && qtd > 0 && destino && handleSaida(cod, qtd, destino, solicitante, resp, obs)
-          }
-          disabled={!cod || qtd <= 0 || !destino}
+          onClick={handleSalvar}
+          disabled={!valido || saving}
           className="rounded-md bg-red-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
         >
-          Registrar Saída
+          {saving ? "Salvando..." : "Registrar Saída"}
         </button>
       </div>
     );
   };
 
   const FormAjuste = () => {
-    const [cod, setCod] = useState("");
+    const [selected, setSelected] = useState<Material | null>(null);
     const [qtdNova, setQtdNova] = useState(0);
     const [motivo, setMotivo] = useState("");
-    const mat = materiais.find((m) => m.cod_sap === cod);
+    const [saving, setSaving] = useState(false);
+    const qtdRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const valido = selected !== null && qtdNova >= 0 && motivo.trim().length > 0;
+    const diff = selected !== null ? qtdNova - selected.saldo_atual : 0;
+
+    const handleSalvar = async () => {
+      if (!valido || !selected || saving) return;
+      setSaving(true);
+      const { error } = await supabase.from("movimentacoes").insert({
+        cod_sap: selected.cod_sap,
+        tipo: "AJUSTE",
+        quantidade: diff,
+        motivo_ajuste: motivo.trim(),
+        criado_por: user?.email || "",
+      });
+      if (error) {
+        toast.error("Erro ao registrar ajuste: " + error.message);
+        setSaving(false);
+        return;
+      }
+      await carregarDados();
+      toast.success(`Saldo ajustado de ${selected.saldo_atual} para ${qtdNova} ${selected.unidade_medida} (diferença: ${diff > 0 ? "+" : ""}${diff})`);
+      setDialogMov(null);
+    };
+
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Material *</span>
-          <AutoCompleteMaterial value={cod} onChange={setCod} />
-          {mat && (
-            <span className="text-[10px] text-slate-400">
-              Saldo atual: {mat.saldo_atual} {mat.unidade_medida}
-            </span>
-          )}
+          <AutoCompleteMaterial
+            value={selected}
+            onChange={(m) => {
+              setSelected(m);
+              if (m) {
+                setQtdNova(m.saldo_atual);
+                setTimeout(() => qtdRef.current?.focus(), 0);
+              }
+            }}
+            inputRef={inputRef}
+          />
         </label>
+        {selected && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-600">Saldo atual no sistema:</span>
+              <span className="text-lg font-bold">{selected.saldo_atual} {selected.unidade_medida}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">{selected.descricao}</div>
+          </div>
+        )}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">
-            Nova quantidade (saldo físico real) *
-          </span>
+          <span className="text-xs font-semibold text-slate-600">Novo saldo (físico real) *</span>
           <input
+            ref={qtdRef}
             type="number"
             min={0}
             value={qtdNova}
             onChange={(e) => setQtdNova(Number(e.target.value) || 0)}
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
           />
+          {selected && (
+            <span className={`text-[11px] ${diff !== 0 ? "font-semibold text-amber-600" : "text-slate-400"}`}>
+              {diff === 0
+                ? "Sem alteração"
+                : `Diferença: ${diff > 0 ? "+" : ""}${diff} ${selected.unidade_medida} (${diff > 0 ? "aumento" : "redução"})`}
+            </span>
+          )}
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Motivo do ajuste *</span>
@@ -703,32 +756,33 @@ function EstoquePage() {
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm"
-            placeholder="Ex: Inventário físico, diferença encontrada..."
+            placeholder="Ex: Inventário físico, correção de erro de lançamento..."
           />
         </label>
         <button
-          onClick={() => cod && motivo && handleAjuste(cod, qtdNova, motivo)}
-          disabled={!cod || !motivo}
+          onClick={handleSalvar}
+          disabled={!valido || saving}
           className="rounded-md bg-amber-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
         >
-          Registrar Ajuste
+          {saving ? "Salvando..." : "Registrar Ajuste"}
         </button>
       </div>
     );
   };
 
   const FormNovaCompra = () => {
-    const [cod, setCod] = useState("");
+    const [selected, setSelected] = useState<Material | null>(null);
     const [qtd, setQtd] = useState(1);
     const [fornecedor, setFornecedor] = useState("");
     const [dataPrev, setDataPrev] = useState("");
     const [obs, setObs] = useState("");
-    const mat = materiais.find((m) => m.cod_sap === cod);
+    const qtdRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const mat = selected;
 
-    // Sugestão baseada em consumo médio
     const sugestao = useMemo(() => {
-      if (!cod) return 0;
-      const saidas = movimentacoes.filter((m) => m.cod_sap === cod && m.tipo === "SAIDA");
+      if (!selected) return 0;
+      const saidas = movimentacoes.filter((m) => m.cod_sap === selected.cod_sap && m.tipo === "SAIDA");
       if (saidas.length < 2) return 0;
       const total = saidas.reduce((s, m) => s + m.quantidade, 0);
       const meses = Math.max(
@@ -738,13 +792,20 @@ function EstoquePage() {
         ),
       );
       return Math.ceil(total / meses);
-    }, [cod, movimentacoes]);
+    }, [selected, movimentacoes]);
 
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Material *</span>
-          <AutoCompleteMaterial value={cod} onChange={setCod} />
+          <AutoCompleteMaterial
+            value={selected}
+            onChange={(m) => {
+              setSelected(m);
+              if (m) setTimeout(() => qtdRef.current?.focus(), 0);
+            }}
+            inputRef={inputRef}
+          />
           {mat && (
             <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
               <span>
@@ -766,6 +827,7 @@ function EstoquePage() {
             )}
           </span>
           <input
+            ref={qtdRef}
             type="number"
             min={1}
             value={qtd}
@@ -802,10 +864,10 @@ function EstoquePage() {
         </label>
         <button
           onClick={() =>
-            cod &&
+            selected &&
             qtd > 0 &&
             handleNovaCompra({
-              cod_sap: cod,
+              cod_sap: selected.cod_sap,
               quantidade_solicitada: qtd,
               fornecedor,
               data_prevista_entrega: dataPrev || null,
@@ -813,7 +875,7 @@ function EstoquePage() {
               solicitante: profile?.nome_completo || user?.email || "",
             })
           }
-          disabled={!cod || qtd <= 0}
+          disabled={!selected || qtd <= 0}
           className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
         >
           Solicitar Compra
