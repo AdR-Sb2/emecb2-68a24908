@@ -27,6 +27,10 @@ import {
   Box,
   BarChart3,
   List,
+  Settings,
+  ArrowUp,
+  ArrowDown,
+  Tag,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
@@ -45,15 +49,14 @@ import {
   Material,
   Movimentacao,
   Compra,
-  CategoriaMaterial,
+  Categoria,
   StatusCompra,
   TipoMovimentacao,
   OrigemMovimentacao,
-  CATEGORIAS,
-  CATEGORIA_LABEL,
   STATUS_COMPRA_CORES,
   getStatusEstoque,
   getStatusCor,
+  getCategoriaNome,
   StatusEstoque,
 } from "@/lib/estoque-types";
 import {
@@ -67,6 +70,10 @@ import {
   PieChart,
   Pie,
   LabelList,
+  LineChart,
+  Line,
+  CartesianGrid,
+  Legend,
 } from "recharts";
 
 export const Route = createFileRoute("/estoque")({
@@ -82,6 +89,7 @@ function EstoquePage() {
   const { user, profile } = useAuth();
   const [aba, setAba] = useState<"estoque" | "compras" | "registros">("estoque");
   const [materiais, setMateriais] = useState<Material[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +107,8 @@ function EstoquePage() {
   const [dialogHistorico, setDialogHistorico] = useState(false);
   const [dialogCompra, setDialogCompra] = useState(false);
   const [dialogImportar, setDialogImportar] = useState(false);
+  const [dialogCategorias, setDialogCategorias] = useState(false);
+  const [dialogMaterial, setDialogMaterial] = useState(false);
   const [editandoMinimo, setEditandoMinimo] = useState<string | null>(null);
   const [editandoValor, setEditandoValor] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -111,12 +121,14 @@ function EstoquePage() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const [matRes, movRes, compRes] = await Promise.all([
-        supabase.from("materiais").select("*").order("cod_sap"),
+      const [matRes, catRes, movRes, compRes] = await Promise.all([
+        supabase.from("materiais").select("*, categorias(id, nome, ativo)").order("cod_sap"),
+        supabase.from("categorias").select("*").order("nome"),
         supabase.from("movimentacoes").select("*").order("data", { ascending: false }).limit(5000),
         supabase.from("compras").select("*").order("data_solicitacao", { ascending: false }),
       ]);
       if (matRes.data) setMateriais(matRes.data as Material[]);
+      if (catRes.data) setCategorias(catRes.data as Categoria[]);
       if (movRes.data) setMovimentacoes(movRes.data as Movimentacao[]);
       if (compRes.data) setCompras(compRes.data as Compra[]);
     } catch (err) {
@@ -147,7 +159,8 @@ function EstoquePage() {
         (m) => m.cod_sap.toLowerCase().includes(q) || m.descricao.toLowerCase().includes(q),
       );
     }
-    if (filtroCategoria !== "TODAS") list = list.filter((m) => m.categoria === filtroCategoria);
+    if (filtroCategoria !== "TODAS")
+      list = list.filter((m) => String(m.categoria_id) === filtroCategoria);
     if (filtroStatus !== "TODAS") list = list.filter((m) => m._status === filtroStatus);
     if (filtroCritico) list = list.filter((m) => m.material_critico);
     if (filtroElevatoria) list = list.filter((m) => m.vinculo_elevatoria === filtroElevatoria);
@@ -218,7 +231,9 @@ function EstoquePage() {
     );
     if (filtroCategoriaDestino !== "TODAS") {
       const codsCategoria = new Set(
-        materiais.filter((mat) => mat.categoria === filtroCategoriaDestino).map((mat) => mat.cod_sap),
+        materiais
+          .filter((mat) => String(mat.categoria_id) === filtroCategoriaDestino)
+          .map((mat) => mat.cod_sap),
       );
       movs = movs.filter((m) => codsCategoria.has(m.cod_sap));
     }
@@ -341,6 +356,31 @@ function EstoquePage() {
     toast.success("Status atualizado!");
   };
 
+  const categoriasAtivas = useMemo(
+    () => categorias.filter((c) => c.ativo),
+    [categorias],
+  );
+
+  const resolverCategoriaId = (valor: string): number | null => {
+    const v = valor.trim().toLowerCase();
+    if (!v) return categorias.find((c) => c.nome === "Outros")?.id ?? null;
+    const porId = categorias.find((c) => String(c.id) === v);
+    if (porId) return porId.id;
+    const porNome = categorias.find((c) => c.nome.toLowerCase() === v);
+    if (porNome) return porNome.id;
+    const slugMap: Record<string, string> = {
+      eletrico: "Elétrico",
+      mecanico: "Mecânico",
+      hidraulico: "Hidráulico",
+      epi: "EPI",
+      consumivel: "Consumível",
+      outros: "Outros",
+    };
+    const nome = slugMap[v];
+    if (nome) return categorias.find((c) => c.nome === nome)?.id ?? null;
+    return categorias.find((c) => c.nome === "Outros")?.id ?? null;
+  };
+
   const handleImportarCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -358,14 +398,14 @@ function EstoquePage() {
     let importados = 0;
     for (const d of dados) {
       if (!d.cod_sap || !d.descricao) continue;
+      const categoriaId = resolverCategoriaId(d.categoria || d.categoria_id || "");
+      if (!categoriaId) continue;
       const { error } = await supabase.from("materiais").upsert(
         {
           cod_sap: d.cod_sap,
           descricao: d.descricao,
           unidade_medida: d.unidade_medida || "UN",
-          categoria: (CATEGORIAS.includes(d.categoria as CategoriaMaterial)
-            ? d.categoria
-            : "outros") as CategoriaMaterial,
+          categoria_id: categoriaId,
           fabricante: d.fabricante || "",
           local_armazenagem: d.local_armazenagem || "",
           estoque_minimo: Number(d.estoque_minimo) || 0,
@@ -398,9 +438,22 @@ function EstoquePage() {
       "saldo_atual",
       "custo_unitario",
     ];
-    const rows = materiais.map((m) =>
-      headers.map((h) => `"${String((m as any)[h] ?? "").replace(/"/g, '""')}"`).join(","),
-    );
+    const rows = materiais.map((m) => {
+      const row: Record<string, string | number | boolean> = {
+        cod_sap: m.cod_sap,
+        descricao: m.descricao,
+        unidade_medida: m.unidade_medida,
+        categoria: getCategoriaNome(m),
+        fabricante: m.fabricante,
+        local_armazenagem: m.local_armazenagem,
+        estoque_minimo: m.estoque_minimo,
+        material_critico: m.material_critico,
+        vinculo_elevatoria: m.vinculo_elevatoria,
+        saldo_atual: m.saldo_atual,
+        custo_unitario: m.custo_unitario,
+      };
+      return headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(",");
+    });
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1021,21 +1074,459 @@ function EstoquePage() {
     );
   };
 
+  const FormNovoMaterial = () => {
+    const [codSap, setCodSap] = useState("");
+    const [descricao, setDescricao] = useState("");
+    const [unidade, setUnidade] = useState("UN");
+    const [categoriaId, setCategoriaId] = useState(
+      () => String(categoriasAtivas.find((c) => c.nome === "Outros")?.id ?? categoriasAtivas[0]?.id ?? ""),
+    );
+    const [fabricante, setFabricante] = useState("");
+    const [local, setLocal] = useState("");
+    const [minimo, setMinimo] = useState(0);
+    const [critico, setCritico] = useState(false);
+    const [elevatoria, setElevatoria] = useState("");
+    const [saldo, setSaldo] = useState(0);
+    const [saving, setSaving] = useState(false);
+
+    const valido = codSap.trim() && descricao.trim() && categoriaId;
+
+    const handleSalvar = async () => {
+      if (!valido) return;
+      setSaving(true);
+      const { error } = await supabase.from("materiais").upsert(
+        {
+          cod_sap: codSap.trim(),
+          descricao: descricao.trim(),
+          unidade_medida: unidade.trim() || "UN",
+          categoria_id: Number(categoriaId),
+          fabricante: fabricante.trim(),
+          local_armazenagem: local.trim(),
+          estoque_minimo: minimo,
+          material_critico: critico,
+          vinculo_elevatoria: elevatoria.trim(),
+          saldo_atual: saldo,
+          ativo: true,
+        },
+        { onConflict: "cod_sap" },
+      );
+      setSaving(false);
+      if (error) {
+        toast.error("Erro ao salvar material: " + error.message);
+        return;
+      }
+      await carregarDados();
+      toast.success("Material cadastrado!");
+      setDialogMaterial(false);
+    };
+
+    return (
+      <div className="grid gap-3 py-2 text-sm">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Código SAP *</span>
+          <input
+            value={codSap}
+            onChange={(e) => setCodSap(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            placeholder="Ex: 12345678"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Descrição *</span>
+          <input
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Unidade</span>
+            <input
+              value={unidade}
+              onChange={(e) => setUnidade(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Categoria *</span>
+            <select
+              value={categoriaId}
+              onChange={(e) => setCategoriaId(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+            >
+              {categoriasAtivas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Fabricante</span>
+            <input
+              value={fabricante}
+              onChange={(e) => setFabricante(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Local de armazenagem</span>
+            <input
+              value={local}
+              onChange={(e) => setLocal(e.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Estoque mínimo</span>
+            <input
+              type="number"
+              min={0}
+              value={minimo}
+              onChange={(e) => setMinimo(Number(e.target.value))}
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-600">Saldo inicial</span>
+            <input
+              type="number"
+              min={0}
+              value={saldo}
+              onChange={(e) => setSaldo(Number(e.target.value))}
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            />
+          </label>
+        </div>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Elevatória vinculada</span>
+          <input
+            value={elevatoria}
+            onChange={(e) => setElevatoria(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+          />
+        </label>
+        <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={critico}
+            onChange={(e) => setCritico(e.target.checked)}
+          />
+          <Star className="h-3.5 w-3.5 text-amber-500" /> Material crítico
+        </label>
+        <button
+          onClick={handleSalvar}
+          disabled={!valido || saving}
+          className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+        >
+          {saving ? "Salvando..." : "Cadastrar Material"}
+        </button>
+      </div>
+    );
+  };
+
+  const GerenciarCategorias = () => {
+    const [novaNome, setNovaNome] = useState("");
+    const [editandoId, setEditandoId] = useState<number | null>(null);
+    const [editandoNome, setEditandoNome] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    const handleCriar = async () => {
+      const nome = novaNome.trim();
+      if (!nome) return;
+      setSaving(true);
+      const { error } = await supabase.from("categorias").insert({ nome });
+      setSaving(false);
+      if (error) {
+        toast.error("Erro ao criar categoria: " + error.message);
+        return;
+      }
+      setNovaNome("");
+      await carregarDados();
+      toast.success("Categoria criada!");
+    };
+
+    const handleSalvarEdicao = async (id: number) => {
+      const nome = editandoNome.trim();
+      if (!nome) return;
+      setSaving(true);
+      const { error } = await supabase.from("categorias").update({ nome }).eq("id", id);
+      setSaving(false);
+      if (error) {
+        toast.error("Erro ao atualizar: " + error.message);
+        return;
+      }
+      setEditandoId(null);
+      await carregarDados();
+      toast.success("Categoria atualizada!");
+    };
+
+    const handleToggleAtivo = async (cat: Categoria) => {
+      const { error } = await supabase
+        .from("categorias")
+        .update({ ativo: !cat.ativo })
+        .eq("id", cat.id);
+      if (error) {
+        toast.error("Erro: " + error.message);
+        return;
+      }
+      await carregarDados();
+      toast.success(cat.ativo ? "Categoria desativada" : "Categoria reativada");
+    };
+
+    return (
+      <div className="py-2">
+        <div className="mb-4 flex gap-2">
+          <input
+            value={novaNome}
+            onChange={(e) => setNovaNome(e.target.value)}
+            placeholder="Nome da nova categoria..."
+            className="min-h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm shadow-sm"
+            onKeyDown={(e) => e.key === "Enter" && handleCriar()}
+          />
+          <button
+            onClick={handleCriar}
+            disabled={!novaNome.trim() || saving}
+            className="rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+          >
+            <Plus className="mr-1 inline h-4 w-4" /> Criar
+          </button>
+        </div>
+        <div className="max-h-80 space-y-2 overflow-auto">
+          {categorias.length === 0 && (
+            <p className="py-4 text-center text-sm text-slate-400">Nenhuma categoria cadastrada.</p>
+          )}
+          {categorias.map((cat) => (
+            <div
+              key={cat.id}
+              className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${
+                cat.ativo ? "border-slate-200 bg-white" : "border-slate-100 bg-slate-50 opacity-60"
+              }`}
+            >
+              {editandoId === cat.id ? (
+                <div className="flex flex-1 items-center gap-2">
+                  <input
+                    value={editandoNome}
+                    onChange={(e) => setEditandoNome(e.target.value)}
+                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSalvarEdicao(cat.id);
+                      if (e.key === "Escape") setEditandoId(null);
+                    }}
+                  />
+                  <button
+                    onClick={() => handleSalvarEdicao(cat.id)}
+                    className="rounded bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-700"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => setEditandoId(null)}
+                    className="rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-[#0b3a73]" />
+                    <span className="font-medium text-slate-800">{cat.nome}</span>
+                    {!cat.ativo && (
+                      <Badge variant="outline" className="text-[10px] text-slate-400">
+                        Inativa
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditandoId(cat.id);
+                        setEditandoNome(cat.nome);
+                      }}
+                      className="rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-200"
+                    >
+                      <Edit3 className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => handleToggleAtivo(cat)}
+                      className={`rounded px-2 py-1 text-[11px] font-bold ${
+                        cat.ativo
+                          ? "bg-red-50 text-red-600 hover:bg-red-100"
+                          : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                      }`}
+                    >
+                      {cat.ativo ? "Desativar" : "Reativar"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const AbaRegistros = ({
     movimentacoes: movs,
     materiais: mats,
+    categorias: cats,
   }: {
     movimentacoes: Movimentacao[];
     materiais: Material[];
+    categorias: Categoria[];
   }) => {
     const [filtroTipo, setFiltroTipo] = useState<TipoMovimentacao | "TODAS">("TODAS");
     const [filtroOrigem, setFiltroOrigem] = useState<OrigemMovimentacao | "TODAS">("TODAS");
+    const [filtroCategoriaGrafico, setFiltroCategoriaGrafico] = useState<string>("TODAS");
     const [dataInicio, setDataInicio] = useState("");
     const [dataFim, setDataFim] = useState("");
     const [search, setSearch] = useState("");
     const [destinoFilter, setDestinoFilter] = useState("");
     const [page, setPage] = useState(0);
     const pageSize = 50;
+
+    const codsNaCategoria = useMemo(() => {
+      if (filtroCategoriaGrafico === "TODAS") return null;
+      return new Set(
+        mats
+          .filter((m) => String(m.categoria_id) === filtroCategoriaGrafico)
+          .map((m) => m.cod_sap),
+      );
+    }, [mats, filtroCategoriaGrafico]);
+
+    const movsGrafico = useMemo(() => {
+      let list = movs.filter((m) => m.afeta_saldo !== false);
+      if (codsNaCategoria) list = list.filter((m) => codsNaCategoria.has(m.cod_sap));
+      return list;
+    }, [movs, codsNaCategoria]);
+
+    const mesLabel = (d: Date) =>
+      d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+
+    const ultimos12Meses = useMemo(() => {
+      const meses: { key: string; label: string; inicio: Date; fim: Date }[] = [];
+      const now = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const inicio = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const fim = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+        const key = `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, "0")}`;
+        meses.push({ key, label: mesLabel(inicio), inicio, fim });
+      }
+      return meses;
+    }, []);
+
+    const dadosBarras = useMemo(() => {
+      return ultimos12Meses.map((mes) => {
+        const noMes = movsGrafico.filter((m) => {
+          if (!m.data) return false;
+          const d = new Date(m.data);
+          return d >= mes.inicio && d <= mes.fim;
+        });
+        const entradas = noMes
+          .filter((m) => m.tipo === "ENTRADA")
+          .reduce((s, m) => s + m.quantidade, 0);
+        const saidas = noMes
+          .filter((m) => m.tipo === "SAIDA")
+          .reduce((s, m) => s + m.quantidade, 0);
+        return { mes: mes.label, entradas, saidas };
+      });
+    }, [movsGrafico, ultimos12Meses]);
+
+    const dadosSaldoLinha = useMemo(() => {
+      const cods =
+        codsNaCategoria ?? new Set(mats.map((m) => m.cod_sap));
+      const matsFiltrados = mats.filter((m) => cods.has(m.cod_sap));
+      const saldos = new Map(matsFiltrados.map((m) => [m.cod_sap, m.saldo_atual]));
+
+      const movsRelevantes = movsGrafico
+        .filter((m) => m.data && cods.has(m.cod_sap))
+        .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
+      const pontos: { mes: string; saldo: number }[] = [];
+
+      for (let i = ultimos12Meses.length - 1; i >= 0; i--) {
+        const mes = ultimos12Meses[i];
+        const total = Array.from(saldos.values()).reduce((s, v) => s + v, 0);
+        pontos.unshift({ mes: mes.label, saldo: Math.round(total * 100) / 100 });
+
+        const noMes = movsRelevantes.filter((m) => {
+          const d = new Date(m.data);
+          return d >= mes.inicio && d <= mes.fim;
+        });
+
+        for (const mov of noMes) {
+          const atual = saldos.get(mov.cod_sap) ?? 0;
+          if (mov.tipo === "ENTRADA") saldos.set(mov.cod_sap, atual - mov.quantidade);
+          else if (mov.tipo === "SAIDA") saldos.set(mov.cod_sap, atual + mov.quantidade);
+          else if (mov.tipo === "AJUSTE") {
+            const anteriores = movsGrafico
+              .filter(
+                (m) =>
+                  m.cod_sap === mov.cod_sap &&
+                  m.data &&
+                  new Date(m.data) < new Date(mov.data) &&
+                  m.afeta_saldo !== false,
+              )
+              .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+            let saldoAntes = 0;
+            for (const ant of anteriores) {
+              if (ant.tipo === "ENTRADA") saldoAntes += ant.quantidade;
+              else if (ant.tipo === "SAIDA") saldoAntes -= ant.quantidade;
+              else if (ant.tipo === "AJUSTE") {
+                saldoAntes = ant.quantidade;
+                break;
+              }
+            }
+            saldos.set(mov.cod_sap, saldoAntes);
+          }
+        }
+      }
+
+      return pontos;
+    }, [movsGrafico, mats, codsNaCategoria, ultimos12Meses]);
+
+    const comparativoMes = useMemo(() => {
+      const now = new Date();
+      const inicioAtual = new Date(now.getFullYear(), now.getMonth(), 1);
+      const inicioAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const fimAnterior = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+      const noPeriodo = (inicio: Date, fim: Date) =>
+        movsGrafico.filter((m) => {
+          if (!m.data) return false;
+          const d = new Date(m.data);
+          return d >= inicio && d <= fim;
+        });
+
+      const atual = noPeriodo(inicioAtual, now);
+      const anterior = noPeriodo(inicioAnterior, fimAnterior);
+
+      const sumTipo = (list: Movimentacao[], tipo: TipoMovimentacao) =>
+        list.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.quantidade, 0);
+
+      const entradasAtual = sumTipo(atual, "ENTRADA");
+      const saidasAtual = sumTipo(atual, "SAIDA");
+      const entradasAnterior = sumTipo(anterior, "ENTRADA");
+      const saidasAnterior = sumTipo(anterior, "SAIDA");
+
+      const variacao = (atual: number, anterior: number) =>
+        anterior === 0 ? (atual > 0 ? 100 : 0) : Math.round(((atual - anterior) / anterior) * 100);
+
+      return {
+        entradasAtual,
+        saidasAtual,
+        varEntradas: variacao(entradasAtual, entradasAnterior),
+        varSaidas: variacao(saidasAtual, saidasAnterior),
+      };
+    }, [movsGrafico]);
 
     const filtered = useMemo(() => {
       let list = [...movs];
@@ -1080,6 +1571,124 @@ function EstoquePage() {
 
     return (
       <div>
+        {/* Dashboard */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-[#0b3a73]">
+              <BarChart3 className="mr-1 inline h-4 w-4" /> Resumo de Movimentações
+            </h2>
+            <select
+              value={filtroCategoriaGrafico}
+              onChange={(e) => setFiltroCategoriaGrafico(e.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[13px] shadow-sm"
+            >
+              <option value="TODAS">Todas categorias</option>
+              {cats.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Card>
+              <CardContent className="flex items-center justify-around py-4">
+                <div className="text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                    Entradas (mês atual)
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-700">
+                    {comparativoMes.entradasAtual}
+                  </p>
+                  <p
+                    className={`mt-0.5 flex items-center justify-center gap-0.5 text-[12px] font-semibold ${
+                      comparativoMes.varEntradas >= 0 ? "text-emerald-600" : "text-red-500"
+                    }`}
+                  >
+                    {comparativoMes.varEntradas >= 0 ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )}
+                    {Math.abs(comparativoMes.varEntradas)}% vs mês anterior
+                  </p>
+                </div>
+                <div className="h-12 w-px bg-slate-200" />
+                <div className="text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-red-600">
+                    Saídas (mês atual)
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-red-700">
+                    {comparativoMes.saidasAtual}
+                  </p>
+                  <p
+                    className={`mt-0.5 flex items-center justify-center gap-0.5 text-[12px] font-semibold ${
+                      comparativoMes.varSaidas <= 0 ? "text-emerald-600" : "text-red-500"
+                    }`}
+                  >
+                    {comparativoMes.varSaidas >= 0 ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )}
+                    {Math.abs(comparativoMes.varSaidas)}% vs mês anterior
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-xs font-semibold text-slate-600">
+                  Saldo total acumulado
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-3">
+                <div className="h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dadosSaldoLinha} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} width={40} />
+                      <Tooltip formatter={(v: number) => [`${v} un.`, "Saldo"]} />
+                      <Line
+                        type="monotone"
+                        dataKey="saldo"
+                        stroke="#0b3a73"
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: "#0b3a73" }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-xs font-semibold text-slate-600">
+                Entradas x Saídas por mês (últimos 12 meses)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dadosBarras} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} width={40} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="entradas" name="Entradas" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="saidas" name="Saídas" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Filtros */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <select
@@ -1266,13 +1875,29 @@ function EstoquePage() {
   };
 
   const HistoricoMaterial = ({ material }: { material: Material }) => {
-    const movs = movimentacoes.filter((m) => m.cod_sap === material.cod_sap);
+    const movs = movimentacoes
+      .filter((m) => m.cod_sap === material.cod_sap)
+      .sort((a, b) => {
+        const ta = a.data ? new Date(a.data).getTime() : 0;
+        const tb = b.data ? new Date(b.data).getTime() : 0;
+        return tb - ta;
+      });
+
+    const tipoIcon = (tipo: TipoMovimentacao) => {
+      if (tipo === "ENTRADA")
+        return { bg: "bg-emerald-500", symbol: "+", label: "Entrada" };
+      if (tipo === "SAIDA")
+        return { bg: "bg-red-500", symbol: "−", label: "Saída" };
+      return { bg: "bg-orange-500", symbol: "~", label: "Ajuste" };
+    };
+
     return (
       <div className="text-sm">
-        <div className="mb-3 flex items-center justify-between rounded-lg bg-slate-50 p-3">
+        {/* Topo */}
+        <div className="mb-6 flex items-center justify-between rounded-xl bg-slate-50 p-4">
           <div>
             <span className="font-mono text-lg font-bold text-[#0b3a73]">{material.cod_sap}</span>
-            <p className="text-slate-600">{material.descricao}</p>
+            <p className="mt-0.5 text-slate-700">{material.descricao}</p>
           </div>
           <div className="text-right">
             <div
@@ -1286,51 +1911,130 @@ function EstoquePage() {
             <div className="text-[11px] text-slate-400">{material.unidade_medida}</div>
           </div>
         </div>
-        <div className="max-h-80 space-y-1 overflow-auto">
-          {movs.length === 0 && (
-            <p className="text-slate-400 py-4 text-center">Nenhuma movimentação registrada.</p>
-          )}
-          {movs.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-center justify-between rounded border border-slate-100 px-3 py-2 text-[13px]"
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${m.tipo === "ENTRADA" ? "bg-emerald-500" : m.tipo === "SAIDA" ? "bg-red-500" : "bg-amber-500"}`}
-                >
-                  {m.tipo === "ENTRADA" ? "+" : m.tipo === "SAIDA" ? "-" : "~"}
-                </span>
-                <span className="font-semibold">
-                  {m.tipo === "AJUSTE"
-                    ? m.quantidade
-                    : m.tipo === "ENTRADA"
-                      ? `+${m.quantidade}`
-                      : `-${m.quantidade}`}
-                </span>
-                <span className="text-slate-500">{m.destino && `→ ${m.destino}`}</span>
-              </div>
-              <div className="flex items-center gap-2 text-right text-[11px] text-slate-400">
-                <span
-                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                    m.origem === "SISTEMA"
-                      ? "bg-blue-100 text-blue-600"
-                      : "bg-slate-200 text-slate-500"
-                  }`}
-                >
-                  {m.origem === "SISTEMA" ? "Sistema" : "Hist."}
-                </span>
-                <div>
-                  <div>
-                    {m.data
-                      ? new Date(m.data).toLocaleDateString("pt-BR")
-                      : <span className="italic text-slate-400">Sem data</span>}
-                  </div>
-                  {m.responsavel && <div>{m.responsavel}</div>}
-                </div>
-              </div>
+
+        {/* Dados Cadastrais */}
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0b3a73]">
+            Dados Cadastrais
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-medium text-slate-400">Categoria</p>
+              <p className="font-medium text-slate-800">{getCategoriaNome(material)}</p>
             </div>
-          ))}
+            <div>
+              <p className="text-[11px] font-medium text-slate-400">Estoque mínimo</p>
+              <p className="font-medium text-slate-800">
+                {material.estoque_minimo} {material.unidade_medida}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-400">Fabricante</p>
+              <p className="text-slate-700">{material.fabricante || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-400">Local de armazenagem</p>
+              <p className="text-slate-700">{material.local_armazenagem || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-400">Elevatória vinculada</p>
+              <p className="text-slate-700">{material.vinculo_elevatoria || "—"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-400">Status crítico</p>
+              <p className="flex items-center gap-1 font-medium text-slate-800">
+                {material.material_critico ? (
+                  <>
+                    <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> Crítico
+                  </>
+                ) : (
+                  <span className="text-slate-500">Não</span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Histórico de Movimentações */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-[#0b3a73]">
+            Histórico de Movimentações
+          </h3>
+          <div className="max-h-80 space-y-3 overflow-auto">
+            {movs.length === 0 && (
+              <p className="py-6 text-center text-slate-400">Nenhuma movimentação registrada.</p>
+            )}
+            {movs.map((m) => {
+              const icon = tipoIcon(m.tipo);
+              return (
+                <div
+                  key={m.id}
+                  className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3"
+                >
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${icon.bg}`}
+                  >
+                    {icon.symbol}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span
+                        className={`text-base font-bold ${
+                          m.tipo === "ENTRADA"
+                            ? "text-emerald-600"
+                            : m.tipo === "SAIDA"
+                              ? "text-red-600"
+                              : "text-orange-600"
+                        }`}
+                      >
+                        {m.tipo === "AJUSTE"
+                          ? m.quantidade
+                          : m.tipo === "ENTRADA"
+                            ? `+${m.quantidade}`
+                            : `−${m.quantidade}`}{" "}
+                        <span className="text-[11px] font-normal text-slate-400">
+                          {material.unidade_medida}
+                        </span>
+                      </span>
+                      <span className="text-[12px] text-slate-500">
+                        {m.data ? (
+                          new Date(m.data).toLocaleDateString("pt-BR")
+                        ) : (
+                          <em className="text-slate-400">sem data</em>
+                        )}
+                      </span>
+                    </div>
+                    {(m.responsavel || m.solicitante) && (
+                      <p className="mt-1 text-[13px] text-slate-700">
+                        <span className="text-[11px] font-medium text-slate-400">
+                          Responsável:{" "}
+                        </span>
+                        {m.responsavel || m.solicitante}
+                      </p>
+                    )}
+                    {m.destino && (
+                      <p className="mt-0.5 text-[13px] text-slate-600">
+                        <span className="text-[11px] font-medium text-slate-400">Origem: </span>
+                        {m.destino}
+                      </p>
+                    )}
+                    {m.observacao && (
+                      <p className="mt-1 text-[12px] italic text-slate-500">{m.observacao}</p>
+                    )}
+                    <span
+                      className={`mt-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+                        m.origem === "SISTEMA"
+                          ? "bg-blue-100 text-blue-600"
+                          : "bg-slate-200 text-slate-500"
+                      }`}
+                    >
+                      {m.origem === "SISTEMA" ? "Sistema" : "Histórico"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
@@ -1431,6 +2135,22 @@ function EstoquePage() {
               >
                 <Upload className="h-4 w-4" /> Importar
               </button>
+              {podeEditar && (
+                <>
+                  <button
+                    onClick={() => setDialogMaterial(true)}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                  >
+                    <Plus className="h-4 w-4" /> Novo Material
+                  </button>
+                  <button
+                    onClick={() => setDialogCategorias(true)}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                  >
+                    <Settings className="h-4 w-4" /> Gerenciar Categorias
+                  </button>
+                </>
+              )}
             </>
           )}
           {aba === "compras" && (
@@ -1562,9 +2282,9 @@ function EstoquePage() {
                     className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] shadow-sm"
                   >
                     <option value="TODAS">Todas categorias</option>
-                    {CATEGORIAS.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORIA_LABEL[c]}
+                    {categorias.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
                       </option>
                     ))}
                   </select>
@@ -1669,9 +2389,9 @@ function EstoquePage() {
                 className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
               >
                 <option value="TODAS">Todas categorias</option>
-                {CATEGORIAS.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORIA_LABEL[c]}
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
                   </option>
                 ))}
               </select>
@@ -1759,7 +2479,7 @@ function EstoquePage() {
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5">
                         <Badge variant="outline" className="text-[10px]">
-                          {CATEGORIA_LABEL[m.categoria] || m.categoria}
+                          {getCategoriaNome(m)}
                         </Badge>
                       </td>
                       <td
@@ -2002,6 +2722,7 @@ function EstoquePage() {
         <AbaRegistros
           movimentacoes={movimentacoes}
           materiais={materiais}
+          categorias={categorias}
         />
       )}
 
@@ -2040,7 +2761,7 @@ function EstoquePage() {
       </Dialog>
 
       <Dialog open={dialogHistorico} onOpenChange={setDialogHistorico}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0b3a73]">
               <Eye className="mr-1 inline h-4 w-4" /> Histórico do Material
@@ -2077,6 +2798,7 @@ function EstoquePage() {
               </code>
             </p>
             <p className="mb-4 text-xs text-slate-400">
+              O campo <code>categoria</code> aceita o nome da categoria (ex: Elétrico) ou ID.
               Materiais com mesmo <code>cod_sap</code> serão atualizados.
             </p>
             <input
@@ -2087,6 +2809,28 @@ function EstoquePage() {
               className="block w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#0b3a73] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-[#1f7ad6]"
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dialogCategorias} onOpenChange={setDialogCategorias}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <Tag className="mr-1 inline h-4 w-4" /> Gerenciar Categorias
+            </DialogTitle>
+          </DialogHeader>
+          <GerenciarCategorias />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dialogMaterial} onOpenChange={setDialogMaterial}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <Package className="mr-1 inline h-4 w-4" /> Cadastrar Material
+            </DialogTitle>
+          </DialogHeader>
+          <FormNovoMaterial />
         </DialogContent>
       </Dialog>
     </div>

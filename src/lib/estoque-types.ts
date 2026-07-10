@@ -1,28 +1,9 @@
-export type CategoriaMaterial =
-  | "eletrico"
-  | "mecanico"
-  | "hidraulico"
-  | "epi"
-  | "consumivel"
-  | "outros";
-
-export const CATEGORIAS: CategoriaMaterial[] = [
-  "eletrico",
-  "mecanico",
-  "hidraulico",
-  "epi",
-  "consumivel",
-  "outros",
-];
-
-export const CATEGORIA_LABEL: Record<CategoriaMaterial, string> = {
-  eletrico: "Elétrico",
-  mecanico: "Mecânico",
-  hidraulico: "Hidráulico",
-  epi: "EPI",
-  consumivel: "Consumível",
-  outros: "Outros",
-};
+export interface Categoria {
+  id: number;
+  nome: string;
+  ativo: boolean;
+  criado_em?: string;
+}
 
 export type TipoMovimentacao = "ENTRADA" | "SAIDA" | "AJUSTE";
 export type OrigemMovimentacao = "HISTORICO_PLANILHA" | "SISTEMA";
@@ -47,7 +28,8 @@ export interface Material {
   cod_sap: string;
   descricao: string;
   unidade_medida: string;
-  categoria: CategoriaMaterial;
+  categoria_id: number;
+  categorias?: Categoria | null;
   fabricante: string;
   local_armazenagem: string;
   estoque_minimo: number;
@@ -58,6 +40,10 @@ export interface Material {
   custo_unitario: number;
   criado_em: string;
   atualizado_em: string;
+}
+
+export function getCategoriaNome(m: Material): string {
+  return m.categorias?.nome ?? "—";
 }
 
 export interface Movimentacao {
