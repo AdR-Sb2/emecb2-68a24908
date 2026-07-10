@@ -172,6 +172,13 @@ function EstoquePage() {
         supabase.from("movimentacoes").select("*").order("data", { ascending: false }).limit(5000),
         supabase.from("compras").select("*").order("dt_criacao_rc", { ascending: false }),
       ]);
+      if (matRes.error) console.error("Erro ao carregar materiais:", matRes.error.message);
+      if (catRes.error) console.error("Erro ao carregar categorias:", catRes.error.message);
+      if (movRes.error) console.error("Erro ao carregar movimentações:", movRes.error.message);
+      if (compRes.error) {
+        console.error("Erro ao carregar compras:", compRes.error.message);
+        toast.error("Erro ao carregar compras: " + compRes.error.message);
+      }
       if (matRes.data) setMateriais(matRes.data as Material[]);
       if (catRes.data) setCategorias(catRes.data as Categoria[]);
       if (movRes.data) setMovimentacoes(movRes.data as Movimentacao[]);
