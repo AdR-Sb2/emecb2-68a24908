@@ -12,7 +12,7 @@ import pandas as pd
 import requests
 import time
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 EXCEL_PATH = "/workspaces/emecbx2/ALMOXARIFADO ELETROMECANICA BXD2.xlsx"
@@ -40,30 +40,41 @@ def carregar_materiais():
 
 
 # ── Util: parse de data ──
+# Excel epoch: 1899-12-30 (accounting for Lotus 123 bug)
+EXCEL_EPOCH = datetime(1899, 12, 30)
+
 def parse_data(val):
     if pd.isna(val):
         return None
-    val = str(val).strip()
-    if not val or val.upper() in ("ANTIGO", "N/A", ""):
+
+    # Se já veio como datetime/Timestamp do pandas
+    if isinstance(val, (datetime, pd.Timestamp)):
+        return val.isoformat() if isinstance(val, datetime) else val.to_pydatetime().isoformat()
+
+    # Se veio como número (Excel serial date)
+    if isinstance(val, (int, float)):
+        serial = int(val)
+        if 1 < serial < 100000:
+            dt = EXCEL_EPOCH + timedelta(days=serial)
+            if 1900 <= dt.year <= 2100:
+                return dt.isoformat()
         return None
-    # Tentar dd.mm.yy
-    try:
-        dt = datetime.strptime(val, "%d.%m.%y")
-        return dt.isoformat()
-    except ValueError:
-        pass
-    # Tentar dd/mm/yyyy
-    try:
-        dt = datetime.strptime(val, "%d/%m/%Y")
-        return dt.isoformat()
-    except ValueError:
-        pass
-    # Tentar iso yyyy-mm-dd
-    try:
-        dt = datetime.strptime(val[:10], "%Y-%m-%d")
-        return dt.isoformat()
-    except ValueError:
-        pass
+
+    val = str(val).strip()
+    if not val or val.upper() in ("ANTIGO", "N/A", "", "NAN", "NONE"):
+        return None
+
+    # Tentar dd.mm.yyyy (4-digit year) — DEVE vir antes de %y
+    for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(val, fmt)
+            # Rejeitar anos absurdos
+            if dt.year < 1900 or dt.year > 2100:
+                continue
+            return dt.isoformat()
+        except ValueError:
+            continue
+
     return None
 
 
@@ -185,7 +196,7 @@ def importar_aba(sheet_name, tipo, column_map, materiais):
             "cod_sap": cod_resolvido,
             "tipo": tipo,
             "quantidade": qtd,
-            "data": data_val or datetime.now().isoformat(),
+            "data": data_val,  # None → NULL (coluna é nullable agora)
             "destino": destino,
             "solicitante": solicitante,
             "responsavel": responsavel,

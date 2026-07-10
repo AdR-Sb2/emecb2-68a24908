@@ -97,6 +97,8 @@ function EstoquePage() {
   const [dialogHistorico, setDialogHistorico] = useState(false);
   const [dialogCompra, setDialogCompra] = useState(false);
   const [dialogImportar, setDialogImportar] = useState(false);
+  const [editandoMinimo, setEditandoMinimo] = useState<string | null>(null);
+  const [editandoValor, setEditandoValor] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const podeEditar =
@@ -179,21 +181,24 @@ function EstoquePage() {
     return { criticos, atencao, total, valorTotal, parados };
   }, [materiaisComStatus, materiais, movimentacoes]);
 
+  const truncar = (s: string, max: number) =>
+    s.length > max ? s.slice(0, max) + "…" : s;
+
   const topConsumidos = useMemo(() => {
     const consumo = new Map<string, number>();
     const now = new Date();
     const mesPassado = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     movimentacoes
-      .filter((m) => m.tipo === "SAIDA" && new Date(m.data) >= mesPassado)
+      .filter((m) => m.tipo === "SAIDA" && m.data && new Date(m.data) >= mesPassado)
       .forEach((m) => {
         consumo.set(m.cod_sap, (consumo.get(m.cod_sap) || 0) + m.quantidade);
       });
     return Array.from(consumo.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, 5)
       .map(([cod_sap, qtd]) => {
         const mat = materiais.find((m) => m.cod_sap === cod_sap);
-        return { cod_sap, descricao: mat?.descricao || cod_sap, qtd };
+        return { cod_sap, descricao: truncar(mat?.descricao || cod_sap, 30), qtd, descricaoCompleta: mat?.descricao || cod_sap };
       });
   }, [movimentacoes, materiais]);
 
@@ -202,14 +207,14 @@ function EstoquePage() {
     const now = new Date();
     const mesPassado = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     movimentacoes
-      .filter((m) => m.tipo === "SAIDA" && m.destino && new Date(m.data) >= mesPassado)
+      .filter((m) => m.tipo === "SAIDA" && m.destino && m.data && new Date(m.data) >= mesPassado)
       .forEach((m) => {
         destinos.set(m.destino, (destinos.get(m.destino) || 0) + m.quantidade);
       });
     return Array.from(destinos.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([destino, qtd]) => ({ destino, qtd }));
+      .slice(0, 5)
+      .map(([destino, qtd]) => ({ destino: truncar(destino, 25), qtd, destinoCompleto: destino }));
   }, [movimentacoes]);
 
   // --- Compras computed ---
@@ -353,6 +358,46 @@ function EstoquePage() {
       setSortKey(key);
       setSortDir("asc");
     }
+  };
+
+  // --- Ações inline ---
+  const toggleCritico = async (m: Material) => {
+    const novo = !m.material_critico;
+    const { error } = await supabase
+      .from("materiais")
+      .update({ material_critico: novo })
+      .eq("cod_sap", m.cod_sap);
+    if (error) {
+      toast.error("Erro ao alternar crítico: " + error.message);
+      return;
+    }
+    setMateriais((prev) =>
+      prev.map((mat) =>
+        mat.cod_sap === m.cod_sap ? { ...mat, material_critico: novo } : mat,
+      ),
+    );
+  };
+
+  const salvarMinimo = async (cod_sap: string, valor: number) => {
+    const { error } = await supabase
+      .from("materiais")
+      .update({ estoque_minimo: valor })
+      .eq("cod_sap", cod_sap);
+    if (error) {
+      toast.error("Erro ao salvar mínimo: " + error.message);
+      return;
+    }
+    setMateriais((prev) =>
+      prev.map((mat) =>
+        mat.cod_sap === cod_sap ? { ...mat, estoque_minimo: valor } : mat,
+      ),
+    );
+    toast.success("Mínimo atualizado!");
+  };
+
+  const iniciarEdicaoMinimo = (cod_sap: string, valorAtual: number) => {
+    setEditandoMinimo(cod_sap);
+    setEditandoValor(String(valorAtual));
   };
 
   // --- Material autocomplete ---
@@ -925,7 +970,11 @@ function EstoquePage() {
         const q = destinoFilter.toLowerCase();
         list = list.filter((m) => m.destino.toLowerCase().includes(q));
       }
-      list.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      list.sort((a, b) => {
+        const ta = a.data ? new Date(a.data).getTime() : 0;
+        const tb = b.data ? new Date(b.data).getTime() : 0;
+        return tb - ta;
+      });
       return list;
     }, [movs, filtroTipo, filtroOrigem, dataInicio, dataFim, search, destinoFilter, mats]);
 
@@ -1032,7 +1081,9 @@ function EstoquePage() {
                     className="border-b border-slate-100 transition hover:bg-slate-50"
                   >
                     <td className="whitespace-nowrap px-3 py-2 text-slate-500">
-                      {new Date(m.data).toLocaleDateString("pt-BR")}
+                      {m.data
+                        ? new Date(m.data).toLocaleDateString("pt-BR")
+                        : <span className="italic text-slate-400">Não informada</span>}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[#0b3a73]">
                       {m.cod_sap}
@@ -1181,7 +1232,11 @@ function EstoquePage() {
                   {m.origem === "SISTEMA" ? "Sistema" : "Hist."}
                 </span>
                 <div>
-                  <div>{new Date(m.data).toLocaleDateString("pt-BR")}</div>
+                  <div>
+                    {m.data
+                      ? new Date(m.data).toLocaleDateString("pt-BR")
+                      : <span className="italic text-slate-400">Sem data</span>}
+                  </div>
                   {m.responsavel && <div>{m.responsavel}</div>}
                 </div>
               </div>
@@ -1358,25 +1413,31 @@ function EstoquePage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-[#0b3a73]">
-                  Top 10 Mais Consumidos (mês)
+                  Top 5 Mais Consumidos (mês)
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-52">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={topConsumidos}
                       layout="vertical"
                       margin={{ left: 20, right: 20 }}
+                      barCategoryGap={8}
                     >
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis
                         type="category"
                         dataKey="descricao"
-                        tick={{ fontSize: 10 }}
-                        width={120}
+                        tick={{ fontSize: 10, width: 150 }}
+                        width={150}
                       />
-                      <Tooltip />
+                      <Tooltip
+                        formatter={(value: number) => `${value} un`}
+                        labelFormatter={(_l: string, payload: { payload?: { descricaoCompleta?: string } }[]) =>
+                          payload?.[0]?.payload?.descricaoCompleta || _l
+                        }
+                      />
                       <Bar dataKey="qtd" fill="#0b3a73" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1390,17 +1451,27 @@ function EstoquePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-52">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={topDestinos} layout="vertical" margin={{ left: 20, right: 20 }}>
+                    <BarChart
+                      data={topDestinos}
+                      layout="vertical"
+                      margin={{ left: 20, right: 20 }}
+                      barCategoryGap={8}
+                    >
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis
                         type="category"
                         dataKey="destino"
                         tick={{ fontSize: 10 }}
-                        width={120}
+                        width={140}
                       />
-                      <Tooltip />
+                      <Tooltip
+                        formatter={(value: number) => `${value} un`}
+                        labelFormatter={(_l: string, payload: { payload?: { destinoCompleto?: string } }[]) =>
+                          payload?.[0]?.payload?.destinoCompleto || _l
+                        }
+                      />
                       <Bar dataKey="qtd" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1535,8 +1606,35 @@ function EstoquePage() {
                           {m.unidade_medida}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-slate-600">
-                        {m.estoque_minimo}
+                      <td className="whitespace-nowrap px-2 py-1.5">
+                        {editandoMinimo === m.cod_sap ? (
+                          <input
+                            type="number"
+                            value={editandoValor}
+                            onChange={(e) => setEditandoValor(e.target.value)}
+                            onBlur={() => {
+                              const v = parseFloat(editandoValor);
+                              if (!isNaN(v) && v >= 0) {
+                                salvarMinimo(m.cod_sap, v);
+                              }
+                              setEditandoMinimo(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              if (e.key === "Escape") setEditandoMinimo(null);
+                            }}
+                            className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-[13px] text-slate-700"
+                            autoFocus
+                          />
+                        ) : (
+                          <button
+                            onClick={() => iniciarEdicaoMinimo(m.cod_sap, m.estoque_minimo)}
+                            className="cursor-pointer rounded px-1 py-0.5 text-slate-600 hover:bg-slate-100 hover:text-[#0b3a73]"
+                            title="Clique para editar"
+                          >
+                            {m.estoque_minimo}
+                          </button>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-slate-600">{m.fabricante}</td>
                       <td className="px-2 py-1.5 text-slate-600">{m.local_armazenagem}</td>
@@ -1545,11 +1643,17 @@ function EstoquePage() {
                         <Semaforo saldo={m.saldo_atual} minimo={m.estoque_minimo} />
                       </td>
                       <td className="px-2 py-1.5">
-                        {m.material_critico ? (
-                          <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
+                        <button
+                          onClick={() => toggleCritico(m)}
+                          className="cursor-pointer"
+                          title={m.material_critico ? "Remover crítico" : "Marcar como crítico"}
+                        >
+                          {m.material_critico ? (
+                            <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                          ) : (
+                            <Star className="h-4 w-4 text-slate-300 hover:text-amber-400" />
+                          )}
+                        </button>
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5">
                         <div className="flex items-center gap-1">
