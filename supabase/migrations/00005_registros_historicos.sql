@@ -32,7 +32,7 @@ BEGIN
   UPDATE materiais m
   SET saldo_atual = COALESCE(
     (SELECT SUM(CASE WHEN tipo = 'ENTRADA' THEN quantidade WHEN tipo = 'SAIDA' THEN -quantidade ELSE 0 END)
-     FROM movimentacoes WHERE cod_sap = OLD.cod_sap AND afeta_saldo = true), 0),
+     FROM movimentacoes WHERE cod_sap = OLD.cod_sap AND afeta_saldo = true), m.saldo_atual),
     atualizado_em = now()
   WHERE m.cod_sap = OLD.cod_sap;
   RETURN OLD;
