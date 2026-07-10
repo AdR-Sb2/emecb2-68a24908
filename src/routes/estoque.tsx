@@ -90,6 +90,8 @@ function EstoquePage() {
   const [filtroStatus, setFiltroStatus] = useState<StatusEstoque | "TODAS">("TODAS");
   const [filtroCritico, setFiltroCritico] = useState(false);
   const [filtroElevatoria, setFiltroElevatoria] = useState("");
+  const [metricaDestino, setMetricaDestino] = useState<"movimentacoes" | "quantidade">("movimentacoes");
+  const [filtroCategoriaDestino, setFiltroCategoriaDestino] = useState<string>("TODAS");
   const [sortKey, setSortKey] = useState<string>("cod_sap");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [materialSelecionado, setMaterialSelecionado] = useState<Material | null>(null);
@@ -204,26 +206,54 @@ function EstoquePage() {
   }, [movimentacoes, materiais]);
 
   const topDestinos = useMemo(() => {
-    const destinos = new Map<string, number>();
     const now = new Date();
     const mesPassado = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    movimentacoes
-      .filter(
-        (m) =>
-          m.tipo === "SAIDA" &&
-          m.destino &&
-          m.destino.toUpperCase() !== "AJUSTE" &&
-          m.data &&
-          new Date(m.data) >= mesPassado,
-      )
-      .forEach((m) => {
-        destinos.set(m.destino, (destinos.get(m.destino) || 0) + m.quantidade);
+    let movs = movimentacoes.filter(
+      (m) =>
+        m.tipo === "SAIDA" &&
+        m.destino &&
+        m.destino.toUpperCase() !== "AJUSTE" &&
+        m.data &&
+        new Date(m.data) >= mesPassado,
+    );
+    if (filtroCategoriaDestino !== "TODAS") {
+      const codsCategoria = new Set(
+        materiais.filter((mat) => mat.categoria === filtroCategoriaDestino).map((mat) => mat.cod_sap),
+      );
+      movs = movs.filter((m) => codsCategoria.has(m.cod_sap));
+    }
+    if (metricaDestino === "movimentacoes") {
+      const destinos = new Map<string, number>();
+      movs.forEach((m) => {
+        destinos.set(m.destino, (destinos.get(m.destino) || 0) + 1);
       });
-    return Array.from(destinos.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([destino, qtd]) => ({ destino: truncar(destino, 25), qtd, destinoCompleto: destino }));
-  }, [movimentacoes]);
+      return Array.from(destinos.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([destino, qtd]) => ({ destino: truncar(destino, 25), qtd, destinoCompleto: destino }));
+    } else {
+      const grupos = new Map<string, { nome: string; unidade: string; qtd: number }>();
+      movs.forEach((m) => {
+        const mat = materiais.find((mat) => mat.cod_sap === m.cod_sap);
+        const un = mat?.unidade_medida || "";
+        const key = `${m.destino}||${un}`;
+        const g = grupos.get(key);
+        if (g) {
+          g.qtd += m.quantidade;
+        } else {
+          grupos.set(key, { nome: m.destino, unidade: un, qtd: m.quantidade });
+        }
+      });
+      return Array.from(grupos.entries())
+        .sort((a, b) => b[1].qtd - a[1].qtd)
+        .slice(0, 5)
+        .map(([, v]) => ({
+          destino: truncar(v.unidade ? `${v.nome} (${v.unidade})` : v.nome, 30),
+          qtd: v.qtd,
+          destinoCompleto: `${v.nome} (${v.unidade})`,
+        }));
+    }
+  }, [movimentacoes, materiais, metricaDestino, filtroCategoriaDestino]);
 
   const ajustesMes = useMemo(() => {
     const now = new Date();
@@ -1517,6 +1547,31 @@ function EstoquePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <select
+                    value={metricaDestino}
+                    onChange={(e) => setMetricaDestino(e.target.value as "movimentacoes" | "quantidade")}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] shadow-sm"
+                  >
+                    <option value="movimentacoes">Movimentações</option>
+                    <option value="quantidade">Quantidade</option>
+                  </select>
+                  <select
+                    value={filtroCategoriaDestino}
+                    onChange={(e) => setFiltroCategoriaDestino(e.target.value)}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] shadow-sm"
+                  >
+                    <option value="TODAS">Todas categorias</option>
+                    {CATEGORIAS.map((c) => (
+                      <option key={c} value={c}>
+                        {CATEGORIA_LABEL[c]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[11px] text-slate-400">
+                    {metricaDestino === "movimentacoes" ? "contagem de saídas" : "soma de quantidades"}
+                  </span>
+                </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
@@ -1530,15 +1585,21 @@ function EstoquePage() {
                         type="category"
                         dataKey="destino"
                         tick={{ fontSize: 10 }}
-                        width={140}
+                        width={160}
                       />
                       <Tooltip
-                        formatter={(value: number) => `${value} un`}
+                        formatter={(value: number) =>
+                          metricaDestino === "movimentacoes" ? `${value} movimentações` : `${value} unidades`
+                        }
                         labelFormatter={(_l: string, payload: { payload?: { destinoCompleto?: string } }[]) =>
                           payload?.[0]?.payload?.destinoCompleto || _l
                         }
                       />
-                      <Bar dataKey="qtd" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                      <Bar
+                        dataKey="qtd"
+                        fill={metricaDestino === "movimentacoes" ? "#1f7ad6" : "#f59e0b"}
+                        radius={[0, 4, 4, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
