@@ -13,6 +13,8 @@ import { Route as TestesRouteImport } from './routes/testes'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as ManuaisAvaliacaoRouteImport } from './routes/manuais-avaliacao'
+import { Route as ManuaisRouteImport } from './routes/manuais'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as EstoqueRouteImport } from './routes/estoque'
 import { Route as EscalaRouteImport } from './routes/escala'
@@ -41,6 +43,16 @@ const RegisterRoute = RegisterRouteImport.update({
 const PendingRoute = PendingRouteImport.update({
   id: '/pending',
   path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManuaisAvaliacaoRoute = ManuaisAvaliacaoRouteImport.update({
+  id: '/manuais-avaliacao',
+  path: '/manuais-avaliacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManuaisRoute = ManuaisRouteImport.update({
+  id: '/manuais',
+  path: '/manuais',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -98,6 +110,8 @@ export interface FileRoutesByFullPath {
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
+  '/manuais': typeof ManuaisRoute
+  '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
@@ -113,6 +127,8 @@ export interface FileRoutesByTo {
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
+  '/manuais': typeof ManuaisRoute
+  '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
@@ -129,6 +145,8 @@ export interface FileRoutesById {
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
+  '/manuais': typeof ManuaisRoute
+  '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
@@ -146,6 +164,8 @@ export interface FileRouteTypes {
     | '/escala'
     | '/estoque'
     | '/login'
+    | '/manuais'
+    | '/manuais-avaliacao'
     | '/pending'
     | '/register'
     | '/relatorio'
@@ -161,6 +181,8 @@ export interface FileRouteTypes {
     | '/escala'
     | '/estoque'
     | '/login'
+    | '/manuais'
+    | '/manuais-avaliacao'
     | '/pending'
     | '/register'
     | '/relatorio'
@@ -176,6 +198,8 @@ export interface FileRouteTypes {
     | '/escala'
     | '/estoque'
     | '/login'
+    | '/manuais'
+    | '/manuais-avaliacao'
     | '/pending'
     | '/register'
     | '/relatorio'
@@ -192,6 +216,8 @@ export interface RootRouteChildren {
   EscalaRoute: typeof EscalaRoute
   EstoqueRoute: typeof EstoqueRoute
   LoginRoute: typeof LoginRoute
+  ManuaisRoute: typeof ManuaisRoute
+  ManuaisAvaliacaoRoute: typeof ManuaisAvaliacaoRoute
   PendingRoute: typeof PendingRoute
   RegisterRoute: typeof RegisterRoute
   RelatorioRoute: typeof RelatorioRoute
@@ -227,6 +253,20 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manuais-avaliacao': {
+      id: '/manuais-avaliacao'
+      path: '/manuais-avaliacao'
+      fullPath: '/manuais-avaliacao'
+      preLoaderRoute: typeof ManuaisAvaliacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manuais': {
+      id: '/manuais'
+      path: '/manuais'
+      fullPath: '/manuais'
+      preLoaderRoute: typeof ManuaisRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -304,6 +344,8 @@ const rootRouteChildren: RootRouteChildren = {
   EscalaRoute: EscalaRoute,
   EstoqueRoute: EstoqueRoute,
   LoginRoute: LoginRoute,
+  ManuaisRoute: ManuaisRoute,
+  ManuaisAvaliacaoRoute: ManuaisAvaliacaoRoute,
   PendingRoute: PendingRoute,
   RegisterRoute: RegisterRoute,
   RelatorioRoute: RelatorioRoute,

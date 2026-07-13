@@ -13,6 +13,7 @@ import {
   User,
   Package,
   CalendarCheck,
+  BookOpen,
 } from "lucide-react";
 import {
   Dialog,
@@ -54,6 +55,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   backlog: { bg: "bg-violet-100", icon: "text-violet-600", ring: "hover:ring-violet-300" },
   estoque: { bg: "bg-cyan-100", icon: "text-cyan-600", ring: "hover:ring-cyan-300" },
   escala: { bg: "bg-rose-100", icon: "text-rose-600", ring: "hover:ring-rose-300" },
+  manuais: { bg: "bg-orange-100", icon: "text-orange-600", ring: "hover:ring-orange-300" },
 };
 
 function getCardColor(chave: string) {
@@ -63,6 +65,7 @@ function getCardColor(chave: string) {
   if (chave.startsWith("relatorio")) return CARD_COLORS.relatorio;
   if (chave.startsWith("dashboard_os")) return CARD_COLORS.backlog;
   if (chave.startsWith("escala")) return CARD_COLORS.escala;
+  if (chave.startsWith("manuais")) return CARD_COLORS.manuais;
   return CARD_COLORS.dashboard;
 }
 
@@ -129,10 +132,11 @@ function Index() {
   const shouldShowBacklog = hasPanel("dashboard_os") || hasFallbackPanels;
   const shouldShowEscala = hasPanel("escala_trabalho") || hasFallbackPanels;
   const shouldShowEstoque = hasPanel("estoque");
+  const shouldShowManuais = hasPanel("manuais") || hasFallbackPanels;
   const canAdmin = hasPanel("admin");
 
   return (
-    <div className="min-h-screen bg-[#f0f4f8]">
+    <div className="min-h-screen bg-[#f0f4f8] dark:bg-slate-900">
       <style>{animations}</style>
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] text-white shadow-[0_18px_40px_-24px_rgba(0,0,0,0.65)]">
@@ -249,6 +253,16 @@ function Index() {
                 <CardCta>Abrir estoque</CardCta>
               </CardLink>
             )}
+
+            {/* Manuais */}
+            {shouldShowManuais && (
+              <CardLink to="/manuais" chave="manuais" delay={6}>
+                <CardIcon chave="manuais" icon={BookOpen} />
+                <CardTitle>Manuais</CardTitle>
+                <CardDesc>Normas, manuais técnicos e procedimentos.</CardDesc>
+                <CardCta>Abrir manuais</CardCta>
+              </CardLink>
+            )}
           </div>
         )}
 
@@ -355,11 +369,11 @@ function CardIcon({ chave, icon: Icon }: { chave: string; icon: typeof LayoutDas
 }
 
 function CardTitle({ children }: { children: string }) {
-  return <h2 className="text-lg font-semibold text-[#0b3a73]">{children}</h2>;
+  return <h2 className="text-lg font-semibold text-[#0b3a73] dark:text-white">{children}</h2>;
 }
 
 function CardDesc({ children }: { children: string }) {
-  return <p className="text-sm leading-relaxed text-slate-500">{children}</p>;
+  return <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{children}</p>;
 }
 
 function CardCta({ children }: { children: string }) {
@@ -386,7 +400,7 @@ function CardButton({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2`}
+      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       {children}
@@ -409,7 +423,7 @@ function CardLink({
   return (
     <Link
       to={to}
-      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2`}
+      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       {children}

@@ -12,7 +12,8 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AuthProvider } from "../lib/auth";
+import { AuthProvider, useAuth } from "../lib/auth";
+import { TemaProvider, ThemeToggle } from "../lib/tema";
 
 function NotFoundComponent() {
   return (
@@ -115,7 +116,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
@@ -127,14 +128,26 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function ThemeInner() {
+  const { user } = useAuth();
+  return (
+    <TemaProvider userId={user?.id}>
+      <Outlet />
+      <div className="fixed bottom-5 right-5 z-50">
+        <ThemeToggle />
+      </div>
+      <Toaster richColors position="top-right" />
+    </TemaProvider>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
-        <Toaster richColors position="top-right" />
+        <ThemeInner />
       </AuthProvider>
     </QueryClientProvider>
   );
