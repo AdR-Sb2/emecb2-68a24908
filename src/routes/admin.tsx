@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Shield,
@@ -13,6 +13,8 @@ import {
   Trash2,
   Plus,
   Save,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
@@ -47,6 +49,14 @@ type PainelRow = {
 
 type Tab = "usuarios" | "cargos" | "paineis";
 
+type PermissaoRow = {
+  id: number;
+  key: string;
+  label: string;
+  panel_key: string;
+  is_generic: boolean;
+};
+
 function AdminPage() {
   const navigate = useNavigate();
   const { user, profile, loading, signOut } = useAuth();
@@ -55,6 +65,8 @@ function AdminPage() {
   const [cargos, setCargos] = useState<CargoRow[]>([]);
   const [paineis, setPaineis] = useState<PainelRow[]>([]);
   const [cargoPaineis, setCargoPaineis] = useState<Record<number, number[]>>({});
+  const [permissoes, setPermissoes] = useState<PermissaoRow[]>([]);
+  const [cargoPermissoes, setCargoPermissoes] = useState<Record<number, number[]>>({});
   const [loadingData, setLoadingData] = useState(true);
 
   // Filtros
@@ -67,6 +79,8 @@ function AdminPage() {
   const [newCargoNome, setNewCargoNome] = useState("");
   const [newCargoDesc, setNewCargoDesc] = useState("");
   const [newCargoPaineis, setNewCargoPaineis] = useState<number[]>([]);
+  const [newCargoPermissoes, setNewCargoPermissoes] = useState<number[]>([]);
+  const [expandedPainelPerms, setExpandedPainelPerms] = useState<Set<number>>(new Set());
   const [showNewCargo, setShowNewCargo] = useState(false);
 
   useEffect(() => {
@@ -107,11 +121,13 @@ function AdminPage() {
       return;
     }
     setLoadingData(true);
-    const [profilesRes, cargosRes, paineisRes, cpRes] = await Promise.all([
+    const [profilesRes, cargosRes, paineisRes, cpRes, permsRes, cppRes] = await Promise.all([
       supabase.from("profiles").select("*").order("criado_em", { ascending: false }),
       supabase.from("cargos").select("*").order("nome"),
       supabase.from("paineis").select("*").order("nome_exibicao"),
       supabase.from("cargo_paineis").select("*"),
+      supabase.from("permissions").select("*").order("panel_key, id"),
+      supabase.from("cargo_panel_permissions").select("*"),
     ]);
     if (profilesRes.data) setProfiles(profilesRes.data);
     if (cargosRes.data) setCargos(cargosRes.data);
@@ -123,6 +139,15 @@ function AdminPage() {
         map[row.cargo_id].push(row.painel_id);
       }
       setCargoPaineis(map);
+    }
+    if (permsRes.data) setPermissoes(permsRes.data);
+    if (cppRes.data) {
+      const map: Record<number, number[]> = {};
+      for (const row of cppRes.data) {
+        if (!map[row.cargo_id]) map[row.cargo_id] = [];
+        map[row.cargo_id].push(row.permission_id);
+      }
+      setCargoPermissoes(map);
     }
     setLoadingData(false);
   };
@@ -189,6 +214,12 @@ function AdminPage() {
           .from("cargo_paineis")
           .insert(newCargoPaineis.map((p) => ({ cargo_id: editingCargo.id, painel_id: p })));
       }
+      await supabase.from("cargo_panel_permissions").delete().eq("cargo_id", editingCargo.id);
+      if (newCargoPermissoes.length) {
+        await supabase
+          .from("cargo_panel_permissions")
+          .insert(newCargoPermissoes.map((p) => ({ cargo_id: editingCargo.id, permission_id: p })));
+      }
       toast.success("Cargo atualizado!");
     } else {
       const { data, error } = await supabase
@@ -205,6 +236,11 @@ function AdminPage() {
           .from("cargo_paineis")
           .insert(newCargoPaineis.map((p) => ({ cargo_id: data.id, painel_id: p })));
       }
+      if (newCargoPermissoes.length) {
+        await supabase
+          .from("cargo_panel_permissions")
+          .insert(newCargoPermissoes.map((p) => ({ cargo_id: data.id, permission_id: p })));
+      }
       toast.success("Cargo criado!");
     }
     setEditingCargo(null);
@@ -212,6 +248,8 @@ function AdminPage() {
     setNewCargoNome("");
     setNewCargoDesc("");
     setNewCargoPaineis([]);
+    setNewCargoPermissoes([]);
+    setExpandedPainelPerms(new Set());
     loadData();
   };
 
@@ -236,6 +274,42 @@ function AdminPage() {
     setNewCargoPaineis((prev) =>
       prev.includes(painelId) ? prev.filter((p) => p !== painelId) : [...prev, painelId],
     );
+  };
+
+  const togglePermissaoCargo = (permId: number) => {
+    setNewCargoPermissoes((prev) =>
+      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId],
+    );
+  };
+
+  const toggleExpandPainelPerms = (painelId: number) => {
+    setExpandedPainelPerms((prev) => {
+      const next = new Set(prev);
+      if (next.has(painelId)) next.delete(painelId);
+      else next.add(painelId);
+      return next;
+    });
+  };
+
+  const permissoesPorPainel = useMemo(() => {
+    const map: Record<string, PermissaoRow[]> = {};
+    for (const p of permissoes) {
+      if (!map[p.panel_key]) map[p.panel_key] = [];
+      map[p.panel_key].push(p);
+    }
+    return map;
+  }, [permissoes]);
+
+  const selectAllPermissoesPainel = (painelChave: string, add: boolean) => {
+    const perms = permissoesPorPainel[painelChave] || [];
+    setNewCargoPermissoes((prev) => {
+      const ids = new Set(prev);
+      for (const p of perms) {
+        if (add) ids.add(p.id);
+        else ids.delete(p.id);
+      }
+      return Array.from(ids);
+    });
   };
 
   const filteredProfiles = profiles.filter((p) => {
@@ -442,6 +516,8 @@ function AdminPage() {
                   setNewCargoNome("");
                   setNewCargoDesc("");
                   setNewCargoPaineis([]);
+                  setNewCargoPermissoes([]);
+                  setExpandedPainelPerms(new Set());
                 }}
                 className="inline-flex items-center gap-1 rounded-lg bg-[#0ea5e9] px-3 py-2 text-sm font-medium text-white hover:bg-[#0284c7] cursor-pointer"
               >
@@ -464,6 +540,8 @@ function AdminPage() {
                           setNewCargoNome(c.nome);
                           setNewCargoDesc(c.descricao);
                           setNewCargoPaineis(cargoPaineis[c.id] || []);
+                          setNewCargoPermissoes(cargoPermissoes[c.id] || []);
+                          setExpandedPainelPerms(new Set());
                           setShowNewCargo(true);
                         }}
                         className="rounded bg-[#0ea5e9]/20 px-2 py-1 text-xs font-medium text-[#0ea5e9] hover:bg-[#0ea5e9]/30 cursor-pointer"
@@ -481,14 +559,23 @@ function AdminPage() {
                   <div className="mt-2 flex flex-wrap gap-1">
                     {(cargoPaineis[c.id] || []).map((pid) => {
                       const painel = paineis.find((p) => p.id === pid);
-                      return painel ? (
+                      if (!painel) return null;
+                      const permsCount = (cargoPermissoes[c.id] || []).filter((permId) =>
+                        permissoes.some((p) => p.id === permId && p.panel_key === painel.chave),
+                      ).length;
+                      return (
                         <span
                           key={pid}
                           className="rounded-full bg-[#0ea5e9]/10 px-2 py-0.5 text-[11px] text-[#0ea5e9]"
                         >
                           {painel.nome_exibicao}
+                          {permsCount > 0 && (
+                            <span className="ml-1 text-[10px] text-[#38bdf8]">
+                              ({permsCount})
+                            </span>
+                          )}
                         </span>
-                      ) : null;
+                      );
                     })}
                   </div>
                 </div>
@@ -527,23 +614,80 @@ function AdminPage() {
                     </div>
                     <div>
                       <label className="mb-2 block text-xs font-semibold text-[#94a3b8]">
-                        Painéis liberados
+                        Painéis e permissões
                       </label>
                       <div className="grid gap-2">
-                        {paineis.map((p) => (
-                          <label
-                            key={p.id}
-                            className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 hover:border-[#0ea5e9]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={newCargoPaineis.includes(p.id)}
-                              onChange={() => togglePainelCargo(p.id)}
-                              className="h-4 w-4 accent-[#0ea5e9]"
-                            />
-                            <span className="text-sm text-[#f8fafc]">{p.nome_exibicao}</span>
-                          </label>
-                        ))}
+                        {paineis.map((p) => {
+                          const painelPerms = permissoesPorPainel[p.chave] || [];
+                          const hasPerms = painelPerms.length > 0;
+                          const expanded = expandedPainelPerms.has(p.id);
+                          return (
+                            <div
+                              key={p.id}
+                              className="rounded-lg border border-[#334155] bg-[#0f172a]"
+                            >
+                              <div className="flex items-center gap-2 px-3 py-2">
+                                {hasPerms && (
+                                  <button
+                                    onClick={() => toggleExpandPainelPerms(p.id)}
+                                    className="text-[#64748b] hover:text-[#f8fafc] cursor-pointer bg-transparent border-none p-0"
+                                  >
+                                    {expanded ? (
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <ChevronRight className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                )}
+                                {!hasPerms && <div className="w-3.5" />}
+                                <input
+                                  type="checkbox"
+                                  checked={newCargoPaineis.includes(p.id)}
+                                  onChange={() => togglePainelCargo(p.id)}
+                                  className="h-4 w-4 accent-[#0ea5e9]"
+                                />
+                                <span className="text-sm text-[#f8fafc]">{p.nome_exibicao}</span>
+                              </div>
+                              {hasPerms && expanded && newCargoPaineis.includes(p.id) && (
+                                <div className="border-t border-[#334155] px-6 py-2">
+                                  <div className="mb-1 flex items-center gap-2">
+                                    <button
+                                      onClick={() => selectAllPermissoesPainel(p.chave, true)}
+                                      className="text-[10px] font-medium text-[#0ea5e9] hover:text-[#38bdf8] bg-transparent border-none cursor-pointer"
+                                    >
+                                      Marcar todas
+                                    </button>
+                                    <span className="text-[#334155]">|</span>
+                                    <button
+                                      onClick={() => selectAllPermissoesPainel(p.chave, false)}
+                                      className="text-[10px] font-medium text-[#64748b] hover:text-[#94a3b8] bg-transparent border-none cursor-pointer"
+                                    >
+                                      Desmarcar todas
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {painelPerms.map((perm) => (
+                                      <label
+                                        key={perm.id}
+                                        className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={newCargoPermissoes.includes(perm.id)}
+                                          onChange={() => togglePermissaoCargo(perm.id)}
+                                          className="h-3.5 w-3.5 accent-[#0ea5e9]"
+                                        />
+                                        <span className="text-[11px] text-[#cbd5e1]">
+                                          {perm.label}
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -573,23 +717,50 @@ function AdminPage() {
           <>
             <h2 className="mb-4 text-lg font-bold">Painéis do Sistema</h2>
             <div className="grid gap-3">
-              {paineis.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between rounded-lg border border-[#334155] bg-[#1e293b] p-4"
-                >
-                  <div>
-                    <h3 className="font-semibold">{p.nome_exibicao}</h3>
-                    <p className="text-xs text-[#64748b]">
-                      Chave: <code className="text-[#0ea5e9]">{p.chave}</code>
-                    </p>
-                    <p className="text-sm text-[#94a3b8]">{p.descricao}</p>
+              {paineis.map((p) => {
+                const panelPerms = permissoesPorPainel[p.chave] || [];
+                return (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-[#334155] bg-[#1e293b] p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold">{p.nome_exibicao}</h3>
+                        <p className="text-xs text-[#64748b]">
+                          Chave: <code className="text-[#0ea5e9]">{p.chave}</code>
+                        </p>
+                        <p className="text-sm text-[#94a3b8]">{p.descricao}</p>
+                      </div>
+                      <span className="rounded-full bg-[#0ea5e9]/10 px-2 py-0.5 text-[11px] text-[#0ea5e9]">
+                        {p.icone}
+                      </span>
+                    </div>
+                    {panelPerms.length > 0 && (
+                      <div className="mt-3 border-t border-[#334155] pt-2">
+                        <p className="mb-1 text-[11px] font-semibold text-[#64748b]">
+                          Permissões cadastradas ({panelPerms.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {panelPerms.map((perm) => (
+                            <span
+                              key={perm.id}
+                              className={`rounded-full px-2 py-0.5 text-[10px] ${
+                                perm.is_generic
+                                  ? "bg-[#6366f1]/10 text-[#a5b4fc]"
+                                  : "bg-[#0ea5e9]/10 text-[#38bdf8]"
+                              }`}
+                              title={perm.is_generic ? "Permissão genérica" : "Permissão específica"}
+                            >
+                              {perm.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <span className="rounded-full bg-[#0ea5e9]/10 px-2 py-0.5 text-[11px] text-[#0ea5e9]">
-                    {p.icone}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

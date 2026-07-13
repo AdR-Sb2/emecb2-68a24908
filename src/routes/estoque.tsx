@@ -59,7 +59,8 @@ import {
   getCategoriaNome,
   StatusEstoque,
 } from "@/lib/estoque-types";
-import { getPermissoesEstoque } from "@/lib/estoque-permissoes";
+import { getPermissoesCargo, temPermissao, clearPermissoesCache } from "@/lib/permissoes";
+import type { PermissoesEstoque } from "@/lib/estoque-permissoes";
 import {
   BarChart,
   Bar,
@@ -136,10 +137,19 @@ function EstoquePage() {
   const [editandoValor, setEditandoValor] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const permissoes = useMemo(
-    () => getPermissoesEstoque(profile?.cargo_nome),
-    [profile?.cargo_nome],
-  );
+  const [permissoes, setPermissoes] = useState<PermissoesEstoque>({
+    acessarModulo: false,
+    registrarEntrada: false,
+    registrarSaida: false,
+    registrarAjuste: false,
+    solicitarCompra: false,
+    gerenciarCompras: false,
+    editarConfigMaterial: false,
+    exportar: false,
+    importar: false,
+    cadastrarMaterial: false,
+    gerenciarCategorias: false,
+  });
   const [acessoVerificado, setAcessoVerificado] = useState(false);
 
   useEffect(() => {
@@ -159,13 +169,33 @@ function EstoquePage() {
         .eq("cargo_id", profile.cargo_id)
         .eq("paineis.chave", "estoque")
         .maybeSingle();
-      if (!data || !permissoes.acessarModulo) {
+      if (!data) {
         navigate({ to: "/", replace: true });
         return;
       }
       setAcessoVerificado(true);
     })();
-  }, [authLoading, user, profile, navigate, permissoes.acessarModulo]);
+  }, [authLoading, user, profile, navigate]);
+
+  useEffect(() => {
+    if (!acessoVerificado || !profile?.cargo_id) return;
+    (async () => {
+      const perms = await getPermissoesCargo(profile.cargo_id);
+      setPermissoes({
+        acessarModulo: perms.has("estoque"),
+        registrarEntrada: temPermissao(perms, "estoque", "registrar_entrada"),
+        registrarSaida: temPermissao(perms, "estoque", "registrar_saida"),
+        registrarAjuste: temPermissao(perms, "estoque", "registrar_ajuste"),
+        solicitarCompra: temPermissao(perms, "estoque", "solicitar_compra"),
+        gerenciarCompras: temPermissao(perms, "estoque", "gerenciar_compras"),
+        editarConfigMaterial: temPermissao(perms, "estoque", "editar_config_material"),
+        exportar: temPermissao(perms, "estoque", "exportar"),
+        importar: temPermissao(perms, "estoque", "importar"),
+        cadastrarMaterial: temPermissao(perms, "estoque", "cadastrar_material"),
+        gerenciarCategorias: temPermissao(perms, "estoque", "gerenciar_categorias"),
+      });
+    })();
+  }, [acessoVerificado, profile?.cargo_id]);
 
   useEffect(() => {
     if (!acessoVerificado) return;
