@@ -20,6 +20,7 @@ export function useTema() {
 
 export function TemaProvider({ children, userId }: { children: ReactNode; userId?: string | null }) {
   const [tema, setTema] = useState<Tema>(() => {
+    if (typeof localStorage === "undefined") return "light";
     const saved = localStorage.getItem("tema_preferido") as Tema | null;
     return saved || "light";
   });
