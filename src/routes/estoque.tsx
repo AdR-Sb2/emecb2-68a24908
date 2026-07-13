@@ -3035,7 +3035,7 @@ function EstoquePage() {
                         ) : (
                           <span
                             className="cursor-pointer text-blue-600 hover:underline"
-                            onClick={() => { setEditandoCompraId(c.id); setEditandoCampo("pedido"); setEditandoValorCompra(c.pedido || ""); }}
+                            onClick={(e) => { if (e.ctrlKey || e.metaKey) return; setEditandoCompraId(c.id); setEditandoCampo("pedido"); setEditandoValorCompra(c.pedido || ""); }}
                           >
                             {c.pedido || "—"}
                           </span>
@@ -3043,7 +3043,7 @@ function EstoquePage() {
                       </td>
                       <td className="px-2 py-1.5">{c.item_rc || "—"}</td>
                       <td className="px-2 py-1.5 font-mono font-bold">{c.cod_sap || "—"}</td>
-                      <td className="max-w-[200px] truncate px-2 py-1.5 text-slate-600">
+                      <td className="max-w-[200px] truncate px-2 py-1.5 text-slate-600" title={c.descricao_material || ""}>
                         {c.descricao_material || "—"}
                       </td>
                       <td className="px-2 py-1.5 text-right font-bold">{c.qtde_rc ?? "—"}</td>
@@ -3059,7 +3059,7 @@ function EstoquePage() {
                           ))}
                         </select>
                       </td>
-                      <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-500">
+                      <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-500" title={c.fornecedor || ""}>
                         {c.fornecedor || "—"}
                       </td>
                       <td className="px-2 py-1.5 text-center">
@@ -3102,28 +3102,33 @@ function EstoquePage() {
                         ) : (
                           <span
                             className="cursor-pointer text-slate-600 hover:underline"
-                            onClick={() => { setEditandoCompraId(c.id); setEditandoCampo("data_confirmada"); setEditandoValorCompra(c.data_confirmada || ""); }}
+                            onClick={(e) => { if (e.ctrlKey || e.metaKey) return; setEditandoCompraId(c.id); setEditandoCampo("data_confirmada"); setEditandoValorCompra(c.data_confirmada || ""); }}
                           >
                             {c.data_confirmada || "—"}
                           </span>
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-right">
-                        {diasAberto !== null ? (
-                          <span
-                            className={
-                              diasAberto > 30
-                                ? "font-bold text-red-600"
-                                : diasAberto > 15
-                                  ? "text-orange-500"
-                                  : "text-slate-500"
-                            }
-                          >
-                            {diasAberto}d
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
+                        <div className="flex flex-col items-end gap-0.5">
+                          {c.dt_criacao_rc && (
+                            <span className="text-[10px] text-slate-400">{c.dt_criacao_rc}</span>
+                          )}
+                          {diasAberto !== null ? (
+                            <span
+                              className={
+                                diasAberto > 30
+                                  ? "font-bold text-red-600"
+                                  : diasAberto > 15
+                                    ? "text-orange-500"
+                                    : "text-slate-500"
+                              }
+                            >
+                              {diasAberto}d
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
