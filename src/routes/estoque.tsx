@@ -251,6 +251,7 @@ function EstoquePage() {
     filtroCategoria,
     filtroStatus,
     filtroCritico,
+    filtroSaldoNegativo,
     filtroElevatoria,
     sortKey,
     sortDir,
@@ -2787,6 +2788,14 @@ function EstoquePage() {
                 />
                 <Star className="h-3.5 w-3.5 text-amber-500" /> Só críticos
               </label>
+              {filtroSaldoNegativo && (
+                <button
+                  onClick={() => setFiltroSaldoNegativo(false)}
+                  className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-[12px] font-semibold text-red-700 hover:bg-red-100"
+                >
+                  <AlertTriangle className="h-3 w-3" /> Saldo negativo ativo ✕
+                </button>
+              )}
             </div>
           </div>
 
