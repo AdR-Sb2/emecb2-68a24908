@@ -1298,7 +1298,7 @@ function EstoquePage() {
       const { error } = await supabase.from("movimentacoes").insert({
         cod_sap: selected.cod_sap,
         tipo: "AJUSTE",
-        quantidade: diff,
+        quantidade: qtdNova,
         motivo_ajuste: motivoFinal,
         criado_por: user?.email || "",
       });
