@@ -119,6 +119,7 @@ function EstoquePage() {
   const [filtroChegou, setFiltroChegou] = useState<"TODOS" | "sim" | "nao">("TODOS");
   const [filtroRetirado, setFiltroRetirado] = useState<"TODOS" | "sim" | "nao">("TODOS");
   const [filtroFila, setFiltroFila] = useState<"TODOS" | "sim" | "nao">("TODOS");
+  const [filtroBuscaCompra, setFiltroBuscaCompra] = useState("");
   const [filtroAguardandoRetirada, setFiltroAguardandoRetirada] = useState(false);
   const [editandoCompraId, setEditandoCompraId] = useState<number | null>(null);
   const [editandoCampo, setEditandoCampo] = useState<string | null>(null);
@@ -126,6 +127,7 @@ function EstoquePage() {
   const [dialogImportar, setDialogImportar] = useState(false);
   const [dialogImportarCompras, setDialogImportarCompras] = useState(false);
   const [dialogRcEmFila, setDialogRcEmFila] = useState(false);
+  const [dialogDetalheCompra, setDialogDetalheCompra] = useState<Compra | null>(null);
   const [showAddFila, setShowAddFila] = useState(false);
   const [filaDescricao, setFilaDescricao] = useState("");
   const [filaQtde, setFilaQtde] = useState(1);
@@ -464,6 +466,17 @@ function EstoquePage() {
       if (filtroFila === "sim" && !c.rc_em_fila) return false;
       if (filtroFila === "nao" && c.rc_em_fila) return false;
       if (filtroAguardandoRetirada && (!c.chegou || c.foi_retirado)) return false;
+      if (filtroBuscaCompra) {
+        const q = filtroBuscaCompra.toLowerCase();
+        const match =
+          (c.descricao_material?.toLowerCase() || "").includes(q) ||
+          (c.cod_sap?.toLowerCase() || "").includes(q) ||
+          (c.fornecedor?.toLowerCase() || "").includes(q) ||
+          (c.pedido?.toLowerCase() || "").includes(q) ||
+          (c.solicitante?.toLowerCase() || "").includes(q) ||
+          (c.requisicao?.toString() || "").includes(q);
+        if (!match) return false;
+      }
       return true;
     });
   }, [
@@ -474,6 +487,7 @@ function EstoquePage() {
     filtroRetirado,
     filtroFila,
     filtroAguardandoRetirada,
+    filtroBuscaCompra,
   ]);
 
   const handleToggleChegou = async (id: number, current: boolean) => {
@@ -482,7 +496,7 @@ function EstoquePage() {
       toast.error("Erro: " + error.message);
       return;
     }
-    await carregarDados();
+    setCompras((prev) => prev.map((c) => (c.id === id ? { ...c, chegou: !current } : c)));
   };
 
   const handleToggleFoiRetirado = async (id: number, current: boolean, afeta_saldo: boolean) => {
@@ -499,7 +513,7 @@ function EstoquePage() {
       toast.error("Erro: " + error.message);
       return;
     }
-    await carregarDados();
+    setCompras((prev) => prev.map((c) => (c.id === id ? { ...c, foi_retirado: false, data_retirado: null } : c)));
   };
 
   const confirmarRetirada = async () => {
@@ -521,8 +535,8 @@ function EstoquePage() {
     } else {
       toast.success("Compra marcada como retirada (histórico, sem efeito no estoque).");
     }
+    setCompras((prev) => prev.map((c) => (c.id === dialogDataRetirada ? { ...c, foi_retirado: true, data_retirado: dataRetiradaInput || null } : c)));
     setDialogDataRetirada(null);
-    await carregarDados();
   };
 
   const elevatoriaOptions = useMemo(
@@ -603,7 +617,7 @@ function EstoquePage() {
       toast.error("Erro: " + error.message);
       return;
     }
-    await carregarDados();
+    setCompras((prev) => prev.map((c) => (c.id === id ? { ...c, status_geral } : c)));
     toast.success("Status atualizado!");
   };
 
@@ -613,7 +627,7 @@ function EstoquePage() {
       toast.error("Erro: " + error.message);
       return;
     }
-    await carregarDados();
+    setCompras((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
     toast.success("Atualizado!");
     setEditandoCompraId(null);
     setEditandoCampo(null);
@@ -2479,6 +2493,15 @@ function EstoquePage() {
     );
   };
 
+  function LabelValor({ label, valor }: { label: string; valor?: string | null }) {
+    return (
+      <div>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+        <p className="text-slate-700">{valor || "—"}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-3 md:p-6">
       {/* Header */}
@@ -3142,6 +3165,16 @@ function EstoquePage() {
 
           {/* Filtros */}
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={filtroBuscaCompra}
+                onChange={(e) => setFiltroBuscaCompra(e.target.value)}
+                placeholder="Pesquisar por descrição, SAP, fornecedor..."
+                className="w-full rounded-lg border border-slate-300 pl-8 pr-2 py-1.5 text-[12px]"
+              />
+            </div>
             <select
               value={filtroStatusCompra}
               onChange={(e) => setFiltroStatusCompra(e.target.value)}
@@ -3205,6 +3238,7 @@ function EstoquePage() {
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-2 py-2 w-8"></th>
                   <th className="px-2 py-2">Requisição</th>
                   <th className="px-2 py-2">Pedido</th>
                   <th className="px-2 py-2">Item</th>
@@ -3228,6 +3262,15 @@ function EstoquePage() {
                   const editando = editandoCompraId === c.id;
                   return (
                     <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-2 py-1.5">
+                        <button
+                          onClick={() => setDialogDetalheCompra(c)}
+                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600 cursor-pointer"
+                          title="Ver detalhes"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                       <td className="px-2 py-1.5 font-mono text-[#1f7ad6]">
                         {c.requisicao || "—"}
                       </td>
@@ -3345,7 +3388,7 @@ function EstoquePage() {
                 })}
                 {comprasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="py-8 text-center text-slate-400">
+                    <td colSpan={13} className="py-8 text-center text-slate-400">
                       Nenhuma compra encontrada com os filtros selecionados.
                     </td>
                   </tr>
@@ -3401,6 +3444,51 @@ function EstoquePage() {
             </DialogTitle>
           </DialogHeader>
           {materialSelecionado && <HistoricoMaterial material={materialSelecionado} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Detalhe da Compra */}
+      <Dialog open={!!dialogDetalheCompra} onOpenChange={(o) => { if (!o) setDialogDetalheCompra(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-blue-700">
+              <Eye className="mr-1 inline h-4 w-4" /> Detalhes da Compra
+            </DialogTitle>
+          </DialogHeader>
+          {dialogDetalheCompra && (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+              <LabelValor label="Requisição" valor={dialogDetalheCompra.requisicao?.toString()} />
+              <LabelValor label="Item RC" valor={dialogDetalheCompra.item_rc?.toString()} />
+              <LabelValor label="Pedido" valor={dialogDetalheCompra.pedido} />
+              <LabelValor label="Cód. SAP" valor={dialogDetalheCompra.cod_sap} />
+              <div className="col-span-2">
+                <LabelValor label="Descrição" valor={dialogDetalheCompra.descricao_material} />
+              </div>
+              <LabelValor label="Quantidade" valor={dialogDetalheCompra.qtde_rc?.toString()} />
+              <LabelValor label="Depósito" valor={dialogDetalheCompra.deposito_rc} />
+              <LabelValor label="Status" valor={dialogDetalheCompra.status_geral} />
+              <LabelValor label="Fornecedor" valor={dialogDetalheCompra.fornecedor} />
+              <LabelValor label="Comprador" valor={dialogDetalheCompra.comprador_cotacao} />
+              <LabelValor label="Solicitante" valor={dialogDetalheCompra.solicitante} />
+              <LabelValor label="Previsão de uso" valor={dialogDetalheCompra.previsao_uso} />
+              <LabelValor label="Dt. criação RC" valor={dialogDetalheCompra.dt_criacao_rc} />
+              <LabelValor label="Dt. aprovação RC" valor={dialogDetalheCompra.dt_aprovacao_rc} />
+              <LabelValor label="Dt. criação pedido" valor={dialogDetalheCompra.dt_criacao_pedido} />
+              <LabelValor label="Dt. remessa" valor={dialogDetalheCompra.dt_remessa_pedido} />
+              <LabelValor label="Data confirmada" valor={dialogDetalheCompra.data_confirmada} />
+              <LabelValor label="Emissão NF" valor={dialogDetalheCompra.emissao_nf} />
+              <LabelValor label="Dt. pagamento" valor={dialogDetalheCompra.dt_pagamento} />
+              <LabelValor label="Chegou" valor={dialogDetalheCompra.chegou ? "Sim" : "Não"} />
+              <LabelValor label="Data chegou" valor={dialogDetalheCompra.data_chegou} />
+              <LabelValor label="Retirado" valor={dialogDetalheCompra.foi_retirado ? "Sim" : "Não"} />
+              <LabelValor label="Data retirado" valor={dialogDetalheCompra.data_retirado} />
+              <LabelValor label="Fila" valor={dialogDetalheCompra.rc_em_fila ? `Sim (${dialogDetalheCompra.status_fila || "Pendente"})` : "Não"} />
+              <LabelValor label="Criado por" valor={dialogDetalheCompra.criado_por} />
+              <div className="col-span-2">
+                <LabelValor label="Observação" valor={dialogDetalheCompra.observacao} />
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
