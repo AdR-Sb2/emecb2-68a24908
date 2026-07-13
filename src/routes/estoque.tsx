@@ -881,6 +881,13 @@ function EstoquePage() {
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    useEffect(() => {
+      if (dialogMov === "entrada" && materialSelecionado) {
+        setSelected(materialSelecionado);
+        setQtd(1);
+      }
+    }, [materialSelecionado, dialogMov]);
+
     const valido = selected !== null && qtd > 0 && resp.trim().length > 0;
 
     const handleSalvar = async () => {
@@ -972,6 +979,17 @@ function EstoquePage() {
     const [saving, setSaving] = useState(false);
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (dialogMov === "saida" && materialSelecionado) {
+        setSelected(materialSelecionado);
+        setQtd(1);
+        setDestino("");
+        setSolicitante("");
+        setResp("");
+        setObs("");
+      }
+    }, [materialSelecionado, dialogMov]);
 
     const sugestoesDestino = useMemo(
       () =>
