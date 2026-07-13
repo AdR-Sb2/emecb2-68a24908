@@ -282,6 +282,25 @@ function AdminPage() {
     );
   };
 
+  const togglePermissaoVirtual = async (painelChave: string, label: string) => {
+    const key = `${painelChave}.${label.toLowerCase()}`;
+    const { data, error } = await supabase
+      .from("permissions")
+      .upsert({ key, label, panel_key: painelChave, is_generic: true }, { onConflict: "key" })
+      .select("id")
+      .single();
+    if (error || !data) {
+      toast.error("Erro ao criar permissão: " + (error?.message || ""));
+      return;
+    }
+    setPermissoes((prev) => [
+      ...prev,
+      { id: data.id, key, label, panel_key: painelChave, is_generic: true },
+    ]);
+    setNewCargoPermissoes((prev) => [...prev, data.id]);
+    toast.success(`Permissão "${label}" criada!`);
+  };
+
   const toggleExpandPainelPerms = (painelId: number) => {
     setExpandedPainelPerms((prev) => {
       const next = new Set(prev);
@@ -299,6 +318,19 @@ function AdminPage() {
     }
     return map;
   }, [permissoes]);
+
+  const getPermsOuGenericas = (painelChave: string): PermissaoRow[] => {
+    const dbPerms = permissoesPorPainel[painelChave];
+    if (dbPerms && dbPerms.length > 0) return dbPerms;
+    // Fallback: retorna permissões genéricas virtuais (não persistem no BD)
+    const genericas: PermissaoRow[] = [
+      { id: -1, key: `${painelChave}.ver`, label: 'Ver', panel_key: painelChave, is_generic: true },
+      { id: -2, key: `${painelChave}.editar`, label: 'Editar', panel_key: painelChave, is_generic: true },
+      { id: -3, key: `${painelChave}.excluir`, label: 'Excluir', panel_key: painelChave, is_generic: true },
+      { id: -4, key: `${painelChave}.exportar`, label: 'Exportar', panel_key: painelChave, is_generic: true },
+    ];
+    return genericas;
+  };
 
   const selectAllPermissoesPainel = (painelChave: string, add: boolean) => {
     const perms = permissoesPorPainel[painelChave] || [];
@@ -634,7 +666,7 @@ function AdminPage() {
                       </label>
                       <div className="grid gap-2">
                         {paineis.map((p) => {
-                          const painelPerms = permissoesPorPainel[p.chave] || [];
+                          const painelPerms = getPermsOuGenericas(p.chave);
                           const expanded = expandedPainelPerms.has(p.id);
                           return (
                             <div
@@ -662,7 +694,7 @@ function AdminPage() {
                               </div>
                               {expanded && newCargoPaineis.includes(p.id) && (
                                 <div className="border-t border-[#334155] px-6 py-2">
-                                  {painelPerms.length > 0 ? (
+                                  {permissoesPorPainel[p.chave]?.length ? (
                                     <>
                                       <div className="mb-1 flex items-center gap-2">
                                         <button
@@ -680,28 +712,72 @@ function AdminPage() {
                                         </button>
                                       </div>
                                       <div className="flex flex-wrap gap-2">
-                                        {painelPerms.map((perm) => (
+                                        {painelPerms.map((perm) => {
+                                          const isVirtual = perm.id < 0;
+                                          return (
+                                            <label
+                                              key={perm.key}
+                                              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={
+                                                  isVirtual
+                                                    ? false
+                                                    : newCargoPermissoes.includes(perm.id)
+                                                }
+                                                onChange={() => {
+                                                  if (isVirtual) {
+                                                    togglePermissaoVirtual(perm.panel_key, perm.label);
+                                                  } else {
+                                                    togglePermissaoCargo(perm.id);
+                                                  }
+                                                }}
+                                                className="h-3.5 w-3.5 accent-[#0ea5e9]"
+                                              />
+                                              <span className="text-[11px] text-[#cbd5e1]">
+                                                {perm.label}
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                      {painelPerms.map((perm) => {
+                                        const isVirtual = perm.id < 0;
+                                        return (
                                           <label
-                                            key={perm.id}
+                                            key={perm.key}
                                             className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
                                           >
                                             <input
                                               type="checkbox"
-                                              checked={newCargoPermissoes.includes(perm.id)}
-                                              onChange={() => togglePermissaoCargo(perm.id)}
+                                              checked={
+                                                isVirtual
+                                                  ? false
+                                                  : newCargoPermissoes.includes(perm.id)
+                                              }
+                                              onChange={() => {
+                                                if (isVirtual) {
+                                                  togglePermissaoVirtual(perm.panel_key, perm.label);
+                                                } else {
+                                                  togglePermissaoCargo(perm.id);
+                                                }
+                                              }}
                                               className="h-3.5 w-3.5 accent-[#0ea5e9]"
                                             />
                                             <span className="text-[11px] text-[#cbd5e1]">
                                               {perm.label}
                                             </span>
                                           </label>
-                                        ))}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <p className="text-[11px] text-[#64748b] italic">
-                                      Nenhuma permissão cadastrada para este painel ainda.
-                                    </p>
+                                        );
+                                      })}
+                                      <p className="w-full text-[10px] text-[#64748b] italic pt-1">
+                                        Permissões genéricas. Ao marcar, serão criadas automaticamente no banco.
+                                      </p>
+                                    </div>
                                   )}
                                 </div>
                               )}
