@@ -12,6 +12,7 @@ import {
   Loader2,
   User,
   Package,
+  CalendarCheck,
 } from "lucide-react";
 import {
   Dialog,
@@ -52,6 +53,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   relatorio: { bg: "bg-amber-100", icon: "text-amber-600", ring: "hover:ring-amber-300" },
   backlog: { bg: "bg-violet-100", icon: "text-violet-600", ring: "hover:ring-violet-300" },
   estoque: { bg: "bg-cyan-100", icon: "text-cyan-600", ring: "hover:ring-cyan-300" },
+  escala: { bg: "bg-rose-100", icon: "text-rose-600", ring: "hover:ring-rose-300" },
 };
 
 function getCardColor(chave: string) {
@@ -60,6 +62,7 @@ function getCardColor(chave: string) {
   if (chave.startsWith("sistemas")) return CARD_COLORS.sistemas;
   if (chave.startsWith("relatorio")) return CARD_COLORS.relatorio;
   if (chave.startsWith("dashboard_os")) return CARD_COLORS.backlog;
+  if (chave.startsWith("escala")) return CARD_COLORS.escala;
   return CARD_COLORS.dashboard;
 }
 
@@ -124,6 +127,7 @@ function Index() {
   const shouldShowSistema = hasPanel("sistemas") || hasFallbackPanels;
   const shouldShowRelatorio = hasPanel("relatorio_tecnico") || hasFallbackPanels;
   const shouldShowBacklog = hasPanel("dashboard_os") || hasFallbackPanels;
+  const shouldShowEscala = hasPanel("escala_trabalho") || hasFallbackPanels;
   const shouldShowEstoque = hasPanel("estoque");
   const canAdmin = hasPanel("admin");
 
@@ -226,9 +230,19 @@ function Index() {
               </CardLink>
             )}
 
-            {/* Estoque */}
+            {/* Escala de Trabalho */}
+            {shouldShowEscala && (
+              <CardLink to="/escala" chave="escala" delay={4}>
+                <CardIcon chave="escala" icon={CalendarCheck} />
+                <CardTitle>Escala de Trabalho</CardTitle>
+                <CardDesc>Equipe, plantões e escala semanal de trabalho.</CardDesc>
+                <CardCta>Abrir escala</CardCta>
+              </CardLink>
+            )}
+
+            {/* Estoque / Almoxarifado */}
             {shouldShowEstoque && (
-              <CardLink to="/estoque" chave="estoque" delay={4}>
+              <CardLink to="/estoque" chave="estoque" delay={5}>
                 <CardIcon chave="estoque" icon={Package} />
                 <CardTitle>Almoxarifado</CardTitle>
                 <CardDesc>Estoque de materiais, entrada/saída, compras e pedidos.</CardDesc>

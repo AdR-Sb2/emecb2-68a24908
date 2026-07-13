@@ -150,6 +150,7 @@ function EstoquePage() {
     cadastrarMaterial: false,
     gerenciarCategorias: false,
   });
+  const [permissoesLoading, setPermissoesLoading] = useState(true);
   const [acessoVerificado, setAcessoVerificado] = useState(false);
 
   useEffect(() => {
@@ -179,6 +180,7 @@ function EstoquePage() {
 
   useEffect(() => {
     if (!acessoVerificado || !profile?.cargo_id) return;
+    setPermissoesLoading(true);
     (async () => {
       const perms = await getPermissoesCargo(profile.cargo_id);
       setPermissoes({
@@ -194,6 +196,7 @@ function EstoquePage() {
         cadastrarMaterial: temPermissao(perms, "estoque", "cadastrar_material"),
         gerenciarCategorias: temPermissao(perms, "estoque", "gerenciar_categorias"),
       });
+      setPermissoesLoading(false);
     })();
   }, [acessoVerificado, profile?.cargo_id]);
 
@@ -2563,7 +2566,7 @@ function EstoquePage() {
         </div>
       </div>
 
-      {loading || !acessoVerificado ? (
+      {loading || !acessoVerificado || permissoesLoading ? (
         <div className="flex items-center justify-center py-20 text-slate-400">
           <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Carregando...
         </div>

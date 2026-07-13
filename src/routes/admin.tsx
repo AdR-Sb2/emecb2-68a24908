@@ -527,7 +527,19 @@ function AdminPage() {
 
             <div className="grid gap-3">
               {cargos.map((c) => (
-                <div key={c.id} className="rounded-lg border border-[#334155] bg-[#1e293b] p-4">
+                <div
+                  key={c.id}
+                  className="rounded-lg border border-[#334155] bg-[#1e293b] p-4 hover:border-[#0ea5e9] transition-colors cursor-pointer"
+                  onClick={() => {
+                    setEditingCargo(c);
+                    setNewCargoNome(c.nome);
+                    setNewCargoDesc(c.descricao);
+                    setNewCargoPaineis(cargoPaineis[c.id] || []);
+                    setNewCargoPermissoes(cargoPermissoes[c.id] || []);
+                    setExpandedPainelPerms(new Set());
+                    setShowNewCargo(true);
+                  }}
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-semibold">{c.nome}</h3>
@@ -535,7 +547,8 @@ function AdminPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setEditingCargo(c);
                           setNewCargoNome(c.nome);
                           setNewCargoDesc(c.descricao);
@@ -549,7 +562,10 @@ function AdminPage() {
                         Editar
                       </button>
                       <button
-                        onClick={() => deleteCargo(c)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteCargo(c);
+                        }}
                         className="rounded bg-red-500/10 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20 cursor-pointer"
                       >
                         Excluir
@@ -619,7 +635,6 @@ function AdminPage() {
                       <div className="grid gap-2">
                         {paineis.map((p) => {
                           const painelPerms = permissoesPorPainel[p.chave] || [];
-                          const hasPerms = painelPerms.length > 0;
                           const expanded = expandedPainelPerms.has(p.id);
                           return (
                             <div
@@ -627,19 +642,16 @@ function AdminPage() {
                               className="rounded-lg border border-[#334155] bg-[#0f172a]"
                             >
                               <div className="flex items-center gap-2 px-3 py-2">
-                                {hasPerms && (
-                                  <button
-                                    onClick={() => toggleExpandPainelPerms(p.id)}
-                                    className="text-[#64748b] hover:text-[#f8fafc] cursor-pointer bg-transparent border-none p-0"
-                                  >
-                                    {expanded ? (
-                                      <ChevronDown className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <ChevronRight className="h-3.5 w-3.5" />
-                                    )}
-                                  </button>
-                                )}
-                                {!hasPerms && <div className="w-3.5" />}
+                                <button
+                                  onClick={() => toggleExpandPainelPerms(p.id)}
+                                  className="text-[#64748b] hover:text-[#f8fafc] cursor-pointer bg-transparent border-none p-0"
+                                >
+                                  {expanded ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
                                 <input
                                   type="checkbox"
                                   checked={newCargoPaineis.includes(p.id)}
@@ -648,41 +660,49 @@ function AdminPage() {
                                 />
                                 <span className="text-sm text-[#f8fafc]">{p.nome_exibicao}</span>
                               </div>
-                              {hasPerms && expanded && newCargoPaineis.includes(p.id) && (
+                              {expanded && newCargoPaineis.includes(p.id) && (
                                 <div className="border-t border-[#334155] px-6 py-2">
-                                  <div className="mb-1 flex items-center gap-2">
-                                    <button
-                                      onClick={() => selectAllPermissoesPainel(p.chave, true)}
-                                      className="text-[10px] font-medium text-[#0ea5e9] hover:text-[#38bdf8] bg-transparent border-none cursor-pointer"
-                                    >
-                                      Marcar todas
-                                    </button>
-                                    <span className="text-[#334155]">|</span>
-                                    <button
-                                      onClick={() => selectAllPermissoesPainel(p.chave, false)}
-                                      className="text-[10px] font-medium text-[#64748b] hover:text-[#94a3b8] bg-transparent border-none cursor-pointer"
-                                    >
-                                      Desmarcar todas
-                                    </button>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {painelPerms.map((perm) => (
-                                      <label
-                                        key={perm.id}
-                                        className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={newCargoPermissoes.includes(perm.id)}
-                                          onChange={() => togglePermissaoCargo(perm.id)}
-                                          className="h-3.5 w-3.5 accent-[#0ea5e9]"
-                                        />
-                                        <span className="text-[11px] text-[#cbd5e1]">
-                                          {perm.label}
-                                        </span>
-                                      </label>
-                                    ))}
-                                  </div>
+                                  {painelPerms.length > 0 ? (
+                                    <>
+                                      <div className="mb-1 flex items-center gap-2">
+                                        <button
+                                          onClick={() => selectAllPermissoesPainel(p.chave, true)}
+                                          className="text-[10px] font-medium text-[#0ea5e9] hover:text-[#38bdf8] bg-transparent border-none cursor-pointer"
+                                        >
+                                          Marcar todas
+                                        </button>
+                                        <span className="text-[#334155]">|</span>
+                                        <button
+                                          onClick={() => selectAllPermissoesPainel(p.chave, false)}
+                                          className="text-[10px] font-medium text-[#64748b] hover:text-[#94a3b8] bg-transparent border-none cursor-pointer"
+                                        >
+                                          Desmarcar todas
+                                        </button>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {painelPerms.map((perm) => (
+                                          <label
+                                            key={perm.id}
+                                            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={newCargoPermissoes.includes(perm.id)}
+                                              onChange={() => togglePermissaoCargo(perm.id)}
+                                              className="h-3.5 w-3.5 accent-[#0ea5e9]"
+                                            />
+                                            <span className="text-[11px] text-[#cbd5e1]">
+                                              {perm.label}
+                                            </span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className="text-[11px] text-[#64748b] italic">
+                                      Nenhuma permissão cadastrada para este painel ainda.
+                                    </p>
+                                  )}
                                 </div>
                               )}
                             </div>
