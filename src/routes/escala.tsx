@@ -74,7 +74,7 @@ function getWeekDates(ref: Date): Date[] {
   const monday = new Date(ref);
   monday.setDate(ref.getDate() - ((dow + 6) % 7));
   const dates: Date[] = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 14; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     dates.push(d);
@@ -582,16 +582,16 @@ function EscalaPage() {
                 onClick={() => setSemanaOffset((p) => p - 1)}
                 className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
               >
-                <ChevronLeft className="h-4 w-4" /> Semana anterior
+                <ChevronLeft className="h-4 w-4" /> 2 semanas anteriores
               </button>
               <span className="text-sm font-semibold text-[#0b3a73]">
-                {diasSemana[0].toLocaleDateString("pt-BR")} — {diasSemana[6].toLocaleDateString("pt-BR")}
+                {diasSemana[0].toLocaleDateString("pt-BR")} — {diasSemana[13].toLocaleDateString("pt-BR")}
               </span>
               <button
                 onClick={() => setSemanaOffset((p) => p + 1)}
                 className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
               >
-                Próxima semana <ChevronRight className="h-4 w-4" />
+                Próximas 2 semanas <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
