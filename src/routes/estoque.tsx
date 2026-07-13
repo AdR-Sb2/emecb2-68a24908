@@ -126,6 +126,9 @@ function EstoquePage() {
   const [dialogImportarCompras, setDialogImportarCompras] = useState(false);
   const [dialogRcEmFila, setDialogRcEmFila] = useState(false);
   const [dialogSaldoNegativo, setDialogSaldoNegativo] = useState(false);
+  const [dialogSolicitarRc, setDialogSolicitarRc] = useState(false);
+  const [solicitarRcMaterial, setSolicitarRcMaterial] = useState<Material | null>(null);
+  const [solicitarRcQtd, setSolicitarRcQtd] = useState(1);
   const fileInputRefCompras = useRef<HTMLInputElement>(null);
   const [dialogCategorias, setDialogCategorias] = useState(false);
   const [dialogMaterial, setDialogMaterial] = useState(false);
@@ -2965,6 +2968,19 @@ function EstoquePage() {
                           >
                             <Eye className="h-3 w-3" />
                           </button>
+                          {permissoes.solicitarCompra && (
+                            <button
+                              onClick={() => {
+                                setSolicitarRcMaterial(m);
+                                setSolicitarRcQtd(1);
+                                setDialogSolicitarRc(true);
+                              }}
+                              className="rounded bg-orange-100 px-1.5 py-1 text-[10px] font-bold text-orange-700 hover:bg-orange-200 cursor-pointer"
+                              title="Solicitar RC"
+                            >
+                              <ShoppingCart className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -3511,6 +3527,66 @@ function EstoquePage() {
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Solicitar RC */}
+      <Dialog open={dialogSolicitarRc} onOpenChange={setDialogSolicitarRc}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-orange-700">
+              <ShoppingCart className="mr-1 inline h-4 w-4" /> Solicitar RC
+            </DialogTitle>
+          </DialogHeader>
+          {solicitarRcMaterial && (
+            <div className="grid gap-3 py-2 text-sm">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px]">
+                <div className="font-mono font-bold text-slate-700">{solicitarRcMaterial.cod_sap}</div>
+                <div className="text-slate-600">{solicitarRcMaterial.descricao}</div>
+                <div className="mt-1 text-[12px] text-slate-400">
+                  Saldo: {solicitarRcMaterial.saldo_atual} {solicitarRcMaterial.unidade_medida} · Mínimo: {solicitarRcMaterial.estoque_minimo}
+                </div>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Quantidade</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={solicitarRcQtd}
+                  onChange={(e) => setSolicitarRcQtd(Number(e.target.value) || 0)}
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                  autoFocus
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (solicitarRcQtd <= 0) return;
+                    handleNovaCompra({
+                      cod_sap: solicitarRcMaterial.cod_sap,
+                      descricao_material: solicitarRcMaterial.descricao,
+                      qtde_rc: solicitarRcQtd,
+                      deposito_rc: "DP98",
+                      solicitante: profile?.nome_completo || user?.email || "",
+                      rc_em_fila: true,
+                      afeta_saldo: true,
+                    });
+                    setDialogSolicitarRc(false);
+                  }}
+                  disabled={solicitarRcQtd <= 0}
+                  className="flex-1 rounded-md bg-orange-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                >
+                  Adicionar à Fila
+                </button>
+                <button
+                  onClick={() => setDialogSolicitarRc(false)}
+                  className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
