@@ -14,6 +14,7 @@ export type PermissoesEstoque = {
   importar: boolean;
   cadastrarMaterial: boolean;
   gerenciarCategorias: boolean;
+  gerenciarFila: boolean;
 };
 
 export function getPermissoesEstoque(cargoNome: string | null | undefined): PermissoesEstoque {
@@ -32,6 +33,7 @@ export function getPermissoesEstoque(cargoNome: string | null | undefined): Perm
       importar: true,
       cadastrarMaterial: true,
       gerenciarCategorias: true,
+      gerenciarFila: true,
     };
   }
 
@@ -48,6 +50,7 @@ export function getPermissoesEstoque(cargoNome: string | null | undefined): Perm
       importar: true,
       cadastrarMaterial: true,
       gerenciarCategorias: true,
+      gerenciarFila: true,
     };
   }
 
@@ -64,6 +67,7 @@ export function getPermissoesEstoque(cargoNome: string | null | undefined): Perm
       importar: false,
       cadastrarMaterial: false,
       gerenciarCategorias: false,
+      gerenciarFila: true,
     };
   }
 
@@ -80,6 +84,7 @@ export function getPermissoesEstoque(cargoNome: string | null | undefined): Perm
       importar: false,
       cadastrarMaterial: false,
       gerenciarCategorias: false,
+      gerenciarFila: false,
     };
   }
 
@@ -95,6 +100,7 @@ export function getPermissoesEstoque(cargoNome: string | null | undefined): Perm
     importar: false,
     cadastrarMaterial: false,
     gerenciarCategorias: false,
+    gerenciarFila: false,
   };
 }
 

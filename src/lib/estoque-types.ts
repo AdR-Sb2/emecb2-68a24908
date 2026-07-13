@@ -110,6 +110,7 @@ export interface Compra {
   solicitante: string | null;
   previsao_uso: string | null;
   rc_em_fila: boolean;
+  status_fila: string;
   afeta_saldo: boolean;
   criado_por: string;
   criado_em: string;

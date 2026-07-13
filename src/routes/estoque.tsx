@@ -126,6 +126,14 @@ function EstoquePage() {
   const [dialogImportar, setDialogImportar] = useState(false);
   const [dialogImportarCompras, setDialogImportarCompras] = useState(false);
   const [dialogRcEmFila, setDialogRcEmFila] = useState(false);
+  const [showAddFila, setShowAddFila] = useState(false);
+  const [filaDescricao, setFilaDescricao] = useState("");
+  const [filaQtde, setFilaQtde] = useState(1);
+  const [filaDeposito, setFilaDeposito] = useState("DP98");
+  const [filaSolicitante, setFilaSolicitante] = useState("");
+  const [filaPrevisao, setFilaPrevisao] = useState("");
+  const [filaObs, setFilaObs] = useState("");
+  const [filaCodSap, setFilaCodSap] = useState("");
   const [dialogSaldoNegativo, setDialogSaldoNegativo] = useState(false);
   const [dialogSolicitarRc, setDialogSolicitarRc] = useState(false);
   const [solicitarRcMaterial, setSolicitarRcMaterial] = useState<Material | null>(null);
@@ -149,6 +157,7 @@ function EstoquePage() {
     importar: false,
     cadastrarMaterial: false,
     gerenciarCategorias: false,
+    gerenciarFila: false,
   });
   const [permissoesLoading, setPermissoesLoading] = useState(true);
   const [acessoVerificado, setAcessoVerificado] = useState(false);
@@ -195,6 +204,7 @@ function EstoquePage() {
         importar: temPermissao(perms, "estoque", "importar"),
         cadastrarMaterial: temPermissao(perms, "estoque", "cadastrar_material"),
         gerenciarCategorias: temPermissao(perms, "estoque", "gerenciar_categorias"),
+        gerenciarFila: temPermissao(perms, "estoque", "gerenciar_fila"),
       });
       setPermissoesLoading(false);
     })();
@@ -533,6 +543,57 @@ function EstoquePage() {
     await carregarDados();
     toast.success("Pedido de compra criado!");
     setDialogCompra(false);
+  };
+
+  const handleStatusFila = async (id: number, status_fila: string) => {
+    const update: Partial<Compra> = { status_fila };
+    if (status_fila === "Finalizado") {
+      update.rc_em_fila = false;
+    }
+    const { error } = await supabase.from("compras").update(update).eq("id", id);
+    if (error) {
+      toast.error("Erro ao atualizar fila: " + error.message);
+      return;
+    }
+    await carregarDados();
+    if (status_fila === "Finalizado") {
+      toast.success("RC finalizada e movida para pedidos!");
+    } else {
+      toast.success(`Status alterado para "${status_fila}"`);
+    }
+  };
+
+  const handleAdicionarFila = async (data: {
+    descricao: string;
+    qtde: number;
+    deposito: string;
+    solicitante: string;
+    previsao_uso: string;
+    observacao: string;
+    cod_sap?: string;
+  }) => {
+    const { error } = await supabase.from("compras").insert({
+      requisicao: null,
+      item_rc: null,
+      cod_sap: data.cod_sap || null,
+      descricao_material: data.descricao,
+      qtde_rc: data.qtde,
+      deposito_rc: data.deposito,
+      solicitante: data.solicitante || profile?.nome_completo || user?.email || "",
+      previsao_uso: data.previsao_uso,
+      observacao: data.observacao,
+      rc_em_fila: true,
+      status_fila: "Pendente",
+      afeta_saldo: true,
+      criado_por: user?.email || "",
+    });
+    if (error) {
+      toast.error("Erro ao adicionar à fila: " + error.message);
+      return;
+    }
+    await carregarDados();
+    toast.success("Adicionado à fila de RCs!");
+    setDialogRcEmFila(false);
   };
 
   const handleCompraStatus = async (id: number, status_geral: StatusCompra) => {
@@ -3455,13 +3516,77 @@ function EstoquePage() {
       </Dialog>
 
       {/* Dialog RC em Fila */}
-      <Dialog open={dialogRcEmFila} onOpenChange={setDialogRcEmFila}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={dialogRcEmFila} onOpenChange={(open) => { setDialogRcEmFila(open); if (!open) setShowAddFila(false); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-blue-700">
               <ShoppingCart className="mr-1 inline h-4 w-4" /> RCs em Fila
             </DialogTitle>
           </DialogHeader>
+
+          {/* Botão Adicionar Fila */}
+          {permissoes.solicitarCompra && !showAddFila && (
+            <button
+              onClick={() => { setShowAddFila(true); setFilaDescricao(""); setFilaQtde(1); setFilaDeposito("DP98"); setFilaSolicitante(""); setFilaPrevisao(""); setFilaObs(""); setFilaCodSap(""); }}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 cursor-pointer"
+            >
+              <Plus className="h-4 w-4" /> Adicionar fila
+            </button>
+          )}
+
+          {/* Formulário Adicionar Fila */}
+          {showAddFila && (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <h4 className="mb-2 text-sm font-bold text-emerald-800">Nova solicitação na fila</h4>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Cód. SAP (opcional)
+                  <input value={filaCodSap} onChange={(e) => setFilaCodSap(e.target.value)} placeholder="Deixe em branco se for novo" className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Descrição do material *
+                  <input value={filaDescricao} onChange={(e) => setFilaDescricao(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Quantidade *
+                  <input type="number" min={1} value={filaQtde} onChange={(e) => setFilaQtde(Number(e.target.value) || 0)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Depósito
+                  <select value={filaDeposito} onChange={(e) => setFilaDeposito(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm">
+                    <option value="DP98">DP98</option>
+                    <option value="DP96">DP96</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Solicitante
+                  <input value={filaSolicitante} onChange={(e) => setFilaSolicitante(e.target.value)} placeholder={profile?.nome_completo || user?.email || ""} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Previsão de uso
+                  <input value={filaPrevisao} onChange={(e) => setFilaPrevisao(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                </label>
+              </div>
+              <label className="mt-3 flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Observação
+                <textarea value={filaObs} onChange={(e) => setFilaObs(e.target.value)} className="min-h-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm" />
+              </label>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => handleAdicionarFila({ descricao: filaDescricao, qtde: filaQtde, deposito: filaDeposito, solicitante: filaSolicitante, previsao_uso: filaPrevisao, observacao: filaObs, cod_sap: filaCodSap || undefined })}
+                  disabled={!filaDescricao.trim() || filaQtde <= 0}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                >
+                  <Plus className="mr-1 inline h-4 w-4" /> Adicionar
+                </button>
+                <button onClick={() => setShowAddFila(false)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista da fila */}
           <div className="grid gap-2 text-sm">
             {compras.filter((c) => c.rc_em_fila).length === 0 ? (
               <p className="text-slate-400">Nenhuma RC em fila no momento.</p>
@@ -3469,21 +3594,46 @@ function EstoquePage() {
               compras
                 .filter((c) => c.rc_em_fila)
                 .sort((a, b) => (b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1)
-                .map((c) => (
-                  <div key={c.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-                    <span className="font-mono text-sm font-bold text-blue-600">
-                      {c.requisicao || "—"}
-                    </span>
-                    <span className="text-xs text-slate-400">Item {c.item_rc}</span>
-                    <span className="flex-1 truncate text-slate-600">
-                      {c.descricao_material || "—"}
-                    </span>
-                    <span className="font-bold">{c.qtde_rc ?? "—"}</span>
-                    <span className="text-xs text-slate-400">
-                      {c.dt_criacao_rc || "—"}
-                    </span>
-                  </div>
-                ))
+                .map((c) => {
+                  const STATUS_FILA_OPCOES = ["Pendente", "Visto", "Em Processo", "Aguardando Retorno", "Finalizado"];
+                  const STATUS_FILA_CORES: Record<string, string> = {
+                    "Pendente": "bg-amber-100 text-amber-700 border-amber-200",
+                    "Visto": "bg-blue-100 text-blue-700 border-blue-200",
+                    "Em Processo": "bg-purple-100 text-purple-700 border-purple-200",
+                    "Aguardando Retorno": "bg-orange-100 text-orange-700 border-orange-200",
+                    "Finalizado": "bg-emerald-100 text-emerald-700 border-emerald-200",
+                  };
+                  return (
+                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                      <span className="font-mono text-sm font-bold text-blue-600">
+                        {c.requisicao || "—"}
+                      </span>
+                      <span className="text-xs text-slate-400">Item {c.item_rc}</span>
+                      <span className="flex-1 truncate text-slate-600">
+                        {c.descricao_material || "—"}
+                      </span>
+                      <span className="font-bold">{c.qtde_rc ?? "—"}</span>
+                      <span className="text-xs text-slate-400">
+                        {c.dt_criacao_rc || "—"}
+                      </span>
+                      {permissoes.gerenciarFila ? (
+                        <select
+                          value={c.status_fila || "Pendente"}
+                          onChange={(e) => handleStatusFila(c.id, e.target.value)}
+                          className={`rounded-md border px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_FILA_CORES[c.status_fila || "Pendente"] || "bg-slate-100 text-slate-600"}`}
+                        >
+                          {STATUS_FILA_OPCOES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${STATUS_FILA_CORES[c.status_fila || "Pendente"] || "bg-slate-100 text-slate-600"}`}>
+                          {c.status_fila || "Pendente"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
             )}
           </div>
         </DialogContent>
