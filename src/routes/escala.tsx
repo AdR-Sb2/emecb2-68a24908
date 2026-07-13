@@ -85,17 +85,18 @@ function calcularStatusPorFormula(
   data: Date,
 ): "TRABALHA" | "FOLGA" | null {
   const escala = col.escala;
-  if (escala === "Comercial") {
+  const esc = escala.toUpperCase();
+  if (esc === "COMERCIAL") {
     return isWeekend(data) ? "FOLGA" : "TRABALHA";
   }
-  if (escala === "Plantão 1" || escala === "Plantão 2") {
+  if (esc === "PLANTÃO 1" || esc === "PLANTÃO 2") {
     if (!col.data_ancora) return null;
     const ancora = new Date(col.data_ancora);
     const diff = Math.floor((data.getTime() - ancora.getTime()) / 86400000);
     if (diff < 0) return null;
     // Ciclo 2x2: dias 0-1 TRABALHA, dias 2-3 FOLGA
     // Plantão 2 tem offset de +2 dias (complementar)
-    const offset = escala === "Plantão 2" ? 2 : 0;
+    const offset = esc === "PLANTÃO 2" ? 2 : 0;
     const phase = (diff + offset) % 4;
     return phase < 2 ? "TRABALHA" : "FOLGA";
   }
@@ -234,7 +235,7 @@ function EscalaPage() {
   // --- Agrupar por escala ---
   const grupos = useMemo(() => {
     const grupos: { label: string; cols: Colaborador[] }[] = [];
-    const ordem = ["Comercial", "Plantão 1", "Plantão 2", "Férias"];
+    const ordem = ["COMERCIAL", "PLANTÃO 1", "PLANTÃO 2", "Férias"];
     for (const label of ordem) {
       const cols = colaboradoresFiltrados.filter((c) => c.escala === label);
       if (cols.length) grupos.push({ label, cols });
@@ -575,9 +576,9 @@ function EscalaPage() {
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
               >
                 <option value="TODAS">Todas escalas</option>
-                <option value="Comercial">Comercial</option>
-                <option value="Plantão 1">Plantão 1</option>
-                <option value="Plantão 2">Plantão 2</option>
+                <option value="COMERCIAL">Comercial</option>
+                <option value="PLANTÃO 1">Plantão 1</option>
+                <option value="PLANTÃO 2">Plantão 2</option>
                 <option value="Férias">Férias</option>
               </select>
               <select
