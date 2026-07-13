@@ -964,6 +964,30 @@ function EstoquePage() {
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const sugestoesDestino = useMemo(
+      () =>
+        [
+          ...new Set(
+            movimentacoes
+              .filter((m) => m.tipo === "SAIDA" && m.destino)
+              .map((m) => m.destino),
+          ),
+        ].sort(),
+      [movimentacoes],
+    );
+
+    const sugestoesSolicitante = useMemo(
+      () =>
+        [
+          ...new Set(
+            movimentacoes
+              .filter((m) => m.tipo === "SAIDA" && m.solicitante)
+              .map((m) => m.solicitante),
+          ),
+        ].sort(),
+      [movimentacoes],
+    );
+
     const saldoInsuficiente = selected !== null && qtd > selected.saldo_atual;
     const valido =
       selected !== null &&
@@ -1039,17 +1063,29 @@ function EstoquePage() {
           <input
             value={destino}
             onChange={(e) => setDestino(e.target.value)}
+            list="sugestoes-destino"
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
             placeholder="Ex: PL-RJB-EAT1005"
           />
+          <datalist id="sugestoes-destino">
+            {sugestoesDestino.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Solicitante *</span>
           <input
             value={solicitante}
             onChange={(e) => setSolicitante(e.target.value)}
+            list="sugestoes-solicitante"
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
           />
+          <datalist id="sugestoes-solicitante">
+            {sugestoesSolicitante.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Responsável pela saída *</span>
