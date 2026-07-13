@@ -99,6 +99,7 @@ function EstoquePage() {
   const [filtroCategoria, setFiltroCategoria] = useState<string>("TODAS");
   const [filtroStatus, setFiltroStatus] = useState<StatusEstoque | "TODAS">("TODAS");
   const [filtroCritico, setFiltroCritico] = useState(false);
+  const [filtroSaldoNegativo, setFiltroSaldoNegativo] = useState(false);
   const [filtroElevatoria, setFiltroElevatoria] = useState("");
   const [metricaDestino, setMetricaDestino] = useState<"movimentacoes" | "quantidade">(
     "movimentacoes",
@@ -124,6 +125,7 @@ function EstoquePage() {
   const [dialogImportar, setDialogImportar] = useState(false);
   const [dialogImportarCompras, setDialogImportarCompras] = useState(false);
   const [dialogRcEmFila, setDialogRcEmFila] = useState(false);
+  const [dialogSaldoNegativo, setDialogSaldoNegativo] = useState(false);
   const fileInputRefCompras = useRef<HTMLInputElement>(null);
   const [dialogCategorias, setDialogCategorias] = useState(false);
   const [dialogMaterial, setDialogMaterial] = useState(false);
@@ -211,6 +213,17 @@ function EstoquePage() {
     [materiais],
   );
 
+  const materiaisComSaldoNegativo = useMemo(
+    () => materiais.filter((m) => m.saldo_atual < 0),
+    [materiais],
+  );
+
+  useEffect(() => {
+    if (materiaisComSaldoNegativo.length > 0 && !loading && acessoVerificado) {
+      setDialogSaldoNegativo(true);
+    }
+  }, [materiaisComSaldoNegativo, acessoVerificado, loading]);
+
   const materiaisFiltrados = useMemo(() => {
     let list = materiaisComStatus;
     if (search) {
@@ -223,6 +236,7 @@ function EstoquePage() {
       list = list.filter((m) => String(m.categoria_id) === filtroCategoria);
     if (filtroStatus !== "TODAS") list = list.filter((m) => m._status === filtroStatus);
     if (filtroCritico) list = list.filter((m) => m.material_critico);
+    if (filtroSaldoNegativo) list = list.filter((m) => m.saldo_atual < 0);
     if (filtroElevatoria) list = list.filter((m) => m.vinculo_elevatoria === filtroElevatoria);
     list.sort((a, b) => {
       const av = a[sortKey as keyof typeof a] ?? "";
@@ -3366,6 +3380,50 @@ function EstoquePage() {
               onChange={handleImportarComprasCSV}
               className="block w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#0b3a73] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-[#1f7ad6]"
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Saldo Negativo */}
+      <Dialog open={dialogSaldoNegativo} onOpenChange={setDialogSaldoNegativo}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-red-700">
+              <AlertTriangle className="mr-1 inline h-4 w-4" /> Furo de Estoque Detectado
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 text-sm">
+            <p className="text-slate-600">
+              Existem <strong className="text-red-600">{materiaisComSaldoNegativo.length} materiais</strong> com saldo negativo no estoque.
+              Isso indica possíveis divergências entre o saldo registrado e o físico.
+            </p>
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-red-100 bg-red-50 p-3">
+              {materiaisComSaldoNegativo.map((m) => (
+                <div key={m.cod_sap} className="flex items-center justify-between text-[13px]">
+                  <span className="font-mono text-red-700">{m.cod_sap}</span>
+                  <span className="flex-1 truncate px-2 text-slate-600">{m.descricao}</span>
+                  <span className="font-bold text-red-600">{m.saldo_atual}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setDialogSaldoNegativo(false);
+                  setFiltroSaldoNegativo(true);
+                  setAba("estoque");
+                }}
+                className="flex-1 rounded-md bg-red-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-red-700"
+              >
+                VERIFICAR AGORA
+              </button>
+              <button
+                onClick={() => setDialogSaldoNegativo(false)}
+                className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
