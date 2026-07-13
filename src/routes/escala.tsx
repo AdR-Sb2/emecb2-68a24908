@@ -63,12 +63,6 @@ function formatDateISO(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
-function parseDateFromHeader(header: string): Date | null {
-  const m = header.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (!m) return null;
-  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-}
-
 function getWeekDates(ref: Date): Date[] {
   const dow = ref.getDay();
   const monday = new Date(ref);
@@ -320,30 +314,57 @@ function EscalaPage() {
     setImportando(true);
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (!json.length) {
-        toast.error("Planilha vazia ou inválida.");
+      const wb = XLSX.read(buf, { type: "array", cellDates: false });
+      const ws = wb.Sheets["ESCALA EQUIPES"] || wb.Sheets[wb.SheetNames[0]];
+      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { defval: null, header: 1 });
+
+      // Encontrar linha de cabeçalho (EQUIPE, HORARIO, COLABORADOR...)
+      let headerRow = -1;
+      let dateRow = -1;
+      for (let i = 0; i < Math.min(10, rows.length); i++) {
+        const r = rows[i];
+        if (r && String(r[0] || "").trim().toUpperCase() === "EQUIPE") headerRow = i;
+      }
+      if (headerRow < 0) {
+        toast.error("Formato de planilha não reconhecido. Procure a aba 'ESCALA EQUIPES'.");
+        setImportando(false);
+        return;
+      }
+      dateRow = headerRow + 1;
+
+      const headers = rows[headerRow] as unknown[];
+      const dateSerials = rows[dateRow] as (number | null)[];
+
+      // Identificar colunas fixas e colunas de data
+      const colunasFixas = ["EQUIPE", "HORARIO", "COLABORADOR", "LOGIN SAP", "LOGIN FIELD", "FUNÇÃO", "ESCALA"];
+      const colunasData: { index: number; date: Date }[] = [];
+      for (let i = 7; i < headers.length; i++) {
+        const serial = dateSerials[i];
+        if (typeof serial === "number") {
+          const d = new Date((serial - 25569) * 86400000);
+          if (!isNaN(d.getTime())) colunasData.push({ index: i, date: d });
+        }
+      }
+
+      if (!colunasData.length) {
+        toast.error("Nenhuma coluna de data encontrada na planilha.");
         setImportando(false);
         return;
       }
 
-      // Identificar colunas fixas vs colunas de data
-      const headers = Object.keys(json[0]);
-      const colunasFixas = ["Equipe", "Horário", "Colaborador", "Login SAP", "Login Field", "Função", "Escala"];
-      const colunasData = headers.filter((h) => !colunasFixas.includes(h) && parseDateFromHeader(h));
-
       let importados = 0;
-      for (const row of json) {
-        const equipe = String(row["Equipe"] || "").trim();
-        const horario = String(row["Horário"] || "").trim();
-        const colaboradorNome = String(row["Colaborador"] || "").trim();
-        const loginSap = String(row["Login SAP"] || "").trim();
-        const loginField = String(row["Login Field"] || "").trim();
-        const funcao = String(row["Função"] || "").trim();
-        const escala = String(row["Escala"] || "").trim();
-        if (!colaboradorNome) continue;
+      for (let i = dateRow + 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !Array.isArray(row)) continue;
+        const colaboradorNome = String(row[2] || "").trim();
+        if (!colaboradorNome || colaboradorNome === "VAGO" || colaboradorNome === "-") continue;
+
+        const equipe = String(row[0] || "").trim() || "—";
+        const horario = String(row[1] || "").trim();
+        const loginSap = String(row[3] || "").trim();
+        const loginField = String(row[4] || "").trim();
+        const funcao = String(row[5] || "").trim();
+        const escala = String(row[6] || "").trim();
 
         // Inserir/atualizar colaborador
         const { data: colData, error: colErr } = await supabase
@@ -368,15 +389,13 @@ function EscalaPage() {
         if (colErr || !colData) continue;
         const colId = colData.id;
 
-        // Encontrar data_ancora para Plantão
+        // Encontrar data_ancora
         let dataAncora: string | null = null;
         if (escala === "Plantão 1" || escala === "Plantão 2") {
-          for (const ch of colunasData) {
-            const d = parseDateFromHeader(ch);
-            if (!d) continue;
-            const val = String(row[ch] || "").trim().toUpperCase();
+          for (const cd of colunasData) {
+            const val = String(row[cd.index] || "").trim().toUpperCase();
             if (val === "TRABALHA") {
-              dataAncora = formatDateISO(d);
+              dataAncora = formatDateISO(cd.date);
               break;
             }
           }
@@ -384,25 +403,23 @@ function EscalaPage() {
 
         // Inserir dias
         const diasParaInserir: { colaborador_id: number; data: string; status: string }[] = [];
-        for (const ch of colunasData) {
-          const d = parseDateFromHeader(ch);
-          if (!d) continue;
-          const val = String(row[ch] || "").trim().toUpperCase();
-          const status = val === "TRABALHA" || val === "T" ? "TRABALHA" : "FOLGA";
+        for (const cd of colunasData) {
+          const val = String(row[cd.index] || "").trim().toUpperCase();
+          const status = val === "TRABALHA" ? "TRABALHA" : "FOLGA";
           diasParaInserir.push({
             colaborador_id: colId,
-            data: formatDateISO(d),
+            data: formatDateISO(cd.date),
             status,
           });
         }
 
         if (diasParaInserir.length) {
-          await supabase.from("escala_dias").upsert(diasParaInserir, {
-            onConflict: "colaborador_id,data",
-          });
+          const { error: upsertErr } = await supabase
+            .from("escala_dias")
+            .upsert(diasParaInserir, { onConflict: "colaborador_id,data" });
+          if (upsertErr) console.error("Erro ao inserir dias:", upsertErr);
         }
 
-        // Atualizar data_ancora se encontrada
         if (dataAncora) {
           await supabase
             .from("colaboradores_escala")
