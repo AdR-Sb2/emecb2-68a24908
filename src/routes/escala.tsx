@@ -15,6 +15,11 @@ import {
   Upload,
   Users,
   Edit3,
+  Phone,
+  Trash2,
+  Plus,
+  GripVertical,
+  Pencil,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
@@ -37,6 +42,8 @@ type Colaborador = {
   escala: string;
   data_ancora: string | null;
   ativo: boolean;
+  telefone: string;
+  ordem: number;
 };
 
 type EscalaDia = {
@@ -156,7 +163,7 @@ function EscalaPage() {
   const carregarDados = async () => {
     setLoading(true);
     const [colRes, diasRes] = await Promise.all([
-      supabase.from("colaboradores_escala").select("*").eq("ativo", true).order("id"),
+      supabase.from("colaboradores_escala").select("*").eq("ativo", true).order("ordem"),
       supabase.from("escala_dias").select("*"),
     ]);
     if (colRes.data) setColaboradores(colRes.data);
@@ -235,7 +242,7 @@ function EscalaPage() {
   // --- Agrupar por escala ---
   const grupos = useMemo(() => {
     const grupos: { label: string; cols: Colaborador[] }[] = [];
-    const ordem = ["COMERCIAL", "PLANTÃO 1", "PLANTÃO 2", "Férias"];
+    const ordem = ["COMERCIAL", "PLANTÃO 1", "PLANTÃO 2", "FÉRIAS"];
     for (const label of ordem) {
       const cols = colaboradoresFiltrados.filter((c) => c.escala === label);
       if (cols.length) grupos.push({ label, cols });
@@ -253,11 +260,11 @@ function EscalaPage() {
   }, [colaboradores, gridStatus]);
 
   const diurnosHoje = useMemo(
-    () => trabalhaHoje.filter((c) => c.horario === "Diurno"),
+    () => trabalhaHoje.filter((c) => c.horario.toUpperCase() === "DIURNO"),
     [trabalhaHoje],
   );
   const noturnosHoje = useMemo(
-    () => trabalhaHoje.filter((c) => c.horario === "Noturno"),
+    () => trabalhaHoje.filter((c) => c.horario.toUpperCase() === "NOTURNO"),
     [trabalhaHoje],
   );
 
@@ -392,7 +399,7 @@ function EscalaPage() {
 
         // Encontrar data_ancora
         let dataAncora: string | null = null;
-        if (escala === "Plantão 1" || escala === "Plantão 2") {
+        if (escala.toUpperCase() === "PLANTÃO 1" || escala.toUpperCase() === "PLANTÃO 2") {
           for (const cd of colunasData) {
             const val = String(row[cd.index] || "").trim().toUpperCase();
             if (val === "TRABALHA") {
@@ -445,7 +452,7 @@ function EscalaPage() {
   useEffect(() => {
     if (!colaboradores.length || !escalaDias.length) return;
     const semAncora = colaboradores.filter(
-      (c) => (c.escala === "Plantão 1" || c.escala === "Plantão 2") && !c.data_ancora,
+      (c) => (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") && !c.data_ancora,
     );
     for (const col of semAncora) {
       const dias = escalaDias
@@ -460,6 +467,159 @@ function EscalaPage() {
       }
     }
   }, [colaboradores, escalaDias]);
+
+  // --- Edição inline ---
+  const [editando, setEditando] = useState<{ colId: number; campo: string } | null>(null);
+  const edicoesRef = useRef<Map<string, number>>(new Map());
+
+  const salvarCampo = async (colId: number, campo: string, valor: string) => {
+    const key = `${colId}_${campo}`;
+    const now = Date.now();
+    const last = edicoesRef.current.get(key) || 0;
+    if (now - last < 300) return; // debounce
+    edicoesRef.current.set(key, now);
+
+    const { error } = await supabase
+      .from("colaboradores_escala")
+      .update({ [campo]: valor })
+      .eq("id", colId);
+    if (error) {
+      toast.error("Erro ao salvar: " + error.message);
+      return;
+    }
+    setColaboradores((prev) =>
+      prev.map((c) => (c.id === colId ? { ...c, [campo]: valor } : c)),
+    );
+    setEditando(null);
+    if (campo === "escala") {
+      // recalcular data_ancora se mudou para plantão
+      if (valor.toUpperCase() === "PLANTÃO 1" || valor.toUpperCase() === "PLANTÃO 2") {
+        const col = colaboradores.find((c) => c.id === colId);
+        if (col) {
+          const dias = escalaDias
+            .filter((ed) => ed.colaborador_id === colId && ed.status === "TRABALHA")
+            .sort((a, b) => a.data.localeCompare(b.data));
+          if (dias.length) {
+            await supabase
+              .from("colaboradores_escala")
+              .update({ data_ancora: dias[0].data })
+              .eq("id", colId);
+          }
+        }
+      }
+      await carregarDados();
+    }
+  };
+
+  const toggleEdit = (colId: number, campo: string) => {
+    if (editando?.colId === colId && editando?.campo === campo) {
+      setEditando(null);
+    } else {
+      setEditando({ colId, campo });
+    }
+  };
+
+  const opcoesEscala = ["COMERCIAL", "PLANTÃO 1", "PLANTÃO 2", "FÉRIAS"];
+  const opcoesHorario = ["DIURNO", "NOTURNO"];
+
+  // --- Drag & drop (swap) ---
+  const [dragId, setDragId] = useState<number | null>(null);
+
+  const handleDragStart = (colId: number) => {
+    setDragId(colId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (targetId: number) => {
+    if (dragId === null || dragId === targetId) {
+      setDragId(null);
+      return;
+    }
+    setDragId(null);
+
+    const colDrag = colaboradores.find((c) => c.id === dragId);
+    const colTarget = colaboradores.find((c) => c.id === targetId);
+    if (!colDrag || !colTarget) return;
+
+    const tempOrdem = colDrag.ordem;
+    const { error: err1 } = await supabase
+      .from("colaboradores_escala")
+      .update({ ordem: colTarget.ordem })
+      .eq("id", colDrag.id);
+    const { error: err2 } = await supabase
+      .from("colaboradores_escala")
+      .update({ ordem: tempOrdem })
+      .eq("id", colTarget.id);
+    if (err1 || err2) {
+      toast.error("Erro ao trocar posição.");
+      return;
+    }
+    await carregarDados();
+    toast.success("Posição trocada!");
+  };
+
+  // --- Excluir técnico ---
+  const excluirTecnico = async (colId: number, nome: string) => {
+    if (!confirm(`Excluir "${nome}"?`)) return;
+    const { error } = await supabase
+      .from("colaboradores_escala")
+      .update({ ativo: false })
+      .eq("id", colId);
+    if (error) {
+      toast.error("Erro ao excluir: " + error.message);
+      return;
+    }
+    await carregarDados();
+    toast.success(`${nome} excluído.`);
+  };
+
+  // --- Adicionar técnico ---
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoEquipe, setNovoEquipe] = useState("");
+  const [novoHorario, setNovoHorario] = useState("DIURNO");
+  const [novoEscala, setNovoEscala] = useState("COMERCIAL");
+  const [novoLoginSap, setNovoLoginSap] = useState("");
+  const [novoLoginField, setNovoLoginField] = useState("");
+  const [novoFuncao, setNovoFuncao] = useState("");
+  const [novoTelefone, setNovoTelefone] = useState("");
+
+  const adicionarTecnico = async () => {
+    if (!novoNome.trim()) {
+      toast.error("Nome é obrigatório.");
+      return;
+    }
+    const { error } = await supabase.from("colaboradores_escala").insert({
+      time_nome: "EMEC Baixada 2",
+      equipe: novoEquipe || "—",
+      horario: novoHorario,
+      colaborador: novoNome.trim(),
+      login_sap: novoLoginSap,
+      login_field: novoLoginField,
+      funcao: novoFuncao,
+      escala: novoEscala,
+      telefone: novoTelefone,
+      ativo: true,
+    });
+    if (error) {
+      toast.error("Erro ao adicionar: " + error.message);
+      return;
+    }
+    setShowAddForm(false);
+    setNovoNome("");
+    setNovoEquipe("");
+    setNovoHorario("DIURNO");
+    setNovoEscala("COMERCIAL");
+    setNovoLoginSap("");
+    setNovoLoginField("");
+    setNovoFuncao("");
+    setNovoTelefone("");
+    await carregarDados();
+    toast.success(`${novoNome.trim()} adicionado!`);
+  };
 
   if (authLoading) return null;
 
@@ -493,10 +653,47 @@ function EscalaPage() {
               ) : (
                 <Upload className="h-4 w-4" />
               )}
-              Importar escala (Excel)
+              Importar (Excel)
+            </button>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar técnico
             </button>
           </div>
         </div>
+
+        {showAddForm && (
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+            <h3 className="mb-3 text-sm font-bold text-emerald-800">Novo técnico</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome *" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+              <input value={novoEquipe} onChange={(e) => setNovoEquipe(e.target.value)} placeholder="Equipe (ex: C1)" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+              <select value={novoHorario} onChange={(e) => setNovoHorario(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2">
+                <option value="DIURNO">DIURNO</option>
+                <option value="NOTURNO">NOTURNO</option>
+              </select>
+              <select value={novoEscala} onChange={(e) => setNovoEscala(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2">
+                {opcoesEscala.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <input value={novoFuncao} onChange={(e) => setNovoFuncao(e.target.value)} placeholder="Função" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+              <input value={novoLoginSap} onChange={(e) => setNovoLoginSap(e.target.value)} placeholder="Login SAP" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+              <input value={novoLoginField} onChange={(e) => setNovoLoginField(e.target.value)} placeholder="E-mail" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+              <input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value)} placeholder="Telefone" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button onClick={adicionarTecnico} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 cursor-pointer">
+                <Plus className="mr-1 inline h-4 w-4" />
+                Adicionar
+              </button>
+              <button onClick={() => setShowAddForm(false)} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -626,11 +823,15 @@ function EscalaPage() {
                   <thead>
                     {/* Cabeçalho: info do colaborador */}
                     <tr className="bg-[#f1f5f9] text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[80px]">Equipe</th>
-                      <th className="sticky left-[80px] z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[70px]">Horário</th>
-                      <th className="sticky left-[150px] z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[180px]">Colaborador</th>
-                      <th className="px-2 py-2 text-left min-w-[80px]">Função</th>
+                      <th className="w-6 px-1 py-2"></th>
+                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[70px]">Equipe</th>
+                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[65px]">Turno</th>
+                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[170px]">Colaborador</th>
+                      <th className="px-2 py-2 text-left min-w-[75px]">Função</th>
                       <th className="px-2 py-2 text-left min-w-[60px]">Escala</th>
+                      <th className="px-2 py-2 text-left min-w-[80px]">SAP ID</th>
+                      <th className="px-2 py-2 text-left min-w-[100px]">Telefone</th>
+                      <th className="w-6 px-1 py-2"></th>
                       {diasSemana.map((d) => {
                         const iso = formatDateISO(d);
                         const header = formatDateHeader(d);
@@ -661,58 +862,185 @@ function EscalaPage() {
                         {/* Separador de grupo */}
                         <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc]">
                           <td
-                            colSpan={5 + diasSemana.length}
+                            colSpan={9 + diasSemana.length}
                             className="px-2 py-1.5 text-[12px] font-bold text-[#0b3a73]"
                           >
                             {grupo.label}
                           </td>
                         </tr>
-                        {grupo.cols.map((col) => {
-                          const isPlantao = col.escala === "Plantão 1" || col.escala === "Plantão 2";
+                        {grupo.cols.map((col, idx) => {
+                          const esc = col.escala.toUpperCase();
+                          const hor = col.horario.toUpperCase();
                           return (
-                            <tr key={col.id} className="hover:bg-slate-50">
-                              <td className="sticky left-0 z-10 bg-white px-2 py-1.5 font-mono text-xs text-slate-600">
-                                {col.equipe}
+                            <tr
+                              key={col.id}
+                              className="hover:bg-slate-50"
+                              draggable
+                              onDragStart={() => handleDragStart(col.id)}
+                              onDragOver={handleDragOver}
+                              onDrop={() => handleDrop(col.id)}
+                            >
+                              <td className="px-1 py-1.5 cursor-grab text-slate-300 hover:text-slate-500">
+                                <GripVertical className="h-3.5 w-3.5" />
                               </td>
-                              <td className="sticky left-[80px] z-10 bg-white px-2 py-1.5 text-xs">
-                                <span
-                                  className={`inline-flex items-center gap-1 ${
-                                    col.horario === "Diurno"
-                                      ? "text-amber-600"
-                                      : "text-indigo-600"
-                                  }`}
-                                >
-                                  {col.horario === "Diurno" ? (
-                                    <Sun className="h-3 w-3" />
-                                  ) : (
-                                    <Moon className="h-3 w-3" />
-                                  )}
-                                  {col.horario}
-                                </span>
+                              <td className="sticky left-0 z-10 bg-white px-2 py-1.5">
+                                {editando?.colId === col.id && editando?.campo === "equipe" ? (
+                                  <input
+                                    autoFocus
+                                    defaultValue={col.equipe}
+                                    className="w-16 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    onBlur={(e) => {
+                                      const v = e.target.value.trim();
+                                      if (v && v !== col.equipe) salvarCampo(col.id, "equipe", v);
+                                      else setEditando(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                      if (e.key === "Escape") setEditando(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    className="cursor-pointer rounded px-1 py-0.5 text-xs font-mono text-slate-600 hover:bg-slate-100"
+                                    onClick={() => toggleEdit(col.id, "equipe")}
+                                    title="Clique para renomear"
+                                  >
+                                    {col.equipe}
+                                  </span>
+                                )}
                               </td>
-                              <td className="sticky left-[150px] z-10 bg-white px-2 py-1.5 text-sm font-medium text-slate-800">
+                              <td className="sticky left-[70px] z-10 bg-white px-2 py-1.5 text-xs">
+                                {editando?.colId === col.id && editando?.campo === "horario" ? (
+                                  <select
+                                    autoFocus
+                                    defaultValue={hor}
+                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    onChange={(e) => salvarCampo(col.id, "horario", e.target.value)}
+                                    onBlur={() => setEditando(null)}
+                                  >
+                                    {opcoesHorario.map((o) => (
+                                      <option key={o} value={o}>{o}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span
+                                    className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 ${
+                                      hor === "DIURNO"
+                                        ? "bg-amber-50 text-amber-700"
+                                        : "bg-indigo-50 text-indigo-700"
+                                    }`}
+                                    onClick={() => toggleEdit(col.id, "horario")}
+                                  >
+                                    {hor === "DIURNO" ? (
+                                      <Sun className="h-3 w-3" />
+                                    ) : (
+                                      <Moon className="h-3 w-3" />
+                                    )}
+                                    {col.horario}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="sticky left-[135px] z-10 bg-white px-2 py-1.5 text-sm font-medium text-slate-800">
                                 {col.colaborador}
-                                {isPlantao && col.data_ancora && (
+                                {(esc === "PLANTÃO 1" || esc === "PLANTÃO 2") && col.data_ancora && (
                                   <span className="ml-1 text-[10px] text-slate-400">
                                     (ref: {new Date(col.data_ancora + "T12:00:00").toLocaleDateString("pt-BR")})
                                   </span>
                                 )}
                               </td>
-                              <td className="px-2 py-1.5 text-xs text-slate-500">{col.funcao}</td>
+                              <td className="px-2 py-1.5 text-xs text-slate-500">
+                                {editando?.colId === col.id && editando?.campo === "funcao" ? (
+                                  <input
+                                    autoFocus
+                                    defaultValue={col.funcao}
+                                    className="w-28 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    onBlur={(e) => {
+                                      const v = e.target.value.trim();
+                                      if (v && v !== col.funcao) salvarCampo(col.id, "funcao", v);
+                                      else setEditando(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                      if (e.key === "Escape") setEditando(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100"
+                                    onClick={() => toggleEdit(col.id, "funcao")}
+                                  >
+                                    {col.funcao}
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-2 py-1.5">
-                                <span
-                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                                    col.escala === "Comercial"
-                                      ? "bg-green-100 text-green-700"
-                                      : col.escala === "Plantão 1"
-                                        ? "bg-blue-100 text-blue-700"
-                                        : col.escala === "Plantão 2"
-                                          ? "bg-purple-100 text-purple-700"
-                                          : "bg-orange-100 text-orange-700"
-                                  }`}
+                                {editando?.colId === col.id && editando?.campo === "escala" ? (
+                                  <select
+                                    autoFocus
+                                    defaultValue={esc}
+                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-[10px] outline-none"
+                                    onChange={(e) => salvarCampo(col.id, "escala", e.target.value)}
+                                    onBlur={() => setEditando(null)}
+                                  >
+                                    {opcoesEscala.map((o) => (
+                                      <option key={o} value={o}>{o}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span
+                                    className={`cursor-pointer rounded-full px-1.5 py-0.5 text-[10px] font-semibold hover:ring-2 hover:ring-[#1f7ad6] ${
+                                      esc === "COMERCIAL"
+                                        ? "bg-green-100 text-green-700"
+                                        : esc === "PLANTÃO 1"
+                                          ? "bg-blue-100 text-blue-700"
+                                          : esc === "PLANTÃO 2"
+                                            ? "bg-purple-100 text-purple-700"
+                                            : "bg-orange-100 text-orange-700"
+                                    }`}
+                                    onClick={() => toggleEdit(col.id, "escala")}
+                                  >
+                                    {col.escala}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 font-mono text-[11px] text-slate-500">{col.login_sap || "—"}</td>
+                              <td className="px-2 py-1.5 text-[11px] text-slate-500">
+                                {editando?.colId === col.id && editando?.campo === "telefone" ? (
+                                  <input
+                                    autoFocus
+                                    defaultValue={col.telefone}
+                                    className="w-24 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    onBlur={(e) => {
+                                      const v = e.target.value.trim();
+                                      if (v !== col.telefone) salvarCampo(col.id, "telefone", v);
+                                      else setEditando(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                      if (e.key === "Escape") setEditando(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 ${
+                                      col.telefone ? "text-slate-600" : "text-slate-300"
+                                    }`}
+                                    onClick={() => toggleEdit(col.id, "telefone")}
+                                  >
+                                    {col.telefone ? (
+                                      <><Phone className="h-3 w-3" />{col.telefone}</>
+                                    ) : "—"}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-1 py-1.5">
+                                <button
+                                  onClick={() => excluirTecnico(col.id, col.colaborador)}
+                                  className="cursor-pointer text-slate-300 hover:text-red-500"
+                                  title="Excluir técnico"
                                 >
-                                  {col.escala}
-                                </span>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </td>
                               {diasSemana.map((d) => {
                                 const iso = formatDateISO(d);
