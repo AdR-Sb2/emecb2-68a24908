@@ -281,6 +281,11 @@ function EscalaPage() {
     [trabalhaHoje],
   );
 
+  const equipesHoje = useMemo(
+    () => new Set(trabalhaHoje.map((c) => c.equipe)).size,
+    [trabalhaHoje],
+  );
+
   // --- Estatísticas por escala ---
   const statsEscala = useMemo(() => {
     const comercial = colaboradores.filter((c) => c.escala.toUpperCase() === "COMERCIAL");
@@ -943,7 +948,7 @@ function EscalaPage() {
         ) : (
           <>
             {/* KPI Cards */}
-            <div className="mb-6 grid gap-4 sm:grid-cols-4">
+            <div className="mb-6 grid gap-4 sm:grid-cols-5">
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-500" />
                 <div className="p-4">
@@ -952,6 +957,16 @@ function EscalaPage() {
                     Total Hoje
                   </div>
                   <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{trabalhaHoje.length}</div>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="h-1 bg-gradient-to-r from-cyan-400 to-cyan-500" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
+                    <Users className="h-4 w-4" />
+                    Equipes Hoje
+                  </div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{equipesHoje}</div>
                 </div>
               </div>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
