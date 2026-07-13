@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -7,7 +7,6 @@ import {
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  Download,
   Filter,
   Loader2,
   Search,
@@ -15,11 +14,10 @@ import {
   Moon,
   Upload,
   Users,
-  UserCheck,
   Edit3,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
-import { supabase, supabaseConfigSummary } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
 
 export const Route = createFileRoute("/escala")({
   component: EscalaPage,
@@ -641,7 +639,7 @@ function EscalaPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {grupos.map((grupo) => (
-                      <>
+                      <Fragment key={grupo.label}>
                         {/* Separador de grupo */}
                         <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc]">
                           <td
@@ -734,7 +732,7 @@ function EscalaPage() {
                             </tr>
                           );
                         })}
-                      </>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
