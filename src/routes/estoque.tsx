@@ -102,6 +102,7 @@ function EstoquePage() {
   const [filtroCritico, setFiltroCritico] = useState(false);
   const [filtroSaldoNegativo, setFiltroSaldoNegativo] = useState(false);
   const [filtroElevatoria, setFiltroElevatoria] = useState("");
+  const [filtroKpi, setFiltroKpi] = useState("");
   const [metricaDestino, setMetricaDestino] = useState<"movimentacoes" | "quantidade">(
     "movimentacoes",
   );
@@ -286,6 +287,18 @@ function EstoquePage() {
     if (filtroCritico) list = list.filter((m) => m.material_critico);
     if (filtroSaldoNegativo) list = list.filter((m) => m.saldo_atual < 0);
     if (filtroElevatoria) list = list.filter((m) => m.vinculo_elevatoria === filtroElevatoria);
+    if (filtroKpi === "sem_estoque") list = list.filter((m) => m._status === "sem_estoque");
+    if (filtroKpi === "baixo") list = list.filter((m) => m._status === "baixo");
+    if (filtroKpi === "atencao") list = list.filter((m) => m._status === "atencao");
+    if (filtroKpi === "critico_marcado") list = list.filter((m) => m.material_critico);
+    if (filtroKpi === "parados") {
+      const tresMesesAtras = new Date();
+      tresMesesAtras.setMonth(tresMesesAtras.getMonth() - 3);
+      list = list.filter((m) => {
+        const movs = movimentacoes.filter((mv) => mv.cod_sap === m.cod_sap);
+        return movs.length === 0 || new Date(movs[0].data) < tresMesesAtras;
+      });
+    }
     list.sort((a, b) => {
       const av = a[sortKey as keyof typeof a] ?? "";
       const bv = b[sortKey as keyof typeof b] ?? "";
@@ -301,8 +314,10 @@ function EstoquePage() {
     filtroCritico,
     filtroSaldoNegativo,
     filtroElevatoria,
+    filtroKpi,
     sortKey,
     sortDir,
+    movimentacoes,
   ]);
 
   const kpis = useMemo(() => {
@@ -2658,42 +2673,84 @@ function EstoquePage() {
         <>
           {/* KPIs */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-6">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+            <div
+              onClick={() => setFiltroKpi(filtroKpi === "sem_estoque" ? "" : "sem_estoque")}
+              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                filtroKpi === "sem_estoque"
+                  ? "border-red-400 bg-red-100 ring-2 ring-red-300"
+                  : "border-red-200 bg-red-50"
+              }`}
+            >
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-700">
                 <AlertTriangle className="h-3 w-3" /> Crítico (Sem Estoque)
               </div>
               <div className="mt-1 text-3xl font-bold text-red-700">{kpis.semEstoque.length}</div>
               <div className="text-[11px] text-red-500">ruptura total, saldo = 0</div>
             </div>
-            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
+            <div
+              onClick={() => setFiltroKpi(filtroKpi === "baixo" ? "" : "baixo")}
+              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                filtroKpi === "baixo"
+                  ? "border-orange-400 bg-orange-100 ring-2 ring-orange-300"
+                  : "border-orange-200 bg-orange-50"
+              }`}
+            >
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-orange-600">
                 <AlertTriangle className="h-3 w-3" /> Baixo Estoque
               </div>
               <div className="mt-1 text-3xl font-bold text-orange-600">{kpis.baixo.length}</div>
               <div className="text-[11px] text-orange-500">abaixo do mínimo, mas &gt; 0</div>
             </div>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <div
+              onClick={() => setFiltroKpi(filtroKpi === "atencao" ? "" : "atencao")}
+              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                filtroKpi === "atencao"
+                  ? "border-amber-400 bg-amber-100 ring-2 ring-amber-300"
+                  : "border-amber-200 bg-amber-50"
+              }`}
+            >
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-600">
                 <AlertCircle className="h-3 w-3" /> Atenção
               </div>
               <div className="mt-1 text-3xl font-bold text-amber-600">{kpis.atencao.length}</div>
               <div className="text-[11px] text-amber-500">próximos do mínimo</div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div
+              onClick={() => setFiltroKpi("")}
+              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                !filtroKpi
+                  ? "border-blue-400 bg-blue-50 ring-2 ring-blue-300"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <Box className="mr-1 inline h-3 w-3" /> Total Itens
               </div>
               <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{kpis.total}</div>
               <div className="text-[11px] text-slate-400">materiais cadastrados</div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div
+              onClick={() => setFiltroKpi(filtroKpi === "parados" ? "" : "parados")}
+              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                filtroKpi === "parados"
+                  ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <BarChart3 className="mr-1 inline h-3 w-3" /> Parados
               </div>
               <div className="mt-1 text-3xl font-bold text-slate-600">{kpis.parados.length}</div>
               <div className="text-[11px] text-slate-400">sem mov. há 3+ meses</div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div
+              onClick={() => setFiltroKpi(filtroKpi === "critico_marcado" ? "" : "critico_marcado")}
+              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+                filtroKpi === "critico_marcado"
+                  ? "border-amber-400 bg-amber-100 ring-2 ring-amber-300"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <Star className="mr-1 inline h-3 w-3" /> Críticos marcados
               </div>
