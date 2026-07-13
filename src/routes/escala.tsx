@@ -19,10 +19,11 @@ import {
   Trash2,
   Plus,
   GripVertical,
-  Pencil,
+  Home,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
+import logoHeader from "@/assets/logo-branca.png";
 
 export const Route = createFileRoute("/escala")({
   component: EscalaPage,
@@ -75,7 +76,7 @@ function getWeekDates(ref: Date): Date[] {
   const monday = new Date(ref);
   monday.setDate(ref.getDate() - ((dow + 6) % 7));
   const dates: Date[] = [];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     dates.push(d);
@@ -624,16 +625,43 @@ function EscalaPage() {
   if (authLoading) return null;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
-      <div className="mx-auto max-w-7xl p-4 md:p-6">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="text-[#64748b] hover:text-[#0b3a73]">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <CalendarCheck className="h-6 w-6 text-[#1f7ad6]" />
-            <h1 className="text-xl font-bold text-[#0b3a73]">Escala de Trabalho</h1>
+    <div className="min-h-screen bg-slate-50">
+      <div className="p-3 md:p-6">
+        {/* Header corporativo */}
+        <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
+                <img
+                  src={logoHeader}
+                  alt="Águas do Rio - Eletromecânica"
+                  className="h-14 w-auto object-contain"
+                  loading="eager"
+                />
+              </div>
+              <div className="min-w-0 text-white">
+                <p className="truncate text-lg font-semibold">Águas do Rio</p>
+                <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Escala e Equipes</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/"
+                title="Voltar ao Hub"
+                aria-label="Voltar ao Hub"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
+              >
+                <Home className="h-5 w-5 sm:h-4 sm:w-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Botões superiores */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CalendarCheck className="h-5 w-5 text-[#1f7ad6]" />
+            <h2 className="text-lg font-bold text-[#0b3a73]">Escala de Trabalho</h2>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -646,7 +674,7 @@ function EscalaPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={importando}
-              className="inline-flex items-center gap-1 rounded-md bg-[#1f7ad6] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#0b3a73] disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#1f7ad6] px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-[#0b3a73] disabled:opacity-50 cursor-pointer"
             >
               {importando ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -657,7 +685,7 @@ function EscalaPage() {
             </button>
             <button
               onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               Adicionar técnico
@@ -701,66 +729,72 @@ function EscalaPage() {
           </div>
         ) : (
           <>
-            {/* Quem trabalha hoje */}
+            {/* KPI Cards */}
             <div className="mb-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#0b3a73]">
-                  <Sun className="h-4 w-4 text-amber-500" />
-                  Diurno — Hoje ({hoje.toLocaleDateString("pt-BR")})
-                </div>
-                <div className="mt-2 text-2xl font-bold text-[#1f7ad6]">{diurnosHoje.length}</div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {diurnosHoje.map((c) => (
-                    <span
-                      key={c.id}
-                      className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-[#0b3a73]"
-                    >
-                      {c.colaborador}
-                    </span>
-                  ))}
-                  {diurnosHoje.length === 0 && (
-                    <span className="text-xs text-slate-400">Nenhum diurno escalado hoje</span>
-                  )}
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-500" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    <Sun className="h-4 w-4" />
+                    Diurno — {hoje.toLocaleDateString("pt-BR")}
+                  </div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{diurnosHoje.length}</div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {diurnosHoje.map((c) => (
+                      <span
+                        key={c.id}
+                        className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                      >
+                        {c.colaborador}
+                      </span>
+                    ))}
+                    {diurnosHoje.length === 0 && (
+                      <span className="text-[11px] text-slate-400">Nenhum diurno escalado hoje</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <Moon className="h-4 w-4 text-indigo-500" />
-                  Noturno — Hoje ({hoje.toLocaleDateString("pt-BR")})
-                </div>
-                <div className="mt-2 text-2xl font-bold text-slate-600">{noturnosHoje.length}</div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {noturnosHoje.map((c) => (
-                    <span
-                      key={c.id}
-                      className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] text-slate-700"
-                    >
-                      {c.colaborador}
-                    </span>
-                  ))}
-                  {noturnosHoje.length === 0 && (
-                    <span className="text-xs text-slate-400">Nenhum noturno escalado hoje</span>
-                  )}
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="h-1 bg-gradient-to-r from-indigo-400 to-indigo-500" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
+                    <Moon className="h-4 w-4" />
+                    Noturno — {hoje.toLocaleDateString("pt-BR")}
+                  </div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{noturnosHoje.length}</div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {noturnosHoje.map((c) => (
+                      <span
+                        key={c.id}
+                        className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700"
+                      >
+                        {c.colaborador}
+                      </span>
+                    ))}
+                    {noturnosHoje.length === 0 && (
+                      <span className="text-[11px] text-slate-400">Nenhum noturno escalado hoje</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Filtros */}
             <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative min-w-[200px] flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]" />
                 <input
                   type="text"
                   placeholder="Buscar por nome..."
                   value={searchNome}
                   onChange={(e) => setSearchNome(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                  className="h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
                 />
               </div>
               <select
                 value={filtroEquipe}
                 onChange={(e) => setFiltroEquipe(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
               >
                 <option value="TODAS">Todas equipes</option>
                 {equipes.map((e) => (
@@ -770,18 +804,18 @@ function EscalaPage() {
               <select
                 value={filtroEscala}
                 onChange={(e) => setFiltroEscala(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
               >
                 <option value="TODAS">Todas escalas</option>
                 <option value="COMERCIAL">Comercial</option>
                 <option value="PLANTÃO 1">Plantão 1</option>
                 <option value="PLANTÃO 2">Plantão 2</option>
-                <option value="Férias">Férias</option>
+                <option value="FÉRIAS">Férias</option>
               </select>
               <select
                 value={filtroFuncao}
                 onChange={(e) => setFiltroFuncao(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
               >
                 <option value="TODAS">Todas funções</option>
                 {funcoes.map((f) => (
@@ -795,18 +829,18 @@ function EscalaPage() {
             <div className="mb-4 flex items-center justify-between">
               <button
                 onClick={() => setSemanaOffset((p) => p - 1)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer"
               >
-                <ChevronLeft className="h-4 w-4" /> 2 semanas anteriores
+                <ChevronLeft className="h-4 w-4" /> Semana anterior
               </button>
-              <span className="text-sm font-semibold text-[#0b3a73]">
-                {diasSemana[0].toLocaleDateString("pt-BR")} — {diasSemana[13].toLocaleDateString("pt-BR")}
+              <span className="text-sm font-bold text-[#0b3a73]">
+                {diasSemana[0].toLocaleDateString("pt-BR")} — {diasSemana[6].toLocaleDateString("pt-BR")}
               </span>
               <button
                 onClick={() => setSemanaOffset((p) => p + 1)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer"
               >
-                Próximas 2 semanas <ChevronRight className="h-4 w-4" />
+                Próxima semana <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
@@ -821,17 +855,16 @@ function EscalaPage() {
               <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    {/* Cabeçalho: info do colaborador */}
                     <tr className="bg-[#f1f5f9] text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                      <th className="w-6 px-1 py-2"></th>
-                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[70px]">Equipe</th>
-                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[65px]">Turno</th>
-                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2 text-left min-w-[170px]">Colaborador</th>
-                      <th className="px-2 py-2 text-left min-w-[75px]">Função</th>
-                      <th className="px-2 py-2 text-left min-w-[60px]">Escala</th>
-                      <th className="px-2 py-2 text-left min-w-[80px]">SAP ID</th>
-                      <th className="px-2 py-2 text-left min-w-[100px]">Telefone</th>
-                      <th className="w-6 px-1 py-2"></th>
+                      <th className="w-6 px-1 py-2.5"></th>
+                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[70px]">Equipe</th>
+                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[65px]">Turno</th>
+                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[180px]">Colaborador</th>
+                      <th className="px-2 py-2.5 text-left min-w-[80px]">Função</th>
+                      <th className="px-2 py-2.5 text-left min-w-[65px]">Escala</th>
+                      <th className="px-2 py-2.5 text-left min-w-[80px]">SAP ID</th>
+                      <th className="px-2 py-2.5 text-left min-w-[100px]">Telefone</th>
+                      <th className="w-6 px-1 py-2.5"></th>
                       {diasSemana.map((d) => {
                         const iso = formatDateISO(d);
                         const header = formatDateHeader(d);
@@ -840,7 +873,7 @@ function EscalaPage() {
                         return (
                           <th
                             key={iso}
-                            className={`px-2 py-2 text-center text-[11px] min-w-[95px] ${
+                            className={`px-2 py-2.5 text-center text-[11px] min-w-[90px] ${
                               isHoje
                                 ? "bg-[#1f7ad6] text-white"
                                 : isFds
@@ -859,7 +892,6 @@ function EscalaPage() {
                   <tbody className="divide-y divide-slate-100">
                     {grupos.map((grupo) => (
                       <Fragment key={grupo.label}>
-                        {/* Separador de grupo */}
                         <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc]">
                           <td
                             colSpan={9 + diasSemana.length}
@@ -868,19 +900,19 @@ function EscalaPage() {
                             {grupo.label}
                           </td>
                         </tr>
-                        {grupo.cols.map((col, idx) => {
+                        {grupo.cols.map((col) => {
                           const esc = col.escala.toUpperCase();
                           const hor = col.horario.toUpperCase();
                           return (
                             <tr
                               key={col.id}
-                              className="hover:bg-slate-50"
+                              className="hover:bg-slate-50 transition-colors"
                               draggable
                               onDragStart={() => handleDragStart(col.id)}
                               onDragOver={handleDragOver}
                               onDrop={() => handleDrop(col.id)}
                             >
-                              <td className="px-1 py-1.5 cursor-grab text-slate-300 hover:text-slate-500">
+                              <td className="cursor-grab px-1 py-1.5 text-slate-300 hover:text-slate-500">
                                 <GripVertical className="h-3.5 w-3.5" />
                               </td>
                               <td className="sticky left-0 z-10 bg-white px-2 py-1.5">
@@ -901,7 +933,7 @@ function EscalaPage() {
                                   />
                                 ) : (
                                   <span
-                                    className="cursor-pointer rounded px-1 py-0.5 text-xs font-mono text-slate-600 hover:bg-slate-100"
+                                    className="cursor-pointer rounded px-1 py-0.5 font-mono text-xs text-slate-600 hover:bg-slate-100"
                                     onClick={() => toggleEdit(col.id, "equipe")}
                                     title="Clique para renomear"
                                   >
@@ -1036,7 +1068,7 @@ function EscalaPage() {
                               <td className="px-1 py-1.5">
                                 <button
                                   onClick={() => excluirTecnico(col.id, col.colaborador)}
-                                  className="cursor-pointer text-slate-300 hover:text-red-500"
+                                  className="cursor-pointer text-slate-300 hover:text-red-500 transition-colors"
                                   title="Excluir técnico"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
