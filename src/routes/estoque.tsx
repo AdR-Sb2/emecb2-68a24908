@@ -521,6 +521,15 @@ function EstoquePage() {
     setEditandoCampo(null);
   };
 
+  const handleAtualizarCategoria = async (cod_sap: string, categoria_id: number) => {
+    const { error } = await supabase.from("materiais").update({ categoria_id }).eq("cod_sap", cod_sap);
+    if (error) {
+      toast.error("Erro ao alterar categoria: " + error.message);
+      return;
+    }
+    await carregarDados();
+  };
+
   const categoriasAtivas = useMemo(() => categorias.filter((c) => c.ativo), [categorias]);
 
   const resolverCategoriaId = (valor: string): number | null => {
@@ -2810,9 +2819,23 @@ function EstoquePage() {
                         </button>
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5">
-                        <Badge variant="outline" className="text-[10px]">
-                          {getCategoriaNome(m)}
-                        </Badge>
+                        {permissoes.editarConfigMaterial ? (
+                          <select
+                            value={m.categoria_id || ""}
+                            onChange={(e) => handleAtualizarCategoria(m.cod_sap, Number(e.target.value))}
+                            className="rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                          >
+                            {categoriasAtivas.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.nome}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">
+                            {getCategoriaNome(m)}
+                          </Badge>
+                        )}
                       </td>
                       <td
                         className={`whitespace-nowrap px-2 py-1.5 font-bold text-base ${m.saldo_atual === 0 ? "text-red-700" : m.saldo_atual <= m.estoque_minimo ? "text-orange-600" : m.saldo_atual <= m.estoque_minimo * 1.2 ? "text-amber-600" : "text-emerald-600"}`}
@@ -3200,7 +3223,7 @@ function EstoquePage() {
       )}
 
       {/* Dialogs */}
-      <Dialog open={dialogMov === "entrada"} onOpenChange={(o) => !o && setDialogMov(null)}>
+      <Dialog open={dialogMov === "entrada"} onOpenChange={(open) => { if (!open) setDialogMov(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-emerald-700">
@@ -3211,7 +3234,7 @@ function EstoquePage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={dialogMov === "saida"} onOpenChange={(o) => !o && setDialogMov(null)}>
+      <Dialog open={dialogMov === "saida"} onOpenChange={(open) => { if (!open) setDialogMov(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-red-700">
@@ -3222,7 +3245,7 @@ function EstoquePage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={dialogMov === "ajuste"} onOpenChange={(o) => !o && setDialogMov(null)}>
+      <Dialog open={dialogMov === "ajuste"} onOpenChange={(open) => { if (!open) setDialogMov(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-amber-700">
