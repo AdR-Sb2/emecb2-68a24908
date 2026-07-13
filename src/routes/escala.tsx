@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
+  Download,
   Filter,
   Loader2,
   Search,
@@ -44,6 +45,7 @@ type Colaborador = {
   data_ancora: string | null;
   ativo: boolean;
   telefone: string;
+  especialidade: string;
   ordem: number;
 };
 
@@ -134,6 +136,13 @@ function EscalaPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Export
+  const [exportAte, setExportAte] = useState("");
+  const [showExport, setShowExport] = useState(false);
+
+  // Sort
+  const [sortPor, setSortPor] = useState("equipe");
+
   // --- Auth check ---
   useEffect(() => {
     if (authLoading) return;
@@ -217,7 +226,7 @@ function EscalaPage() {
 
   // --- Colaboradores filtrados ---
   const colaboradoresFiltrados = useMemo(() => {
-    return colaboradores.filter((c) => {
+    let result = colaboradores.filter((c) => {
       if (filtroEquipe !== "TODAS" && c.equipe !== filtroEquipe) return false;
       if (filtroEscala !== "TODAS" && c.escala !== filtroEscala) return false;
       if (filtroFuncao !== "TODAS" && c.funcao !== filtroFuncao) return false;
@@ -228,7 +237,12 @@ function EscalaPage() {
         return false;
       return true;
     });
-  }, [colaboradores, filtroEquipe, filtroEscala, filtroFuncao, searchNome]);
+    if (sortPor === "equipe") result.sort((a, b) => a.equipe.localeCompare(b.equipe));
+    else if (sortPor === "nome") result.sort((a, b) => a.colaborador.localeCompare(b.colaborador));
+    else if (sortPor === "escala") result.sort((a, b) => a.escala.localeCompare(b.escala));
+    else if (sortPor === "ordem") result.sort((a, b) => a.ordem - b.ordem);
+    return result;
+  }, [colaboradores, filtroEquipe, filtroEscala, filtroFuncao, searchNome, sortPor]);
 
   // --- Opções únicas para filtros ---
   const equipes = useMemo(
@@ -259,6 +273,8 @@ function EscalaPage() {
       return status === "TRABALHA";
     });
   }, [colaboradores, gridStatus]);
+
+  const hojeISO = formatDateISO(hoje);
 
   const diurnosHoje = useMemo(
     () => trabalhaHoje.filter((c) => c.horario.toUpperCase() === "DIURNO"),
@@ -449,6 +465,47 @@ function EscalaPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // --- Exportar Excel ---
+  const handleExportar = async () => {
+    if (!exportAte) { toast.error("Selecione a data final."); return; }
+    const ate = new Date(exportAte + "T23:59:59");
+    const datas = escalaDias.map(d => d.data).sort();
+    const inicio = datas.length ? new Date(datas[0] + "T12:00:00") : new Date();
+
+    const cabecalho = ["EQUIPE", "HORARIO", "COLABORADOR", "LOGIN SAP", "Login Field", "FUNÇÃO", "ESCALA", "ESPECIALIDADE", "SAP ID", "TELEFONE"];
+    const diasCol: Date[] = [];
+    const cursor = new Date(inicio);
+    while (cursor <= ate) {
+      diasCol.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    for (const d of diasCol) {
+      cabecalho.push(formatDateHeader(d));
+    }
+
+    const linhas = [cabecalho];
+    for (const col of colaboradores) {
+      const linha: string[] = [
+        col.equipe, col.horario, col.colaborador, col.login_sap, col.login_field,
+        col.funcao, col.escala, col.especialidade, col.login_sap, col.telefone,
+      ];
+      for (const d of diasCol) {
+        const iso = formatDateISO(d);
+        const manual = escalaDias.find(ed => ed.colaborador_id === col.id && ed.data === iso);
+        const status = manual ? manual.status : (calcularStatusPorFormula(col, d) || "FOLGA");
+        linha.push(status === "TRABALHA" ? "!" : "F");
+      }
+      linhas.push(linha);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(linhas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ESCALA");
+    XLSX.writeFile(wb, `escala_${formatDateISO(inicio)}_ate_${exportAte}.xlsx`);
+    toast.success("Escala exportada!");
+    setShowExport(false);
+  };
+
   // --- Marcar data_ancora automaticamente para plantonistas sem ancora ---
   useEffect(() => {
     if (!colaboradores.length || !escalaDias.length) return;
@@ -522,6 +579,7 @@ function EscalaPage() {
 
   const opcoesEscala = ["COMERCIAL", "PLANTÃO 1", "PLANTÃO 2", "FÉRIAS"];
   const opcoesHorario = ["DIURNO", "NOTURNO"];
+  const opcoesEspecialidade = ["AUTOMAÇÃO", "ELÉTRICA", "MECÂNICA", "MULTIFUNCIONAL"];
 
   // --- Drag & drop (swap) ---
   const [dragId, setDragId] = useState<number | null>(null);
@@ -684,6 +742,13 @@ function EscalaPage() {
               Importar (Excel)
             </button>
             <button
+              onClick={() => setShowExport(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 cursor-pointer"
+            >
+              <Download className="h-4 w-4" />
+              Exportar
+            </button>
+            <button
               onClick={() => setShowAddForm(true)}
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 cursor-pointer"
             >
@@ -692,6 +757,36 @@ function EscalaPage() {
             </button>
           </div>
         </div>
+
+        {/* Modal Exportar */}
+        {showExport && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+              <h3 className="mb-4 text-lg font-bold text-[#0b3a73]">Exportar Escala</h3>
+              <label className="mb-1 block text-sm font-medium text-slate-600">Data final</label>
+              <input
+                type="date"
+                value={exportAte}
+                onChange={(e) => setExportAte(e.target.value)}
+                className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExportar}
+                  className="rounded-md bg-[#1f7ad6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b3a73] cursor-pointer"
+                >
+                  Confirmar
+                </button>
+                <button
+                  onClick={() => setShowExport(false)}
+                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showAddForm && (
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
@@ -730,27 +825,26 @@ function EscalaPage() {
         ) : (
           <>
             {/* KPI Cards */}
-            <div className="mb-6 grid gap-4 sm:grid-cols-2">
+            <div className="mb-6 grid gap-4 sm:grid-cols-4">
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-500" />
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
                     <Sun className="h-4 w-4" />
-                    Diurno — {hoje.toLocaleDateString("pt-BR")}
+                    Total Hoje
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{diurnosHoje.length}</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {diurnosHoje.map((c) => (
-                      <span
-                        key={c.id}
-                        className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
-                      >
-                        {c.colaborador}
-                      </span>
-                    ))}
-                    {diurnosHoje.length === 0 && (
-                      <span className="text-[11px] text-slate-400">Nenhum diurno escalado hoje</span>
-                    )}
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{trabalhaHoje.length}</div>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="h-1 bg-gradient-to-r from-green-400 to-green-500" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-green-700">
+                    <CalendarCheck className="h-4 w-4" />
+                    Comercial
+                  </div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">
+                    {colaboradores.filter(c => c.escala.toUpperCase() === "COMERCIAL" && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
                   </div>
                 </div>
               </div>
@@ -759,22 +853,21 @@ function EscalaPage() {
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
                     <Moon className="h-4 w-4" />
-                    Noturno — {hoje.toLocaleDateString("pt-BR")}
+                    Plantão
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{noturnosHoje.length}</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {noturnosHoje.map((c) => (
-                      <span
-                        key={c.id}
-                        className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700"
-                      >
-                        {c.colaborador}
-                      </span>
-                    ))}
-                    {noturnosHoje.length === 0 && (
-                      <span className="text-[11px] text-slate-400">Nenhum noturno escalado hoje</span>
-                    )}
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">
+                    {colaboradores.filter(c => (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
                   </div>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="h-1 bg-gradient-to-r from-blue-400 to-blue-500" />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                    <Users className="h-4 w-4" />
+                    Total Técnicos
+                  </div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{colaboradores.length}</div>
                 </div>
               </div>
             </div>
@@ -822,6 +915,16 @@ function EscalaPage() {
                   <option key={f} value={f}>{f}</option>
                 ))}
               </select>
+              <select
+                value={sortPor}
+                onChange={(e) => setSortPor(e.target.value)}
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+              >
+                <option value="equipe">Por equipe</option>
+                <option value="nome">Por nome</option>
+                <option value="escala">Por escala</option>
+                <option value="ordem">Ordem padrão</option>
+              </select>
               <Filter className="h-4 w-4 text-slate-400" />
             </div>
 
@@ -862,6 +965,7 @@ function EscalaPage() {
                       <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[180px]">Colaborador</th>
                       <th className="px-2 py-2.5 text-left min-w-[80px]">Função</th>
                       <th className="px-2 py-2.5 text-left min-w-[65px]">Escala</th>
+                      <th className="px-2 py-2.5 text-left min-w-[85px]">Especialidade</th>
                       <th className="px-2 py-2.5 text-left min-w-[80px]">SAP ID</th>
                       <th className="px-2 py-2.5 text-left min-w-[100px]">Telefone</th>
                       <th className="w-6 px-1 py-2.5"></th>
@@ -894,7 +998,7 @@ function EscalaPage() {
                       <Fragment key={grupo.label}>
                         <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc]">
                           <td
-                            colSpan={9 + diasSemana.length}
+                            colSpan={10 + diasSemana.length}
                             className="px-2 py-1.5 text-[12px] font-bold text-[#0b3a73]"
                           >
                             {grupo.label}
@@ -1032,6 +1136,28 @@ function EscalaPage() {
                                     onClick={() => toggleEdit(col.id, "escala")}
                                   >
                                     {col.escala}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-xs text-slate-500">
+                                {editando?.colId === col.id && editando?.campo === "especialidade" ? (
+                                  <select
+                                    autoFocus
+                                    defaultValue={col.especialidade}
+                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    onChange={(e) => salvarCampo(col.id, "especialidade", e.target.value)}
+                                    onBlur={() => setEditando(null)}
+                                  >
+                                    {opcoesEspecialidade.map((o) => (
+                                      <option key={o} value={o}>{o}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span
+                                    className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100"
+                                    onClick={() => toggleEdit(col.id, "especialidade")}
+                                  >
+                                    {col.especialidade || "—"}
                                   </span>
                                 )}
                               </td>
