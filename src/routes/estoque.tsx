@@ -117,7 +117,14 @@ function EstoquePage() {
   const [filtroChegou, setFiltroChegou] = useState<"TODOS" | "sim" | "nao">("TODOS");
   const [filtroRetirado, setFiltroRetirado] = useState<"TODOS" | "sim" | "nao">("TODOS");
   const [filtroFila, setFiltroFila] = useState<"TODOS" | "sim" | "nao">("TODOS");
+  const [filtroAguardandoRetirada, setFiltroAguardandoRetirada] = useState(false);
+  const [editandoCompraId, setEditandoCompraId] = useState<number | null>(null);
+  const [editandoCampo, setEditandoCampo] = useState<string | null>(null);
+  const [editandoValorCompra, setEditandoValorCompra] = useState("");
   const [dialogImportar, setDialogImportar] = useState(false);
+  const [dialogImportarCompras, setDialogImportarCompras] = useState(false);
+  const [dialogRcEmFila, setDialogRcEmFila] = useState(false);
+  const fileInputRefCompras = useRef<HTMLInputElement>(null);
   const [dialogCategorias, setDialogCategorias] = useState(false);
   const [dialogMaterial, setDialogMaterial] = useState(false);
   const [editandoMinimo, setEditandoMinimo] = useState<string | null>(null);
@@ -395,6 +402,7 @@ function EstoquePage() {
       if (filtroRetirado === "nao" && c.foi_retirado) return false;
       if (filtroFila === "sim" && !c.rc_em_fila) return false;
       if (filtroFila === "nao" && c.rc_em_fila) return false;
+      if (filtroAguardandoRetirada && (!c.chegou || c.foi_retirado)) return false;
       return true;
     });
   }, [
@@ -404,6 +412,7 @@ function EstoquePage() {
     filtroChegou,
     filtroRetirado,
     filtroFila,
+    filtroAguardandoRetirada,
   ]);
 
   const handleToggleChegou = async (id: number, current: boolean) => {
@@ -486,6 +495,18 @@ function EstoquePage() {
     toast.success("Status atualizado!");
   };
 
+  const handleUpdateCompra = async (id: number, data: Partial<Compra>) => {
+    const { error } = await supabase.from("compras").update(data).eq("id", id);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    await carregarDados();
+    toast.success("Atualizado!");
+    setEditandoCompraId(null);
+    setEditandoCampo(null);
+  };
+
   const categoriasAtivas = useMemo(() => categorias.filter((c) => c.ativo), [categorias]);
 
   const resolverCategoriaId = (valor: string): number | null => {
@@ -549,6 +570,64 @@ function EstoquePage() {
     await carregarDados();
     setDialogImportar(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleImportarComprasCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const lines = text.split("\n").filter(Boolean);
+    const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
+    const dados = lines.slice(1).map((line) => {
+      const vals = line.split(",").map((v) => v.trim().replace(/"/g, ""));
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => {
+        obj[h] = vals[i] || "";
+      });
+      return obj;
+    });
+    let importados = 0;
+    for (const d of dados) {
+      const requisicao = Number(d.requisicao) || null;
+      const item_rc = Number(d.item_rc) || null;
+      if (!requisicao || !item_rc) continue;
+      const { error } = await supabase.from("compras").upsert(
+        {
+          requisicao,
+          item_rc,
+          cod_sap: d.cod_sap || null,
+          descricao_material: d.descricao_material || d.descricao || "",
+          qtde_rc: Number(d.qtde_rc) || 0,
+          comprador_cotacao: d.comprador_cotacao || null,
+          pedido: d.pedido || null,
+          fornecedor: d.fornecedor || null,
+          deposito_rc: d.deposito_rc || null,
+          status_geral: d.status_geral || null,
+          dt_criacao_rc: d.dt_criacao_rc || null,
+          dt_aprovacao_rc: d.dt_aprovacao_rc || null,
+          dt_criacao_pedido: d.dt_criacao_pedido || null,
+          dt_remessa_pedido: d.dt_remessa_pedido || null,
+          data_confirmada: d.data_confirmada || d.dt_prevista_entrega || null,
+          emissao_nf: d.emissao_nf || null,
+          dt_pagamento: d.dt_pagamento || null,
+          chegou: d.chegou === "true" || d.chegou === "sim",
+          data_chegou: d.data_chegou || null,
+          foi_retirado: d.foi_retirado === "true" || d.foi_retirado === "sim",
+          data_retirado: d.data_retirado || null,
+          cobrado_via_email: d.cobrado_via_email === "true" || d.cobrado_via_email === "sim",
+          observacao: d.observacao || null,
+          rc_em_fila: d.rc_em_fila === "true" || d.rc_em_fila === "sim",
+          afeta_saldo: d.afeta_saldo === "true" || d.afeta_saldo === "sim",
+          criado_por: "IMPORTACAO_PLANILHA",
+        },
+        { onConflict: "requisicao,item_rc" },
+      );
+      if (!error) importados++;
+    }
+    toast.success(`${importados} pedidos importados/atualizados com sucesso!`);
+    await carregarDados();
+    setDialogImportarCompras(false);
+    if (fileInputRefCompras.current) fileInputRefCompras.current.value = "";
   };
 
   const exportarCSV = () => {
@@ -2356,6 +2435,14 @@ function EstoquePage() {
               <Plus className="h-4 w-4" /> Novo Pedido
             </button>
           )}
+          {aba === "compras" && (
+            <button
+              onClick={() => setDialogImportarCompras(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+            >
+              <Upload className="h-4 w-4" /> Atualizar Pedidos
+            </button>
+          )}
           <button
             onClick={carregarDados}
             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
@@ -2799,7 +2886,10 @@ function EstoquePage() {
         <>
           {/* KPIs Compras */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+            <button
+              onClick={() => setDialogRcEmFila(true)}
+              className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm text-left hover:bg-blue-100 transition-all"
+            >
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-blue-600">
                 <ShoppingCart className="h-3 w-3" /> RC em Fila
               </div>
@@ -2807,7 +2897,7 @@ function EstoquePage() {
                 {compras.filter((c) => c.rc_em_fila).length}
               </div>
               <div className="text-[11px] text-blue-500">solicitações pendentes</div>
-            </div>
+            </button>
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-600">
                 <AlertTriangle className="h-3 w-3" /> Críticos sem pedido
@@ -2817,7 +2907,10 @@ function EstoquePage() {
               </div>
               <div className="text-[11px] text-red-500">itens críticos sem compra</div>
             </div>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <button
+              onClick={() => setFiltroAguardandoRetirada((v) => !v)}
+              className={`rounded-xl border p-4 shadow-sm text-left transition-all ${filtroAguardandoRetirada ? "border-amber-400 bg-amber-100 ring-2 ring-amber-300" : "border-amber-200 bg-amber-50 hover:bg-amber-100"}`}
+            >
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-600">
                 <Package className="h-3 w-3" /> Aguardando retirada
               </div>
@@ -2825,7 +2918,7 @@ function EstoquePage() {
                 {compras.filter((c) => c.chegou && !c.foi_retirado).length}
               </div>
               <div className="text-[11px] text-amber-500">chegou, não retirado</div>
-            </div>
+            </button>
             <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-sm">
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-orange-600">
                 <Clock className="h-3 w-3" /> Atrasados
@@ -2838,7 +2931,7 @@ function EstoquePage() {
           </div>
 
           {/* Filtros */}
-          <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <select
               value={filtroStatusCompra}
               onChange={(e) => setFiltroStatusCompra(e.target.value)}
@@ -2903,6 +2996,7 @@ function EstoquePage() {
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   <th className="px-2 py-2">Requisição</th>
+                  <th className="px-2 py-2">Pedido</th>
                   <th className="px-2 py-2">Item</th>
                   <th className="px-2 py-2">Cód. SAP</th>
                   <th className="px-2 py-2">Descrição</th>
@@ -2911,6 +3005,7 @@ function EstoquePage() {
                   <th className="px-2 py-2">Fornecedor</th>
                   <th className="px-2 py-2 text-center">Chegou?</th>
                   <th className="px-2 py-2 text-center">Retirado?</th>
+                  <th className="px-2 py-2 text-center">Data Prevista</th>
                   <th className="px-2 py-2 text-right">Dias aberto</th>
                 </tr>
               </thead>
@@ -2920,10 +3015,31 @@ function EstoquePage() {
                     !c.foi_retirado && c.dt_criacao_rc
                       ? Math.floor((Date.now() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
                       : null;
+                  const editando = editandoCompraId === c.id;
                   return (
                     <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-2 py-1.5 font-mono text-[#1f7ad6]">
                         {c.requisicao || "—"}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {editando && editandoCampo === "pedido" ? (
+                          <input
+                            type="text"
+                            value={editandoValorCompra}
+                            onChange={(e) => setEditandoValorCompra(e.target.value)}
+                            onBlur={() => handleUpdateCompra(c.id, { pedido: editandoValorCompra || null })}
+                            onKeyDown={(e) => e.key === "Enter" && handleUpdateCompra(c.id, { pedido: editandoValorCompra || null })}
+                            className="w-full min-w-[100px] rounded border border-blue-300 px-1 py-0.5 text-[12px]"
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            className="cursor-pointer text-blue-600 hover:underline"
+                            onClick={() => { setEditandoCompraId(c.id); setEditandoCampo("pedido"); setEditandoValorCompra(c.pedido || ""); }}
+                          >
+                            {c.pedido || "—"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-1.5">{c.item_rc || "—"}</td>
                       <td className="px-2 py-1.5 font-mono font-bold">{c.cod_sap || "—"}</td>
@@ -2932,13 +3048,16 @@ function EstoquePage() {
                       </td>
                       <td className="px-2 py-1.5 text-right font-bold">{c.qtde_rc ?? "—"}</td>
                       <td className="px-2 py-1.5">
-                        {c.status_geral && (
-                          <span
-                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COMPRA_CORES[c.status_geral] || "bg-slate-100 text-slate-600"}`}
-                          >
-                            {c.status_geral}
-                          </span>
-                        )}
+                        <select
+                          value={c.status_geral || ""}
+                          onChange={(e) => handleCompraStatus(c.id, e.target.value as StatusCompra)}
+                          className={`max-w-[140px] rounded border px-1 py-0.5 text-[10px] font-semibold ${(c.status_geral && STATUS_COMPRA_CORES[c.status_geral]) || "bg-slate-100 text-slate-600"} cursor-pointer`}
+                        >
+                          <option value="">Sem status</option>
+                          {Object.keys(STATUS_COMPRA_CORES).sort().map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-500">
                         {c.fornecedor || "—"}
@@ -2969,6 +3088,26 @@ function EstoquePage() {
                           <span>{c.foi_retirado ? "✓" : "—"}</span>
                         )}
                       </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {editando && editandoCampo === "data_confirmada" ? (
+                          <input
+                            type="date"
+                            value={editandoValorCompra}
+                            onChange={(e) => setEditandoValorCompra(e.target.value)}
+                            onBlur={() => handleUpdateCompra(c.id, { data_confirmada: editandoValorCompra || null })}
+                            onKeyDown={(e) => e.key === "Enter" && handleUpdateCompra(c.id, { data_confirmada: editandoValorCompra || null })}
+                            className="w-full rounded border border-blue-300 px-1 py-0.5 text-[12px]"
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            className="cursor-pointer text-slate-600 hover:underline"
+                            onClick={() => { setEditandoCompraId(c.id); setEditandoCampo("data_confirmada"); setEditandoValorCompra(c.data_confirmada || ""); }}
+                          >
+                            {c.data_confirmada || "—"}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 py-1.5 text-right">
                         {diasAberto !== null ? (
                           <span
@@ -2991,7 +3130,7 @@ function EstoquePage() {
                 })}
                 {comprasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-8 text-center text-slate-400">
+                    <td colSpan={12} className="py-8 text-center text-slate-400">
                       Nenhuma compra encontrada com os filtros selecionados.
                     </td>
                   </tr>
@@ -3158,6 +3297,71 @@ function EstoquePage() {
             </DialogTitle>
           </DialogHeader>
           <FormNovoMaterial />
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog RC em Fila */}
+      <Dialog open={dialogRcEmFila} onOpenChange={setDialogRcEmFila}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-blue-700">
+              <ShoppingCart className="mr-1 inline h-4 w-4" /> RCs em Fila
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2 text-sm">
+            {compras.filter((c) => c.rc_em_fila).length === 0 ? (
+              <p className="text-slate-400">Nenhuma RC em fila no momento.</p>
+            ) : (
+              compras
+                .filter((c) => c.rc_em_fila)
+                .sort((a, b) => (b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1)
+                .map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                    <span className="font-mono text-sm font-bold text-blue-600">
+                      {c.requisicao || "—"}
+                    </span>
+                    <span className="text-xs text-slate-400">Item {c.item_rc}</span>
+                    <span className="flex-1 truncate text-slate-600">
+                      {c.descricao_material || "—"}
+                    </span>
+                    <span className="font-bold">{c.qtde_rc ?? "—"}</span>
+                    <span className="text-xs text-slate-400">
+                      {c.dt_criacao_rc || "—"}
+                    </span>
+                  </div>
+                ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Importar Compras */}
+      <Dialog open={dialogImportarCompras} onOpenChange={setDialogImportarCompras}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <Upload className="mr-1 inline h-4 w-4" /> Atualizar Pedidos (CSV)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-slate-600">
+            <p className="mb-2">
+              Importe um arquivo CSV com os dados atualizados dos pedidos.
+              O formato esperado é similar ao "Export" da planilha COMPRAS.
+            </p>
+            <p className="mb-4 text-xs text-slate-400">
+              Colunas principais: <code>requisicao</code>, <code>item_rc</code>,{' '}
+              <code>pedido</code>, <code>status_geral</code>, <code>dt_remessa_pedido</code>,{' '}
+              <code>data_confirmada</code>, <code>fornecedor</code>, etc.
+              Registros com mesma <code>requisicao</code> + <code>item_rc</code> serão atualizados.
+            </p>
+            <input
+              ref={fileInputRefCompras}
+              type="file"
+              accept=".csv"
+              onChange={handleImportarComprasCSV}
+              className="block w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#0b3a73] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-[#1f7ad6]"
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>
