@@ -1004,6 +1004,7 @@ function EstoquePage() {
     const [qtd, setQtd] = useState(1);
     const [resp, setResp] = useState("");
     const [obs, setObs] = useState("");
+    const [data, setData] = useState(() => new Date().toISOString().split("T")[0]);
     const [saving, setSaving] = useState(false);
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1024,6 +1025,7 @@ function EstoquePage() {
         cod_sap: selected.cod_sap,
         tipo: "ENTRADA",
         quantidade: qtd,
+        data: new Date(data).toISOString(),
         responsavel: resp.trim(),
         observacao: obs.trim(),
         criado_por: user?.email || "",
@@ -1057,6 +1059,15 @@ function EstoquePage() {
               Saldo atual: {selected.saldo_atual} {selected.unidade_medida}
             </span>
           )}
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Data *</span>
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Quantidade *</span>
@@ -1103,6 +1114,7 @@ function EstoquePage() {
     const [solicitante, setSolicitante] = useState("");
     const [resp, setResp] = useState("");
     const [obs, setObs] = useState("");
+    const [data, setData] = useState(() => new Date().toISOString().split("T")[0]);
     const [saving, setSaving] = useState(false);
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1158,6 +1170,7 @@ function EstoquePage() {
         cod_sap: selected.cod_sap,
         tipo: "SAIDA",
         quantidade: qtd,
+        data: new Date(data).toISOString(),
         destino: destino.trim(),
         solicitante: solicitante.trim(),
         responsavel: resp.trim(),
@@ -1194,6 +1207,15 @@ function EstoquePage() {
               {selected.estoque_minimo}
             </span>
           )}
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Data *</span>
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600">Quantidade *</span>
@@ -1280,6 +1302,7 @@ function EstoquePage() {
     const [qtdNova, setQtdNova] = useState(0);
     const [motivoOpcao, setMotivoOpcao] = useState("");
     const [motivoOutro, setMotivoOutro] = useState("");
+    const [data, setData] = useState(() => new Date().toISOString().split("T")[0]);
     const [saving, setSaving] = useState(false);
     const qtdRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1299,6 +1322,7 @@ function EstoquePage() {
         cod_sap: selected.cod_sap,
         tipo: "AJUSTE",
         quantidade: qtdNova,
+        data: new Date(data).toISOString(),
         motivo_ajuste: motivoFinal,
         criado_por: user?.email || "",
       });
@@ -1328,6 +1352,15 @@ function EstoquePage() {
               }
             }}
             inputRef={inputRef}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-slate-600">Data *</span>
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
           />
         </label>
         {selected && (
@@ -1959,7 +1992,7 @@ function EstoquePage() {
       const anterior = noPeriodo(inicioAnterior, fimAnterior);
 
       const sumTipo = (list: Movimentacao[], tipo: TipoMovimentacao) =>
-        list.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.quantidade, 0);
+        list.filter((m) => m.tipo === tipo).length;
 
       const entradasAtual = sumTipo(atual, "ENTRADA");
       const saidasAtual = sumTipo(atual, "SAIDA");

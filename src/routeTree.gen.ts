@@ -14,8 +14,8 @@ import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as EscalaRouteImport } from './routes/escala'
 import { Route as EstoqueRouteImport } from './routes/estoque'
+import { Route as EscalaRouteImport } from './routes/escala'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as BloqueadoRouteImport } from './routes/bloqueado'
 import { Route as BacklogRouteImport } from './routes/backlog'
@@ -95,8 +95,8 @@ export interface FileRoutesByFullPath {
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
-  '/estoque': typeof EstoqueRoute
   '/escala': typeof EscalaRoute
+  '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
@@ -110,8 +110,8 @@ export interface FileRoutesByTo {
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
-  '/estoque': typeof EstoqueRoute
   '/escala': typeof EscalaRoute
+  '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
@@ -126,8 +126,8 @@ export interface FileRoutesById {
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/dashboard': typeof DashboardRoute
-  '/estoque': typeof EstoqueRoute
   '/escala': typeof EscalaRoute
+  '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
@@ -143,8 +143,8 @@ export interface FileRouteTypes {
     | '/backlog'
     | '/bloqueado'
     | '/dashboard'
-    | '/estoque'
     | '/escala'
+    | '/estoque'
     | '/login'
     | '/pending'
     | '/register'
@@ -158,8 +158,8 @@ export interface FileRouteTypes {
     | '/backlog'
     | '/bloqueado'
     | '/dashboard'
-    | '/estoque'
     | '/escala'
+    | '/estoque'
     | '/login'
     | '/pending'
     | '/register'
@@ -173,8 +173,8 @@ export interface FileRouteTypes {
     | '/backlog'
     | '/bloqueado'
     | '/dashboard'
-    | '/estoque'
     | '/escala'
+    | '/estoque'
     | '/login'
     | '/pending'
     | '/register'
@@ -189,8 +189,8 @@ export interface RootRouteChildren {
   BacklogRoute: typeof BacklogRoute
   BloqueadoRoute: typeof BloqueadoRoute
   DashboardRoute: typeof DashboardRoute
-  EstoqueRoute: typeof EstoqueRoute
   EscalaRoute: typeof EscalaRoute
+  EstoqueRoute: typeof EstoqueRoute
   LoginRoute: typeof LoginRoute
   PendingRoute: typeof PendingRoute
   RegisterRoute: typeof RegisterRoute
@@ -243,18 +243,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EstoqueRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/escala': {
       id: '/escala'
       path: '/escala'
       fullPath: '/escala'
       preLoaderRoute: typeof EscalaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bloqueado': {
@@ -301,8 +301,8 @@ const rootRouteChildren: RootRouteChildren = {
   BacklogRoute: BacklogRoute,
   BloqueadoRoute: BloqueadoRoute,
   DashboardRoute: DashboardRoute,
-  EstoqueRoute: EstoqueRoute,
   EscalaRoute: EscalaRoute,
+  EstoqueRoute: EstoqueRoute,
   LoginRoute: LoginRoute,
   PendingRoute: PendingRoute,
   RegisterRoute: RegisterRoute,

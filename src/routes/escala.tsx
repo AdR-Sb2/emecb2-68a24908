@@ -136,10 +136,6 @@ function EscalaPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Export
-  const [exportAte, setExportAte] = useState("");
-  const [showExport, setShowExport] = useState(false);
-
   // Sort
   const [sortPor, setSortPor] = useState("equipe");
 
@@ -284,6 +280,24 @@ function EscalaPage() {
     () => trabalhaHoje.filter((c) => c.horario.toUpperCase() === "NOTURNO"),
     [trabalhaHoje],
   );
+
+  // --- Estatísticas por escala ---
+  const statsEscala = useMemo(() => {
+    const comercial = colaboradores.filter((c) => c.escala.toUpperCase() === "COMERCIAL");
+    const plantao1 = colaboradores.filter((c) => c.escala.toUpperCase() === "PLANTÃO 1");
+    const plantao2 = colaboradores.filter((c) => c.escala.toUpperCase() === "PLANTÃO 2");
+    return {
+      comercial: {
+        tecnicos: comercial.length,
+        equipes: new Set(comercial.map((c) => c.equipe)).size,
+      },
+      plantao: {
+        tecnicos: plantao1.length + plantao2.length,
+        equipes: new Set([...plantao1, ...plantao2].map((c) => c.equipe)).size,
+      },
+      totalEquipes: new Set(colaboradores.map((c) => c.equipe)).size,
+    };
+  }, [colaboradores]);
 
   // --- Alternar status (edição manual) ---
   const alternarStatus = async (colId: number, data: string) => {
@@ -467,43 +481,177 @@ function EscalaPage() {
 
   // --- Exportar Excel ---
   const handleExportar = async () => {
-    if (!exportAte) { toast.error("Selecione a data final."); return; }
-    const ate = new Date(exportAte + "T23:59:59");
-    const datas = escalaDias.map(d => d.data).sort();
-    const inicio = datas.length ? new Date(datas[0] + "T12:00:00") : new Date();
+    const diasExport = diasSemana;
+    if (!diasExport.length) { toast.error("Nenhum dia para exportar."); return; }
 
-    const cabecalho = ["EQUIPE", "HORARIO", "COLABORADOR", "LOGIN SAP", "Login Field", "FUNÇÃO", "ESCALA", "ESPECIALIDADE", "SAP ID", "TELEFONE"];
-    const diasCol: Date[] = [];
-    const cursor = new Date(inicio);
-    while (cursor <= ate) {
-      diasCol.push(new Date(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    for (const d of diasCol) {
-      cabecalho.push(formatDateHeader(d));
+    const dataInicial = formatDateISO(diasExport[0]);
+    const dataFinal = formatDateISO(diasExport[6]);
+
+    const { default: ExcelJS } = await import("exceljs");
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "EMEC Baixada 2";
+    const ws = wb.addWorksheet("ESCALA EQUIPES");
+
+    const DIAS_ABREV = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+
+    // Cores
+    const AZUL_CLARO = "003087";
+    const AZUL_MEDIO = "002d74";
+    const VERDE_FUNDO = "d4edda";
+    const VERMELHO_TEXTO = "FF0000";
+    const BRANCO = "FFFFFF";
+
+    // ---- CABEÇALHO PRINCIPAL (linha 1) ----
+    const numColunas = 7 + diasExport.length;
+    ws.mergeCells(1, 1, 1, numColunas);
+
+    const tituloCell = ws.getCell("A1");
+    tituloCell.value = "INFORMAÇÕES TIME EMEC - BAIXADA 2";
+    tituloCell.font = { name: "Calibri", size: 14, bold: true, color: { argb: BRANCO } };
+    tituloCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } };
+    tituloCell.alignment = { horizontal: "left", vertical: "middle" };
+
+    // Título "ESCALA DE TRABALHO" na mesma linha, à direita
+    const escalaCell = ws.getCell(1, numColunas);
+    escalaCell.value = "ESCALA DE TRABALHO";
+    escalaCell.font = { name: "Calibri", size: 14, bold: true, color: { argb: BRANCO } };
+    escalaCell.alignment = { horizontal: "right", vertical: "middle" };
+
+    // ---- CABEÇALHO DE COLUNAS (linha 2) ----
+    const colunasFixas = ["EQUIPE", "HORARIO", "COLABORADOR", "LOGIN SAP", "Login Field", "FUNÇÃO", "ESCALA"];
+
+    // Primeira linha do cabeçalho: cabeçalhos fixos + dias (abreviados)
+    for (let i = 0; i < colunasFixas.length; i++) {
+      const cell = ws.getCell(2, i + 1);
+      cell.value = colunasFixas[i];
+      cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: BRANCO } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     }
 
-    const linhas = [cabecalho];
-    for (const col of colaboradores) {
-      const linha: string[] = [
-        col.equipe, col.horario, col.colaborador, col.login_sap, col.login_field,
-        col.funcao, col.escala, col.especialidade, col.login_sap, col.telefone,
-      ];
-      for (const d of diasCol) {
-        const iso = formatDateISO(d);
-        const manual = escalaDias.find(ed => ed.colaborador_id === col.id && ed.data === iso);
-        const status = manual ? manual.status : (calcularStatusPorFormula(col, d) || "FOLGA");
-        linha.push(status === "TRABALHA" ? "!" : "F");
+    for (let i = 0; i < diasExport.length; i++) {
+      const colIdx = 8 + i;
+      const d = diasExport[i];
+      const abrev = DIAS_ABREV[d.getDay()];
+      const cell = ws.getCell(2, colIdx);
+      cell.value = abrev;
+      cell.font = { name: "Calibri", size: 9, bold: true, color: { argb: BRANCO } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+
+      if (d.getDay() === 0 || d.getDay() === 6) {
+        cell.font = { name: "Calibri", size: 9, bold: true, color: { argb: VERMELHO_TEXTO } };
       }
-      linhas.push(linha);
+
+      // Data na linha 3
+      const dataCell = ws.getCell(3, colIdx);
+      dataCell.value = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+      dataCell.font = { name: "Calibri", size: 9, color: { argb: BRANCO } };
+      dataCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } };
+      dataCell.alignment = { horizontal: "center", vertical: "middle" };
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(linhas);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "ESCALA");
-    XLSX.writeFile(wb, `escala_${formatDateISO(inicio)}_ate_${exportAte}.xlsx`);
-    toast.success("Escala exportada!");
-    setShowExport(false);
+    // Preencher o restante da linha 3 para colunas fixas com fundo azul
+    for (let i = 0; i < colunasFixas.length; i++) {
+      const cell = ws.getCell(3, i + 1);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } };
+    }
+
+    // ---- DADOS ----
+    let linhaAtual = 4;
+    const ordem = ["COMERCIAL", "PLANTÃO 1", "PLANTÃO 2", "FÉRIAS"];
+
+    for (const label of ordem) {
+      const cols = colaboradoresFiltrados.filter((c) => c.escala === label);
+      if (!cols.length) continue;
+
+      // Linha de separação entre grupos
+      if (linhaAtual > 4) {
+        linhaAtual++;
+      }
+
+      for (const col of cols) {
+        const row = ws.getRow(linhaAtual);
+        row.getCell(1).value = col.equipe;
+        row.getCell(2).value = col.horario;
+        row.getCell(3).value = col.colaborador;
+        row.getCell(4).value = col.login_sap;
+        row.getCell(5).value = col.login_field;
+        row.getCell(6).value = col.funcao;
+        row.getCell(7).value = col.escala;
+
+        // Estilo básico das células fixas
+        for (let i = 1; i <= 7; i++) {
+          const cell = row.getCell(i);
+          cell.font = { name: "Calibri", size: 10 };
+          cell.border = {
+            top: { style: "thin", color: { argb: "d0d0d0" } },
+            left: { style: "thin", color: { argb: "d0d0d0" } },
+            bottom: { style: "thin", color: { argb: "d0d0d0" } },
+            right: { style: "thin", color: { argb: "d0d0d0" } },
+          };
+        }
+
+        for (let i = 0; i < diasExport.length; i++) {
+          const colIdx = 8 + i;
+          const d = diasExport[i];
+          const iso = formatDateISO(d);
+          const status = gridStatus[col.id]?.[iso] || "FOLGA";
+          const cell = row.getCell(colIdx);
+          cell.value = status === "TRABALHA" ? "TRABALHA" : "FOLGA";
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.font = { name: "Calibri", size: 10 };
+
+          if (status === "TRABALHA") {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VERDE_FUNDO } };
+          }
+
+          cell.border = {
+            top: { style: "thin", color: { argb: "d0d0d0" } },
+            left: { style: "thin", color: { argb: "d0d0d0" } },
+            bottom: { style: "thin", color: { argb: "d0d0d0" } },
+            right: { style: "thin", color: { argb: "d0d0d0" } },
+          };
+        }
+
+        linhaAtual++;
+      }
+    }
+
+    // ---- LARGURAS DAS COLUNAS ----
+    ws.getColumn(1).width = 10;  // EQUIPE
+    ws.getColumn(2).width = 10;  // HORARIO
+    ws.getColumn(3).width = 35;  // COLABORADOR
+    ws.getColumn(4).width = 20;  // LOGIN SAP
+    ws.getColumn(5).width = 35;  // Login Field
+    ws.getColumn(6).width = 25;  // FUNÇÃO
+    ws.getColumn(7).width = 15;  // ESCALA
+    for (let i = 0; i < diasExport.length; i++) {
+      ws.getColumn(8 + i).width = 14;
+    }
+
+    // ---- CONGELAR PAINEL (freeze) ----
+    ws.views = [
+      { state: "frozen", xSplit: 7, ySplit: 3, activeCell: "H4" },
+    ];
+
+    // ---- ALTURA DAS LINHAS ----
+    ws.getRow(1).height = 30;
+    ws.getRow(2).height = 20;
+    ws.getRow(3).height = 20;
+
+    // ---- GERAR ARQUIVO ----
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Escala_Trabalho_BXD2_${dataInicial}_a_${dataFinal}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Escala exportada com formatação!");
   };
 
   // --- Marcar data_ancora automaticamente para plantonistas sem ancora ---
@@ -742,7 +890,7 @@ function EscalaPage() {
               Importar (Excel)
             </button>
             <button
-              onClick={() => setShowExport(true)}
+              onClick={handleExportar}
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 cursor-pointer"
             >
               <Download className="h-4 w-4" />
@@ -757,36 +905,6 @@ function EscalaPage() {
             </button>
           </div>
         </div>
-
-        {/* Modal Exportar */}
-        {showExport && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
-              <h3 className="mb-4 text-lg font-bold text-[#0b3a73]">Exportar Escala</h3>
-              <label className="mb-1 block text-sm font-medium text-slate-600">Data final</label>
-              <input
-                type="date"
-                value={exportAte}
-                onChange={(e) => setExportAte(e.target.value)}
-                className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleExportar}
-                  className="rounded-md bg-[#1f7ad6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b3a73] cursor-pointer"
-                >
-                  Confirmar
-                </button>
-                <button
-                  onClick={() => setShowExport(false)}
-                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {showAddForm && (
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
@@ -846,6 +964,9 @@ function EscalaPage() {
                   <div className="mt-1 text-3xl font-bold text-[#0b3a73]">
                     {colaboradores.filter(c => c.escala.toUpperCase() === "COMERCIAL" && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
                   </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
+                    {statsEscala.comercial.tecnicos} técnico{statsEscala.comercial.tecnicos !== 1 && "s"} · {statsEscala.comercial.equipes} equipe{statsEscala.comercial.equipes !== 1 && "s"}
+                  </div>
                 </div>
               </div>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -858,6 +979,9 @@ function EscalaPage() {
                   <div className="mt-1 text-3xl font-bold text-[#0b3a73]">
                     {colaboradores.filter(c => (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
                   </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
+                    {statsEscala.plantao.tecnicos} técnico{statsEscala.plantao.tecnicos !== 1 && "s"} · {statsEscala.plantao.equipes} equipe{statsEscala.plantao.equipes !== 1 && "s"}
+                  </div>
                 </div>
               </div>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -868,6 +992,9 @@ function EscalaPage() {
                     Total Técnicos
                   </div>
                   <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{colaboradores.length}</div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
+                    {statsEscala.totalEquipes} equipe{statsEscala.totalEquipes !== 1 && "s"}
+                  </div>
                 </div>
               </div>
             </div>
