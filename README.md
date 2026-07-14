@@ -239,6 +239,14 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 
 ## 5. Histórico de Mudanças
 
+### [2026-07-14] — Manuais: Inversores, "Ver manuais", criação de cards, Backlog: responsável editável
+
+- **Manuais**: Novas categorias "Inversores WEG" e "Inversores Danfoss" com manuais (CFW500, CFW300, CFW900, CFW11, FC-51, FC-360, FC-302, VLT AQUA Drive) — migration `00031`
+- **Manuais**: Botão "Novo Manual" no modo edição para criar cards diretamente na categoria ativa
+- **Manuais**: Cards com múltiplos PDFs exibem botão "Ver manuais (N)" que abre modal centralizado com a lista de PDFs — UX focada em navegação
+- **Backlog BI**: Coluna "Resp." agora é editável inline (exatamente como "Equipe"), com `<select>` de todas as opções, persistência em `localStorage` + Supabase (`responsabilidade_overrides`), e botão ↺ para reverter — migration `00030`
+- **Backlog BI**: Exportação CSV do backlog e das rotas agora usa separador `;` (semicolongo) em vez de vírgula, adequado para o locale brasileiro
+
 ### [2026-07-14] — Correção do módulo Manuais Técnicos
 
 **Commits:** `469ad7f`

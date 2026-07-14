@@ -87,6 +87,7 @@ type Row = {
 
 const DATA = rawData as unknown as Row[];
 const EQUIPE_OVERRIDES = rawEquipeOverrides as Record<string, string>;
+const RESP_OVERRIDES = rawEquipeOverrides as Record<string, string>;
 
 const plantaToElevatoriaMap = new Map<string, string>();
 (elevatoriasData as Array<{ PLANTA: string | null; ELEVATORIAS: string | null }>).forEach(
@@ -496,13 +497,63 @@ function BacklogPage() {
       });
   }, []);
 
+  const [responsabilidadeOverrides, setResponsabilidadeOverrides] = useState<
+    Record<string, Responsabilidade>
+  >(() => {
+    try {
+      const stored = localStorage.getItem("responsabilidadeOverrides");
+      if (stored) return JSON.parse(stored) as Record<string, Responsabilidade>;
+    } catch {}
+    return RESP_OVERRIDES as Record<string, Responsabilidade>;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "responsabilidadeOverrides",
+        JSON.stringify(responsabilidadeOverrides),
+      );
+    } catch {}
+  }, [responsabilidadeOverrides]);
+  useEffect(() => {
+    supabase
+      .from("responsabilidade_overrides")
+      .select("*")
+      .then(({ data, error }) => {
+        if (error) return;
+        if (data?.length) {
+          const map: Record<string, Responsabilidade> = {};
+          data.forEach((row: { om: string; responsabilidade: string }) => {
+            const valid: Responsabilidade[] = [
+              "Planta Inativa",
+              "Não atendemos",
+              "CDA",
+              "Baixada 1",
+              "Baixada 2",
+              "Outra SUP",
+              "Ainda não identificado",
+            ];
+            if (valid.includes(row.responsabilidade as Responsabilidade)) {
+              map[row.om] = row.responsabilidade as Responsabilidade;
+            }
+          });
+          setResponsabilidadeOverrides(
+            (prev) => ({ ...prev, ...map }) as Record<string, Responsabilidade>,
+          );
+        }
+      });
+  }, []);
+
   const enriched = useMemo(
     () =>
       enrich(data, now).map((e) => {
-        const override = equipeOverrides[e.om];
-        return override ? { ...e, equipe: override } : e;
+        const eqOverride = equipeOverrides[e.om];
+        const respOverride = responsabilidadeOverrides[e.om];
+        let result = e;
+        if (eqOverride) result = { ...result, equipe: eqOverride };
+        if (respOverride) result = { ...result, responsabilidade: respOverride };
+        return result;
       }),
-    [data, now, equipeOverrides],
+    [data, now, equipeOverrides, responsabilidadeOverrides],
   );
 
   // ---------- filtros ----------
@@ -843,7 +894,7 @@ function BacklogPage() {
       e.r["TEXTO BREVE"] ?? "",
     ]);
     const csv = [headers, ...rows]
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";"))
       .join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1524,7 +1575,7 @@ function BacklogPage() {
     });
 
     const csv = [headers, ...rows]
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";"))
       .join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -2872,7 +2923,72 @@ function BacklogPage() {
                       {e.slaStatus}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-1 text-[12px]">{e.responsabilidade}</td>
+                  <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                    <span className="inline-flex items-center gap-1">
+                      <select
+                        value={e.responsabilidade}
+                        onChange={(ev) => {
+                          const val = ev.target.value;
+                          if (!val) return;
+                          setResponsabilidadeOverrides((prev) => ({
+                            ...prev,
+                            [e.om]: val as Responsabilidade,
+                          }));
+                          supabase
+                            .from("responsabilidade_overrides")
+                            .upsert(
+                              { om: e.om, responsabilidade: val },
+                              { ignoreDuplicates: false },
+                            )
+                            .then(
+                              ({ error }) =>
+                                error && console.warn("Falha ao salvar resp", error),
+                            );
+                        }}
+                        className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                      >
+                        {(
+                          [
+                            "Planta Inativa",
+                            "Não atendemos",
+                            "CDA",
+                            "Baixada 1",
+                            "Baixada 2",
+                            "Outra SUP",
+                            "Ainda não identificado",
+                          ] as const
+                        ).map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      {responsabilidadeOverrides[e.om] && (
+                        <button
+                          onClick={() => {
+                            setResponsabilidadeOverrides((prev) => {
+                              const next = { ...prev };
+                              delete next[e.om];
+                              return next;
+                            });
+                            supabase
+                              .from("responsabilidade_overrides")
+                              .delete()
+                              .eq("om", e.om)
+                              .then(
+                                ({ error }) =>
+                                  error &&
+                                  console.warn("Falha ao remover resp override", error),
+                              );
+                          }}
+                          className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
+                          title="Reverter ao cálculo automático"
+                        >
+                          ↺
+                        </button>
+                      )}
+                    </span>
+                  </td>
                   <td className="whitespace-nowrap px-2 py-1 text-[12px]">
                     {e.responsabilidade === "Baixada 2" ? (
                       <span className="inline-flex items-center gap-1">
@@ -3011,7 +3127,70 @@ function BacklogPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                      {e.responsabilidade}
+                      <span className="inline-flex items-center gap-1">
+                        <select
+                          value={e.responsabilidade}
+                          onChange={(ev) => {
+                            const val = ev.target.value;
+                            if (!val) return;
+                            setResponsabilidadeOverrides((prev) => ({
+                              ...prev,
+                              [e.om]: val as Responsabilidade,
+                            }));
+                            supabase
+                              .from("responsabilidade_overrides")
+                              .upsert(
+                                { om: e.om, responsabilidade: val },
+                                { ignoreDuplicates: false },
+                              )
+                              .then(
+                                ({ error }) =>
+                                  error && console.warn("Falha ao salvar resp", error),
+                              );
+                          }}
+                          className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                        >
+                          {(
+                            [
+                              "Planta Inativa",
+                              "Não atendemos",
+                              "CDA",
+                              "Baixada 1",
+                              "Baixada 2",
+                              "Outra SUP",
+                              "Ainda não identificado",
+                            ] as const
+                          ).map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        {responsabilidadeOverrides[e.om] && (
+                          <button
+                            onClick={() => {
+                              setResponsabilidadeOverrides((prev) => {
+                                const next = { ...prev };
+                                delete next[e.om];
+                                return next;
+                              });
+                              supabase
+                                .from("responsabilidade_overrides")
+                                .delete()
+                                .eq("om", e.om)
+                                .then(
+                                  ({ error }) =>
+                                    error &&
+                                    console.warn("Falha ao remover resp override", error),
+                                );
+                            }}
+                            className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
+                            title="Reverter ao cálculo automático"
+                          >
+                            ↺
+                          </button>
+                        )}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-[12px]">
                       {e.responsabilidade === "Baixada 2" ? (
