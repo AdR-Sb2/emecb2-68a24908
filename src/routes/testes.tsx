@@ -968,11 +968,10 @@ function TestesPage() {
                     <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Retaguarda ?? ""}</td>
                   </tr>
                 );
-              }}
+              })}
             </tbody>
           </table>
         </div>
-      </div>
       </div>
 
       <p className="text-center text-xs text-slate-500 dark:text-slate-400">
