@@ -916,7 +916,7 @@ function EstoquePage() {
             setQuery(displayText || "");
           }}
           placeholder={placeholder}
-          className="min-h-11 w-full rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+          className="min-h-11 w-full rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
         />
         {open && (
           <>
@@ -927,7 +927,7 @@ function EstoquePage() {
                 if (!value) setQuery("");
               }}
             />
-            <div className="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+            <div className="absolute z-40 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
               {!query && (
                 <div className="px-2 py-3 text-center text-sm text-slate-400">
                   Digite para buscar...
@@ -951,15 +951,15 @@ function EstoquePage() {
                   }}
                   className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${value?.cod_sap === m.cod_sap ? "bg-blue-50" : ""}`}
                 >
-                  <span className="font-mono text-[#1f7ad6]">{m.cod_sap}</span>
-                  <span className="truncate text-slate-600">{m.descricao}</span>
-                  <span className="ml-auto shrink-0 text-xs text-slate-400">
+                  <span className="font-mono text-[#1f7ad6] dark:text-blue-400">{m.cod_sap}</span>
+                  <span className="truncate text-slate-600 dark:text-slate-300">{m.descricao}</span>
+                  <span className="ml-auto shrink-0 text-xs text-slate-400 dark:text-slate-500">
                     {m.saldo_atual} {m.unidade_medida}
                   </span>
                 </button>
               ))}
               {remaining > 0 && (
-                <div className="border-t border-slate-100 px-2 py-1.5 text-center text-xs text-slate-400">
+                <div className="border-t border-slate-100 px-2 py-1.5 text-center text-xs text-slate-400 dark:border-slate-700 dark:text-slate-500">
                   +{remaining} resultado{remaining > 1 ? "s" : ""}, refine sua busca
                 </div>
               )}
@@ -1045,7 +1045,7 @@ function EstoquePage() {
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Material *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Material *</span>
           <AutoCompleteMaterial
             value={selected}
             onChange={(m) => {
@@ -1061,39 +1061,39 @@ function EstoquePage() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Data *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Data *</span>
           <input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Quantidade *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Quantidade *</span>
           <input
             ref={qtdRef}
             type="number"
             min={1}
             value={qtd}
             onChange={(e) => setQtd(Number(e.target.value) || 0)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Quem recebeu *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Quem recebeu *</span>
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Observação</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Observação</span>
           <textarea
             value={obs}
             onChange={(e) => setObs(e.target.value)}
-            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm"
+            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <button
@@ -1192,7 +1192,7 @@ function EstoquePage() {
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Material *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Material *</span>
           <AutoCompleteMaterial
             value={selected}
             onChange={(m) => {
@@ -1209,16 +1209,16 @@ function EstoquePage() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Data *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Data *</span>
           <input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Quantidade *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Quantidade *</span>
           <input
             ref={qtdRef}
             type="number"
@@ -1226,7 +1226,7 @@ function EstoquePage() {
             max={selected?.saldo_atual || 1}
             value={qtd}
             onChange={(e) => setQtd(Number(e.target.value) || 0)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           {saldoInsuficiente && (
             <span className="text-[11px] font-semibold text-red-600">
@@ -1235,12 +1235,12 @@ function EstoquePage() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Destino (elevatória/local) *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Destino (elevatória/local) *</span>
           <input
             value={destino}
             onChange={(e) => setDestino(e.target.value)}
             list="sugestoes-destino"
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             placeholder="Ex: PL-RJB-EAT1005"
           />
           <datalist id="sugestoes-destino">
@@ -1250,12 +1250,12 @@ function EstoquePage() {
           </datalist>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Solicitante *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Solicitante *</span>
           <input
             value={solicitante}
             onChange={(e) => setSolicitante(e.target.value)}
             list="sugestoes-solicitante"
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <datalist id="sugestoes-solicitante">
             {sugestoesSolicitante.map((s) => (
@@ -1264,19 +1264,19 @@ function EstoquePage() {
           </datalist>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Responsável pela saída *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Responsável pela saída *</span>
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Observação</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Observação</span>
           <textarea
             value={obs}
             onChange={(e) => setObs(e.target.value)}
-            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm"
+            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <button
@@ -1341,7 +1341,7 @@ function EstoquePage() {
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Material *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Material *</span>
           <AutoCompleteMaterial
             value={selected}
             onChange={(m) => {
@@ -1355,38 +1355,38 @@ function EstoquePage() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Data *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Data *</span>
           <input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         {selected && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="flex items-center justify-between">
-              <span className="text-slate-600">Saldo atual no sistema:</span>
+              <span className="text-slate-600 dark:text-slate-300">Saldo atual no sistema:</span>
               <span className="text-lg font-bold">
                 {selected.saldo_atual} {selected.unidade_medida}
               </span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">{selected.descricao}</div>
+            <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{selected.descricao}</div>
           </div>
         )}
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Novo saldo (físico real) *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Novo saldo (físico real) *</span>
           <input
             ref={qtdRef}
             type="number"
             min={0}
             value={qtdNova}
             onChange={(e) => setQtdNova(Number(e.target.value) || 0)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           {selected && (
             <span
-              className={`text-[11px] ${diff !== 0 ? "font-semibold text-amber-600" : "text-slate-400"}`}
+              className={`text-[11px] ${diff !== 0 ? "font-semibold text-amber-600" : "text-slate-400 dark:text-slate-500"}`}
             >
               {diff === 0
                 ? "Sem alteração"
@@ -1395,11 +1395,11 @@ function EstoquePage() {
           )}
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Motivo do ajuste *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Motivo do ajuste *</span>
           <select
             value={motivoOpcao}
             onChange={(e) => setMotivoOpcao(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="">Selecione o motivo...</option>
             {MOTIVOS_AJUSTE.map((opt) => (
@@ -1413,7 +1413,7 @@ function EstoquePage() {
               value={motivoOutro}
               onChange={(e) => setMotivoOutro(e.target.value)}
               placeholder="Descreva o motivo..."
-              className="mt-1 min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="mt-1 min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           )}
         </label>
@@ -1458,7 +1458,7 @@ function EstoquePage() {
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Material *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Material *</span>
           <AutoCompleteMaterial
             value={selected}
             onChange={(m) => {
@@ -1482,7 +1482,7 @@ function EstoquePage() {
         </label>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
               Quantidade solicitada{" "}
               {sugestao > 0 && (
                 <span className="text-blue-500 font-normal">(sugestão: {sugestao})</span>
@@ -1494,15 +1494,15 @@ function EstoquePage() {
               min={1}
               value={qtd}
               onChange={(e) => setQtd(Number(e.target.value) || 0)}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Depósito destino</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Depósito destino</span>
             <select
               value={deposito}
               onChange={(e) => setDeposito(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="DP98">DP98</option>
               <option value="DP96">DP96</option>
@@ -1511,29 +1511,29 @@ function EstoquePage() {
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Solicitante</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Solicitante</span>
             <input
               value={solicitante}
               onChange={(e) => setSolicitante(e.target.value)}
               placeholder={profile?.nome_completo || user?.email || ""}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Previsão de uso</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Previsão de uso</span>
             <input
               value={previsaoUso}
               onChange={(e) => setPrevisaoUso(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
         </div>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Observação</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Observação</span>
           <textarea
             value={obs}
             onChange={(e) => setObs(e.target.value)}
-            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm"
+            className="min-h-20 rounded-md border border-slate-300 px-2 py-1.5 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <button
@@ -1612,37 +1612,37 @@ function EstoquePage() {
     return (
       <div className="grid gap-3 py-2 text-sm">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Código SAP *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Código SAP *</span>
           <input
             value={codSap}
             onChange={(e) => setCodSap(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             placeholder="Ex: 12345678"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Descrição *</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Descrição *</span>
           <input
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Unidade</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Unidade</span>
             <input
               value={unidade}
               onChange={(e) => setUnidade(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Categoria *</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Categoria *</span>
             <select
               value={categoriaId}
               onChange={(e) => setCategoriaId(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               {categoriasAtivas.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -1654,50 +1654,50 @@ function EstoquePage() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Fabricante</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Fabricante</span>
             <input
               value={fabricante}
               onChange={(e) => setFabricante(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Local de armazenagem</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Local de armazenagem</span>
             <input
               value={local}
               onChange={(e) => setLocal(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Estoque mínimo</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Estoque mínimo</span>
             <input
               type="number"
               min={0}
               value={minimo}
               onChange={(e) => setMinimo(Number(e.target.value))}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600">Saldo inicial</span>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Saldo inicial</span>
             <input
               type="number"
               min={0}
               value={saldo}
               onChange={(e) => setSaldo(Number(e.target.value))}
-              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+              className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
           </label>
         </div>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-600">Elevatória vinculada</span>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Elevatória vinculada</span>
           <input
             value={elevatoria}
             onChange={(e) => setElevatoria(e.target.value)}
-            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
         </label>
         <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
@@ -1771,7 +1771,7 @@ function EstoquePage() {
             value={novaNome}
             onChange={(e) => setNovaNome(e.target.value)}
             placeholder="Nome da nova categoria..."
-            className="min-h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm shadow-sm"
+            className="min-h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             onKeyDown={(e) => e.key === "Enter" && handleCriar()}
           />
           <button
@@ -1790,7 +1790,7 @@ function EstoquePage() {
             <div
               key={cat.id}
               className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${
-                cat.ativo ? "border-slate-200 bg-white" : "border-slate-100 bg-slate-50 opacity-60"
+                cat.ativo ? "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800" : "border-slate-100 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-800"
               }`}
             >
               {editandoId === cat.id ? (
@@ -1798,7 +1798,7 @@ function EstoquePage() {
                   <input
                     value={editandoNome}
                     onChange={(e) => setEditandoNome(e.target.value)}
-                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleSalvarEdicao(cat.id);
@@ -1822,7 +1822,7 @@ function EstoquePage() {
                 <>
                   <div className="flex items-center gap-2">
                     <Tag className="h-4 w-4 text-[#0b3a73]" />
-                    <span className="font-medium text-slate-800">{cat.nome}</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-100">{cat.nome}</span>
                     {!cat.ativo && (
                       <Badge variant="outline" className="text-[10px] text-slate-400">
                         Inativa
@@ -2061,13 +2061,13 @@ function EstoquePage() {
         {/* Dashboard */}
         <div className="mb-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#0b3a73]">
-              <BarChart3 className="mr-1 inline h-4 w-4" /> Resumo de Movimentações
+              <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white">
+                <BarChart3 className="mr-1 inline h-4 w-4" /> Resumo de Movimentações
             </h2>
             <select
               value={filtroCategoriaGrafico}
               onChange={(e) => setFiltroCategoriaGrafico(e.target.value)}
-              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[13px] shadow-sm"
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODAS">Todas categorias</option>
               {cats.map((c) => (
@@ -2196,7 +2196,7 @@ function EstoquePage() {
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value as TipoMovimentacao | "TODAS")}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="TODAS">Todos os tipos</option>
             <option value="ENTRADA">Entrada</option>
@@ -2206,7 +2206,7 @@ function EstoquePage() {
           <select
             value={filtroOrigem}
             onChange={(e) => setFiltroOrigem(e.target.value as OrigemMovimentacao | "TODAS")}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="TODAS">Todas origens</option>
             <option value="SISTEMA">Sistema</option>
@@ -2217,12 +2217,12 @@ function EstoquePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar código ou descrição..."
-            className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm placeholder:text-slate-400"
+            className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <select
             value={destinoFilter}
             onChange={(e) => setDestinoFilter(e.target.value)}
-            className="max-w-40 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            className="max-w-40 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="">Todos destinos</option>
             {destinos.map((d) => (
@@ -2235,7 +2235,7 @@ function EstoquePage() {
             type="date"
             value={dataInicio}
             onChange={(e) => setDataInicio(e.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             title="Data inicial"
           />
           <span className="text-[11px] text-slate-400">até</span>
@@ -2243,7 +2243,7 @@ function EstoquePage() {
             type="date"
             value={dataFim}
             onChange={(e) => setDataFim(e.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm"
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             title="Data final"
           />
           <span className="ml-auto text-[12px] text-slate-400">
@@ -2252,10 +2252,10 @@ function EstoquePage() {
         </div>
 
         {/* Tabela */}
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <table className="w-full text-left text-[13px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                 <th className="px-3 py-2">Data</th>
                 <th className="px-3 py-2">Cód. SAP</th>
                 <th className="px-3 py-2">Descrição</th>
@@ -2278,18 +2278,18 @@ function EstoquePage() {
               {paginated.map((m) => {
                 const mat = mats.find((mat) => mat.cod_sap === m.cod_sap);
                 return (
-                  <tr key={m.id} className="border-b border-slate-100 transition hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-3 py-2 text-slate-500">
+                  <tr key={m.id} className="border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-750">
+                    <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">
                       {m.data ? (
                         new Date(m.data).toLocaleDateString("pt-BR")
                       ) : (
                         <span className="italic text-slate-400">Não informada</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[#0b3a73]">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[#0b3a73] dark:text-blue-400">
                       {m.cod_sap}
                     </td>
-                    <td className="max-w-56 truncate px-3 py-2 text-slate-700">
+                    <td className="max-w-56 truncate px-3 py-2 text-slate-700 dark:text-slate-200">
                       {mat?.descricao || m.cod_sap}
                     </td>
                     <td className="px-3 py-2">
@@ -2322,10 +2322,10 @@ function EstoquePage() {
                             : `-${m.quantidade}`}
                       </span>
                     </td>
-                    <td className="max-w-28 truncate px-3 py-2 text-slate-600">
+                    <td className="max-w-28 truncate px-3 py-2 text-slate-600 dark:text-slate-300">
                       {m.destino || "—"}
                     </td>
-                    <td className="max-w-28 truncate px-3 py-2 text-slate-600">
+                    <td className="max-w-28 truncate px-3 py-2 text-slate-600 dark:text-slate-300">
                       {m.solicitante || m.responsavel || "—"}
                     </td>
                     <td className="px-3 py-2">
@@ -2339,7 +2339,7 @@ function EstoquePage() {
                         {m.origem === "SISTEMA" ? "Sistema" : "Histórico"}
                       </span>
                     </td>
-                    <td className="max-w-40 truncate px-3 py-2 text-slate-400">
+                    <td className="max-w-40 truncate px-3 py-2 text-slate-400 dark:text-slate-500">
                       {m.observacao || "—"}
                     </td>
                   </tr>
@@ -2351,7 +2351,7 @@ function EstoquePage() {
 
         {/* Paginação */}
         {totalPages > 1 && (
-          <div className="mt-3 flex items-center justify-between text-[13px] text-slate-500">
+          <div className="mt-3 flex items-center justify-between text-[13px] text-slate-500 dark:text-slate-400">
             <span>
               Página {page + 1} de {totalPages}
             </span>
@@ -2359,14 +2359,14 @@ function EstoquePage() {
               <button
                 onClick={() => setPage(Math.max(0, page - 1))}
                 disabled={page === 0}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[13px] font-semibold transition hover:bg-slate-100 disabled:opacity-40"
+                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[13px] font-semibold transition hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Anterior
               </button>
               <button
                 onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                 disabled={page >= totalPages - 1}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[13px] font-semibold transition hover:bg-slate-100 disabled:opacity-40"
+                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[13px] font-semibold transition hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Próximo
               </button>
@@ -2395,10 +2395,10 @@ function EstoquePage() {
     return (
       <div className="text-sm">
         {/* Topo */}
-        <div className="mb-6 flex items-center justify-between rounded-xl bg-slate-50 p-4">
-          <div>
-            <span className="font-mono text-lg font-bold text-[#0b3a73]">{material.cod_sap}</span>
-            <p className="mt-0.5 text-slate-700">{material.descricao}</p>
+          <div className="mb-6 flex items-center justify-between rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
+            <div>
+              <span className="font-mono text-lg font-bold text-[#0b3a73] dark:text-white">{material.cod_sap}</span>
+              <p className="mt-0.5 text-slate-700 dark:text-slate-200">{material.descricao}</p>
           </div>
           <div className="text-right">
             <div
@@ -2414,42 +2414,42 @@ function EstoquePage() {
         </div>
 
         {/* Dados Cadastrais */}
-        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0b3a73]">
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0b3a73] dark:text-white">
             Dados Cadastrais
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <p className="text-[11px] font-medium text-slate-400">Categoria</p>
-              <p className="font-medium text-slate-800">{getCategoriaNome(material)}</p>
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Categoria</p>
+              <p className="font-medium text-slate-800 dark:text-slate-100">{getCategoriaNome(material)}</p>
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-400">Estoque mínimo</p>
-              <p className="font-medium text-slate-800">
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Estoque mínimo</p>
+              <p className="font-medium text-slate-800 dark:text-slate-100">
                 {material.estoque_minimo} {material.unidade_medida}
               </p>
             </div>
             <div>
               <p className="text-[11px] font-medium text-slate-400">Fabricante</p>
-              <p className="text-slate-700">{material.fabricante || "—"}</p>
+              <p className="text-slate-700 dark:text-slate-200">{material.fabricante || "—"}</p>
             </div>
             <div>
               <p className="text-[11px] font-medium text-slate-400">Local de armazenagem</p>
-              <p className="text-slate-700">{material.local_armazenagem || "—"}</p>
+              <p className="text-slate-700 dark:text-slate-200">{material.local_armazenagem || "—"}</p>
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-400">Elevatória vinculada</p>
-              <p className="text-slate-700">{material.vinculo_elevatoria || "—"}</p>
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Elevatória vinculada</p>
+              <p className="text-slate-700 dark:text-slate-200">{material.vinculo_elevatoria || "—"}</p>
             </div>
             <div>
-              <p className="text-[11px] font-medium text-slate-400">Status crítico</p>
-              <p className="flex items-center gap-1 font-medium text-slate-800">
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Status crítico</p>
+              <p className="flex items-center gap-1 font-medium text-slate-800 dark:text-slate-100">
                 {material.material_critico ? (
                   <>
                     <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> Crítico
                   </>
                 ) : (
-                  <span className="text-slate-500">Não</span>
+                  <span className="text-slate-500 dark:text-slate-400">Não</span>
                 )}
               </p>
             </div>
@@ -2457,8 +2457,8 @@ function EstoquePage() {
         </div>
 
         {/* Histórico de Movimentações */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-[#0b3a73]">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+          <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-[#0b3a73] dark:text-white">
             Histórico de Movimentações
           </h3>
           <div className="max-h-80 space-y-3 overflow-auto">
@@ -2470,7 +2470,7 @@ function EstoquePage() {
               return (
                 <div
                   key={m.id}
-                  className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3"
+                  className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/50"
                 >
                   <div
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${icon.bg}`}
@@ -2497,7 +2497,7 @@ function EstoquePage() {
                           {material.unidade_medida}
                         </span>
                       </span>
-                      <span className="text-[12px] text-slate-500">
+                      <span className="text-[12px] text-slate-500 dark:text-slate-400">
                         {m.data ? (
                           new Date(m.data).toLocaleDateString("pt-BR")
                         ) : (
@@ -2506,21 +2506,21 @@ function EstoquePage() {
                       </span>
                     </div>
                     {(m.responsavel || m.solicitante) && (
-                      <p className="mt-1 text-[13px] text-slate-700">
-                        <span className="text-[11px] font-medium text-slate-400">
+                      <p className="mt-1 text-[13px] text-slate-700 dark:text-slate-200">
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
                           Responsável:{" "}
                         </span>
                         {m.responsavel || m.solicitante}
                       </p>
                     )}
                     {m.destino && (
-                      <p className="mt-0.5 text-[13px] text-slate-600">
-                        <span className="text-[11px] font-medium text-slate-400">Origem: </span>
+                      <p className="mt-0.5 text-[13px] text-slate-600 dark:text-slate-300">
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Origem: </span>
                         {m.destino}
                       </p>
                     )}
                     {m.observacao && (
-                      <p className="mt-1 text-[12px] italic text-slate-500">{m.observacao}</p>
+                      <p className="mt-1 text-[12px] italic text-slate-500 dark:text-slate-400">{m.observacao}</p>
                     )}
                     <span
                       className={`mt-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
@@ -2551,7 +2551,7 @@ function EstoquePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 md:p-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
       {/* Header */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2580,13 +2580,13 @@ function EstoquePage() {
 
       {/* Toggle e ações */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <button
             onClick={() => setAba("estoque")}
             className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "estoque"
                 ? "bg-[#0b3a73] text-white shadow"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
             }`}
           >
             <Package className="h-4 w-4" /> Estoque
@@ -2596,7 +2596,7 @@ function EstoquePage() {
             className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "compras"
                 ? "bg-[#0b3a73] text-white shadow"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
             } ${!permissoes.solicitarCompra ? "hidden" : ""}`}
           >
             <ShoppingCart className="h-4 w-4" /> Compras
@@ -2606,7 +2606,7 @@ function EstoquePage() {
             className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "registros"
                 ? "bg-[#0b3a73] text-white shadow"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
             }`}
           >
             <List className="h-4 w-4" /> Registros
@@ -2642,7 +2642,7 @@ function EstoquePage() {
               {permissoes.exportar && (
                 <button
                   onClick={exportarCSV}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   <Download className="h-4 w-4" /> Exportar
                 </button>
@@ -2650,7 +2650,7 @@ function EstoquePage() {
               {permissoes.importar && (
                 <button
                   onClick={() => setDialogImportar(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   <Upload className="h-4 w-4" /> Importar
                 </button>
@@ -2658,7 +2658,7 @@ function EstoquePage() {
               {permissoes.cadastrarMaterial && (
                 <button
                   onClick={() => setDialogMaterial(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   <Plus className="h-4 w-4" /> Novo Material
                 </button>
@@ -2666,7 +2666,7 @@ function EstoquePage() {
               {permissoes.gerenciarCategorias && (
                 <button
                   onClick={() => setDialogCategorias(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   <Settings className="h-4 w-4" /> Gerenciar Categorias
                 </button>
@@ -2684,14 +2684,14 @@ function EstoquePage() {
           {aba === "compras" && (
             <button
               onClick={() => setDialogImportarCompras(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               <Upload className="h-4 w-4" /> Atualizar Pedidos
             </button>
           )}
           <button
             onClick={carregarDados}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -2753,13 +2753,13 @@ function EstoquePage() {
               className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
                 !filtroKpi
                   ? "border-blue-400 bg-blue-50 ring-2 ring-blue-300"
-                  : "border-slate-200 bg-white"
+                  : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
               }`}
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <Box className="mr-1 inline h-3 w-3" /> Total Itens
               </div>
-              <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{kpis.total}</div>
+              <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{kpis.total}</div>
               <div className="text-[11px] text-slate-400">materiais cadastrados</div>
             </div>
             <div
@@ -2767,30 +2767,30 @@ function EstoquePage() {
               className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
                 filtroKpi === "parados"
                   ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300"
-                  : "border-slate-200 bg-white"
+                  : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
               }`}
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <BarChart3 className="mr-1 inline h-3 w-3" /> Parados
               </div>
-              <div className="mt-1 text-3xl font-bold text-slate-600">{kpis.parados.length}</div>
-              <div className="text-[11px] text-slate-400">sem mov. há 3+ meses</div>
+              <div className="mt-1 text-3xl font-bold text-slate-600 dark:text-slate-300">{kpis.parados.length}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">sem mov. há 3+ meses</div>
             </div>
             <div
               onClick={() => setFiltroKpi(filtroKpi === "critico_marcado" ? "" : "critico_marcado")}
               className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
                 filtroKpi === "critico_marcado"
                   ? "border-amber-400 bg-amber-100 ring-2 ring-amber-300"
-                  : "border-slate-200 bg-white"
+                  : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
               }`}
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <Star className="mr-1 inline h-3 w-3" /> Críticos marcados
               </div>
               <div className="mt-1 text-3xl font-bold text-amber-500">
                 {materiais.filter((m) => m.material_critico).length}
               </div>
-              <div className="text-[11px] text-slate-400">com flag manual</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">com flag manual</div>
             </div>
           </div>
 
@@ -2798,7 +2798,7 @@ function EstoquePage() {
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-[#0b3a73]">
+                <CardTitle className="text-sm font-semibold text-[#0b3a73] dark:text-white">
                   Top 5 Mais Consumidos (mês)
                 </CardTitle>
               </CardHeader>
@@ -2833,7 +2833,7 @@ function EstoquePage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-[#0b3a73]">
+                <CardTitle className="text-sm font-semibold text-[#0b3a73] dark:text-white">
                   Ranking de Destinos (mês)
                 </CardTitle>
               </CardHeader>
@@ -2909,7 +2909,7 @@ function EstoquePage() {
           <div className="mb-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-[#0b3a73]">
+                <CardTitle className="text-sm font-semibold text-[#0b3a73] dark:text-white">
                   <Edit3 className="mr-1 inline h-4 w-4" /> Ajustes do Mês
                 </CardTitle>
               </CardHeader>
@@ -2921,10 +2921,10 @@ function EstoquePage() {
                   <div className="space-y-2">
                     {ajustesPorMotivo.map((item) => (
                       <div key={item.motivo} className="flex items-center justify-between text-sm">
-                        <span className="truncate text-slate-600" title={item.motivoCompleto}>
+                        <span className="truncate text-slate-600 dark:text-slate-300" title={item.motivoCompleto}>
                           {item.motivo}
                         </span>
-                        <span className="font-semibold text-slate-800">{item.qtd}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-100">{item.qtd}</span>
                       </div>
                     ))}
                   </div>
@@ -2934,7 +2934,7 @@ function EstoquePage() {
           </div>
 
           {/* Filtros */}
-          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -2942,7 +2942,7 @@ function EstoquePage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por código ou descrição..."
-                  className="min-h-11 w-full rounded-md border border-slate-300 pl-8 pr-8 text-[14px] shadow-sm"
+                  className="min-h-11 w-full rounded-md border border-slate-300 pl-8 pr-8 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 />
                 {search && (
                   <button
@@ -2956,7 +2956,7 @@ function EstoquePage() {
               <select
                 value={filtroCategoria}
                 onChange={(e) => setFiltroCategoria(e.target.value)}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todas categorias</option>
                 {categorias.map((c) => (
@@ -2968,7 +2968,7 @@ function EstoquePage() {
               <select
                 value={filtroStatus}
                 onChange={(e) => setFiltroStatus(e.target.value as StatusEstoque | "TODAS")}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todos status</option>
                 <option value="sem_estoque">Sem Estoque</option>
@@ -2980,7 +2980,7 @@ function EstoquePage() {
                 <select
                   value={filtroElevatoria}
                   onChange={(e) => setFiltroElevatoria(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">Todas elevatórias</option>
                   {elevatoriaOptions.map((e) => (
@@ -2990,7 +2990,7 @@ function EstoquePage() {
                   ))}
                 </select>
               )}
-              <label className="inline-flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer">
+              <label className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={filtroCritico}
@@ -3010,10 +3010,10 @@ function EstoquePage() {
           </div>
 
           {/* Tabela */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="max-h-[600px] overflow-auto">
               <table className="min-w-[900px] w-full text-left text-[13px]">
-                <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10">
+                <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-800 dark:text-slate-200">
                   <tr>
                     {[
                       ["cod_sap", "Código SAP"],
@@ -3040,8 +3040,8 @@ function EstoquePage() {
                 </thead>
                 <tbody>
                   {materiaisFiltrados.map((m) => (
-                    <tr key={m.cod_sap} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-2 py-1.5 font-mono text-[12px] text-[#1f7ad6] font-bold">
+                    <tr key={m.cod_sap} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-750">
+                      <td className="whitespace-nowrap px-2 py-1.5 font-mono text-[12px] text-[#1f7ad6] font-bold dark:text-blue-400">
                         {m.cod_sap}
                       </td>
                       <td className="px-2 py-1.5">
@@ -3099,24 +3099,24 @@ function EstoquePage() {
                               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                               if (e.key === "Escape") setEditandoMinimo(null);
                             }}
-                            className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-[13px] text-slate-700"
+                            className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-[13px] text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                             autoFocus
                           />
                         ) : permissoes.editarConfigMaterial ? (
                           <button
                             onClick={() => iniciarEdicaoMinimo(m.cod_sap, m.estoque_minimo)}
-                            className="cursor-pointer rounded px-1 py-0.5 text-slate-600 hover:bg-slate-100 hover:text-[#0b3a73]"
+                            className="cursor-pointer rounded px-1 py-0.5 text-slate-600 hover:bg-slate-100 hover:text-[#0b3a73] dark:text-slate-300 dark:hover:bg-slate-700"
                             title="Clique para editar"
                           >
                             {m.estoque_minimo}
                           </button>
                         ) : (
-                          <span className="text-slate-600">{m.estoque_minimo}</span>
+                          <span className="text-slate-600 dark:text-slate-300">{m.estoque_minimo}</span>
                         )}
                       </td>
-                      <td className="px-2 py-1.5 text-slate-600">{m.fabricante}</td>
-                      <td className="px-2 py-1.5 text-slate-600">{m.local_armazenagem}</td>
-                      <td className="px-2 py-1.5 text-slate-600">{m.vinculo_elevatoria}</td>
+                      <td className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{m.fabricante}</td>
+                      <td className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{m.local_armazenagem}</td>
+                      <td className="px-2 py-1.5 text-slate-600 dark:text-slate-300">{m.vinculo_elevatoria}</td>
                       <td className="whitespace-nowrap px-2 py-1.5">
                         <Semaforo saldo={m.saldo_atual} minimo={m.estoque_minimo} />
                       </td>
@@ -3254,7 +3254,7 @@ function EstoquePage() {
           </div>
 
           {/* Filtros */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -3262,13 +3262,13 @@ function EstoquePage() {
                 value={filtroBuscaCompra}
                 onChange={(e) => setFiltroBuscaCompra(e.target.value)}
                 placeholder="Pesquisar por descrição, SAP, fornecedor..."
-                className="w-full rounded-lg border border-slate-300 pl-8 pr-2 py-1.5 text-[12px]"
+                className="w-full rounded-lg border border-slate-300 pl-8 pr-2 py-1.5 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               />
             </div>
             <select
               value={filtroStatusCompra}
               onChange={(e) => setFiltroStatusCompra(e.target.value)}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Todos os status</option>
               {Object.keys(comprasPorStatus)
@@ -3282,7 +3282,7 @@ function EstoquePage() {
             <select
               value={filtroCompradorCompra}
               onChange={(e) => setFiltroCompradorCompra(e.target.value)}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Todos os compradores</option>
               {compradoresCompra.map((c) => (
@@ -3294,7 +3294,7 @@ function EstoquePage() {
             <select
               value={filtroChegou}
               onChange={(e) => setFiltroChegou(e.target.value as typeof filtroChegou)}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Chegou: Todos</option>
               <option value="sim">Chegou: Sim</option>
@@ -3303,7 +3303,7 @@ function EstoquePage() {
             <select
               value={filtroRetirado}
               onChange={(e) => setFiltroRetirado(e.target.value as typeof filtroRetirado)}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Retirado: Todos</option>
               <option value="sim">Retirado: Sim</option>
@@ -3312,7 +3312,7 @@ function EstoquePage() {
             <select
               value={filtroFila}
               onChange={(e) => setFiltroFila(e.target.value as typeof filtroFila)}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px]"
+              className="rounded-lg border border-slate-300 px-2 py-1.5 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="TODOS">Fila: Todos</option>
               <option value="sim">Em fila: Sim</option>
@@ -3324,10 +3324,10 @@ function EstoquePage() {
           </div>
 
           {/* Tabela de Compras */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                   <th className="px-2 py-2 w-8"></th>
                   <th className="px-2 py-2">Requisição</th>
                   <th className="px-2 py-2">Pedido</th>
@@ -3351,7 +3351,7 @@ function EstoquePage() {
                       : null;
                   const editando = editandoCompraId === c.id;
                   return (
-                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-750">
                       <td className="px-2 py-1.5">
                         <button
                           onClick={() => setDialogDetalheCompra(c)}
@@ -3361,7 +3361,7 @@ function EstoquePage() {
                           <Eye className="h-3.5 w-3.5" />
                         </button>
                       </td>
-                      <td className="px-2 py-1.5 font-mono text-[#1f7ad6]">
+                      <td className="px-2 py-1.5 font-mono text-[#1f7ad6] dark:text-blue-400">
                         {c.requisicao || "—"}
                       </td>
                       <td className="px-2 py-1.5">
@@ -3386,7 +3386,7 @@ function EstoquePage() {
                       </td>
                       <td className="px-2 py-1.5">{c.item_rc || "—"}</td>
                       <td className="px-2 py-1.5 font-mono font-bold">{c.cod_sap || "—"}</td>
-                      <td className="max-w-[200px] truncate px-2 py-1.5 text-slate-600" title={c.descricao_material || ""}>
+                      <td className="max-w-[200px] truncate px-2 py-1.5 text-slate-600 dark:text-slate-300" title={c.descricao_material || ""}>
                         {c.descricao_material || "—"}
                       </td>
                       <td className="px-2 py-1.5 text-right font-bold">{c.qtde_rc ?? "—"}</td>
@@ -3402,7 +3402,7 @@ function EstoquePage() {
                           ))}
                         </select>
                       </td>
-                      <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-500" title={c.fornecedor || ""}>
+                      <td className="max-w-[150px] truncate px-2 py-1.5 text-slate-500 dark:text-slate-400" title={c.fornecedor || ""}>
                         {c.fornecedor || "—"}
                       </td>
                       <td className="px-2 py-1.5 text-center">
@@ -3454,7 +3454,7 @@ function EstoquePage() {
                       <td className="px-2 py-1.5 text-right">
                         <div className="flex flex-col items-end gap-0.5">
                           {c.dt_criacao_rc && (
-                            <span className="text-[10px] text-slate-400">{c.dt_criacao_rc}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">{c.dt_criacao_rc}</span>
                           )}
                           {diasAberto !== null ? (
                             <span
@@ -3607,26 +3607,26 @@ function EstoquePage() {
           </DialogHeader>
           <div className="grid gap-3 py-2 text-sm">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-slate-600">Data da retirada</span>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Data da retirada</span>
               <input
                 type="date"
                 value={dataRetiradaInput}
                 onChange={(e) => setDataRetiradaInput(e.target.value)}
-                className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               />
             </label>
             {(() => {
               const reg = compras.find((c) => c.id === dialogDataRetirada);
               if (reg?.afeta_saldo) {
                 return (
-                  <p className="rounded-md bg-emerald-50 p-2 text-[12px] text-emerald-700">
+                  <p className="rounded-md bg-emerald-50 p-2 text-[12px] text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
                     Esta compra afeta o estoque. Uma entrada automática será registrada ao
                     confirmar.
                   </p>
                 );
               }
               return (
-                <p className="rounded-md bg-slate-50 p-2 text-[12px] text-slate-500">
+                <p className="rounded-md bg-slate-50 p-2 text-[12px] text-slate-500 dark:bg-slate-700 dark:text-slate-400">
                   Esta é uma compra importada (histórico). Nenhuma entrada no estoque será gerada.
                 </p>
               );
@@ -3648,10 +3648,10 @@ function EstoquePage() {
               <Upload className="mr-1 inline h-4 w-4" /> Importar Materiais (CSV)
             </DialogTitle>
           </DialogHeader>
-          <div className="py-4 text-sm text-slate-600">
+          <div className="py-4 text-sm text-slate-600 dark:text-slate-300">
             <p className="mb-2">
               Formato esperado:{" "}
-              <code className="rounded bg-slate-100 px-1 text-xs">
+              <code className="rounded bg-slate-100 px-1 text-xs dark:bg-slate-700 dark:text-slate-200">
                 cod_sap, descricao, unidade_medida, categoria, fabricante, local_armazenagem,
                 estoque_minimo, material_critico, vinculo_elevatoria, saldo_atual
               </code>
@@ -3714,40 +3714,40 @@ function EstoquePage() {
 
           {/* Formulário Adicionar Fila */}
           {showAddFila && (
-            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-              <h4 className="mb-2 text-sm font-bold text-emerald-800">Nova solicitação na fila</h4>
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+              <h4 className="mb-2 text-sm font-bold text-emerald-800 dark:text-emerald-300">Nova solicitação na fila</h4>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Cód. SAP (opcional)
-                  <input value={filaCodSap} onChange={(e) => setFilaCodSap(e.target.value)} placeholder="Deixe em branco se for novo" className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                  <input value={filaCodSap} onChange={(e) => setFilaCodSap(e.target.value)} placeholder="Deixe em branco se for novo" className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Descrição do material *
-                  <input value={filaDescricao} onChange={(e) => setFilaDescricao(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                  <input value={filaDescricao} onChange={(e) => setFilaDescricao(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Quantidade *
-                  <input type="number" min={1} value={filaQtde} onChange={(e) => setFilaQtde(Number(e.target.value) || 0)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                  <input type="number" min={1} value={filaQtde} onChange={(e) => setFilaQtde(Number(e.target.value) || 0)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Depósito
-                  <select value={filaDeposito} onChange={(e) => setFilaDeposito(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm">
+                  <select value={filaDeposito} onChange={(e) => setFilaDeposito(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                     <option value="DP98">DP98</option>
                     <option value="DP96">DP96</option>
                   </select>
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Solicitante
-                  <input value={filaSolicitante} onChange={(e) => setFilaSolicitante(e.target.value)} placeholder={profile?.nome_completo || user?.email || ""} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                  <input value={filaSolicitante} onChange={(e) => setFilaSolicitante(e.target.value)} placeholder={profile?.nome_completo || user?.email || ""} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Previsão de uso
-                  <input value={filaPrevisao} onChange={(e) => setFilaPrevisao(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm" />
+                  <input value={filaPrevisao} onChange={(e) => setFilaPrevisao(e.target.value)} className="min-h-10 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                 </label>
               </div>
               <label className="mt-3 flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Observação
-                <textarea value={filaObs} onChange={(e) => setFilaObs(e.target.value)} className="min-h-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm" />
+                <textarea value={filaObs} onChange={(e) => setFilaObs(e.target.value)} className="min-h-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
               </label>
               <div className="mt-3 flex gap-2">
                 <button
@@ -3757,7 +3757,7 @@ function EstoquePage() {
                 >
                   <Plus className="mr-1 inline h-4 w-4" /> Adicionar
                 </button>
-                <button onClick={() => setShowAddFila(false)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
+                <button onClick={() => setShowAddFila(false)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
                   Cancelar
                 </button>
               </div>
@@ -3782,16 +3782,16 @@ function EstoquePage() {
                     "Finalizado": "bg-emerald-100 text-emerald-700 border-emerald-200",
                   };
                   return (
-                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-800">
                       <span className="font-mono text-sm font-bold text-blue-600">
                         {c.requisicao || "—"}
                       </span>
-                      <span className="text-xs text-slate-400">Item {c.item_rc}</span>
-                      <span className="flex-1 truncate text-slate-600">
+                      <span className="text-xs text-slate-400 dark:text-slate-500">Item {c.item_rc}</span>
+                      <span className="flex-1 truncate text-slate-600 dark:text-slate-300">
                         {c.descricao_material || "—"}
                       </span>
                       <span className="font-bold">{c.qtde_rc ?? "—"}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-slate-400 dark:text-slate-500">
                         {c.dt_criacao_rc || "—"}
                       </span>
                       {permissoes.gerenciarFila ? (
@@ -3856,15 +3856,15 @@ function EstoquePage() {
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2 text-sm">
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-slate-300">
               Existem <strong className="text-red-600">{materiaisComSaldoNegativo.length} materiais</strong> com saldo negativo no estoque.
               Isso indica possíveis divergências entre o saldo registrado e o físico.
             </p>
-            <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-red-100 bg-red-50 p-3">
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-red-100 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/20">
               {materiaisComSaldoNegativo.map((m) => (
                 <div key={m.cod_sap} className="flex items-center justify-between text-[13px]">
                   <span className="font-mono text-red-700">{m.cod_sap}</span>
-                  <span className="flex-1 truncate px-2 text-slate-600">{m.descricao}</span>
+                  <span className="flex-1 truncate px-2 text-slate-600 dark:text-slate-300">{m.descricao}</span>
                   <span className="font-bold text-red-600">{m.saldo_atual}</span>
                 </div>
               ))}
@@ -3882,7 +3882,7 @@ function EstoquePage() {
               </button>
               <button
                 onClick={() => setDialogSaldoNegativo(false)}
-                className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Fechar
               </button>
@@ -3901,21 +3901,21 @@ function EstoquePage() {
           </DialogHeader>
           {solicitarRcMaterial && (
             <div className="grid gap-3 py-2 text-sm">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px]">
-                <div className="font-mono font-bold text-slate-700">{solicitarRcMaterial.cod_sap}</div>
-                <div className="text-slate-600">{solicitarRcMaterial.descricao}</div>
-                <div className="mt-1 text-[12px] text-slate-400">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px] dark:border-slate-700 dark:bg-slate-800">
+                <div className="font-mono font-bold text-slate-700 dark:text-slate-200">{solicitarRcMaterial.cod_sap}</div>
+                <div className="text-slate-600 dark:text-slate-300">{solicitarRcMaterial.descricao}</div>
+                <div className="mt-1 text-[12px] text-slate-400 dark:text-slate-500">
                   Saldo: {solicitarRcMaterial.saldo_atual} {solicitarRcMaterial.unidade_medida} · Mínimo: {solicitarRcMaterial.estoque_minimo}
                 </div>
               </div>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Quantidade</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Quantidade</span>
                 <input
                   type="number"
                   min={1}
                   value={solicitarRcQtd}
                   onChange={(e) => setSolicitarRcQtd(Number(e.target.value) || 0)}
-                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                   autoFocus
                 />
               </label>
@@ -3941,7 +3941,7 @@ function EstoquePage() {
                 </button>
                 <button
                   onClick={() => setDialogSolicitarRc(false)}
-                  className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                  className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   Cancelar
                 </button>

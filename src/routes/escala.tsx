@@ -838,7 +838,7 @@ function EscalaPage() {
   if (authLoading) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <div className="p-3 md:p-6">
         {/* Header corporativo */}
         <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
@@ -874,7 +874,7 @@ function EscalaPage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-[#1f7ad6]" />
-            <h2 className="text-lg font-bold text-[#0b3a73]">Escala de Trabalho</h2>
+            <h2 className="text-lg font-bold text-[#0b3a73] dark:text-white">Escala de Trabalho</h2>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -914,29 +914,29 @@ function EscalaPage() {
         </div>
 
         {showAddForm && (
-          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-            <h3 className="mb-3 text-sm font-bold text-emerald-800">Novo técnico</h3>
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/20">
+            <h3 className="mb-3 text-sm font-bold text-emerald-800 dark:text-emerald-300">Novo técnico</h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome *" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
-              <input value={novoEquipe} onChange={(e) => setNovoEquipe(e.target.value)} placeholder="Equipe (ex: C1)" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
-              <select value={novoHorario} onChange={(e) => setNovoHorario(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2">
+              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome *" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
+              <input value={novoEquipe} onChange={(e) => setNovoEquipe(e.target.value)} placeholder="Equipe (ex: C1)" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
+              <select value={novoHorario} onChange={(e) => setNovoHorario(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 <option value="DIURNO">DIURNO</option>
                 <option value="NOTURNO">NOTURNO</option>
               </select>
-              <select value={novoEscala} onChange={(e) => setNovoEscala(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2">
+              <select value={novoEscala} onChange={(e) => setNovoEscala(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 {opcoesEscala.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
-              <input value={novoFuncao} onChange={(e) => setNovoFuncao(e.target.value)} placeholder="Função" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
-              <input value={novoLoginSap} onChange={(e) => setNovoLoginSap(e.target.value)} placeholder="Login SAP" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
-              <input value={novoLoginField} onChange={(e) => setNovoLoginField(e.target.value)} placeholder="E-mail" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
-              <input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value)} placeholder="Telefone" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2" />
+              <input value={novoFuncao} onChange={(e) => setNovoFuncao(e.target.value)} placeholder="Função" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
+              <input value={novoLoginSap} onChange={(e) => setNovoLoginSap(e.target.value)} placeholder="Login SAP" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
+              <input value={novoLoginField} onChange={(e) => setNovoLoginField(e.target.value)} placeholder="E-mail" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
+              <input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value)} placeholder="Telefone" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
             </div>
             <div className="mt-3 flex gap-2">
               <button onClick={adicionarTecnico} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 cursor-pointer">
                 <Plus className="mr-1 inline h-4 w-4" />
                 Adicionar
               </button>
-              <button onClick={() => setShowAddForm(false)} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
+              <button onClick={() => setShowAddForm(false)} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 Cancelar
               </button>
             </div>
@@ -951,65 +951,65 @@ function EscalaPage() {
           <>
             {/* KPI Cards */}
             <div className="mb-6 grid gap-4 sm:grid-cols-5">
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-500" />
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
                     <Sun className="h-4 w-4" />
                     Total Hoje
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{trabalhaHoje.length}</div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{trabalhaHoje.length}</div>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="h-1 bg-gradient-to-r from-cyan-400 to-cyan-500" />
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
                     <Users className="h-4 w-4" />
                     Equipes Hoje
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{equipesHoje}</div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{equipesHoje}</div>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="h-1 bg-gradient-to-r from-green-400 to-green-500" />
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-green-700">
                     <CalendarCheck className="h-4 w-4" />
                     Comercial
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
                     {colaboradores.filter(c => c.escala.toUpperCase() === "COMERCIAL" && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
                   </div>
-                  <div className="mt-0.5 text-[11px] text-slate-500">
+                  <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                     {statsEscala.comercial.tecnicos} técnico{statsEscala.comercial.tecnicos !== 1 && "s"} · {statsEscala.comercial.equipes} equipe{statsEscala.comercial.equipes !== 1 && "s"}
                   </div>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="h-1 bg-gradient-to-r from-indigo-400 to-indigo-500" />
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
                     <Moon className="h-4 w-4" />
                     Plantão
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
                     {colaboradores.filter(c => (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
                   </div>
-                  <div className="mt-0.5 text-[11px] text-slate-500">
+                  <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                     {statsEscala.plantao.tecnicos} técnico{statsEscala.plantao.tecnicos !== 1 && "s"} · {statsEscala.plantao.equipes} equipe{statsEscala.plantao.equipes !== 1 && "s"}
                   </div>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="h-1 bg-gradient-to-r from-blue-400 to-blue-500" />
                 <div className="p-4">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-blue-700">
                     <Users className="h-4 w-4" />
                     Total Técnicos
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{colaboradores.length}</div>
-                  <div className="mt-0.5 text-[11px] text-slate-500">
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{colaboradores.length}</div>
+                  <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                     {statsEscala.totalEquipes} equipe{statsEscala.totalEquipes !== 1 && "s"}
                   </div>
                 </div>
@@ -1025,13 +1025,13 @@ function EscalaPage() {
                   placeholder="Buscar por nome..."
                   value={searchNome}
                   onChange={(e) => setSearchNome(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                  className="h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 />
               </div>
               <select
                 value={filtroEquipe}
                 onChange={(e) => setFiltroEquipe(e.target.value)}
-                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todas equipes</option>
                 {equipes.map((e) => (
@@ -1041,7 +1041,7 @@ function EscalaPage() {
               <select
                 value={filtroEscala}
                 onChange={(e) => setFiltroEscala(e.target.value)}
-                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todas escalas</option>
                 <option value="COMERCIAL">Comercial</option>
@@ -1052,7 +1052,7 @@ function EscalaPage() {
               <select
                 value={filtroFuncao}
                 onChange={(e) => setFiltroFuncao(e.target.value)}
-                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todas funções</option>
                 {funcoes.map((f) => (
@@ -1062,51 +1062,51 @@ function EscalaPage() {
               <select
                 value={sortPor}
                 onChange={(e) => setSortPor(e.target.value)}
-                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="equipe">Por equipe</option>
                 <option value="nome">Por nome</option>
                 <option value="escala">Por escala</option>
                 <option value="ordem">Ordem padrão</option>
               </select>
-              <Filter className="h-4 w-4 text-slate-400" />
+              <Filter className="h-4 w-4 text-slate-400 dark:text-slate-500 dark:text-slate-500" />
             </div>
 
             {/* Navegação de semanas */}
             <div className="mb-4 flex items-center justify-between">
               <button
                 onClick={() => setSemanaOffset((p) => p - 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <ChevronLeft className="h-4 w-4" /> Semana anterior
               </button>
-              <span className="text-sm font-bold text-[#0b3a73]">
+              <span className="text-sm font-bold text-[#0b3a73] dark:text-white">
                 {diasSemana[0].toLocaleDateString("pt-BR")} — {diasSemana[6].toLocaleDateString("pt-BR")}
               </span>
               <button
                 onClick={() => setSemanaOffset((p) => p + 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 Próxima semana <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
             {colaboradoresFiltrados.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-20 text-slate-400">
+              <div className="flex flex-col items-center gap-2 py-20 text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-500">
                 <Users className="h-10 w-10" />
                 <p>Nenhum colaborador encontrado.</p>
                 <p className="text-xs">Importe uma planilha ou ajuste os filtros.</p>
               </div>
             ) : (
               /* Grid principal */
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <table className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="bg-[#f1f5f9] text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                    <tr className="bg-[#f1f5f9] text-[11px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 uppercase tracking-wide dark:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                       <th className="w-6 px-1 py-2.5"></th>
-                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[70px]">Equipe</th>
-                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[65px]">Turno</th>
-                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[180px]">Colaborador</th>
+                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[70px] dark:bg-slate-800">Equipe</th>
+                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[65px] dark:bg-slate-800">Turno</th>
+                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[180px] dark:bg-slate-800">Colaborador</th>
                       <th className="px-2 py-2.5 text-left min-w-[80px]">Função</th>
                       <th className="px-2 py-2.5 text-left min-w-[65px]">Escala</th>
                       <th className="px-2 py-2.5 text-left min-w-[85px]">Especialidade</th>
@@ -1126,7 +1126,7 @@ function EscalaPage() {
                                 ? "bg-[#1f7ad6] text-white"
                                 : isFds
                                   ? "bg-red-50 text-red-600"
-                                  : "text-slate-500"
+                                  : "text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500"
                             }`}
                           >
                             {header.split(" ")[0]}
@@ -1137,13 +1137,13 @@ function EscalaPage() {
                       })}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {grupos.map((grupo) => (
                       <Fragment key={grupo.label}>
-                        <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc]">
+                        <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc] dark:bg-slate-800/50">
                           <td
                             colSpan={10 + diasSemana.length}
-                            className="px-2 py-1.5 text-[12px] font-bold text-[#0b3a73]"
+                            className="px-2 py-1.5 text-[12px] font-bold text-[#0b3a73] dark:text-white"
                           >
                             {grupo.label}
                           </td>
@@ -1154,21 +1154,21 @@ function EscalaPage() {
                           return (
                             <tr
                               key={col.id}
-                              className="hover:bg-slate-50 transition-colors"
+                              className="hover:bg-slate-50 transition-colors dark:hover:bg-slate-700/50"
                               draggable
                               onDragStart={() => handleDragStart(col.id)}
                               onDragOver={handleDragOver}
                               onDrop={() => handleDrop(col.id)}
                             >
-                              <td className="cursor-grab px-1 py-1.5 text-slate-300 hover:text-slate-500">
+                              <td className="cursor-grab px-1 py-1.5 text-slate-300 hover:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                 <GripVertical className="h-3.5 w-3.5" />
                               </td>
-                              <td className="sticky left-0 z-10 bg-white px-2 py-1.5">
+                              <td className="sticky left-0 z-10 bg-white px-2 py-1.5 dark:bg-slate-800">
                                 {editando?.colId === col.id && editando?.campo === "equipe" ? (
                                   <input
                                     autoFocus
                                     defaultValue={col.equipe}
-                                    className="w-16 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    className="w-16 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none dark:border-slate-600 dark:bg-slate-700"
                                     onBlur={(e) => {
                                       const v = e.target.value.trim();
                                       if (v && v !== col.equipe) salvarCampo(col.id, "equipe", v);
@@ -1181,7 +1181,7 @@ function EscalaPage() {
                                   />
                                 ) : (
                                   <span
-                                    className="cursor-pointer rounded px-1 py-0.5 font-mono text-xs text-slate-600 hover:bg-slate-100"
+                                    className="cursor-pointer rounded px-1 py-0.5 font-mono text-xs text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
                                     onClick={() => toggleEdit(col.id, "equipe")}
                                     title="Clique para renomear"
                                   >
@@ -1189,12 +1189,12 @@ function EscalaPage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="sticky left-[70px] z-10 bg-white px-2 py-1.5 text-xs">
+                              <td className="sticky left-[70px] z-10 bg-white px-2 py-1.5 text-xs dark:bg-slate-800">
                                 {editando?.colId === col.id && editando?.campo === "horario" ? (
                                   <select
                                     autoFocus
                                     defaultValue={hor}
-                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none dark:border-slate-600 dark:bg-slate-700"
                                     onChange={(e) => salvarCampo(col.id, "horario", e.target.value)}
                                     onBlur={() => setEditando(null)}
                                   >
@@ -1204,7 +1204,7 @@ function EscalaPage() {
                                   </select>
                                 ) : (
                                   <span
-                                    className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 ${
+                                    className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 ${
                                       hor === "DIURNO"
                                         ? "bg-amber-50 text-amber-700"
                                         : "bg-indigo-50 text-indigo-700"
@@ -1220,20 +1220,20 @@ function EscalaPage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="sticky left-[135px] z-10 bg-white px-2 py-1.5 text-sm font-medium text-slate-800">
+                              <td className="sticky left-[135px] z-10 bg-white px-2 py-1.5 text-sm font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-200">
                                 {col.colaborador}
                                 {(esc === "PLANTÃO 1" || esc === "PLANTÃO 2") && col.data_ancora && (
-                                  <span className="ml-1 text-[10px] text-slate-400">
+                                  <span className="ml-1 text-[10px] text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                     (ref: {new Date(col.data_ancora + "T12:00:00").toLocaleDateString("pt-BR")})
                                   </span>
                                 )}
                               </td>
-                              <td className="px-2 py-1.5 text-xs text-slate-500">
+                              <td className="px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                 {editando?.colId === col.id && editando?.campo === "funcao" ? (
                                   <input
                                     autoFocus
                                     defaultValue={col.funcao}
-                                    className="w-28 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    className="w-28 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none dark:border-slate-600 dark:bg-slate-700"
                                     onBlur={(e) => {
                                       const v = e.target.value.trim();
                                       if (v && v !== col.funcao) salvarCampo(col.id, "funcao", v);
@@ -1246,7 +1246,7 @@ function EscalaPage() {
                                   />
                                 ) : (
                                   <span
-                                    className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100"
+                                    className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700"
                                     onClick={() => toggleEdit(col.id, "funcao")}
                                   >
                                     {col.funcao}
@@ -1258,7 +1258,7 @@ function EscalaPage() {
                                   <select
                                     autoFocus
                                     defaultValue={esc}
-                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-[10px] outline-none"
+                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-[10px] outline-none dark:border-slate-600 dark:bg-slate-700"
                                     onChange={(e) => salvarCampo(col.id, "escala", e.target.value)}
                                     onBlur={() => setEditando(null)}
                                   >
@@ -1283,12 +1283,12 @@ function EscalaPage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-2 py-1.5 text-xs text-slate-500">
+                              <td className="px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                 {editando?.colId === col.id && editando?.campo === "especialidade" ? (
                                   <select
                                     autoFocus
                                     defaultValue={col.especialidade}
-                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none dark:border-slate-600 dark:bg-slate-700"
                                     onChange={(e) => salvarCampo(col.id, "especialidade", e.target.value)}
                                     onBlur={() => setEditando(null)}
                                   >
@@ -1298,20 +1298,20 @@ function EscalaPage() {
                                   </select>
                                 ) : (
                                   <span
-                                    className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100"
+                                    className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700"
                                     onClick={() => toggleEdit(col.id, "especialidade")}
                                   >
                                     {col.especialidade || "—"}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-2 py-1.5 font-mono text-[11px] text-slate-500">{col.login_sap || "—"}</td>
-                              <td className="px-2 py-1.5 text-[11px] text-slate-500">
+                              <td className="px-2 py-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">{col.login_sap || "—"}</td>
+                              <td className="px-2 py-1.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                 {editando?.colId === col.id && editando?.campo === "telefone" ? (
                                   <input
                                     autoFocus
                                     defaultValue={col.telefone}
-                                    className="w-24 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none"
+                                    className="w-24 rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none dark:border-slate-600 dark:bg-slate-700"
                                     onBlur={(e) => {
                                       const v = e.target.value.trim();
                                       if (v !== col.telefone) salvarCampo(col.id, "telefone", v);
@@ -1324,8 +1324,8 @@ function EscalaPage() {
                                   />
                                 ) : (
                                   <span
-                                    className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 ${
-                                      col.telefone ? "text-slate-600" : "text-slate-300"
+                                    className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 ${
+                                      col.telefone ? "text-slate-600 dark:text-slate-300" : "text-slate-300 dark:text-slate-600"
                                     }`}
                                     onClick={() => toggleEdit(col.id, "telefone")}
                                   >
@@ -1338,7 +1338,7 @@ function EscalaPage() {
                               <td className="px-1 py-1.5">
                                 <button
                                   onClick={() => excluirTecnico(col.id, col.colaborador)}
-                                  className="cursor-pointer text-slate-300 hover:text-red-500 transition-colors"
+                                  className="cursor-pointer text-slate-300 hover:text-red-500 transition-colors dark:text-slate-600"
                                   title="Excluir técnico"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -1362,7 +1362,7 @@ function EscalaPage() {
                                     } ${
                                       status === "TRABALHA"
                                         ? "bg-green-50 text-green-700 hover:bg-green-100"
-                                        : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                                        : "bg-slate-50 text-slate-400 dark:text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-700/30 dark:text-slate-500 dark:hover:bg-slate-700/50 dark:hover:bg-slate-700"
                                     } ${isFds && status === "TRABALHA" ? "bg-green-100" : ""}`}
                                     onClick={() => alternarStatus(col.id, iso)}
                                     title={
@@ -1372,7 +1372,7 @@ function EscalaPage() {
                                   >
                                     {status === "TRABALHA" ? "TRABALHA" : "FOLGA"}
                                     {manual?.editado_manual && (
-                                      <Edit3 className="ml-0.5 inline h-2.5 w-2.5 text-slate-400" />
+                                      <Edit3 className="ml-0.5 inline h-2.5 w-2.5 text-slate-400 dark:text-slate-500 dark:text-slate-500" />
                                     )}
                                   </td>
                                 );

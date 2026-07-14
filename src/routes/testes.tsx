@@ -458,7 +458,7 @@ function TestesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 md:p-6">
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -485,7 +485,7 @@ function TestesPage() {
           </Link>
         </div>
       </div>
-      <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg">
+      <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg dark:text-white">
         Testes & Aferições de Ativos
       </h1>
 
@@ -494,15 +494,15 @@ function TestesPage() {
         <Kpi label="Ativos Atendidos" value={ativosUnicos} />
       </div>
 
-      <details className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm sm:hidden">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-sm font-medium text-slate-700">
+      <details className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm sm:hidden dark:border-slate-700 dark:bg-slate-800">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-sm font-medium text-slate-700 dark:text-slate-200">
           <span className="inline-flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-[#0b3a73]" />
+            <SlidersHorizontal className="h-4 w-4 text-[#0b3a73] dark:text-white" />
             Filtros
           </span>
-          <span className="text-xs text-slate-400">toque para expandir</span>
+          <span className="text-xs text-slate-400 dark:text-slate-400">toque para expandir</span>
         </summary>
-        <div className="flex flex-col gap-3 border-t border-slate-100 p-3">
+        <div className="flex flex-col gap-3 border-t border-slate-100 p-3 dark:border-slate-700">
           <FilterSelect
             label="TIPO DE SERVIÇO"
             value={tipo}
@@ -556,7 +556,7 @@ function TestesPage() {
                 setMesIni("TODOS");
                 setMesFim("TODOS");
               }}
-              className="min-h-11 rounded border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
+              className="min-h-11 rounded border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               Limpar filtros
             </button>
@@ -608,7 +608,7 @@ function TestesPage() {
               setMesIni("TODOS");
               setMesFim("TODOS");
             }}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             Limpar filtros
           </button>
@@ -617,7 +617,7 @@ function TestesPage() {
 
       {(crossElev || crossMes) && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Cross-filter ativo:
           </span>
           {crossElev && (
@@ -632,7 +632,7 @@ function TestesPage() {
               setCrossElev(null);
               setCrossMes(null);
             }}
-            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700"
+            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400"
           >
             limpar todos
           </button>
@@ -684,7 +684,7 @@ function TestesPage() {
               />
             </LineChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-[10px] text-slate-400">
+          <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-400">
             Clique em um ponto para filtrar pelo mês.
           </p>
         </Card>
@@ -697,15 +697,15 @@ function TestesPage() {
         />
       </div>
 
-      <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="mb-3 inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+      <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="mb-3 inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-700">
           <button
             type="button"
             onClick={() => setHydroTab("eletrica")}
             className={`rounded px-4 py-1.5 text-sm font-medium transition ${
               hydroTab === "eletrica"
                 ? "bg-[#0b3a73] text-white shadow"
-                : "text-slate-600 hover:text-[#0b3a73]"
+                : "text-slate-600 hover:text-[#0b3a73] dark:text-slate-400"
             }`}
           >
             ⚡ Elétrica
@@ -716,7 +716,7 @@ function TestesPage() {
             className={`rounded px-4 py-1.5 text-sm font-medium transition ${
               hydroTab === "hidraulica"
                 ? "bg-[#0b3a73] text-white shadow"
-                : "text-slate-600 hover:text-[#0b3a73]"
+                : "text-slate-600 hover:text-[#0b3a73] dark:text-slate-400"
             }`}
           >
             💧 Hidráulica
@@ -884,14 +884,14 @@ function TestesPage() {
         )}
       </div>
 
-      <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-4 rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-700">Registros</h2>
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Registros</h2>
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={tableSort}
               onChange={(e) => setTableSort(e.target.value as TableSort)}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm"
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             >
               <option value="recent">Mais recente → mais antigo</option>
               <option value="oldest">Mais antigo → mais recente</option>
@@ -903,26 +903,26 @@ function TestesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Pesquisar elevatória, colaborador, serviço..."
-              className="w-72 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
+              className="w-72 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
             />
             <button
               type="button"
               onClick={() => setTableExpanded(true)}
               title="Expandir"
-              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73]"
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:text-slate-400"
             >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
-        <div className="mb-2 text-xs text-slate-500">
+        <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
           Mostrando {tableRows.length} de {data.length} testes
         </div>
         <div className="max-h-[60vh] overflow-auto">
           <table className="w-full min-w-[900px] text-left text-xs">
-            <thead className="sticky top-0 bg-slate-100 text-slate-700">
+            <thead className="sticky top-0 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
               <tr>
-                <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5">Data</th>
+                <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5 dark:bg-slate-700">Data</th>
                 <th className="px-2 py-1.5">Elevatória</th>
                 <th className="px-2 py-1.5">Grupo</th>
                 <th className="px-2 py-1.5">Tipo</th>
@@ -941,15 +941,15 @@ function TestesPage() {
                 return (
                   <tr
                     key={rowKey}
-                    className="border-t border-slate-100 hover:bg-slate-50 align-top"
+                    className="border-t border-slate-100 hover:bg-slate-50 align-top dark:border-slate-700"
                   >
-                    <td className="sticky left-0 z-10 bg-white px-2 py-1 whitespace-nowrap shadow-[1px_0_0_rgba(0,0,0,0.05)]">
+                    <td className="sticky left-0 z-10 bg-white px-2 py-1 whitespace-nowrap shadow-[1px_0_0_rgba(0,0,0,0.05)] dark:bg-slate-800">
                       {fmtDate(r["Data do Teste"])}
                     </td>
-                    <td className="px-2 py-1">{r.Elevatória}</td>
-                    <td className="px-2 py-1">{r.Grupo}</td>
-                    <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
-                    <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
+                    <td className="px-2 py-1 dark:border-slate-700">{r.Elevatória}</td>
+                    <td className="px-2 py-1 dark:border-slate-700">{r.Grupo}</td>
+                    <td className="px-2 py-1 dark:border-slate-700">{r["Tipo de Serviço"]}</td>
+                    <td className="px-2 py-1 dark:border-slate-700">{r["Nome dos Colaboradores:"]}</td>
                     <ExpandableCell
                       value={r["Serviço Executado:"]}
                       cellKey={`${rowKey}-serv`}
@@ -962,19 +962,20 @@ function TestesPage() {
                       expandedKey={expandedCell}
                       onToggle={setExpandedCell}
                     />
-                    <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Tensão ( V )"] ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Corrente ( A )"] ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Recalque ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Retaguarda ?? ""}</td>
                   </tr>
                 );
-              })}
+              }}
             </tbody>
           </table>
         </div>
       </div>
+      </div>
 
-      <p className="text-center text-xs text-slate-500">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">
         Fonte: Testes & Aferições de Ativos · {data.length} registros
       </p>
 
@@ -1005,12 +1006,11 @@ function TestesPage() {
             setHasCustomData(false);
           }}
           title="Restaurar planilha original"
-          className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white"
+          className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white dark:text-slate-400"
         >
           restaurar
         </button>
       )}
-
       <Dialog open={!!zoomChart} onOpenChange={(o) => !o && setZoomChart(null)}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
@@ -1036,40 +1036,40 @@ function TestesPage() {
           </DialogHeader>
           <div className="max-h-[80vh] overflow-auto">
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 bg-slate-100 text-slate-700">
-                <tr>
-                  <th className="px-2 py-1.5">Data</th>
-                  <th className="px-2 py-1.5">Elevatória</th>
-                  <th className="px-2 py-1.5">Grupo</th>
-                  <th className="px-2 py-1.5">Tipo</th>
-                  <th className="px-2 py-1.5">Colaboradores</th>
-                  <th className="px-2 py-1.5">Serviço Executado</th>
-                  <th className="px-2 py-1.5">Observação</th>
-                  <th className="px-2 py-1.5">Tensão (V)</th>
-                  <th className="px-2 py-1.5">Corrente (A)</th>
-                  <th className="px-2 py-1.5">Recalque</th>
-                  <th className="px-2 py-1.5">Retaguarda</th>
-                </tr>
-              </thead>
+            <thead className="sticky top-0 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+              <tr>
+                <th className="px-2 py-1.5">Data</th>
+                <th className="px-2 py-1.5">Elevatória</th>
+                <th className="px-2 py-1.5">Grupo</th>
+                <th className="px-2 py-1.5">Tipo</th>
+                <th className="px-2 py-1.5">Colaboradores</th>
+                <th className="px-2 py-1.5">Serviço Executado</th>
+                <th className="px-2 py-1.5">Observação</th>
+                <th className="px-2 py-1.5">Tensão (V)</th>
+                <th className="px-2 py-1.5">Corrente (A)</th>
+                <th className="px-2 py-1.5">Recalque</th>
+                <th className="px-2 py-1.5">Retaguarda</th>
+              </tr>
+            </thead>
               <tbody>
                 {tableRows.map((r, i) => {
                   const rowKey = `exp-${r.Id ?? "row"}-${i}`;
                   return (
                     <tr
                       key={rowKey}
-                      className="border-t border-slate-100 hover:bg-slate-50 align-top"
+                      className="border-t border-slate-100 hover:bg-slate-50 align-top dark:border-slate-700"
                     >
-                      <td className="px-2 py-1 whitespace-nowrap">{fmtDate(r["Data do Teste"])}</td>
-                      <td className="px-2 py-1">{r.Elevatória}</td>
-                      <td className="px-2 py-1">{r.Grupo}</td>
-                      <td className="px-2 py-1">{r["Tipo de Serviço"]}</td>
-                      <td className="px-2 py-1">{r["Nome dos Colaboradores:"]}</td>
-                      <td className="px-2 py-1 whitespace-normal">{r["Serviço Executado:"]}</td>
-                      <td className="px-2 py-1 whitespace-normal">{r["Observação:"]}</td>
-                      <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? ""}</td>
-                      <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? ""}</td>
-                      <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? ""}</td>
-                      <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{fmtDate(r["Data do Teste"])}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r.Elevatória}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r.Grupo}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r["Tipo de Serviço"]}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r["Nome dos Colaboradores:"]}</td>
+                      <td className="px-2 py-1 whitespace-normal dark:border-slate-700">{r["Serviço Executado:"]}</td>
+                      <td className="px-2 py-1 whitespace-normal dark:border-slate-700">{r["Observação:"]}</td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Tensão ( V )"] ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Corrente ( A )"] ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Recalque ?? ""}</td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Retaguarda ?? ""}</td>
                     </tr>
                   );
                 })}
@@ -1099,13 +1099,13 @@ function FilterSelect({
 }) {
   return (
     <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700 dark:text-slate-400">
         {label}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${block ? "w-full" : "max-w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-base shadow-sm sm:min-h-0 sm:text-sm`}
+        className={`${block ? "w-full" : "max-w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-base shadow-sm sm:min-h-0 sm:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200`}
       >
         <option value="TODOS">Todos</option>
         {options.map((o) => (
@@ -1120,7 +1120,7 @@ function FilterSelect({
 
 function CrossChip({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-[#0b3a73]">
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-[#0b3a73] dark:bg-blue-900/40 dark:text-white">
       {label}
       <button
         type="button"
@@ -1156,7 +1156,7 @@ function ExpandableCell({
         type="button"
         title={v}
         onClick={() => onToggle(isExpanded ? null : cellKey)}
-        className={`text-left w-full ${isExpanded ? "whitespace-normal" : "truncate line-clamp-1"} cursor-pointer text-slate-700 hover:text-[#0b3a73]`}
+        className={`text-left w-full ${isExpanded ? "whitespace-normal" : "truncate line-clamp-1"} cursor-pointer text-slate-700 hover:text-[#0b3a73] dark:text-slate-200`}
       >
         {isExpanded ? v : v.slice(0, 60) + "…"}
       </button>
@@ -1166,10 +1166,10 @@ function ExpandableCell({
 
 function Kpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="text-xl font-bold text-[#0b3a73]">{value}</div>
-      {hint && <div className="text-[10px] text-slate-400">{hint}</div>}
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="text-xl font-bold text-[#0b3a73] dark:text-white">{value}</div>
+      {hint && <div className="text-[10px] text-slate-400 dark:text-slate-400">{hint}</div>}
     </div>
   );
 }
@@ -1203,20 +1203,20 @@ function SearchableSelect({
   const display = value === "TODOS" ? "Todos" : value;
   return (
     <div className={block ? "flex flex-col gap-1" : "flex items-center gap-2"}>
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700">
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm sm:font-medium sm:normal-case sm:tracking-normal sm:text-slate-700 dark:text-slate-400">
         {label}
       </label>
       <div ref={ref} className={`relative ${block ? "w-full" : ""}`}>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className={`${block ? "w-full" : "w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-base shadow-sm hover:bg-slate-50 sm:min-h-0 sm:text-sm`}
+          className={`${block ? "w-full" : "w-[260px]"} min-h-11 truncate rounded border border-slate-300 bg-white px-3 py-1.5 text-left text-base shadow-sm hover:bg-slate-50 sm:min-h-0 sm:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200`}
         >
           {display}
         </button>
         {open && (
           <div
-            className={`absolute z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-lg ${block ? "w-full" : "w-[300px]"}`}
+            className={`absolute z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-lg ${block ? "w-full" : "w-[300px]"} dark:border-slate-700 dark:bg-slate-800`}
           >
             <input
               autoFocus
@@ -1224,7 +1224,7 @@ function SearchableSelect({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={placeholder ?? "Buscar..."}
-              className="w-full rounded-t-md border-b border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none"
+              className="w-full rounded-t-md border-b border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             />
             <ul className="max-h-64 overflow-auto py-1 text-sm">
               <li>
@@ -1235,7 +1235,7 @@ function SearchableSelect({
                     setOpen(false);
                     setQuery("");
                   }}
-                  className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === "TODOS" ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""}`}
+                  className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === "TODOS" ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""} dark:hover:bg-blue-900/30 dark:text-slate-200`}
                 >
                   Todos
                 </button>
@@ -1249,14 +1249,14 @@ function SearchableSelect({
                       setOpen(false);
                       setQuery("");
                     }}
-                    className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === o ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""}`}
+                    className={`block w-full px-3 py-1 text-left hover:bg-blue-50 ${value === o ? "bg-blue-50 font-semibold text-[#0b3a73]" : ""} dark:hover:bg-blue-900/30 dark:text-slate-200`}
                   >
                     {o}
                   </button>
                 </li>
               ))}
               {!filtered.length && (
-                <li className="px-3 py-2 text-xs text-slate-400">Nenhum resultado</li>
+                <li className="px-3 py-2 text-xs text-slate-400 dark:text-slate-400">Nenhum resultado</li>
               )}
             </ul>
           </div>
@@ -1296,7 +1296,7 @@ function SortSelect({ value, onChange }: { value: SortMode; onChange: (v: SortMo
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as SortMode)}
-      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] shadow-sm"
+      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
     >
       <option value="az">A → Z</option>
       <option value="za">Z → A</option>
@@ -1331,25 +1331,25 @@ function ScrollChart({
   const ROW = 30;
   const innerHeight = Math.max(sorted.length * ROW + 40, 160);
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
         <div className="flex items-center gap-2">
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Pesquisar..."
-            className="h-7 w-36 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none"
+            className="h-7 w-36 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <SortSelect value={sort} onChange={setSort} />
-          <span className="text-[11px] text-slate-500">{sorted.length} ativos</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">{sorted.length} ativos</span>
           {onExpand && (
             <button
               type="button"
               onClick={onExpand}
               title="Expandir"
-              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73]"
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:text-slate-400"
             >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>
@@ -1357,7 +1357,7 @@ function ScrollChart({
         </div>
       </div>
       {sorted.length === 0 ? (
-        <div className="flex h-[320px] items-center justify-center text-xs text-slate-400">
+        <div className="flex h-[320px] items-center justify-center text-xs text-slate-400 dark:text-slate-400">
           Sem dados para esta classe de tensão.
         </div>
       ) : (
@@ -1446,11 +1446,11 @@ function ExpandedBarChart({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Pesquisar elevatória..."
-            className="h-8 w-56 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none"
+            className="h-8 w-56 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <SortSelect value={sort} onChange={setSort} />
         </div>
-        <span className="text-xs text-slate-500">{sorted.length} ativos</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{sorted.length} ativos</span>
       </div>
       <div className="max-h-[75vh] overflow-y-auto pr-1">
         <div style={{ height: innerHeight }}>
@@ -1517,8 +1517,8 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
-      <h2 className="mb-2 text-sm font-semibold text-slate-700">{title}</h2>
+    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}>
+      <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
       {children}
     </div>
   );
@@ -1560,31 +1560,31 @@ function MetricEvolutionChart({
   };
 
   return (
-    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
+    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
         <div className="relative flex items-center gap-2">
-          <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+          <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Métricas
           </label>
           <button
             type="button"
             onClick={() => setPickerOpen((v) => !v)}
-            className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm hover:border-[#0b3a73]"
+            className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm hover:border-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             {selected.length} selecionada{selected.length > 1 ? "s" : ""}
-            <span className="text-slate-400">▾</span>
+            <span className="text-slate-400 dark:text-slate-400">▾</span>
           </button>
           {pickerOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
                 {METRIC_ORDER.map((m) => {
                   const checked = metrics.includes(m);
                   return (
                     <label
                       key={m}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-slate-100"
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-slate-100 dark:hover:bg-slate-700"
                     >
                       <input
                         type="checkbox"
@@ -1608,13 +1608,13 @@ function MetricEvolutionChart({
         </div>
       </div>
       {!elevName ? (
-        <div className="flex h-[240px] items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50 text-center text-xs text-slate-500">
+        <div className="flex h-[240px] items-center justify-center rounded border border-dashed border-slate-200 bg-slate-50 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
           Selecione uma elevatória (no filtro ou clicando em uma barra) para ver a
           <br />
           evolução de métricas técnicas.
         </div>
       ) : series.length === 0 ? (
-        <div className="flex h-[240px] items-center justify-center text-xs text-slate-400">
+        <div className="flex h-[240px] items-center justify-center text-xs text-slate-400 dark:text-slate-400">
           Sem leituras para esta elevatória no período.
         </div>
       ) : (
@@ -1680,7 +1680,7 @@ function MetricEvolutionChart({
               })}
             </LineChart>
           </ResponsiveContainer>
-          <div className="mt-1 space-y-0.5 text-[10px] text-slate-400">
+          <div className="mt-1 space-y-0.5 text-[10px] text-slate-400 dark:text-slate-400">
             <p>
               {series.length} ponto{series.length > 1 ? "s" : ""}
             </p>

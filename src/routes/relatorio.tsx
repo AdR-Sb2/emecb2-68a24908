@@ -175,9 +175,9 @@ function useLookup() {
 /* ---------------- shared UI ---------------- */
 
 const inputCls =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 disabled:bg-slate-50";
-const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600";
-const cardCls = "rounded-md border border-slate-200 bg-white p-4 shadow-sm md:p-5";
+  "w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 shadow-sm transition placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 disabled:bg-slate-50 dark:disabled:bg-slate-700";
+const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300";
+const cardCls = "rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm md:p-5";
 const sectionTitleCls = "mb-3 flex items-center gap-2 text-sm font-semibold text-[#0b3a73]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -229,7 +229,7 @@ function IdentificacaoBlock(l: ReturnType<typeof useLookup>) {
         </div>
       </Field>
       {l.found !== null && (l.unidade || l.planta) && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
           <CheckCircle2 className="h-4 w-4" />
           <span className="font-medium">
             {l.found ? "Ativo localizado na base." : "Não localizado — preenchimento manual."}
@@ -439,7 +439,7 @@ function RelatorioTecnico() {
         <div className="mb-3 flex items-center justify-between">
           <SectionTitle icon={Settings2}>Grupos Motor-Bomba</SectionTitle>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-slate-600">Quantidade</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Quantidade</label>
             <select
               value={qtd}
               onChange={(e) => setQtd(Number(e.target.value))}
@@ -457,7 +457,7 @@ function RelatorioTecnico() {
           {grupos.map((g, i) => (
             <div
               key={i}
-              className="rounded-md border border-slate-200 bg-slate-50/60 p-3 transition hover:border-[#1f7ad6]/40"
+              className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-700/60 p-3 transition hover:border-[#1f7ad6]/40"
             >
               <div className="mb-3 flex items-center gap-2">
                 <span className="inline-flex h-6 items-center rounded-full bg-[#0b3a73] px-2 text-[11px] font-bold uppercase tracking-wider text-white">
@@ -846,8 +846,8 @@ function RelatorioPlanta() {
 
 function ActionBar({ onSend }: { onSend: () => void }) {
   return (
-    <div className="sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-      <span className="hidden text-xs text-slate-500 sm:inline">
+    <div className="sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg backdrop-blur">
+      <span className="hidden text-xs text-slate-500 dark:text-slate-400 sm:inline">
         Revise os campos e envie — o texto será copiado e registrado na planilha.
       </span>
       <button
@@ -859,7 +859,7 @@ function ActionBar({ onSend }: { onSend: () => void }) {
       </button>
       <Link
         to="/"
-        className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        className="inline-flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-700"
       >
         Voltar
       </Link>
@@ -870,7 +870,7 @@ function ActionBar({ onSend }: { onSend: () => void }) {
 function RelatorioPage() {
   const [aba, setAba] = useState<"tecnico" | "planta">("tecnico");
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
       <Toaster richColors position="top-right" />
       <div className="mx-auto max-w-5xl p-4 md:p-6">
         {/* Header com logo — mesmo padrão do dashboard */}
@@ -902,14 +902,14 @@ function RelatorioPage() {
         </div>
 
         {/* Título + tabs */}
-        <div className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#0b3a73] text-white shadow-sm">
               <FileText className="h-5 w-5" />
             </span>
             <div>
               <h1 className="text-lg font-bold text-[#0b3a73] md:text-xl">Geração de Relatórios</h1>
-              <p className="text-xs text-slate-500 md:text-sm">
+              <p className="text-xs text-slate-500 dark:text-slate-400 md:text-sm">
                 Técnico e de Planta/Unidade · pronto para WhatsApp e planilha
               </p>
             </div>
@@ -917,7 +917,7 @@ function RelatorioPage() {
 
           <div
             role="tablist"
-            className="inline-flex w-full flex-wrap gap-1 rounded-md bg-slate-100 p-1 sm:w-auto"
+            className="inline-flex w-full flex-wrap gap-1 rounded-md bg-slate-100 dark:bg-slate-700 p-1 sm:w-auto"
           >
             <button
               role="tab"
@@ -926,8 +926,8 @@ function RelatorioPage() {
               onClick={() => setAba("tecnico")}
               className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition sm:flex-none ${
                 aba === "tecnico"
-                  ? "bg-white text-[#0b3a73] shadow-sm ring-1 ring-slate-200"
-                  : "text-slate-600 hover:text-[#0b3a73]"
+                  ? "bg-white dark:bg-slate-800 text-[#0b3a73] shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
+                  : "text-slate-600 dark:text-slate-300 hover:text-[#0b3a73]"
               }`}
             >
               <Wrench className="h-4 w-4" /> Técnico
@@ -939,8 +939,8 @@ function RelatorioPage() {
               onClick={() => setAba("planta")}
               className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition sm:flex-none ${
                 aba === "planta"
-                  ? "bg-white text-[#0b3a73] shadow-sm ring-1 ring-slate-200"
-                  : "text-slate-600 hover:text-[#0b3a73]"
+                  ? "bg-white dark:bg-slate-800 text-[#0b3a73] shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
+                  : "text-slate-600 dark:text-slate-300 hover:text-[#0b3a73]"
               }`}
             >
               <ClipboardCheck className="h-4 w-4" /> Planta

@@ -217,7 +217,7 @@ function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 md:p-6">
       {/* Header com logo */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -271,14 +271,14 @@ function DashboardPage() {
       </div>
 
       {/* Filters — mobile collapsible */}
-      <details className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm sm:hidden">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-sm font-medium text-slate-700">
+      <details className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm sm:hidden dark:border-slate-700 dark:bg-slate-800">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-sm font-medium text-slate-700 dark:text-slate-200">
           <span className="inline-flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-[#0b3a73]" /> Filtros
+            <SlidersHorizontal className="h-4 w-4 text-[#0b3a73] dark:text-white" /> Filtros
           </span>
-          <span className="text-xs text-slate-400">toque para expandir</span>
+          <span className="text-xs text-slate-400 dark:text-slate-400">toque para expandir</span>
         </summary>
-        <div className="grid gap-3 border-t border-slate-100 p-3">
+        <div className="grid gap-3 border-t border-slate-100 p-3 dark:border-slate-700">
           {[
             { label: "TIPO", value: tipo, set: setTipo, opts: ["TODOS", ...TIPOS] },
             {
@@ -301,13 +301,13 @@ function DashboardPage() {
             },
           ].map((f) => (
             <div key={f.label} className="flex flex-col gap-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
                 {f.label}
               </label>
               <select
                 value={f.value}
                 onChange={(e) => f.set(e.target.value)}
-                className="min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-base shadow-sm"
+                className="min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-base shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 {f.opts.map((o) => (
                   <option key={o} value={o}>
@@ -323,11 +323,11 @@ function DashboardPage() {
       {/* Filters — desktop row */}
       <div className="mb-4 hidden flex-wrap items-center gap-3 sm:flex">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">TIPO</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">TIPO</label>
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value)}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="TODOS">Todos</option>
             {TIPOS.map((t) => (
@@ -338,11 +338,11 @@ function DashboardPage() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">MUNICÍPIO</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">MUNICÍPIO</label>
           <select
             value={municipio}
             onChange={(e) => setMunicipio(e.target.value)}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="TODOS">Todos</option>
             {MUNICIPIOS.map((m) => (
@@ -353,11 +353,11 @@ function DashboardPage() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">AGUARDANDO COMISSIONAMENTO</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">AGUARDANDO COMISSIONAMENTO</label>
           <select
             value={aguardandoFilter}
             onChange={(e) => setAguardandoFilter(e.target.value)}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="TODOS">Todos</option>
             <option value="SIM">Sim</option>
@@ -365,11 +365,11 @@ function DashboardPage() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">TEM SENSOR?</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">TEM SENSOR?</label>
           <select
             value={sensorFilter}
             onChange={(e) => setSensorFilter(e.target.value)}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="TODOS">Todos</option>
             <option value="SIM">Sim</option>
@@ -388,7 +388,7 @@ function DashboardPage() {
               setAguardandoFilter("TODOS");
               setSensorFilter("TODOS");
             }}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100"
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           >
             Limpar filtros
           </button>
@@ -458,23 +458,23 @@ function DashboardPage() {
       {/* Charts row 2 */}
       <div className={`mb-4 grid gap-4 ${tableExpanded ? "" : "lg:grid-cols-3"}`}>
         <div className={tableExpanded ? "" : "lg:col-span-2"}>
-          <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-700">Tabela de Elevatórias</h2>
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tabela de Elevatórias</h2>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Pesquisar elevatória, planta, município..."
-                  className="w-64 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none"
+                   className="w-64 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 />
                 <button
                   type="button"
                   onClick={() => setTableExpanded((v) => !v)}
                   title={tableExpanded ? "Recolher tabela" : "Expandir tabela"}
                   aria-label={tableExpanded ? "Recolher tabela" : "Expandir tabela"}
-                  className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 shadow-sm hover:bg-slate-100"
+                  className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -506,14 +506,14 @@ function DashboardPage() {
                 </button>
               </div>
             </div>
-            <div className="mb-2 text-xs text-slate-500">
+            <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
               Mostrando {tableRows.length} de {data.length} ativos
             </div>
             <div className={`${tableExpanded ? "max-h-[70vh]" : "max-h-[360px]"} overflow-auto`}>
               <table className="w-full min-w-[720px] text-left text-xs">
-                <thead className="sticky top-0 bg-slate-100 text-slate-700">
+                <thead className="sticky top-0 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                   <tr>
-                    <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5">Elevatória</th>
+                    <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5 dark:bg-slate-700">Elevatória</th>
                     <th className="px-2 py-1.5">Planta</th>
                     <th className="px-2 py-1.5">Município</th>
                     <th className="px-2 py-1.5">Construção</th>
@@ -526,18 +526,18 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {tableRows.map((r, i) => (
-                    <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                      <td className="sticky left-0 z-10 bg-white px-2 py-1 shadow-[1px_0_0_rgba(0,0,0,0.05)]">
+                    <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 dark:border-slate-700">
+                      <td className="sticky left-0 z-10 bg-white px-2 py-1 shadow-[1px_0_0_rgba(0,0,0,0.05)] dark:bg-slate-800">
                         {r.ELEVATORIAS}
                       </td>
-                      <td className="px-2 py-1">{r.PLANTA}</td>
-                      <td className="px-2 py-1">{r.MUNICIPIO}</td>
-                      <td className="px-2 py-1">{r["TIPO CONSTRUTIVO DA ELEVATORIA"]}</td>
-                      <td className="px-2 py-1">{r["TEM CLP?"] ?? ""}</td>
-                      <td className="px-2 py-1">{r["TEM PCP?"] ?? ""}</td>
-                      <td className="px-2 py-1">{r.SENSORES ?? ""}</td>
-                      <td className="px-2 py-1">{r.ELIPSE ?? ""}</td>
-                      <td className="px-2 py-1">{r["TEM SENSOR?"] ?? ""}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r.PLANTA}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r.MUNICIPIO}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r["TIPO CONSTRUTIVO DA ELEVATORIA"]}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r["TEM CLP?"] ?? ""}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r["TEM PCP?"] ?? ""}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r.SENSORES ?? ""}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r.ELIPSE ?? ""}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">{r["TEM SENSOR?"] ?? ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -577,7 +577,7 @@ function DashboardPage() {
         )}
       </div>
 
-      <p className="text-center text-xs text-slate-500">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">
         Fonte: Relação Automação de Elevatórias · {data.length} registros · TIPO: {tipo} ·
         MUNICÍPIO: {municipio}
       </p>
@@ -610,7 +610,7 @@ function DashboardPage() {
             setHasCustomData(false);
           }}
           title="Restaurar planilha original"
-          className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white"
+          className="fixed bottom-2 right-7 rounded bg-white/80 px-2 py-0.5 text-[10px] text-slate-500 shadow-sm hover:bg-white dark:text-slate-400"
         >
           restaurar
         </button>
@@ -652,18 +652,18 @@ function Kpi({
           ? "text-rose-700"
           : "text-[#0b3a73]";
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
       <div className={`text-xl font-bold ${valueColor}`}>{value}</div>
       {progress && (
         <div className="mt-1.5">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
             <div
               className={`h-full ${statusColor}`}
               style={{ width: `${Math.min(100, progress.pct)}%` }}
             />
           </div>
-          <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+          <div className="mt-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
             Meta: {progress.meta}%
           </div>
         </div>
@@ -682,8 +682,8 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm ${className ?? ""}`}>
-      <h2 className="mb-2 text-sm font-semibold text-slate-700">{title}</h2>
+    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}>
+      <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
       {children}
     </div>
   );

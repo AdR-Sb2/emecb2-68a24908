@@ -289,11 +289,11 @@ function MultiSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
+        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
       >
         <span className="truncate">
-          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500">{label}:</span>}
-          <span className="font-medium text-slate-800">
+          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">{label}:</span>}
+          <span className="font-medium text-slate-800 dark:text-slate-100">
             {value.length === 0
               ? "Todos"
               : value.length === 1
@@ -301,13 +301,13 @@ function MultiSelect({
                 : `${value.length} selecionados`}
           </span>
         </span>
-        <Filter className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
+        <Filter className="ml-2 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-400" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute z-40 mt-1 max-h-72 w-full min-w-[220px] overflow-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg">
-            <div className="flex items-center justify-between border-b px-2 py-1 text-xs text-slate-500">
+          <div className="absolute z-40 mt-1 max-h-72 w-full min-w-[220px] overflow-auto rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-1 shadow-lg">
+            <div className="flex items-center justify-between border-b px-2 py-1 text-xs text-slate-500 dark:text-slate-400">
               <span>{value.length} selecionados</span>
               <button className="text-[#1f7ad6] hover:underline" onClick={() => onChange([])}>
                 limpar
@@ -316,7 +316,7 @@ function MultiSelect({
             {options.map((o) => (
               <label
                 key={o}
-                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50"
+                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
               >
                 <input type="checkbox" checked={value.includes(o)} onChange={() => toggle(o)} />
                 <span className="truncate">{o}</span>
@@ -354,13 +354,13 @@ function ComboboxSearch({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
+        className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
       >
         <span className="truncate">
-          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500">{label}:</span>}
-          <span className="font-medium text-slate-800">{selectedLabel}</span>
+          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">{label}:</span>}
+          <span className="font-medium text-slate-800 dark:text-slate-100">{selectedLabel}</span>
         </span>
-        <Search className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
+        <Search className="ml-2 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-400" />
       </button>
       {open && (
         <>
@@ -371,9 +371,9 @@ function ComboboxSearch({
               setQ("");
             }}
           />
-          <div className="absolute z-40 mt-1 w-full min-w-[260px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1">
-              <Search className="h-4 w-4 text-slate-400" />
+          <div className="absolute z-40 mt-1 w-full min-w-[260px] overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-lg">
+            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 px-2 py-1">
+              <Search className="h-4 w-4 text-slate-400 dark:text-slate-400" />
               <input
                 autoFocus
                 value={q}
@@ -382,7 +382,7 @@ function ComboboxSearch({
                 className="min-h-9 w-full border-none text-[14px] outline-none"
               />
               {q && (
-                <button onClick={() => setQ("")} className="text-slate-400 hover:text-slate-700">
+                <button onClick={() => setQ("")} className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -394,12 +394,12 @@ function ComboboxSearch({
                   setOpen(false);
                   setQ("");
                 }}
-                className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${value === "TODAS" ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : ""}`}
+                className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${value === "TODAS" ? "bg-[#eaf3fb] font-semibold text-[#0b3a73] dark:text-white" : ""}`}
               >
                 {allLabel}
               </button>
               {filtered.length === 0 && (
-                <div className="px-2 py-2 text-xs text-slate-400">Nenhum resultado.</div>
+                <div className="px-2 py-2 text-xs text-slate-400 dark:text-slate-400">Nenhum resultado.</div>
               )}
               {filtered.map((o) => (
                 <button
@@ -409,7 +409,7 @@ function ComboboxSearch({
                     setOpen(false);
                     setQ("");
                   }}
-                  className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${value === o ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]" : ""}`}
+                  className={`block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${value === o ? "bg-[#eaf3fb] font-semibold text-[#0b3a73] dark:text-white" : ""}`}
                 >
                   {o}
                 </button>
@@ -1526,7 +1526,7 @@ function BacklogPage() {
     <>
       {showToolbar && (
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-[#0b3a73]">
+          <div className="text-sm font-semibold text-[#0b3a73] dark:text-white">
             <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
           </div>
           <div className="flex items-center gap-1">
@@ -1541,14 +1541,14 @@ function BacklogPage() {
             <button
               onClick={() => setMapFitSignal((n) => n + 1)}
               title="Centralizar nas plantas visíveis"
-              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               <Crosshair className="h-3.5 w-3.5" /> Centralizar
             </button>
             <button
               onClick={() => setMapOpen(true)}
               title="Expandir mapa"
-              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               <Maximize2 className="h-3.5 w-3.5" /> Expandir
             </button>
@@ -1557,12 +1557,12 @@ function BacklogPage() {
       )}
       <div
         style={{ height: heightPx, width: "100%" }}
-        className="overflow-hidden rounded-md bg-slate-100"
+        className="overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
       >
         {mounted ? (
           <Suspense
             fallback={
-              <div className="flex h-full items-center justify-center text-xs text-slate-400">
+              <div className="flex h-full items-center justify-center text-xs text-slate-400 dark:text-slate-400">
                 Carregando mapa…
               </div>
             }
@@ -1580,7 +1580,7 @@ function BacklogPage() {
             />
           </Suspense>
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-slate-400">
+          <div className="flex h-full items-center justify-center text-xs text-slate-400 dark:text-slate-400">
             Carregando mapa…
           </div>
         )}
@@ -1589,7 +1589,7 @@ function BacklogPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 md:p-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
       {/* Header */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1611,7 +1611,7 @@ function BacklogPage() {
             to="/"
             title="Voltar ao Hub"
             aria-label="Voltar ao Hub"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] dark:text-white shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
           >
             <Home className="h-5 w-5 sm:h-4 sm:w-4" />
           </Link>
@@ -1621,8 +1621,8 @@ function BacklogPage() {
       {/* Title + actions */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#0b3a73] sm:text-2xl">Backlog BI</h1>
-          <p className="text-xs text-slate-500">
+          <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">Backlog BI</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Bucket Field/SAP · {data.length} O.S. · atualizado {fmtDate(now)}
           </p>
         </div>
@@ -1647,30 +1647,30 @@ function BacklogPage() {
                 setData(DATA);
                 setHasCustomData(false);
               }}
-              className="rounded border border-slate-300 bg-white px-2 py-2 text-xs text-slate-600 hover:bg-slate-50"
+              className="rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               restaurar exemplo
             </button>
           )}
           <button
             onClick={exportCSV}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white px-3 py-2 text-[13px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb]"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
           >
             <Download className="h-4 w-4" /> Exportar
           </button>
           <button
             onClick={copyResumo}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
           >
             <CopyIcon className="h-4 w-4" /> Copiar resumo
           </button>
           <button
             onClick={saveView}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
           >
             Salvar view
           </button>
-          <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+          <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
               checked={autoRefresh}
@@ -1685,19 +1685,19 @@ function BacklogPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <button
           onClick={clearAllFilters}
-          className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-md"
+          className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-md"
         >
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             O.S. no bucket
           </div>
-          <div className="mt-1 text-3xl font-bold text-[#0b3a73]">{kTotal}</div>
-          <div className="text-[11px] text-slate-400">clique para limpar filtros</div>
+          <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{kTotal}</div>
+          <div className="text-[11px] text-slate-400 dark:text-slate-400">clique para limpar filtros</div>
         </button>
         <button
           onClick={() => setOnlyLate((v) => !v)}
-          className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyLate ? "border-red-500 bg-red-50" : "border-slate-200 bg-white hover:border-red-400"}`}
+          className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyLate ? "border-red-500 bg-red-50" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-red-400"}`}
         >
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             <AlertTriangle className="h-3 w-3" /> O.S. Atrasadas
           </div>
           <div className="mt-1 text-3xl font-bold text-red-600">{kLate}</div>
@@ -1707,9 +1707,9 @@ function BacklogPage() {
         </button>
         <button
           onClick={() => setOnlyEmerg((v) => !v)}
-          className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyEmerg ? "border-orange-500 bg-orange-50" : "border-slate-200 bg-white hover:border-orange-400"}`}
+          className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyEmerg ? "border-orange-500 bg-orange-50" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-orange-400"}`}
         >
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             <Flame className="h-3 w-3" /> Emergenciais
           </div>
           <div className="mt-1 text-3xl font-bold text-orange-600">{kEmerg}</div>
@@ -1717,12 +1717,12 @@ function BacklogPage() {
             <span className="absolute right-3 top-3 inline-flex h-2 w-2 animate-pulse rounded-full bg-orange-500" />
           )}
         </button>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             % SLA Atrasado
           </div>
           <div className="mt-1 text-3xl font-bold text-[#1f7ad6]">{kPct}%</div>
-          <div className="mt-2 h-2 w-full rounded-full bg-slate-100">
+          <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#1f7ad6] to-red-500"
               style={{ width: `${kPct}%` }}
@@ -1732,11 +1732,11 @@ function BacklogPage() {
       </div>
 
       {/* Filtros */}
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
-          className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-[#0b3a73] sm:hidden cursor-pointer"
+          className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-[#0b3a73] dark:text-white sm:hidden cursor-pointer"
         >
           <span className="flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4" /> Filtros do Backlog
@@ -1747,7 +1747,7 @@ function BacklogPage() {
           className={`${showFilters ? "grid" : "hidden"} gap-4 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`}
         >
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Elevatória
             </label>
             <MultiSelect
@@ -1760,7 +1760,7 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Responsabilidade
             </label>
             <MultiSelect
@@ -1773,13 +1773,13 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Status
             </label>
             <select
               value={fStatus}
               onChange={(e) => setFStatus(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODOS">Todos</option>
               {OPT_STATUS.map((p) => (
@@ -1791,13 +1791,13 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Equipe
             </label>
             <select
               value={fEquipe}
               onChange={(e) => setFEquipe(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODAS">Todas</option>
               {OPT_EQUIPE.map((p) => (
@@ -1809,13 +1809,13 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Cidade
             </label>
             <select
               value={fCidade}
               onChange={(e) => setFCidade(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODAS">Todas</option>
               {OPT_CIDADE.map((p) => (
@@ -1827,13 +1827,13 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Tipo de Atividade
             </label>
             <select
               value={fTipo}
               onChange={(e) => setFTipo(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODOS">Todos</option>
               {OPT_TIPO.map((p) => (
@@ -1845,13 +1845,13 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Tempo Aberto
             </label>
             <select
               value={fFaixa}
               onChange={(e) => setFFaixa(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
             >
               <option value="TODAS">Todas as faixas</option>
               {OPT_FAIXA.map((p) => (
@@ -1863,11 +1863,11 @@ function BacklogPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Fim SLA anterior a
             </label>
-            <div className="relative flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 shadow-sm">
-              <Clock className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
+            <div className="relative flex min-h-11 items-center rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 shadow-sm">
+              <Clock className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0 mr-2" />
               <input
                 type="date"
                 value={fSlaBefore}
@@ -1879,12 +1879,12 @@ function BacklogPage() {
 
           {savedViews.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Views Salvas
               </label>
               <select
                 onChange={(e) => e.target.value && loadView(e.target.value)}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
                 defaultValue=""
               >
                 <option value="">Escolha uma view…</option>
@@ -1901,14 +1901,14 @@ function BacklogPage() {
             <button
               type="button"
               onClick={clearAllFilters}
-              className="min-h-11 w-full rounded-md border border-slate-300 bg-slate-50 px-3 text-[13px] font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition cursor-pointer"
+              className="min-h-11 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 text-[13px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:text-slate-100 transition cursor-pointer"
             >
               Limpar filtros
             </button>
           </div>
         </div>
         {fPlantas.length > 0 && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73]">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73] dark:text-white">
             <MapPin className="h-3 w-3" /> {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}{" "}
             selecionada{fPlantas.length > 1 ? "s" : ""}
             <button type="button" onClick={() => setFPlantas([])} className="cursor-pointer">
@@ -1921,8 +1921,8 @@ function BacklogPage() {
       {/* Charts row */}
       <div className="mb-4 grid gap-3 lg:grid-cols-3">
         {/* Faixa */}
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">
+        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
             Backlog por Tempo em Aberto
           </div>
           <ResponsiveContainer width="100%" height={220}>
@@ -1952,8 +1952,8 @@ function BacklogPage() {
         </div>
 
         {/* Pie tipo atividade */}
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">
+        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
             O.S. por Tipo de Atividade
           </div>
           {(() => {
@@ -1996,10 +1996,10 @@ function BacklogPage() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
                       Total
                     </div>
-                    <div className="text-2xl font-bold text-[#0b3a73]">{totalTipo}</div>
+                    <div className="text-2xl font-bold text-[#0b3a73] dark:text-white">{totalTipo}</div>
                   </div>
                 </div>
                 <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
@@ -2011,9 +2011,9 @@ function BacklogPage() {
                         <button
                           type="button"
                           onClick={() => setFTipo((prev) => (prev === d.name ? "TODOS" : d.name))}
-                          className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 p-1 rounded cursor-pointer transition-colors ${
+                          className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 dark:hover:bg-slate-700 p-1 rounded cursor-pointer transition-colors ${
                             isSelected
-                              ? "bg-[#eaf3fb] font-semibold text-[#0b3a73]"
+                              ? "bg-[#eaf3fb] font-semibold text-[#0b3a73] dark:text-white"
                               : "text-slate-750"
                           }`}
                           title={d.name}
@@ -2023,7 +2023,7 @@ function BacklogPage() {
                             style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
                           />
                           <span className="truncate">{d.displayName}</span>
-                          <span className="ml-auto shrink-0 text-[10px] font-bold text-slate-500">
+                          <span className="ml-auto shrink-0 text-[10px] font-bold text-slate-500 dark:text-slate-400">
                             {d.value} ({pct}%)
                           </span>
                         </button>
@@ -2037,8 +2037,8 @@ function BacklogPage() {
         </div>
 
         {/* Cidade */}
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73]">Distribuição por Cidade</div>
+        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">Distribuição por Cidade</div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dataCidade} layout="vertical" margin={{ left: 10, right: 30 }}>
               <XAxis type="number" hide />
@@ -2068,12 +2068,12 @@ function BacklogPage() {
 
       {/* Mapa + Programar */}
       <div className="mb-4 grid gap-3 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
           {mapCard(240)}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-[#0b3a73]">
+        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-[#0b3a73] dark:text-white">
             <Zap className="h-4 w-4" /> Ações recomendadas
           </div>
 
@@ -2091,20 +2091,20 @@ function BacklogPage() {
             <Flame className="h-8 w-8 text-red-400" />
           </button>
 
-          <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase text-slate-500">
+          <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">
             <TrendingUp className="h-3 w-3" /> Top plantas (15+ dias)
           </div>
           <ul className="space-y-1 text-xs">
             {topPlantasBacklog.length === 0 && (
-              <li className="text-slate-400">Nenhuma planta com backlog crítico.</li>
+              <li className="text-slate-400 dark:text-slate-400">Nenhuma planta com backlog crítico.</li>
             )}
             {topPlantasBacklog.map((p) => (
               <li key={p.planta}>
                 <button
                   onClick={() => togglePlanta(p.planta)}
-                  className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlantas.includes(p.planta) ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100"}`}
+                  className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlantas.includes(p.planta) ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100 dark:border-slate-700"}`}
                 >
-                  <span className="truncate font-medium text-[#0b3a73]">
+                  <span className="truncate font-medium text-[#0b3a73] dark:text-white">
                     {p.planta.split(" - ")[0]}
                   </span>
                   <span className="ml-2 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
@@ -2120,7 +2120,7 @@ function BacklogPage() {
       <Dialog open={mapOpen} onOpenChange={setMapOpen}>
         <DialogContent className="max-w-6xl">
           <DialogHeader>
-            <DialogTitle className="text-[#0b3a73]">
+            <DialogTitle className="text-[#0b3a73] dark:text-white">
               <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
             </DialogTitle>
           </DialogHeader>
@@ -2135,14 +2135,14 @@ function BacklogPage() {
             )}
             <button
               onClick={() => setMapFitSignal((n) => n + 1)}
-              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               <Crosshair className="h-3.5 w-3.5" /> Centralizar
             </button>
           </div>
           <div
             style={{ height: "85vh", width: "100%" }}
-            className="overflow-hidden rounded-md bg-slate-100"
+            className="overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
           >
             {mapOpen && mounted && (
               <Suspense fallback={null}>
@@ -2167,30 +2167,30 @@ function BacklogPage() {
       <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-[#0b3a73]">
+            <DialogTitle className="text-[#0b3a73] dark:text-white">
               <RouteIcon className="mr-1 inline h-4 w-4" /> Montar Rota Otimizada
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-2 text-sm">
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Fim SLA anterior a *</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Fim SLA anterior a *</span>
                 <input
                   type="datetime-local"
                   value={rbSlaBefore}
                   onChange={(e) => setRbSlaBefore(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
                 />
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-400 dark:text-slate-400">
                   critério de corte e de urgência (mais antigo = mais prioritário)
                 </span>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Ponto de partida *</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Ponto de partida *</span>
                 <select
                   value={rbStart}
                   onChange={(e) => setRbStart(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[14px] shadow-sm"
                 >
                   <option value="">Selecione…</option>
                   {allPlantas.map((p) => (
@@ -2199,7 +2199,7 @@ function BacklogPage() {
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-400 dark:text-slate-400">
                   só origem do trajeto — não é atendida
                 </span>
               </label>
@@ -2222,19 +2222,19 @@ function BacklogPage() {
 
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Quantidade de rotas *</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Quantidade de rotas *</span>
                 <input
                   type="number"
                   min={1}
                   max={10}
                   value={rbRouteCount}
                   onChange={(e) => setRbRouteCount(Math.max(1, Number(e.target.value) || 1))}
-                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
                 />
-                <span className="text-[10px] text-slate-400">divide as O.S. entre N rotas</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-400">divide as O.S. entre N rotas</span>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Máximo de paradas (O.S.) *
                 </span>
                 <input
@@ -2242,11 +2242,11 @@ function BacklogPage() {
                   min={1}
                   value={rbMaxStops}
                   onChange={(e) => setRbMaxStops(Number(e.target.value) || 0)}
-                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Tolerância de estouro (O.S.)
                 </span>
                 <input
@@ -2254,9 +2254,9 @@ function BacklogPage() {
                   min={0}
                   value={rbTolerance}
                   onChange={(e) => setRbTolerance(Number(e.target.value) || 0)}
-                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm"
+                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
                 />
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-400 dark:text-slate-400">
                   um grupo é incluído inteiro se estourar até isso
                 </span>
               </label>
@@ -2282,11 +2282,11 @@ function BacklogPage() {
             {!rbUseIndividualConfig && (
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600">Equipe</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Equipe</span>
                   <select
                     value={rbEquipe}
                     onChange={(e) => setRbEquipe(e.target.value)}
-                    className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm"
+                    className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[14px] shadow-sm"
                   >
                     <option value="TODAS">Todas</option>
                     <option value="EMEC">EMEC</option>
@@ -2302,27 +2302,27 @@ function BacklogPage() {
                   checked={rbUseIndividualConfig}
                   onCheckedChange={setRbUseIndividualConfig}
                 />
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   Configuração individual por rota
                 </span>
               </div>
             )}
 
             {rbUseIndividualConfig && rbRouteCount > 1 && (
-              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <span className="text-xs font-semibold text-slate-500">
+              <div className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                   Configurações de cada rota
                 </span>
                 {rbRouteConfigs.map((cfg, idx) => (
                   <div
                     key={idx}
-                    className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-4"
+                    className="grid gap-3 rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 sm:grid-cols-4"
                   >
-                    <span className="text-xs font-bold text-[#0b3a73] flex items-center">
+                    <span className="text-xs font-bold text-[#0b3a73] dark:text-white flex items-center">
                       Rota {idx + 1}
                     </span>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500">Equipe</span>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Equipe</span>
                       <select
                         value={cfg.equipe}
                         onChange={(e) => {
@@ -2330,7 +2330,7 @@ function BacklogPage() {
                           next[idx] = { ...next[idx], equipe: e.target.value };
                           setRbRouteConfigs(next);
                         }}
-                        className="min-h-9 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm"
+                        className="min-h-9 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[13px] shadow-sm"
                       >
                         <option value="TODAS">Todas</option>
                         <option value="EMEC">EMEC</option>
@@ -2338,7 +2338,7 @@ function BacklogPage() {
                       </select>
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500">Cidade</span>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Cidade</span>
                       <select
                         value={cfg.cidades[0] || ""}
                         onChange={(e) => {
@@ -2349,7 +2349,7 @@ function BacklogPage() {
                           };
                           setRbRouteConfigs(next);
                         }}
-                        className="min-h-9 rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm"
+                        className="min-h-9 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[13px] shadow-sm"
                       >
                         <option value="">Todas</option>
                         {allCidades.map((c) => (
@@ -2360,7 +2360,7 @@ function BacklogPage() {
                       </select>
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500">
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                         Max paradas
                       </span>
                       <input
@@ -2375,7 +2375,7 @@ function BacklogPage() {
                           };
                           setRbRouteConfigs(next);
                         }}
-                        className="min-h-9 rounded-md border border-slate-300 px-2 text-[13px] shadow-sm"
+                        className="min-h-9 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[13px] shadow-sm"
                       />
                     </label>
                   </div>
@@ -2392,7 +2392,7 @@ function BacklogPage() {
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setRouteDialogOpen(false)}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
               >
                 Cancelar
               </button>
@@ -2409,9 +2409,9 @@ function BacklogPage() {
 
       {/* Resultado da rota */}
       {generatedRoutes.length > 0 && (
-        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md">
+        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-md">
           {/* Abas das rotas */}
-          <div className="flex flex-wrap border-b border-slate-100 bg-slate-50 px-2 pt-2 gap-1">
+          <div className="flex flex-wrap border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 pt-2 gap-1">
             {generatedRoutes.map((route, rIdx) => {
               const isActive = activeRouteTab === rIdx;
               return (
@@ -2421,8 +2421,8 @@ function BacklogPage() {
                   onClick={() => setActiveRouteTab(rIdx)}
                   className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[1px] cursor-pointer ${
                     isActive
-                      ? "bg-white border-[#0b3a73] text-[#0b3a73]"
-                      : "text-slate-500 border-transparent hover:text-slate-850 hover:bg-white/40"
+                      ? "bg-white dark:bg-slate-800 border-[#0b3a73] text-[#0b3a73] dark:text-white"
+                      : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-850 hover:bg-white/40"
                   }`}
                 >
                   <span
@@ -2436,13 +2436,13 @@ function BacklogPage() {
             <div className="ml-auto flex flex-wrap items-center gap-2 pb-2 pr-2">
               <button
                 onClick={copyRouteResumo}
-                className="inline-flex items-center gap-1 rounded border border-slate-350 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
               >
                 <CopyIcon className="h-3.5 w-3.5" /> Copiar Todas (WhatsApp)
               </button>
               <button
                 onClick={() => exportRouteCSV()}
-                className="inline-flex items-center gap-1 rounded border border-slate-350 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
               >
                 <Download className="h-3.5 w-3.5" /> Exportar Todas (CSV)
               </button>
@@ -2461,15 +2461,15 @@ function BacklogPage() {
             if (!activeRoute) return null;
             return (
               <div>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-[#eaf3fb]/20 px-4 py-3">
-                  <div className="flex items-center gap-2 text-[#0b3a73]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-700 bg-[#eaf3fb]/20 px-4 py-3">
+                  <div className="flex items-center gap-2 text-[#0b3a73] dark:text-white">
                     <RouteIcon
                       className="h-5 w-5"
                       style={{ color: activeRoute.color || "#0b3a73" }}
                     />
                     <div>
                       <div className="text-sm font-bold">Detalhes da Rota {activeRouteTab + 1}</div>
-                      <div className="text-[11px] text-slate-600">
+                      <div className="text-[11px] text-slate-600 dark:text-slate-300">
                         {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em{" "}
                         {activeRoute.stops.length} paradas
                         {activeRoute.totalOs > activeRoute.limitConfig.max &&
@@ -2478,19 +2478,19 @@ function BacklogPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <div className="rounded bg-white px-2 py-1 shadow-sm border border-slate-100">
-                      <span className="text-slate-500">Distância:</span>{" "}
-                      <span className="font-bold text-[#0b3a73]">
+                    <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
+                      <span className="text-slate-500 dark:text-slate-400">Distância:</span>{" "}
+                      <span className="font-bold text-[#0b3a73] dark:text-white">
                         {activeRoute.totalKm.toFixed(1)} km
                       </span>
                     </div>
-                    <div className="rounded bg-white px-2 py-1 shadow-sm border border-slate-100">
-                      <span className="text-slate-500">Tempo est.:</span>{" "}
-                      <span className="font-bold text-[#0b3a73]">~{activeRoute.etaMin} min</span>
+                    <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
+                      <span className="text-slate-500 dark:text-slate-400">Tempo est.:</span>{" "}
+                      <span className="font-bold text-[#0b3a73] dark:text-white">~{activeRoute.etaMin} min</span>
                     </div>
                     <button
                       onClick={() => exportRouteCSV(activeRouteTab)}
-                      className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
                     >
                       <Download className="h-3 w-3" /> CSV Rota {activeRouteTab + 1}
                     </button>
@@ -2498,20 +2498,20 @@ function BacklogPage() {
                 </div>
 
                 <div className="grid gap-3 p-3 lg:grid-cols-2">
-                  <div className="rounded border border-slate-150 bg-white p-2 text-xs">
-                    <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73]">
+                  <div className="rounded border border-slate-150 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-xs">
+                    <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73] dark:text-white">
                       <Flag
                         className="h-3.5 w-3.5"
                         style={{ color: activeRoute.color || "#0b3a73" }}
                       />{" "}
                       Ponto de partida:{" "}
-                      <span className="font-normal text-slate-700">{activeRoute.start.label}</span>
+                      <span className="font-normal text-slate-700 dark:text-slate-200">{activeRoute.start.label}</span>
                     </div>
                     <ol className="space-y-1 max-h-[380px] overflow-auto pr-1">
                       {activeRoute.details.map((d) => (
                         <li
                           key={d.ordem}
-                          className="rounded border border-slate-100 p-2 hover:border-[#1f7ad6]"
+                          className="rounded border border-slate-100 dark:border-slate-700 p-2 hover:border-[#1f7ad6]"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2">
@@ -2522,13 +2522,13 @@ function BacklogPage() {
                                 {d.ordem}
                               </span>
                               <div>
-                                <div className="font-semibold text-[#0b3a73]">{d.plantaShort}</div>
-                                <div className="text-[10px] text-slate-500">{d.cidade}</div>
+                                <div className="font-semibold text-[#0b3a73] dark:text-white">{d.plantaShort}</div>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400">{d.cidade}</div>
                               </div>
                             </div>
-                            <div className="text-right text-[10px] text-slate-500">
+                            <div className="text-right text-[10px] text-slate-500 dark:text-slate-400">
                               <div>+{d.distKm.toFixed(1)} km</div>
-                              <div className="text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
+                              <div className="text-slate-400 dark:text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
                             </div>
                             <div className="flex items-center gap-1 ml-2">
                               <button
@@ -2623,7 +2623,7 @@ function BacklogPage() {
                                     setGeneratedRoutes(routes);
                                     setActiveRouteTab(targetIdx);
                                   }}
-                                  className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[10px] text-slate-600 cursor-pointer"
+                                  className="rounded border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-1 py-0.5 text-[10px] text-slate-600 dark:text-slate-300 cursor-pointer"
                                   title="Transferir para outra rota"
                                 >
                                   <option value="">→</option>
@@ -2642,7 +2642,7 @@ function BacklogPage() {
                             {d.oss.map((os) => (
                               <li
                                 key={os.om}
-                                className="flex items-center gap-2 text-[11px] text-slate-600"
+                                className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300"
                               >
                                 <span className="font-mono text-[#1f7ad6]">{os.om}</span>
                                 <span className="truncate">{os.r["TEXTO BREVE"]}</span>
@@ -2658,12 +2658,12 @@ function BacklogPage() {
                       ))}
                     </ol>
                   </div>
-                  <div className="min-h-[500px] rounded border border-slate-150 bg-slate-100">
+                  <div className="min-h-[500px] rounded border border-slate-150 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
                     <div className="h-full min-h-[500px]" style={{ height: 500 }}>
                       {mounted ? (
                         <Suspense
                           fallback={
-                            <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                            <div className="flex h-full items-center justify-center text-xs text-slate-400 dark:text-slate-400">
                               Carregando mapa…
                             </div>
                           }
@@ -2687,13 +2687,13 @@ function BacklogPage() {
       )}
 
       {/* Tabela */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 p-3 text-sm font-semibold text-[#0b3a73] flex items-center justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-sm">
+        <div className="border-b border-slate-100 dark:border-slate-700 p-3 text-sm font-semibold text-[#0b3a73] dark:text-white flex items-center justify-between">
           <span>O.S. filtradas ({sortedRows.length})</span>
           <button
             type="button"
             onClick={() => setTableExpanded(true)}
-            className="inline-flex items-center gap-1 rounded border border-slate-350 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+            className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
             title="Expandir tabela"
           >
             <Maximize2 className="h-3.5 w-3.5" /> Expandir
@@ -2701,7 +2701,7 @@ function BacklogPage() {
         </div>
         <div className="max-h-[500px] overflow-auto">
           <table className="min-w-[900px] w-full text-left text-[13px]">
-            <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73]">
+            <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:text-white">
               <tr>
                 {(
                   [
@@ -2728,7 +2728,7 @@ function BacklogPage() {
             </thead>
             <tbody>
               {sortedRows.map((e, i) => (
-                <tr key={`${e.om}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr key={`${e.om}-${i}`} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700">
                   <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
                     <button
                       type="button"
@@ -2737,7 +2737,7 @@ function BacklogPage() {
                         setCopiedOm(e.om);
                         setTimeout(() => setCopiedOm(null), 1500);
                       }}
-                      className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] font-bold text-left cursor-pointer flex items-center gap-1.5"
+                      className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
                       title="Clique para copiar a O.S."
                     >
                       {e.om}
@@ -2752,12 +2752,12 @@ function BacklogPage() {
                   <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
                   <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
                   <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
-                  <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800">
+                  <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800 dark:text-slate-100">
                     {getElevatoriaName(e.planta)}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1">
                     <span
-                      className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                      className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
                     >
                       {e.slaStatus}
                     </span>
@@ -2782,7 +2782,7 @@ function BacklogPage() {
                               ? "border-blue-200 bg-blue-50 text-blue-700"
                               : e.equipe === "Automação"
                                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-slate-200 bg-white text-slate-400"
+                                : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-400 dark:text-slate-400"
                           }`}
                         >
                           <option value="" disabled>
@@ -2802,7 +2802,7 @@ function BacklogPage() {
                               supabase.from("equipe_overrides").delete().eq("om", e.om)
                                 .then(({ error }) => error && console.warn("Falha ao remover override", error));
                             }}
-                            className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
+                            className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
                             title="Reverter ao cálculo automático"
                           >
                             ↺
@@ -2810,7 +2810,7 @@ function BacklogPage() {
                         )}
                       </span>
                     ) : (
-                      <span className="text-slate-500">{e.equipe}</span>
+                      <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                     )}
                   </td>
                 </tr>
@@ -2824,13 +2824,13 @@ function BacklogPage() {
       <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
         <DialogContent className="max-w-7xl">
           <DialogHeader className="flex flex-row items-center justify-between border-b pb-2">
-            <DialogTitle className="text-[#0b3a73] font-bold">
+            <DialogTitle className="text-[#0b3a73] dark:text-white font-bold">
               Todas as O.S. Filtradas ({sortedRows.length})
             </DialogTitle>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto">
             <table className="w-full text-left text-[13px]">
-              <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10">
+              <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:text-white z-10">
                 <tr>
                   {(
                     [
@@ -2857,7 +2857,7 @@ function BacklogPage() {
               </thead>
               <tbody>
                 {sortedRows.map((e, i) => (
-                  <tr key={`${e.om}-${i}`} className="border-b border-slate-100 hover:bg-slate-50">
+                  <tr key={`${e.om}-${i}`} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700">
                     <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
                       <button
                         type="button"
@@ -2866,7 +2866,7 @@ function BacklogPage() {
                           setCopiedOm(e.om);
                           setTimeout(() => setCopiedOm(null), 1500);
                         }}
-                        className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] font-bold text-left cursor-pointer flex items-center gap-1.5"
+                        className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
                         title="Clique para copiar a O.S."
                       >
                         {e.om}
@@ -2881,12 +2881,12 @@ function BacklogPage() {
                     <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
                     <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
                     <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
-                    <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800">
+                    <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800 dark:text-slate-100">
                       {getElevatoriaName(e.planta)}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1">
                       <span
-                        className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                        className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
                       >
                         {e.slaStatus}
                       </span>
@@ -2913,7 +2913,7 @@ function BacklogPage() {
                                 ? "border-blue-200 bg-blue-50 text-blue-700"
                                 : e.equipe === "Automação"
                                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-slate-200 bg-white text-slate-400"
+                                  : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-400 dark:text-slate-400"
                             }`}
                           >
                             <option value="" disabled>
@@ -2933,7 +2933,7 @@ function BacklogPage() {
                                 supabase.from("equipe_overrides").delete().eq("om", e.om)
                                   .then(({ error }) => error && console.warn("Falha ao remover override", error));
                               }}
-                              className="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200 cursor-pointer"
+                              className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
                               title="Reverter ao cálculo automático"
                             >
                               ↺
@@ -2941,7 +2941,7 @@ function BacklogPage() {
                           )}
                         </span>
                       ) : (
-                        <span className="text-slate-500">{e.equipe}</span>
+                        <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                       )}
                     </td>
                   </tr>
@@ -2964,7 +2964,7 @@ function BacklogPage() {
         }}
       />
 
-      <p className="mt-4 text-center text-xs text-slate-500">
+      <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
         Águas do Rio · Eletromecânica · Backlog Field/SAP
       </p>
     </div>
