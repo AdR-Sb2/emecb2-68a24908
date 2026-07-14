@@ -542,10 +542,12 @@ function EscalaPage() {
       const cell = ws.getCell(2, colIdx);
       cell.value = abrev;
       cell.font = { name: "Calibri", size: 9, bold: true, color: { argb: BRANCO } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } };
       cell.alignment = { horizontal: "center", vertical: "middle" };
 
       if (d.getDay() === 0 || d.getDay() === 6) {
         cell.font = { name: "Calibri", size: 9, bold: true, color: { argb: VERMELHO_TEXTO } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } };
       }
 
       // Data na linha 3
