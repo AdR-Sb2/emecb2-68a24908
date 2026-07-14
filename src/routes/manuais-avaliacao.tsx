@@ -157,10 +157,19 @@ function AvaliacaoPage() {
 
   const handleRejeitar = async (sugId: number) => {
     setSaving(true);
-    await supabase
+    const original = sugestoes.find((s) => s.id === sugId);
+    const novoComentario = motivoRejeicao
+      ? `[Motivo da rejeição: ${motivoRejeicao}]\n\n---\n\n${original?.comentario || ""}`
+      : original?.comentario;
+    const { error } = await supabase
       .from("sugestoes")
-      .update({ status: "rejeitado", comentario: motivoRejeicao || sugestoes.find((s) => s.id === sugId)?.comentario })
+      .update({ status: "rejeitado", comentario: novoComentario })
       .eq("id", sugId);
+    if (error) {
+      toast.error("Erro ao rejeitar: " + error.message);
+      setSaving(false);
+      return;
+    }
     toast.success("Sugestão rejeitada.");
     setAcaoId(null);
     setAcaoTipo(null);

@@ -93,6 +93,9 @@ function ManuaisPage() {
   const [uploadSaving, setUploadSaving] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
+  const sanitizarNome = (nome: string) =>
+    nome.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
+
   const podeEditarArquivo = useMemo(() => {
     return temPermissao(permissoes, "manuais", "editar_arquivo");
   }, [permissoes]);
@@ -158,7 +161,7 @@ function ManuaisPage() {
 
     let arquivoUrl: string | null = null;
     if (sugTipo === "pdf" && sugArquivo) {
-      const nomeArquivo = `sugestoes/${Date.now()}_${sugArquivo.name}`;
+      const nomeArquivo = `sugestoes/${Date.now()}_${sanitizarNome(sugArquivo.name)}`;
       const { error: uploadErr } = await supabase.storage
         .from("manuais")
         .upload(nomeArquivo, sugArquivo);
@@ -269,7 +272,7 @@ function ManuaisPage() {
         <div className="flex items-center gap-2">
           {podeEditarArquivo && (
             <Link
-              to="/manuais/avaliacao"
+              to="/manuais-avaliacao"
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 cursor-pointer"
             >
               <ThumbsUp className="h-4 w-4" />
