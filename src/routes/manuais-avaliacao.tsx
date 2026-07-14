@@ -131,17 +131,36 @@ function AvaliacaoPage() {
 
     // Criar manual
     const titulo = sug.titulo_sugerido || "Manual sem título";
-    const { error: manErr } = await supabase.from("manuais").insert({
-      titulo,
-      descricao: sug.comentario || "",
-      categoria_id: categoriaId,
-      arquivo_url: sug.arquivo_url,
-    });
+    const { data: novoManual, error: manErr } = await supabase
+      .from("manuais")
+      .insert({
+        titulo,
+        descricao: sug.comentario || "",
+        categoria_id: categoriaId,
+      })
+      .select("id")
+      .single();
 
     if (manErr) {
       toast.error("Erro ao criar manual: " + manErr.message);
       setSaving(false);
       return;
+    }
+
+    // Se a sugestão tem PDF, inserir em manuais_arquivos
+    if (sug.arquivo_url) {
+      const { error: arqErr } = await supabase.from("manuais_arquivos").insert({
+        manual_id: novoManual.id,
+        arquivo_url: sug.arquivo_url,
+        nome_exibicao: sug.titulo_sugerido || "PDF anexado",
+        status: "ativo",
+        enviado_por: sug.enviado_por,
+      });
+      if (arqErr) {
+        toast.error("Erro ao salvar arquivo: " + arqErr.message);
+        setSaving(false);
+        return;
+      }
     }
 
     // Atualizar sugestão
