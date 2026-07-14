@@ -11,11 +11,16 @@ CREATE TABLE IF NOT EXISTS manuais_arquivos (
   enviado_por TEXT NOT NULL DEFAULT ''
 );
 
--- 2. Migrar arquivos existentes
-INSERT INTO manuais_arquivos (manual_id, arquivo_url, nome_exibicao, status, enviado_por)
-SELECT id, arquivo_url, '', 'ativo', ''
-FROM manuais
-WHERE arquivo_url IS NOT NULL;
+-- 2. Migrar arquivos existentes (somente se a coluna ainda existir)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='manuais' AND column_name='arquivo_url') THEN
+    INSERT INTO manuais_arquivos (manual_id, arquivo_url, nome_exibicao, status, enviado_por)
+    SELECT id, arquivo_url, '', 'ativo', ''
+    FROM manuais
+    WHERE arquivo_url IS NOT NULL;
+  END IF;
+END $$;
 
 -- 3. Remover coluna antiga
 ALTER TABLE manuais DROP COLUMN IF EXISTS arquivo_url;
