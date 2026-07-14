@@ -22,6 +22,10 @@ import {
   Send,
   Pencil,
   Shield,
+  ScrollText,
+  FolderPlus,
+  ArrowRight,
+  Save,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
@@ -54,6 +58,14 @@ type ManualArquivo = {
   status: string;
   criado_em: string;
   enviado_por: string;
+};
+
+type LogEntry = {
+  id: number;
+  acao: string;
+  detalhes: Record<string, unknown>;
+  usuario: string;
+  criado_em: string;
 };
 
 type Sugestao = {
@@ -113,6 +125,22 @@ function ManuaisPage() {
   const [gerUploadFile, setGerUploadFile] = useState<File | null>(null);
   const [gerSaving, setGerSaving] = useState(false);
   const gerFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Modo editor
+  const [editMode, setEditMode] = useState(false);
+  const [editManualId, setEditManualId] = useState<number | null>(null);
+  const [editTitulo, setEditTitulo] = useState("");
+  const [editDescricao, setEditDescricao] = useState("");
+  const [editCategoriaId, setEditCategoriaId] = useState<number | null>(null);
+
+  // Nova categoria
+  const [showNovaCategoria, setShowNovaCategoria] = useState(false);
+  const [novaCatNome, setNovaCatNome] = useState("");
+  const [novaCatSaving, setNovaCatSaving] = useState(false);
+
+  // Histórico
+  const [showHistory, setShowHistory] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const sanitizarNome = (nome: string) => nome.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
 
@@ -264,6 +292,12 @@ function ManuaisPage() {
       return;
     }
 
+    const manual = manuais.find((m) => m.id === manualId);
+    await adicionarLog("adicionou_pdf", {
+      manual_id: manualId,
+      titulo: manual?.titulo,
+      nome_arquivo: gerUploadFile.name,
+    });
     toast.success("PDF adicionado com sucesso!");
     setGerUploadFile(null);
     setGerSaving(false);
@@ -286,6 +320,12 @@ function ManuaisPage() {
       toast.error("Erro ao remover: " + error.message);
       return;
     }
+    const manual = manuais.find((m) => m.id === arquivo.manual_id);
+    await adicionarLog("removeu_pdf", {
+      manual_id: arquivo.manual_id,
+      titulo: manual?.titulo,
+      nome_arquivo: arquivo.nome_exibicao,
+    });
     toast.success("Arquivo removido!");
     await carregarDados();
   };
@@ -302,6 +342,127 @@ function ManuaisPage() {
     }
     toast.success(novoStatus === "ativo" ? "Arquivo ativado!" : "Arquivo rejeitado.");
     await carregarDados();
+  };
+
+  // --- Adicionar entrada no log ---
+  const adicionarLog = async (acao: string, detalhes: Record<string, unknown> = {}) => {
+    await supabase.from("manuais_log").insert({
+      acao,
+      detalhes,
+      usuario: user?.email || "",
+    });
+  };
+
+  // --- Salvar edição do manual ---
+  const handleSalvarManual = async () => {
+    if (editManualId === null) return;
+    const manual = manuais.find((m) => m.id === editManualId);
+    if (!manual) return;
+
+    const updates: Record<string, unknown> = {};
+    const detalhes: Record<string, unknown> = { manual_id: editManualId };
+
+    if (editTitulo !== manual.titulo) {
+      updates.titulo = editTitulo;
+      detalhes.titulo_antigo = manual.titulo;
+      detalhes.titulo_novo = editTitulo;
+    }
+    if (editDescricao !== manual.descricao) {
+      updates.descricao = editDescricao;
+      detalhes.descricao_antiga = manual.descricao;
+      detalhes.descricao_nova = editDescricao;
+    }
+    if (editCategoriaId !== null && editCategoriaId !== manual.categoria_id) {
+      updates.categoria_id = editCategoriaId;
+      const catAntiga = categorias.find((c) => c.id === manual.categoria_id);
+      const catNova = categorias.find((c) => c.id === editCategoriaId);
+      detalhes.categoria_antiga = catAntiga?.nome_exibicao;
+      detalhes.categoria_nova = catNova?.nome_exibicao;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setEditManualId(null);
+      return;
+    }
+
+    const { error } = await supabase.from("manuais").update(updates).eq("id", editManualId);
+    if (error) {
+      toast.error("Erro ao salvar: " + error.message);
+      return;
+    }
+
+    await adicionarLog("editou_manual", detalhes);
+    toast.success("Manual atualizado!");
+    setEditManualId(null);
+    await carregarDados();
+  };
+
+  // --- Abrir edição do manual ---
+  const handleAbrirEdicao = (manual: Manual) => {
+    setEditManualId(manual.id);
+    setEditTitulo(manual.titulo);
+    setEditDescricao(manual.descricao);
+    setEditCategoriaId(manual.categoria_id);
+  };
+
+  // --- Mover manual para outra categoria (atalho rápido) ---
+  const handleMoverCategoria = async (manualId: number, novaCategoriaId: number) => {
+    const manual = manuais.find((m) => m.id === manualId);
+    const catAntiga = categorias.find((c) => c.id === manual?.categoria_id);
+    const catNova = categorias.find((c) => c.id === novaCategoriaId);
+    if (!manual || !catNova || manual.categoria_id === novaCategoriaId) return;
+
+    const { error } = await supabase
+      .from("manuais")
+      .update({ categoria_id: novaCategoriaId })
+      .eq("id", manualId);
+    if (error) {
+      toast.error("Erro ao mover: " + error.message);
+      return;
+    }
+    await adicionarLog("moveu_manual", {
+      manual_id: manualId,
+      titulo: manual.titulo,
+      categoria_antiga: catAntiga?.nome_exibicao,
+      categoria_nova: catNova.nome_exibicao,
+    });
+    toast.success(`"${manual.titulo}" movido para "${catNova.nome_exibicao}"`);
+    await carregarDados();
+  };
+
+  // --- Criar nova categoria ---
+  const handleCriarCategoria = async () => {
+    if (!novaCatNome.trim()) {
+      toast.error("Informe o nome da categoria.");
+      return;
+    }
+    setNovaCatSaving(true);
+    const chave = novaCatNome.trim().toLowerCase().replace(/\s+/g, "_");
+    const { error } = await supabase.from("manuais_categorias").insert({
+      chave,
+      nome_exibicao: novaCatNome.trim(),
+      ordem: categorias.length + 1,
+    });
+    if (error) {
+      toast.error("Erro ao criar categoria: " + error.message);
+      setNovaCatSaving(false);
+      return;
+    }
+    await adicionarLog("criou_categoria", { nome: novaCatNome.trim(), chave });
+    toast.success(`Categoria "${novaCatNome.trim()}" criada!`);
+    setNovaCatNome("");
+    setShowNovaCategoria(false);
+    setNovaCatSaving(false);
+    await carregarDados();
+  };
+
+  const carregarLogs = async () => {
+    const { data } = await supabase
+      .from("manuais_log")
+      .select("*")
+      .order("criado_em", { ascending: false })
+      .limit(200);
+    if (data) setLogs(data);
   };
 
   const podeMostrar = profile?.cargo_id && permissoes.size > 0;
@@ -325,12 +486,26 @@ function ManuaisPage() {
               <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Manuais e Normas</p>
             </div>
           </div>
-          <Link
-            to="/"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
-          >
-            <Home className="h-5 w-5" />
-          </Link>
+          <div className="flex items-center gap-2">
+            {podeEditarArquivo && (
+              <button
+                onClick={() => {
+                  setShowHistory(true);
+                  carregarLogs();
+                }}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
+                title="Histórico de alterações"
+              >
+                <ScrollText className="h-5 w-5" />
+              </button>
+            )}
+            <Link
+              to="/"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
+            >
+              <Home className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -339,6 +514,11 @@ function ManuaisPage() {
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-[#1f7ad6]" />
           <h2 className="text-lg font-bold text-[#0b3a73] dark:text-white">Manuais Técnicos</h2>
+          {editMode && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+              MODO EDIÇÃO
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {podeEditarArquivo && (
@@ -349,6 +529,19 @@ function ManuaisPage() {
               <ThumbsUp className="h-4 w-4" />
               Avaliar
             </Link>
+          )}
+          {podeEditarArquivo && (
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] font-semibold shadow-sm cursor-pointer ${
+                editMode
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              }`}
+            >
+              <Pencil className="h-4 w-4" />
+              {editMode ? "Sair da Edição" : "Editar"}
+            </button>
           )}
           <button
             onClick={() => setShowSugestao(true)}
@@ -373,7 +566,7 @@ function ManuaisPage() {
       </div>
 
       {/* Abas */}
-      <div className="mb-6 flex gap-1 border-b border-slate-200 dark:border-slate-700">
+      <div className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700">
         {abas.map((aba) => (
           <button
             key={aba.chave}
@@ -387,6 +580,15 @@ function ManuaisPage() {
             {aba.label}
           </button>
         ))}
+        {editMode && (
+          <button
+            onClick={() => setShowNovaCategoria(true)}
+            className="px-4 py-2.5 text-[13px] font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer border-b-2 border-transparent hover:border-emerald-400 flex items-center gap-1"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nova Categoria
+          </button>
+        )}
       </div>
 
       {/* Conteúdo */}
@@ -425,11 +627,13 @@ function ManuaisPage() {
                 key={manual.id}
                 className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
               >
-                {/* Botão gerenciar arquivos (só para quem tem permissão) */}
-                {podeEditarArquivo && (
+                {/* Botão gerenciar arquivos */}
+                {(podeEditarArquivo || editMode) && (
                   <button
                     onClick={() => setGerenciarManualId(manual.id)}
-                    className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-slate-400 opacity-0 shadow-sm transition hover:bg-white hover:text-[#1f7ad6] group-hover:opacity-100 dark:bg-slate-700/80 dark:hover:bg-slate-700"
+                    className={`absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-slate-400 shadow-sm transition hover:bg-white hover:text-[#1f7ad6] dark:bg-slate-700/80 dark:hover:bg-slate-700 ${
+                      editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}
                     title="Gerenciar arquivos"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -443,12 +647,67 @@ function ManuaisPage() {
                       <Icone className={`h-5 w-5 ${cor.cor}`} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                        {manual.titulo}
-                      </h3>
-                      <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                        {manual.descricao}
-                      </p>
+                      {editMode && editManualId === manual.id ? (
+                        <div className="space-y-2">
+                          <input
+                            value={editTitulo}
+                            onChange={(e) => setEditTitulo(e.target.value)}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-sm font-bold text-slate-800 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100"
+                          />
+                          <input
+                            value={editDescricao}
+                            onChange={(e) => setEditDescricao(e.target.value)}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-[12px] text-slate-600 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-300"
+                          />
+                          <div className="flex gap-1">
+                            <select
+                              value={editCategoriaId ?? ""}
+                              onChange={(e) => setEditCategoriaId(Number(e.target.value))}
+                              className="flex-1 rounded border border-slate-300 px-1 py-1 text-[11px] outline-none dark:border-slate-500 dark:bg-slate-700 dark:text-slate-200"
+                            >
+                              {categorias.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.nome_exibicao}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={handleSalvarManual}
+                              className="rounded bg-emerald-600 px-2 py-1 text-white hover:bg-emerald-700"
+                              title="Salvar"
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setEditManualId(null)}
+                              className="rounded bg-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-400 dark:bg-slate-600 dark:text-slate-300"
+                              title="Cancelar"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                              {manual.titulo}
+                            </h3>
+                            <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                              {manual.descricao}
+                            </p>
+                          </div>
+                          {editMode && (
+                            <button
+                              onClick={() => handleAbrirEdicao(manual)}
+                              className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-[#1f7ad6] dark:hover:bg-slate-600"
+                              title="Editar manual"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -488,6 +747,30 @@ function ManuaisPage() {
                       </div>
                     ));
                   })()}
+
+                  {/* Mover para outra categoria (modo edição) */}
+                  {editMode && editManualId !== manual.id && (
+                    <div className="flex items-center gap-1 pt-1">
+                      <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) handleMoverCategoria(manual.id, Number(val));
+                        }}
+                        className="flex-1 rounded border border-slate-200 px-1 py-1 text-[11px] text-slate-500 outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400"
+                      >
+                        <option value="">Mover para...</option>
+                        {categorias
+                          .filter((c) => c.id !== manual.categoria_id)
+                          .map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.nome_exibicao}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -615,6 +898,123 @@ function ManuaisPage() {
                   Nenhum arquivo enviado ainda.
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Histórico */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-lg dark:bg-slate-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#0b3a73] dark:text-white">
+                <ScrollText className="mr-2 inline h-5 w-5" />
+                Histórico de Alterações
+              </h3>
+              <button
+                onClick={() => setShowHistory(false)}
+                className="cursor-pointer text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-96 space-y-2 overflow-y-auto">
+              {logs.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">
+                  Nenhuma alteração registrada.
+                </p>
+              ) : (
+                logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 dark:border-slate-700"
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      {log.acao === "adicionou_pdf" && <Upload className="h-4 w-4 text-blue-500" />}
+                      {log.acao === "removeu_pdf" && <X className="h-4 w-4 text-red-500" />}
+                      {log.acao === "editou_manual" && (
+                        <Pencil className="h-4 w-4 text-amber-500" />
+                      )}
+                      {log.acao === "moveu_manual" && (
+                        <ArrowRight className="h-4 w-4 text-purple-500" />
+                      )}
+                      {log.acao === "criou_categoria" && (
+                        <FolderPlus className="h-4 w-4 text-emerald-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] text-slate-700 dark:text-slate-200">
+                        {log.acao === "adicionou_pdf" &&
+                          `Adicionou PDF "${log.detalhes?.nome_arquivo}" ao "${log.detalhes?.titulo}"`}
+                        {log.acao === "removeu_pdf" &&
+                          `Removeu PDF "${log.detalhes?.nome_arquivo}" do "${log.detalhes?.titulo}"`}
+                        {log.acao === "editou_manual" && (
+                          <>
+                            Editou "{log.detalhes?.titulo_antigo || log.detalhes?.titulo_novo}"
+                            {log.detalhes?.titulo_antigo !== log.detalhes?.titulo_novo &&
+                              ` ("${log.detalhes?.titulo_antigo}" → "${log.detalhes?.titulo_novo}")`}
+                          </>
+                        )}
+                        {log.acao === "moveu_manual" &&
+                          `Moveu "${log.detalhes?.titulo}" de "${log.detalhes?.categoria_antiga}" para "${log.detalhes?.categoria_nova}"`}
+                        {log.acao === "criou_categoria" &&
+                          `Criou categoria "${log.detalhes?.nome}"`}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {log.usuario} · {new Date(log.criado_em).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova Categoria */}
+      {showNovaCategoria && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-slate-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#0b3a73] dark:text-white">
+                <FolderPlus className="mr-2 inline h-5 w-5 text-emerald-500" />
+                Nova Categoria
+              </h3>
+              <button
+                onClick={() => {
+                  setShowNovaCategoria(false);
+                  setNovaCatNome("");
+                }}
+                className="cursor-pointer text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <input
+              value={novaCatNome}
+              onChange={(e) => setNovaCatNome(e.target.value)}
+              placeholder="Nome da nova categoria (ex: NR's, Segurança, etc.)"
+              className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-emerald-400 focus:ring-2 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleCriarCategoria}
+                disabled={novaCatSaving || !novaCatNome.trim()}
+                className="flex-1 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+              >
+                {novaCatSaving ? "Criando..." : "Criar Categoria"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowNovaCategoria(false);
+                  setNovaCatNome("");
+                }}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
