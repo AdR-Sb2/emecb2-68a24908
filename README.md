@@ -239,11 +239,13 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 
 ## 5. Histórico de Mudanças
 
-### [2026-07-14] — Manuais: permissão "Ver apenas com PDF" para Técnicos
+### [2026-07-14] — Manuais: toggle "Apenas com PDF" visível para todos + cache reset
 
-- **Permissão `manuais.ver_com_pdf`**: Técnicos com esta permissão enxergam **somente manuais que já possuem PDF ativo** — ideal para o dia a dia operacional
-- **Badge "APENAS COM PDF"** visível no cabeçalho quando o filtro está ativo
-- Migration `00033` cria a permissão e a atribui ao cargo Técnico
+- **Toggle "Apenas com PDF"**: chip visível para todos os usuários na área de filtros — qualquer um pode ativar/desativar
+- Estado padrão do toggle é determinado pela permissão `manuais.ver_com_pdf` (ON para Técnicos, OFF para Admins/Supervisores)
+- **Badge "APENAS COM PDF"** no cabeçalho quando o toggle está ativo
+- `clearPermissoesCache()` chamado no mount para evitar cache stale
+- Migration `00033` atualizada: concede a permissão a Administrador, Supervisor e Técnico
 
 ### [2026-07-14] — Manuais: Inversores unificado, exclusão de categorias, filtro por fabricante
 
