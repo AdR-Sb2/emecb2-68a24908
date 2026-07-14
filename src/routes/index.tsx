@@ -25,6 +25,7 @@ import {
 import logoHeader from "@/assets/logo-branca.png";
 import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
+import { getPermissoesCargo, temPermissao } from "../lib/permissoes";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -85,6 +86,7 @@ function Index() {
   const [loadingPaineis, setLoadingPaineis] = useState(true);
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
+  const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
     if (loading) return;
@@ -108,13 +110,17 @@ function Index() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("cargo_paineis")
-        .select("painel_id, paineis!inner(chave, nome_exibicao, descricao, icone)")
-        .eq("cargo_id", profile.cargo_id);
-      if (data) {
-        setPaineis(data.map((r: { paineis: unknown }) => r.paineis as unknown as Painel));
+      const [panelsRes, perms] = await Promise.all([
+        supabase
+          .from("cargo_paineis")
+          .select("painel_id, paineis!inner(chave, nome_exibicao, descricao, icone)")
+          .eq("cargo_id", profile.cargo_id),
+        getPermissoesCargo(profile.cargo_id),
+      ]);
+      if (panelsRes.data) {
+        setPaineis(panelsRes.data.map((r: { paineis: unknown }) => r.paineis as unknown as Painel));
       }
+      setPermissoes(perms);
       setLoadingPaineis(false);
     })();
   }, [profile?.cargo_id]);
@@ -323,34 +329,38 @@ function Index() {
             <DialogDescription>Qual hub você quer abrir?</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <a
-              href={SISTEMAS_ADMINISTRATIVO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setSysOpen(false)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-            >
-              <div>
-                <div className="font-semibold text-[#0b3a73] dark:text-white">Administrativo</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  Gestão administrativa
+            {temPermissao(permissoes, "sistemas", "administrativo") && (
+              <a
+                href={SISTEMAS_ADMINISTRATIVO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setSysOpen(false)}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
+              >
+                <div>
+                  <div className="font-semibold text-[#0b3a73] dark:text-white">Administrativo</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Gestão administrativa
+                  </div>
                 </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
-            </a>
-            <a
-              href={SISTEMAS_OPERACIONAL_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setSysOpen(false)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-            >
-              <div>
-                <div className="font-semibold text-[#0b3a73] dark:text-white">Operacional</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Gestão de Ativos</div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
-            </a>
+                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
+              </a>
+            )}
+            {temPermissao(permissoes, "sistemas", "operacional") && (
+              <a
+                href={SISTEMAS_OPERACIONAL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setSysOpen(false)}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
+              >
+                <div>
+                  <div className="font-semibold text-[#0b3a73] dark:text-white">Operacional</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Gestão de Ativos</div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
+              </a>
+            )}
           </div>
         </DialogContent>
       </Dialog>
