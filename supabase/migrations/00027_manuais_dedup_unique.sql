@@ -8,4 +8,9 @@ WHERE a.id > b.id
   AND a.categoria_id = b.categoria_id;
 
 -- 2. Adicionar UNIQUE para evitar futuras duplicatas
-ALTER TABLE manuais ADD CONSTRAINT manuais_titulo_categoria_key UNIQUE (titulo, categoria_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'manuais_titulo_categoria_key') THEN
+    ALTER TABLE manuais ADD CONSTRAINT manuais_titulo_categoria_key UNIQUE (titulo, categoria_id);
+  END IF;
+END $$;
