@@ -44,7 +44,16 @@ type Manual = {
   titulo: string;
   descricao: string;
   categoria_id: number;
-  arquivo_url: string | null;
+};
+
+type ManualArquivo = {
+  id: number;
+  manual_id: number;
+  arquivo_url: string;
+  nome_exibicao: string;
+  status: string;
+  criado_em: string;
+  enviado_por: string;
 };
 
 type Sugestao = {
@@ -88,6 +97,7 @@ function ManuaisPage() {
   const [search, setSearch] = useState("");
   const [showSugestao, setShowSugestao] = useState(false);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
+  const [arquivos, setArquivos] = useState<ManualArquivo[]>([]);
 
   // Sugestão form
   const [sugTipo, setSugTipo] = useState<"pdf" | "texto">("pdf");
@@ -98,11 +108,11 @@ function ManuaisPage() {
   const [sugSaving, setSugSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Upload PDF (admin)
-  const [uploadManualId, setUploadManualId] = useState<number | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadSaving, setUploadSaving] = useState(false);
-  const uploadInputRef = useRef<HTMLInputElement>(null);
+  // Gerenciar arquivos (admin)
+  const [gerenciarManualId, setGerenciarManualId] = useState<number | null>(null);
+  const [gerUploadFile, setGerUploadFile] = useState<File | null>(null);
+  const [gerSaving, setGerSaving] = useState(false);
+  const gerFileInputRef = useRef<HTMLInputElement>(null);
 
   const sanitizarNome = (nome: string) => nome.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
 
@@ -110,15 +120,21 @@ function ManuaisPage() {
     return temPermissao(permissoes, "manuais", "editar_arquivo");
   }, [permissoes]);
 
+  const podeRemoverArquivo = useMemo(() => {
+    return temPermissao(permissoes, "manuais", "remover_arquivo");
+  }, [permissoes]);
+
   // --- Carregar dados ---
   const carregarDados = async () => {
     setLoading(true);
-    const [catRes, manRes] = await Promise.all([
+    const [catRes, manRes, arqRes] = await Promise.all([
       supabase.from("manuais_categorias").select("*").eq("ativo", true).order("ordem"),
       supabase.from("manuais").select("*").order("titulo"),
+      supabase.from("manuais_arquivos").select("*").order("criado_em"),
     ]);
     if (catRes.data) setCategorias(catRes.data);
     if (manRes.data) setManuais(manRes.data);
+    if (arqRes.data) setArquivos(arqRes.data);
     setLoading(false);
   };
 
@@ -216,39 +232,75 @@ function ManuaisPage() {
   };
 
   // --- Upload PDF no manual (admin) ---
-  const handleUploadManual = async (manualId: number) => {
-    if (!uploadFile) {
+  const handleUploadArquivo = async (manualId: number) => {
+    if (!gerUploadFile) {
       toast.error("Selecione um PDF.");
       return;
     }
-    setUploadSaving(true);
-    const nomeArquivo = `manuais/${manualId}_${Date.now()}_${sanitizarNome(uploadFile.name)}`;
+    setGerSaving(true);
+    const nomeArquivo = `manuais/${manualId}_${Date.now()}_${sanitizarNome(gerUploadFile.name)}`;
     const { error: uploadErr } = await supabase.storage
       .from("manuais")
-      .upload(nomeArquivo, uploadFile);
+      .upload(nomeArquivo, gerUploadFile);
     if (uploadErr) {
       toast.error("Erro ao enviar PDF: " + uploadErr.message);
-      setUploadSaving(false);
+      setGerSaving(false);
       return;
     }
     const { data: urlData } = supabase.storage.from("manuais").getPublicUrl(nomeArquivo);
     const arquivoUrl = urlData?.publicUrl || null;
 
-    const { error } = await supabase
-      .from("manuais")
-      .update({ arquivo_url: arquivoUrl })
-      .eq("id", manualId);
+    const { error } = await supabase.from("manuais_arquivos").insert({
+      manual_id: manualId,
+      arquivo_url: arquivoUrl,
+      nome_exibicao: gerUploadFile.name,
+      status: "ativo",
+      enviado_por: user?.email || "",
+    });
 
     if (error) {
       toast.error("Erro ao salvar: " + error.message);
-      setUploadSaving(false);
+      setGerSaving(false);
       return;
     }
 
-    toast.success("PDF atualizado com sucesso!");
-    setUploadManualId(null);
-    setUploadFile(null);
-    setUploadSaving(false);
+    toast.success("PDF adicionado com sucesso!");
+    setGerUploadFile(null);
+    setGerSaving(false);
+    await carregarDados();
+  };
+
+  // --- Remover arquivo ---
+  const handleRemoverArquivo = async (arquivo: ManualArquivo) => {
+    if (!podeRemoverArquivo) {
+      toast.error("Sem permissão para remover arquivos.");
+      return;
+    }
+    const parts = arquivo.arquivo_url.split("/public/manuais/");
+    const storagePath = parts.length > 1 ? parts[1] : null;
+    if (storagePath) {
+      await supabase.storage.from("manuais").remove([storagePath]);
+    }
+    const { error } = await supabase.from("manuais_arquivos").delete().eq("id", arquivo.id);
+    if (error) {
+      toast.error("Erro ao remover: " + error.message);
+      return;
+    }
+    toast.success("Arquivo removido!");
+    await carregarDados();
+  };
+
+  // --- Alternar status do arquivo (aprovar/rejeitar) ---
+  const handleToggleStatus = async (arquivo: ManualArquivo, novoStatus: string) => {
+    const { error } = await supabase
+      .from("manuais_arquivos")
+      .update({ status: novoStatus })
+      .eq("id", arquivo.id);
+    if (error) {
+      toast.error("Erro ao atualizar: " + error.message);
+      return;
+    }
+    toast.success(novoStatus === "ativo" ? "Arquivo ativado!" : "Arquivo rejeitado.");
     await carregarDados();
   };
 
@@ -373,12 +425,12 @@ function ManuaisPage() {
                 key={manual.id}
                 className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
               >
-                {/* Botão editar PDF (só para quem tem permissão) */}
+                {/* Botão gerenciar arquivos (só para quem tem permissão) */}
                 {podeEditarArquivo && (
                   <button
-                    onClick={() => setUploadManualId(manual.id)}
+                    onClick={() => setGerenciarManualId(manual.id)}
                     className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-slate-400 opacity-0 shadow-sm transition hover:bg-white hover:text-[#1f7ad6] group-hover:opacity-100 dark:bg-slate-700/80 dark:hover:bg-slate-700"
-                    title={manual.arquivo_url ? "Trocar PDF" : "Adicionar PDF"}
+                    title="Gerenciar arquivos"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -400,68 +452,171 @@ function ManuaisPage() {
                     </div>
                   </div>
                 </div>
-                <div className="p-4 pt-3">
-                  {manual.arquivo_url ? (
-                    <a
-                      href={manual.arquivo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[#1f7ad6] px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-[#0b3a73]"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Abrir PDF
-                    </a>
-                  ) : (
-                    <div className="flex items-center justify-center gap-1.5 rounded-md bg-slate-100 px-3 py-2 text-[12px] font-medium text-slate-400 dark:bg-slate-700 dark:text-slate-500">
-                      <FileText className="h-3.5 w-3.5" />
-                      PDF pendente de upload
-                    </div>
-                  )}
-                </div>
-
-                {/* Modal de upload inline */}
-                {uploadManualId === manual.id && (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/95 backdrop-blur-sm dark:bg-slate-800/95">
-                    <div className="w-full max-w-xs p-4 text-center">
-                      <p className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        {manual.arquivo_url ? "Trocar PDF" : "Adicionar PDF"}
-                      </p>
-                      <input
-                        ref={uploadInputRef}
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                        className="mb-2 w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#1f7ad6] file:px-2 file:py-1 file:text-xs file:text-white"
-                      />
-                      {uploadFile && (
-                        <p className="mb-2 text-[11px] text-slate-500 truncate">
-                          {uploadFile.name}
-                        </p>
-                      )}
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => handleUploadManual(manual.id)}
-                          disabled={!uploadFile || uploadSaving}
-                          className="rounded-md bg-[#1f7ad6] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b3a73] disabled:opacity-50 cursor-pointer"
+                <div className="p-4 pt-3 space-y-1.5">
+                  {(() => {
+                    const ativos = arquivos.filter(
+                      (a) => a.manual_id === manual.id && a.status === "ativo",
+                    );
+                    if (ativos.length === 0) {
+                      return (
+                        <div className="flex items-center justify-center gap-1.5 rounded-md bg-slate-100 px-3 py-2 text-[12px] font-medium text-slate-400 dark:bg-slate-700 dark:text-slate-500">
+                          <FileText className="h-3.5 w-3.5" />
+                          PDF pendente de upload
+                        </div>
+                      );
+                    }
+                    return ativos.map((arq) => (
+                      <div key={arq.id} className="flex items-center gap-1">
+                        <a
+                          href={arq.arquivo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 inline-flex items-center gap-1.5 rounded-md bg-[#1f7ad6] px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-[#0b3a73] overflow-hidden"
                         >
-                          {uploadSaving ? "Salvando..." : "Salvar"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setUploadManualId(null);
-                            setUploadFile(null);
-                          }}
-                          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
-                        >
-                          Cancelar
-                        </button>
+                          <Eye className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{arq.nome_exibicao || "Abrir PDF"}</span>
+                        </a>
+                        {podeRemoverArquivo && (
+                          <button
+                            onClick={() => handleRemoverArquivo(arq)}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 dark:bg-red-950/30 dark:hover:bg-red-950/50"
+                            title="Remover arquivo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                )}
+                    ));
+                  })()}
+                </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal Gerenciar Arquivos */}
+      {gerenciarManualId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg dark:bg-slate-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#0b3a73] dark:text-white">
+                Gerenciar Arquivos
+              </h3>
+              <button
+                onClick={() => {
+                  setGerenciarManualId(null);
+                  setGerUploadFile(null);
+                }}
+                className="cursor-pointer text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Upload novo arquivo */}
+            <div className="mb-4 rounded-lg border-2 border-dashed border-slate-200 p-4 dark:border-slate-600">
+              <p className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                Adicionar novo PDF
+              </p>
+              <input
+                ref={gerFileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setGerUploadFile(e.target.files?.[0] || null)}
+                className="mb-2 w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#1f7ad6] file:px-2 file:py-1 file:text-xs file:text-white"
+              />
+              {gerUploadFile && (
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 truncate text-[11px] text-slate-500">{gerUploadFile.name}</p>
+                  <button
+                    onClick={() => handleUploadArquivo(gerenciarManualId)}
+                    disabled={gerSaving}
+                    className="rounded-md bg-[#1f7ad6] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0b3a73] disabled:opacity-50 cursor-pointer"
+                  >
+                    {gerSaving ? "Enviando..." : "Enviar"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Lista de arquivos */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {arquivos
+                .filter((a) => a.manual_id === gerenciarManualId)
+                .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
+                .map((arq) => (
+                  <div
+                    key={arq.id}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-600"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-slate-700 dark:text-slate-200">
+                        {arq.nome_exibicao || "Sem nome"}
+                      </p>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                        <span
+                          className={`rounded px-1 py-0.5 text-[10px] font-semibold ${
+                            arq.status === "ativo"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                              : arq.status === "rejeitado"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"
+                          }`}
+                        >
+                          {arq.status}
+                        </span>
+                        <span>{new Date(arq.criado_em).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={arq.arquivo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-[#1f7ad6] dark:hover:bg-slate-600"
+                        title="Visualizar"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </a>
+                      {podeEditarArquivo && arq.status !== "ativo" && (
+                        <button
+                          onClick={() => handleToggleStatus(arq, "ativo")}
+                          className="flex h-7 w-7 items-center justify-center rounded text-green-400 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-950/30"
+                          title="Aprovar"
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {podeEditarArquivo && arq.status !== "rejeitado" && (
+                        <button
+                          onClick={() => handleToggleStatus(arq, "rejeitado")}
+                          className="flex h-7 w-7 items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                          title="Rejeitar"
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {podeRemoverArquivo && (
+                        <button
+                          onClick={() => handleRemoverArquivo(arq)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+                          title="Remover"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              {arquivos.filter((a) => a.manual_id === gerenciarManualId).length === 0 && (
+                <p className="py-4 text-center text-sm text-slate-400">
+                  Nenhum arquivo enviado ainda.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
