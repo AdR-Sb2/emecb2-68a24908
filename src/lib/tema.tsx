@@ -18,7 +18,13 @@ export function useTema() {
   return useContext(TemaContext);
 }
 
-export function TemaProvider({ children, userId }: { children: ReactNode; userId?: string | null }) {
+export function TemaProvider({
+  children,
+  userId,
+}: {
+  children: ReactNode;
+  userId?: string | null;
+}) {
   const [tema, setTema] = useState<Tema>(() => {
     if (typeof localStorage === "undefined") return "light";
     const saved = localStorage.getItem("tema_preferido") as Tema | null;
@@ -57,11 +63,7 @@ export function TemaProvider({ children, userId }: { children: ReactNode; userId
     });
   }, [userId]);
 
-  return (
-    <TemaContext.Provider value={{ tema, alternarTema }}>
-      {children}
-    </TemaContext.Provider>
-  );
+  return <TemaContext.Provider value={{ tema, alternarTema }}>{children}</TemaContext.Provider>;
 }
 
 export function ThemeToggle() {
@@ -73,11 +75,7 @@ export function ThemeToggle() {
       title={tema === "light" ? "Ativar modo escuro" : "Ativar modo claro"}
       className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
     >
-      {tema === "light" ? (
-        <Moon className="h-5 w-5" />
-      ) : (
-        <Sun className="h-5 w-5" />
-      )}
+      {tema === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
     </button>
   );
 }

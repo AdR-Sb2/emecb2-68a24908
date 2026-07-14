@@ -46,8 +46,6 @@ type Painel = {
   icone: string;
 };
 
-
-
 const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = {
   dashboard: { bg: "bg-blue-100", icon: "text-blue-600", ring: "hover:ring-blue-300" },
   sistemas: { bg: "bg-emerald-100", icon: "text-emerald-600", ring: "hover:ring-emerald-300" },
@@ -87,7 +85,6 @@ function Index() {
   const [loadingPaineis, setLoadingPaineis] = useState(true);
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
-  
 
   useEffect(() => {
     if (loading) return;
@@ -126,7 +123,8 @@ function Index() {
 
   const hasPanel = (chave: string) => paineis.some((p) => p.chave === chave);
   const hasFallbackPanels = paineis.length === 0;
-  const shouldShowDashboard = hasPanel("dashboard_automacao") || hasPanel("dashboard_testes") || hasFallbackPanels;
+  const shouldShowDashboard =
+    hasPanel("dashboard_automacao") || hasPanel("dashboard_testes") || hasFallbackPanels;
   const shouldShowSistema = hasPanel("sistemas") || hasFallbackPanels;
   const shouldShowRelatorio = hasPanel("relatorio_tecnico") || hasFallbackPanels;
   const shouldShowBacklog = hasPanel("dashboard_os") || hasFallbackPanels;
@@ -185,11 +183,10 @@ function Index() {
       </header>
 
       <div className="mx-auto max-w-5xl px-4 pt-8 md:px-6 md:pt-12">
-
         {/* Loading */}
         {loadingPaineis ? (
           <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[#1f7ad6]" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#1f7ad6] dark:text-[#38bdf8]" />
           </div>
         ) : (
           /* ===== GRADE DE CARDS ===== */
@@ -267,7 +264,7 @@ function Index() {
         )}
 
         {/* Footer */}
-        <p className="mt-10 text-center text-xs text-slate-400 md:mt-16">
+        <p className="mt-10 text-center text-xs text-slate-400 dark:text-slate-500 md:mt-16">
           Águas do Rio · Eletromecânica
         </p>
       </div>
@@ -276,7 +273,9 @@ function Index() {
       <Dialog open={dashOpen} onOpenChange={setDashOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#0b3a73]">Escolha um dashboard</DialogTitle>
+            <DialogTitle className="text-[#0b3a73] dark:text-white">
+              Escolha um dashboard
+            </DialogTitle>
             <DialogDescription>Qual painel você quer abrir?</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
@@ -284,30 +283,32 @@ function Index() {
               <Link
                 to="/dashboard"
                 onClick={() => setDashOpen(false)}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
               >
                 <div>
-                  <div className="font-semibold text-[#0b3a73]">Automação</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="font-semibold text-[#0b3a73] dark:text-white">Automação</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     Elevatórias · sensores · CLP/PCP · ELIPSE
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
               </Link>
             )}
             {hasPanel("dashboard_testes") && (
               <Link
                 to="/testes"
                 onClick={() => setDashOpen(false)}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
               >
                 <div>
-                  <div className="font-semibold text-[#0b3a73]">Testes & Aferições</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="font-semibold text-[#0b3a73] dark:text-white">
+                    Testes & Aferições
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     Serviços · equipes · parâmetros · impossibilidade
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
               </Link>
             )}
           </div>
@@ -318,7 +319,7 @@ function Index() {
       <Dialog open={sysOpen} onOpenChange={setSysOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[#0b3a73]">Escolha um sistema</DialogTitle>
+            <DialogTitle className="text-[#0b3a73] dark:text-white">Escolha um sistema</DialogTitle>
             <DialogDescription>Qual hub você quer abrir?</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
@@ -327,26 +328,28 @@ function Index() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setSysOpen(false)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
+              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
             >
               <div>
-                <div className="font-semibold text-[#0b3a73]">Administrativo</div>
-                <div className="text-xs text-slate-500">Gestão administrativa</div>
+                <div className="font-semibold text-[#0b3a73] dark:text-white">Administrativo</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Gestão administrativa
+                </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+              <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
             </a>
             <a
               href={SISTEMAS_OPERACIONAL_URL}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setSysOpen(false)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb]"
+              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
             >
               <div>
-                <div className="font-semibold text-[#0b3a73]">Operacional</div>
-                <div className="text-xs text-slate-500">Gestão de Ativos</div>
+                <div className="font-semibold text-[#0b3a73] dark:text-white">Operacional</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Gestão de Ativos</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-[#1f7ad6]" />
+              <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
             </a>
           </div>
         </DialogContent>
@@ -361,7 +364,7 @@ function CardIcon({ chave, icon: Icon }: { chave: string; icon: typeof LayoutDas
   const color = getCardColor(chave);
   return (
     <div
-      className={`flex h-14 w-14 items-center justify-center rounded-xl ${color.bg} ${color.icon} shadow-sm`}
+      className={`flex h-14 w-14 items-center justify-center rounded-xl ${color.bg} dark:bg-slate-700 ${color.icon} dark:text-slate-300 shadow-sm`}
     >
       <Icon className="h-7 w-7" />
     </div>
@@ -378,7 +381,7 @@ function CardDesc({ children }: { children: string }) {
 
 function CardCta({ children }: { children: string }) {
   return (
-    <span className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-[#1f7ad6] opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1">
+    <span className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-[#1f7ad6] dark:text-[#38bdf8] opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1">
       {children} <ArrowRight className="h-4 w-4" />
     </span>
   );
@@ -434,17 +437,21 @@ function CardLink({
 function CardDisabled({ delay }: { delay: number }) {
   return (
     <div
-      className="group flex animate-card cursor-not-allowed flex-col items-start gap-4 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-7 text-left opacity-60 shadow-sm"
+      className="group flex animate-card cursor-not-allowed flex-col items-start gap-4 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-7 text-left opacity-60 shadow-sm dark:border-slate-600 dark:bg-slate-800/50"
       style={{ animationDelay: `${delay * 80}ms` }}
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400 shadow-sm">
+      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400 shadow-sm dark:bg-slate-700 dark:text-slate-500">
         <MoreHorizontal className="h-7 w-7" />
       </div>
       <div>
-        <h2 className="text-lg font-semibold text-slate-400">Outros Sistemas</h2>
-        <p className="text-sm leading-relaxed text-slate-400">Novos módulos serão adicionados aqui.</p>
+        <h2 className="text-lg font-semibold text-slate-400 dark:text-slate-500">
+          Outros Sistemas
+        </h2>
+        <p className="text-sm leading-relaxed text-slate-400 dark:text-slate-500">
+          Novos módulos serão adicionados aqui.
+        </p>
       </div>
-      <span className="mt-auto inline-flex items-center rounded-full border border-slate-300 bg-slate-100/70 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <span className="mt-auto inline-flex items-center rounded-full border border-slate-300 bg-slate-100/70 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-400">
         Em breve
       </span>
     </div>

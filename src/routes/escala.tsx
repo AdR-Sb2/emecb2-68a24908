@@ -90,10 +90,7 @@ function isWeekend(d: Date): boolean {
   return d.getDay() === 0 || d.getDay() === 6;
 }
 
-function calcularStatusPorFormula(
-  col: Colaborador,
-  data: Date,
-): "TRABALHA" | "FOLGA" | null {
+function calcularStatusPorFormula(col: Colaborador, data: Date): "TRABALHA" | "FOLGA" | null {
   const escala = col.escala;
   const esc = escala.toUpperCase();
   if (esc === "COMERCIAL") {
@@ -199,9 +196,7 @@ function EscalaPage() {
       for (const d of diasSemana) {
         const iso = formatDateISO(d);
         // 1. Verifica se há registro manual/editado
-        const manual = escalaDias.find(
-          (ed) => ed.colaborador_id === col.id && ed.data === iso,
-        );
+        const manual = escalaDias.find((ed) => ed.colaborador_id === col.id && ed.data === iso);
         if (manual) {
           row[iso] = manual.status;
           continue;
@@ -222,14 +217,11 @@ function EscalaPage() {
 
   // --- Colaboradores filtrados ---
   const colaboradoresFiltrados = useMemo(() => {
-    let result = colaboradores.filter((c) => {
+    const result = colaboradores.filter((c) => {
       if (filtroEquipe !== "TODAS" && c.equipe !== filtroEquipe) return false;
       if (filtroEscala !== "TODAS" && c.escala !== filtroEscala) return false;
       if (filtroFuncao !== "TODAS" && c.funcao !== filtroFuncao) return false;
-      if (
-        searchNome &&
-        !c.colaborador.toLowerCase().includes(searchNome.toLowerCase())
-      )
+      if (searchNome && !c.colaborador.toLowerCase().includes(searchNome.toLowerCase()))
         return false;
       return true;
     });
@@ -310,9 +302,7 @@ function EscalaPage() {
     if (!col) return;
     const atual = gridStatus[colId]?.[data] || "FOLGA";
     const novoStatus = atual === "TRABALHA" ? "FOLGA" : "TRABALHA";
-    const existente = escalaDias.find(
-      (ed) => ed.colaborador_id === colId && ed.data === data,
-    );
+    const existente = escalaDias.find((ed) => ed.colaborador_id === colId && ed.data === data);
 
     if (existente) {
       const { error } = await supabase
@@ -345,10 +335,18 @@ function EscalaPage() {
       }
       setEscalaDias((prev) => [
         ...prev,
-        { id: insertResult.id, colaborador_id: colId, data, status: novoStatus, editado_manual: true },
+        {
+          id: insertResult.id,
+          colaborador_id: colId,
+          data,
+          status: novoStatus,
+          editado_manual: true,
+        },
       ]);
     }
-    toast.success(`${col.colaborador}: ${novoStatus} em ${formatDateHeader(new Date(data + "T12:00:00"))}`);
+    toast.success(
+      `${col.colaborador}: ${novoStatus} em ${formatDateHeader(new Date(data + "T12:00:00"))}`,
+    );
   };
 
   // --- Importar Excel ---
@@ -367,7 +365,13 @@ function EscalaPage() {
       let dateRow = -1;
       for (let i = 0; i < Math.min(10, rows.length); i++) {
         const r = rows[i];
-        if (r && String(r[0] || "").trim().toUpperCase() === "EQUIPE") headerRow = i;
+        if (
+          r &&
+          String(r[0] || "")
+            .trim()
+            .toUpperCase() === "EQUIPE"
+        )
+          headerRow = i;
       }
       if (headerRow < 0) {
         toast.error("Formato de planilha não reconhecido. Procure a aba 'ESCALA EQUIPES'.");
@@ -380,7 +384,15 @@ function EscalaPage() {
       const dateSerials = rows[dateRow] as (number | null)[];
 
       // Identificar colunas fixas e colunas de data
-      const colunasFixas = ["EQUIPE", "HORARIO", "COLABORADOR", "LOGIN SAP", "LOGIN FIELD", "FUNÇÃO", "ESCALA"];
+      const colunasFixas = [
+        "EQUIPE",
+        "HORARIO",
+        "COLABORADOR",
+        "LOGIN SAP",
+        "LOGIN FIELD",
+        "FUNÇÃO",
+        "ESCALA",
+      ];
       const colunasData: { index: number; date: Date }[] = [];
       for (let i = 7; i < headers.length; i++) {
         const serial = dateSerials[i];
@@ -437,7 +449,9 @@ function EscalaPage() {
         let dataAncora: string | null = null;
         if (escala.toUpperCase() === "PLANTÃO 1" || escala.toUpperCase() === "PLANTÃO 2") {
           for (const cd of colunasData) {
-            const val = String(row[cd.index] || "").trim().toUpperCase();
+            const val = String(row[cd.index] || "")
+              .trim()
+              .toUpperCase();
             if (val === "TRABALHA") {
               dataAncora = formatDateISO(cd.date);
               break;
@@ -448,7 +462,9 @@ function EscalaPage() {
         // Inserir dias
         const diasParaInserir: { colaborador_id: number; data: string; status: string }[] = [];
         for (const cd of colunasData) {
-          const val = String(row[cd.index] || "").trim().toUpperCase();
+          const val = String(row[cd.index] || "")
+            .trim()
+            .toUpperCase();
           const status = val === "TRABALHA" ? "TRABALHA" : "FOLGA";
           diasParaInserir.push({
             colaborador_id: colId,
@@ -487,7 +503,10 @@ function EscalaPage() {
   // --- Exportar Excel ---
   const handleExportar = async () => {
     const diasExport = diasSemana;
-    if (!diasExport.length) { toast.error("Nenhum dia para exportar."); return; }
+    if (!diasExport.length) {
+      toast.error("Nenhum dia para exportar.");
+      return;
+    }
 
     const dataInicial = formatDateISO(diasExport[0]);
     const dataFinal = formatDateISO(diasExport[6]);
@@ -524,7 +543,15 @@ function EscalaPage() {
     escalaCell.alignment = { horizontal: "right", vertical: "middle" };
 
     // ---- CABEÇALHO DE COLUNAS (linha 2) ----
-    const colunasFixas = ["EQUIPE", "HORARIO", "COLABORADOR", "LOGIN SAP", "Login Field", "FUNÇÃO", "ESCALA"];
+    const colunasFixas = [
+      "EQUIPE",
+      "HORARIO",
+      "COLABORADOR",
+      "LOGIN SAP",
+      "Login Field",
+      "FUNÇÃO",
+      "ESCALA",
+    ];
 
     // Primeira linha do cabeçalho: cabeçalhos fixos + dias (abreviados)
     for (let i = 0; i < colunasFixas.length; i++) {
@@ -626,21 +653,19 @@ function EscalaPage() {
     }
 
     // ---- LARGURAS DAS COLUNAS ----
-    ws.getColumn(1).width = 10;  // EQUIPE
-    ws.getColumn(2).width = 10;  // HORARIO
-    ws.getColumn(3).width = 35;  // COLABORADOR
-    ws.getColumn(4).width = 20;  // LOGIN SAP
-    ws.getColumn(5).width = 35;  // Login Field
-    ws.getColumn(6).width = 25;  // FUNÇÃO
-    ws.getColumn(7).width = 15;  // ESCALA
+    ws.getColumn(1).width = 10; // EQUIPE
+    ws.getColumn(2).width = 10; // HORARIO
+    ws.getColumn(3).width = 35; // COLABORADOR
+    ws.getColumn(4).width = 20; // LOGIN SAP
+    ws.getColumn(5).width = 35; // Login Field
+    ws.getColumn(6).width = 25; // FUNÇÃO
+    ws.getColumn(7).width = 15; // ESCALA
     for (let i = 0; i < diasExport.length; i++) {
       ws.getColumn(8 + i).width = 14;
     }
 
     // ---- CONGELAR PAINEL (freeze) ----
-    ws.views = [
-      { state: "frozen", xSplit: 7, ySplit: 3, activeCell: "H4" },
-    ];
+    ws.views = [{ state: "frozen", xSplit: 7, ySplit: 3, activeCell: "H4" }];
 
     // ---- ALTURA DAS LINHAS ----
     ws.getRow(1).height = 30;
@@ -649,7 +674,9 @@ function EscalaPage() {
 
     // ---- GERAR ARQUIVO ----
     const buf = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -665,7 +692,9 @@ function EscalaPage() {
   useEffect(() => {
     if (!colaboradores.length || !escalaDias.length) return;
     const semAncora = colaboradores.filter(
-      (c) => (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") && !c.data_ancora,
+      (c) =>
+        (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") &&
+        !c.data_ancora,
     );
     for (const col of semAncora) {
       const dias = escalaDias
@@ -700,9 +729,7 @@ function EscalaPage() {
       toast.error("Erro ao salvar: " + error.message);
       return;
     }
-    setColaboradores((prev) =>
-      prev.map((c) => (c.id === colId ? { ...c, [campo]: valor } : c)),
-    );
+    setColaboradores((prev) => prev.map((c) => (c.id === colId ? { ...c, [campo]: valor } : c)));
     setEditando(null);
     if (campo === "escala") {
       // recalcular data_ancora se mudou para plantão
@@ -854,7 +881,9 @@ function EscalaPage() {
               </div>
               <div className="min-w-0 text-white">
                 <p className="truncate text-lg font-semibold">Águas do Rio</p>
-                <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Escala e Equipes</p>
+                <p className="truncate text-sm text-cyan-50/90">
+                  Eletromecânica · Escala e Equipes
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -915,28 +944,78 @@ function EscalaPage() {
 
         {showAddForm && (
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/20">
-            <h3 className="mb-3 text-sm font-bold text-emerald-800 dark:text-emerald-300">Novo técnico</h3>
+            <h3 className="mb-3 text-sm font-bold text-emerald-800 dark:text-emerald-300">
+              Novo técnico
+            </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome *" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
-              <input value={novoEquipe} onChange={(e) => setNovoEquipe(e.target.value)} placeholder="Equipe (ex: C1)" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
-              <select value={novoHorario} onChange={(e) => setNovoHorario(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+              <input
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                placeholder="Nome *"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+              <input
+                value={novoEquipe}
+                onChange={(e) => setNovoEquipe(e.target.value)}
+                placeholder="Equipe (ex: C1)"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+              <select
+                value={novoHorario}
+                onChange={(e) => setNovoHorario(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
                 <option value="DIURNO">DIURNO</option>
                 <option value="NOTURNO">NOTURNO</option>
               </select>
-              <select value={novoEscala} onChange={(e) => setNovoEscala(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                {opcoesEscala.map((o) => <option key={o} value={o}>{o}</option>)}
+              <select
+                value={novoEscala}
+                onChange={(e) => setNovoEscala(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                {opcoesEscala.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
               </select>
-              <input value={novoFuncao} onChange={(e) => setNovoFuncao(e.target.value)} placeholder="Função" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
-              <input value={novoLoginSap} onChange={(e) => setNovoLoginSap(e.target.value)} placeholder="Login SAP" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
-              <input value={novoLoginField} onChange={(e) => setNovoLoginField(e.target.value)} placeholder="E-mail" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
-              <input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value)} placeholder="Telefone" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
+              <input
+                value={novoFuncao}
+                onChange={(e) => setNovoFuncao(e.target.value)}
+                placeholder="Função"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+              <input
+                value={novoLoginSap}
+                onChange={(e) => setNovoLoginSap(e.target.value)}
+                placeholder="Login SAP"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+              <input
+                value={novoLoginField}
+                onChange={(e) => setNovoLoginField(e.target.value)}
+                placeholder="E-mail"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+              <input
+                value={novoTelefone}
+                onChange={(e) => setNovoTelefone(e.target.value)}
+                placeholder="Telefone"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
             </div>
             <div className="mt-3 flex gap-2">
-              <button onClick={adicionarTecnico} className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 cursor-pointer">
+              <button
+                onClick={adicionarTecnico}
+                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 cursor-pointer"
+              >
                 <Plus className="mr-1 inline h-4 w-4" />
                 Adicionar
               </button>
-              <button onClick={() => setShowAddForm(false)} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              >
                 Cancelar
               </button>
             </div>
@@ -958,7 +1037,9 @@ function EscalaPage() {
                     <Sun className="h-4 w-4" />
                     Total Hoje
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{trabalhaHoje.length}</div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
+                    {trabalhaHoje.length}
+                  </div>
                 </div>
               </div>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -968,7 +1049,9 @@ function EscalaPage() {
                     <Users className="h-4 w-4" />
                     Equipes Hoje
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{equipesHoje}</div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
+                    {equipesHoje}
+                  </div>
                 </div>
               </div>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -979,10 +1062,18 @@ function EscalaPage() {
                     Comercial
                   </div>
                   <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
-                    {colaboradores.filter(c => c.escala.toUpperCase() === "COMERCIAL" && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
+                    {
+                      colaboradores.filter(
+                        (c) =>
+                          c.escala.toUpperCase() === "COMERCIAL" &&
+                          gridStatus[c.id]?.[hojeISO] === "TRABALHA",
+                      ).length
+                    }
                   </div>
                   <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
-                    {statsEscala.comercial.tecnicos} técnico{statsEscala.comercial.tecnicos !== 1 && "s"} · {statsEscala.comercial.equipes} equipe{statsEscala.comercial.equipes !== 1 && "s"}
+                    {statsEscala.comercial.tecnicos} técnico
+                    {statsEscala.comercial.tecnicos !== 1 && "s"} · {statsEscala.comercial.equipes}{" "}
+                    equipe{statsEscala.comercial.equipes !== 1 && "s"}
                   </div>
                 </div>
               </div>
@@ -994,10 +1085,19 @@ function EscalaPage() {
                     Plantão
                   </div>
                   <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
-                    {colaboradores.filter(c => (c.escala.toUpperCase() === "PLANTÃO 1" || c.escala.toUpperCase() === "PLANTÃO 2") && gridStatus[c.id]?.[hojeISO] === "TRABALHA").length}
+                    {
+                      colaboradores.filter(
+                        (c) =>
+                          (c.escala.toUpperCase() === "PLANTÃO 1" ||
+                            c.escala.toUpperCase() === "PLANTÃO 2") &&
+                          gridStatus[c.id]?.[hojeISO] === "TRABALHA",
+                      ).length
+                    }
                   </div>
                   <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
-                    {statsEscala.plantao.tecnicos} técnico{statsEscala.plantao.tecnicos !== 1 && "s"} · {statsEscala.plantao.equipes} equipe{statsEscala.plantao.equipes !== 1 && "s"}
+                    {statsEscala.plantao.tecnicos} técnico
+                    {statsEscala.plantao.tecnicos !== 1 && "s"} · {statsEscala.plantao.equipes}{" "}
+                    equipe{statsEscala.plantao.equipes !== 1 && "s"}
                   </div>
                 </div>
               </div>
@@ -1008,7 +1108,9 @@ function EscalaPage() {
                     <Users className="h-4 w-4" />
                     Total Técnicos
                   </div>
-                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{colaboradores.length}</div>
+                  <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">
+                    {colaboradores.length}
+                  </div>
                   <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                     {statsEscala.totalEquipes} equipe{statsEscala.totalEquipes !== 1 && "s"}
                   </div>
@@ -1035,7 +1137,9 @@ function EscalaPage() {
               >
                 <option value="TODAS">Todas equipes</option>
                 {equipes.map((e) => (
-                  <option key={e} value={e}>{e}</option>
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
                 ))}
               </select>
               <select
@@ -1056,7 +1160,9 @@ function EscalaPage() {
               >
                 <option value="TODAS">Todas funções</option>
                 {funcoes.map((f) => (
-                  <option key={f} value={f}>{f}</option>
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
                 ))}
               </select>
               <select
@@ -1081,7 +1187,8 @@ function EscalaPage() {
                 <ChevronLeft className="h-4 w-4" /> Semana anterior
               </button>
               <span className="text-sm font-bold text-[#0b3a73] dark:text-white">
-                {diasSemana[0].toLocaleDateString("pt-BR")} — {diasSemana[6].toLocaleDateString("pt-BR")}
+                {diasSemana[0].toLocaleDateString("pt-BR")} —{" "}
+                {diasSemana[6].toLocaleDateString("pt-BR")}
               </span>
               <button
                 onClick={() => setSemanaOffset((p) => p + 1)}
@@ -1104,9 +1211,15 @@ function EscalaPage() {
                   <thead>
                     <tr className="bg-[#f1f5f9] text-[11px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 uppercase tracking-wide dark:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                       <th className="w-6 px-1 py-2.5"></th>
-                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[70px] dark:bg-slate-800">Equipe</th>
-                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[65px] dark:bg-slate-800">Turno</th>
-                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[180px] dark:bg-slate-800">Colaborador</th>
+                      <th className="sticky left-0 z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[70px] dark:bg-slate-800">
+                        Equipe
+                      </th>
+                      <th className="sticky left-[70px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[65px] dark:bg-slate-800">
+                        Turno
+                      </th>
+                      <th className="sticky left-[135px] z-10 bg-[#f1f5f9] px-2 py-2.5 text-left min-w-[180px] dark:bg-slate-800">
+                        Colaborador
+                      </th>
                       <th className="px-2 py-2.5 text-left min-w-[80px]">Função</th>
                       <th className="px-2 py-2.5 text-left min-w-[65px]">Escala</th>
                       <th className="px-2 py-2.5 text-left min-w-[85px]">Especialidade</th>
@@ -1140,7 +1253,10 @@ function EscalaPage() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                     {grupos.map((grupo) => (
                       <Fragment key={grupo.label}>
-                        <tr key={`sep-${grupo.label}`} className="bg-[#f8fafc] dark:bg-slate-800/50">
+                        <tr
+                          key={`sep-${grupo.label}`}
+                          className="bg-[#f8fafc] dark:bg-slate-800/50"
+                        >
                           <td
                             colSpan={10 + diasSemana.length}
                             className="px-2 py-1.5 text-[12px] font-bold text-[#0b3a73] dark:text-white"
@@ -1199,7 +1315,9 @@ function EscalaPage() {
                                     onBlur={() => setEditando(null)}
                                   >
                                     {opcoesHorario.map((o) => (
-                                      <option key={o} value={o}>{o}</option>
+                                      <option key={o} value={o}>
+                                        {o}
+                                      </option>
                                     ))}
                                   </select>
                                 ) : (
@@ -1222,11 +1340,16 @@ function EscalaPage() {
                               </td>
                               <td className="sticky left-[135px] z-10 bg-white px-2 py-1.5 text-sm font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-200">
                                 {col.colaborador}
-                                {(esc === "PLANTÃO 1" || esc === "PLANTÃO 2") && col.data_ancora && (
-                                  <span className="ml-1 text-[10px] text-slate-400 dark:text-slate-500 dark:text-slate-500">
-                                    (ref: {new Date(col.data_ancora + "T12:00:00").toLocaleDateString("pt-BR")})
-                                  </span>
-                                )}
+                                {(esc === "PLANTÃO 1" || esc === "PLANTÃO 2") &&
+                                  col.data_ancora && (
+                                    <span className="ml-1 text-[10px] text-slate-400 dark:text-slate-500 dark:text-slate-500">
+                                      (ref:{" "}
+                                      {new Date(col.data_ancora + "T12:00:00").toLocaleDateString(
+                                        "pt-BR",
+                                      )}
+                                      )
+                                    </span>
+                                  )}
                               </td>
                               <td className="px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                 {editando?.colId === col.id && editando?.campo === "funcao" ? (
@@ -1263,7 +1386,9 @@ function EscalaPage() {
                                     onBlur={() => setEditando(null)}
                                   >
                                     {opcoesEscala.map((o) => (
-                                      <option key={o} value={o}>{o}</option>
+                                      <option key={o} value={o}>
+                                        {o}
+                                      </option>
                                     ))}
                                   </select>
                                 ) : (
@@ -1284,16 +1409,21 @@ function EscalaPage() {
                                 )}
                               </td>
                               <td className="px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
-                                {editando?.colId === col.id && editando?.campo === "especialidade" ? (
+                                {editando?.colId === col.id &&
+                                editando?.campo === "especialidade" ? (
                                   <select
                                     autoFocus
                                     defaultValue={col.especialidade}
                                     className="rounded border border-[#1f7ad6] px-1 py-0.5 text-xs outline-none dark:border-slate-600 dark:bg-slate-700"
-                                    onChange={(e) => salvarCampo(col.id, "especialidade", e.target.value)}
+                                    onChange={(e) =>
+                                      salvarCampo(col.id, "especialidade", e.target.value)
+                                    }
                                     onBlur={() => setEditando(null)}
                                   >
                                     {opcoesEspecialidade.map((o) => (
-                                      <option key={o} value={o}>{o}</option>
+                                      <option key={o} value={o}>
+                                        {o}
+                                      </option>
                                     ))}
                                   </select>
                                 ) : (
@@ -1305,7 +1435,9 @@ function EscalaPage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-2 py-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">{col.login_sap || "—"}</td>
+                              <td className="px-2 py-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
+                                {col.login_sap || "—"}
+                              </td>
                               <td className="px-2 py-1.5 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500">
                                 {editando?.colId === col.id && editando?.campo === "telefone" ? (
                                   <input
@@ -1325,13 +1457,20 @@ function EscalaPage() {
                                 ) : (
                                   <span
                                     className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 ${
-                                      col.telefone ? "text-slate-600 dark:text-slate-300" : "text-slate-300 dark:text-slate-600"
+                                      col.telefone
+                                        ? "text-slate-600 dark:text-slate-300"
+                                        : "text-slate-300 dark:text-slate-600"
                                     }`}
                                     onClick={() => toggleEdit(col.id, "telefone")}
                                   >
                                     {col.telefone ? (
-                                      <><Phone className="h-3 w-3" />{col.telefone}</>
-                                    ) : "—"}
+                                      <>
+                                        <Phone className="h-3 w-3" />
+                                        {col.telefone}
+                                      </>
+                                    ) : (
+                                      "—"
+                                    )}
                                   </span>
                                 )}
                               </td>
@@ -1356,9 +1495,7 @@ function EscalaPage() {
                                   <td
                                     key={iso}
                                     className={`px-2 py-1.5 text-center text-[11px] font-semibold cursor-pointer transition-colors ${
-                                      isHoje
-                                        ? "ring-2 ring-inset ring-[#1f7ad6]"
-                                        : ""
+                                      isHoje ? "ring-2 ring-inset ring-[#1f7ad6]" : ""
                                     } ${
                                       status === "TRABALHA"
                                         ? "bg-green-50 text-green-700 hover:bg-green-100"

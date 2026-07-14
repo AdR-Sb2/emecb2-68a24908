@@ -112,7 +112,12 @@ function AvaliacaoPage() {
       categoriaId = catData.id;
       setCategorias((prev) => [
         ...prev,
-        { id: catData.id, chave: novaCategoria.trim().toLowerCase().replace(/\s+/g, "_"), nome_exibicao: novaCategoria.trim(), ordem: prev.length + 1 },
+        {
+          id: catData.id,
+          chave: novaCategoria.trim().toLowerCase().replace(/\s+/g, "_"),
+          nome_exibicao: novaCategoria.trim(),
+          ordem: prev.length + 1,
+        },
       ]);
     } else {
       categoriaId = Number(catDestino);
@@ -140,10 +145,7 @@ function AvaliacaoPage() {
     }
 
     // Atualizar sugestão
-    await supabase
-      .from("sugestoes")
-      .update({ status: "aprovado" })
-      .eq("id", sug.id);
+    await supabase.from("sugestoes").update({ status: "aprovado" }).eq("id", sug.id);
 
     toast.success("Sugestão aprovada e manual criado!");
     setAcaoId(null);
@@ -195,7 +197,9 @@ function AvaliacaoPage() {
             </div>
             <div className="min-w-0 text-white">
               <p className="truncate text-lg font-semibold">Águas do Rio</p>
-              <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Avaliação de Sugestões</p>
+              <p className="truncate text-sm text-cyan-50/90">
+                Eletromecânica · Avaliação de Sugestões
+              </p>
             </div>
           </div>
           <Link
@@ -237,7 +241,9 @@ function AvaliacaoPage() {
         <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
           <Send className="h-10 w-10" />
           <p className="text-sm font-medium">
-            {filtroStatus === "pendente" ? "Nenhuma sugestão pendente." : "Nenhuma sugestão no histórico."}
+            {filtroStatus === "pendente"
+              ? "Nenhuma sugestão pendente."
+              : "Nenhuma sugestão no histórico."}
           </p>
         </div>
       ) : (
@@ -260,7 +266,11 @@ function AvaliacaoPage() {
                         : "bg-red-500"
                   }`}
                 >
-                  {sug.tipo === "pdf" ? <FileText className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                  {sug.tipo === "pdf" ? (
+                    <FileText className="h-4 w-4" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -281,7 +291,11 @@ function AvaliacaoPage() {
                         : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                   }`}
                 >
-                  {sug.status === "pendente" ? "Pendente" : sug.status === "aprovado" ? "Aprovado" : "Rejeitado"}
+                  {sug.status === "pendente"
+                    ? "Pendente"
+                    : sug.status === "aprovado"
+                      ? "Aprovado"
+                      : "Rejeitado"}
                 </span>
               </button>
 
@@ -316,7 +330,8 @@ function AvaliacaoPage() {
                     </div>
                     {sug.categoria_sugerida && (
                       <div className="col-span-2">
-                        <span className="font-medium">Categoria sugerida:</span> {sug.categoria_sugerida}
+                        <span className="font-medium">Categoria sugerida:</span>{" "}
+                        {sug.categoria_sugerida}
                       </div>
                     )}
                     {sug.tipo === "pdf" && sug.titulo_sugerido && (
@@ -366,7 +381,10 @@ function AvaliacaoPage() {
                         </label>
                         <select
                           value={catDestino}
-                          onChange={(e) => { setCatDestino(e.target.value); setNovaCategoria(""); }}
+                          onChange={(e) => {
+                            setCatDestino(e.target.value);
+                            setNovaCategoria("");
+                          }}
                           className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none ring-emerald-400 focus:ring-2 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
                         >
                           <option value="">Selecione...</option>
@@ -385,7 +403,10 @@ function AvaliacaoPage() {
                         <input
                           type="text"
                           value={novaCategoria}
-                          onChange={(e) => { setNovaCategoria(e.target.value); setCatDestino(""); }}
+                          onChange={(e) => {
+                            setNovaCategoria(e.target.value);
+                            setCatDestino("");
+                          }}
                           placeholder="Nome da nova categoria"
                           className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none ring-emerald-400 focus:ring-2 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
                         />
@@ -400,7 +421,10 @@ function AvaliacaoPage() {
                           {saving ? "Salvando..." : "Confirmar Aprovação"}
                         </button>
                         <button
-                          onClick={() => { setAcaoId(null); setAcaoTipo(null); }}
+                          onClick={() => {
+                            setAcaoId(null);
+                            setAcaoTipo(null);
+                          }}
                           className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
                         >
                           Cancelar
@@ -431,7 +455,10 @@ function AvaliacaoPage() {
                           {saving ? "Salvando..." : "Confirmar Rejeição"}
                         </button>
                         <button
-                          onClick={() => { setAcaoId(null); setAcaoTipo(null); }}
+                          onClick={() => {
+                            setAcaoId(null);
+                            setAcaoTipo(null);
+                          }}
                           className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
                         >
                           Cancelar

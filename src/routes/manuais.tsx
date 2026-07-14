@@ -59,12 +59,23 @@ type Sugestao = {
   criado_em: string;
 };
 
-const NR_CORES: Record<string, { cor: string; bg: string; icon: React.ComponentType<{ className?: string }> }> = {
+const NR_CORES: Record<
+  string,
+  { cor: string; bg: string; icon: React.ComponentType<{ className?: string }> }
+> = {
   "NR-06": { cor: "text-amber-700", bg: "bg-amber-50 dark:bg-amber-950/30", icon: Shield },
   "NR-10": { cor: "text-blue-700", bg: "bg-blue-50 dark:bg-blue-950/30", icon: Zap },
   "NR-12": { cor: "text-red-700", bg: "bg-red-50 dark:bg-red-950/30", icon: Settings },
-  "NR-33": { cor: "text-yellow-700", bg: "bg-yellow-50 dark:bg-yellow-950/30", icon: AlertTriangle },
-  "NR-35": { cor: "text-purple-700", bg: "bg-purple-50 dark:bg-purple-950/30", icon: CloudLightning },
+  "NR-33": {
+    cor: "text-yellow-700",
+    bg: "bg-yellow-50 dark:bg-yellow-950/30",
+    icon: AlertTriangle,
+  },
+  "NR-35": {
+    cor: "text-purple-700",
+    bg: "bg-purple-50 dark:bg-purple-950/30",
+    icon: CloudLightning,
+  },
 };
 
 function ManuaisPage() {
@@ -93,8 +104,7 @@ function ManuaisPage() {
   const [uploadSaving, setUploadSaving] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
-  const sanitizarNome = (nome: string) =>
-    nome.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
+  const sanitizarNome = (nome: string) => nome.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
 
   const podeEditarArquivo = useMemo(() => {
     return temPermissao(permissoes, "manuais", "editar_arquivo");
@@ -150,8 +160,14 @@ function ManuaisPage() {
   // --- Enviar Sugestão ---
   const handleEnviarSugestao = async () => {
     if (sugTipo === "pdf") {
-      if (!sugArquivo) { toast.error("Selecione um arquivo PDF."); return; }
-      if (!sugTitulo.trim()) { toast.error("Informe um título sugerido."); return; }
+      if (!sugArquivo) {
+        toast.error("Selecione um arquivo PDF.");
+        return;
+      }
+      if (!sugTitulo.trim()) {
+        toast.error("Informe um título sugerido.");
+        return;
+      }
     }
     if (sugTipo === "texto" && !sugComentario.trim()) {
       toast.error("Escreva sua sugestão.");
@@ -201,9 +217,12 @@ function ManuaisPage() {
 
   // --- Upload PDF no manual (admin) ---
   const handleUploadManual = async (manualId: number) => {
-    if (!uploadFile) { toast.error("Selecione um PDF."); return; }
+    if (!uploadFile) {
+      toast.error("Selecione um PDF.");
+      return;
+    }
     setUploadSaving(true);
-    const nomeArquivo = `manuais/${manualId}_${Date.now()}_${uploadFile.name}`;
+    const nomeArquivo = `manuais/${manualId}_${Date.now()}_${sanitizarNome(uploadFile.name)}`;
     const { error: uploadErr } = await supabase.storage
       .from("manuais")
       .upload(nomeArquivo, uploadFile);
@@ -366,7 +385,9 @@ function ManuaisPage() {
                 )}
                 <div className={`${cor.bg} p-4`}>
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${cor.bg}`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${cor.bg}`}
+                    >
                       <Icone className={`h-5 w-5 ${cor.cor}`} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -413,7 +434,9 @@ function ManuaisPage() {
                         className="mb-2 w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#1f7ad6] file:px-2 file:py-1 file:text-xs file:text-white"
                       />
                       {uploadFile && (
-                        <p className="mb-2 text-[11px] text-slate-500 truncate">{uploadFile.name}</p>
+                        <p className="mb-2 text-[11px] text-slate-500 truncate">
+                          {uploadFile.name}
+                        </p>
                       )}
                       <div className="flex justify-center gap-2">
                         <button
@@ -424,7 +447,10 @@ function ManuaisPage() {
                           {uploadSaving ? "Salvando..." : "Salvar"}
                         </button>
                         <button
-                          onClick={() => { setUploadManualId(null); setUploadFile(null); }}
+                          onClick={() => {
+                            setUploadManualId(null);
+                            setUploadFile(null);
+                          }}
                           className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
                         >
                           Cancelar

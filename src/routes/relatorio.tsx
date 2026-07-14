@@ -176,8 +176,10 @@ function useLookup() {
 
 const inputCls =
   "w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 shadow-sm transition placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 disabled:bg-slate-50 dark:disabled:bg-slate-700";
-const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300";
-const cardCls = "rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm md:p-5";
+const labelCls =
+  "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300";
+const cardCls =
+  "rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm md:p-5";
 const sectionTitleCls = "mb-3 flex items-center gap-2 text-sm font-semibold text-[#0b3a73]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -439,7 +441,9 @@ function RelatorioTecnico() {
         <div className="mb-3 flex items-center justify-between">
           <SectionTitle icon={Settings2}>Grupos Motor-Bomba</SectionTitle>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Quantidade</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Quantidade
+            </label>
             <select
               value={qtd}
               onChange={(e) => setQtd(Number(e.target.value))}
@@ -887,7 +891,9 @@ function RelatorioPage() {
               </div>
               <div className="min-w-0 text-white">
                 <p className="truncate text-lg font-semibold">Águas do Rio</p>
-                <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Relatórios e comunicação</p>
+                <p className="truncate text-sm text-cyan-50/90">
+                  Eletromecânica · Relatórios e comunicação
+                </p>
               </div>
             </div>
             <Link

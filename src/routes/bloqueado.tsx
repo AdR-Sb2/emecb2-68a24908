@@ -21,18 +21,18 @@ function BlockedPage() {
   if (loading || !user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
-      <div className="w-full max-w-sm rounded-xl bg-[#1e293b] p-8 text-center shadow-2xl">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4 dark:bg-[#0f172a]">
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-2xl dark:border-[#334155] dark:bg-[#1e293b]">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/20">
           <Ban className="h-7 w-7 text-red-500" />
         </div>
-        <h1 className="text-xl font-bold text-[#f8fafc]">Acesso bloqueado</h1>
-        <p className="mt-2 text-sm text-[#94a3b8]">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-[#f8fafc]">Acesso bloqueado</h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-[#94a3b8]">
           Seu acesso foi bloqueado. Entre em contato com o administrador para mais informações.
         </p>
         <button
           onClick={signOut}
-          className="mt-6 inline-flex items-center gap-2 rounded-lg border border-[#334155] px-4 py-2 text-sm font-medium text-[#94a3b8] hover:bg-[#334155] cursor-pointer"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:border-[#334155] dark:text-[#94a3b8] dark:hover:bg-[#334155] cursor-pointer"
         >
           <LogOut className="h-4 w-4" /> Sair
         </button>

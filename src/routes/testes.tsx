@@ -472,7 +472,9 @@ function TestesPage() {
             </div>
             <div className="min-w-0 text-white">
               <p className="truncate text-lg font-semibold">Águas do Rio</p>
-              <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Testes e aferições</p>
+              <p className="truncate text-sm text-cyan-50/90">
+                Eletromecânica · Testes e aferições
+              </p>
             </div>
           </div>
           <Link
@@ -922,7 +924,9 @@ function TestesPage() {
           <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="sticky top-0 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
               <tr>
-                <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5 dark:bg-slate-700">Data</th>
+                <th className="sticky left-0 z-20 bg-slate-100 px-2 py-1.5 dark:bg-slate-700">
+                  Data
+                </th>
                 <th className="px-2 py-1.5">Elevatória</th>
                 <th className="px-2 py-1.5">Grupo</th>
                 <th className="px-2 py-1.5">Tipo</th>
@@ -949,7 +953,9 @@ function TestesPage() {
                     <td className="px-2 py-1 dark:border-slate-700">{r.Elevatória}</td>
                     <td className="px-2 py-1 dark:border-slate-700">{r.Grupo}</td>
                     <td className="px-2 py-1 dark:border-slate-700">{r["Tipo de Serviço"]}</td>
-                    <td className="px-2 py-1 dark:border-slate-700">{r["Nome dos Colaboradores:"]}</td>
+                    <td className="px-2 py-1 dark:border-slate-700">
+                      {r["Nome dos Colaboradores:"]}
+                    </td>
                     <ExpandableCell
                       value={r["Serviço Executado:"]}
                       cellKey={`${rowKey}-serv`}
@@ -962,10 +968,18 @@ function TestesPage() {
                       expandedKey={expandedCell}
                       onToggle={setExpandedCell}
                     />
-                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Tensão ( V )"] ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Corrente ( A )"] ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Recalque ?? ""}</td>
-                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Retaguarda ?? ""}</td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                      {r["Tensão ( V )"] ?? ""}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                      {r["Corrente ( A )"] ?? ""}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                      {r.Recalque ?? ""}
+                    </td>
+                    <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                      {r.Retaguarda ?? ""}
+                    </td>
                   </tr>
                 );
               })}
@@ -1035,21 +1049,21 @@ function TestesPage() {
           </DialogHeader>
           <div className="max-h-[80vh] overflow-auto">
             <table className="w-full text-left text-xs">
-            <thead className="sticky top-0 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-              <tr>
-                <th className="px-2 py-1.5">Data</th>
-                <th className="px-2 py-1.5">Elevatória</th>
-                <th className="px-2 py-1.5">Grupo</th>
-                <th className="px-2 py-1.5">Tipo</th>
-                <th className="px-2 py-1.5">Colaboradores</th>
-                <th className="px-2 py-1.5">Serviço Executado</th>
-                <th className="px-2 py-1.5">Observação</th>
-                <th className="px-2 py-1.5">Tensão (V)</th>
-                <th className="px-2 py-1.5">Corrente (A)</th>
-                <th className="px-2 py-1.5">Recalque</th>
-                <th className="px-2 py-1.5">Retaguarda</th>
-              </tr>
-            </thead>
+              <thead className="sticky top-0 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                <tr>
+                  <th className="px-2 py-1.5">Data</th>
+                  <th className="px-2 py-1.5">Elevatória</th>
+                  <th className="px-2 py-1.5">Grupo</th>
+                  <th className="px-2 py-1.5">Tipo</th>
+                  <th className="px-2 py-1.5">Colaboradores</th>
+                  <th className="px-2 py-1.5">Serviço Executado</th>
+                  <th className="px-2 py-1.5">Observação</th>
+                  <th className="px-2 py-1.5">Tensão (V)</th>
+                  <th className="px-2 py-1.5">Corrente (A)</th>
+                  <th className="px-2 py-1.5">Recalque</th>
+                  <th className="px-2 py-1.5">Retaguarda</th>
+                </tr>
+              </thead>
               <tbody>
                 {tableRows.map((r, i) => {
                   const rowKey = `exp-${r.Id ?? "row"}-${i}`;
@@ -1058,17 +1072,33 @@ function TestesPage() {
                       key={rowKey}
                       className="border-t border-slate-100 hover:bg-slate-50 align-top dark:border-slate-700"
                     >
-                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{fmtDate(r["Data do Teste"])}</td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                        {fmtDate(r["Data do Teste"])}
+                      </td>
                       <td className="px-2 py-1 dark:border-slate-700">{r.Elevatória}</td>
                       <td className="px-2 py-1 dark:border-slate-700">{r.Grupo}</td>
                       <td className="px-2 py-1 dark:border-slate-700">{r["Tipo de Serviço"]}</td>
-                      <td className="px-2 py-1 dark:border-slate-700">{r["Nome dos Colaboradores:"]}</td>
-                      <td className="px-2 py-1 whitespace-normal dark:border-slate-700">{r["Serviço Executado:"]}</td>
-                      <td className="px-2 py-1 whitespace-normal dark:border-slate-700">{r["Observação:"]}</td>
-                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Tensão ( V )"] ?? ""}</td>
-                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r["Corrente ( A )"] ?? ""}</td>
-                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Recalque ?? ""}</td>
-                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">{r.Retaguarda ?? ""}</td>
+                      <td className="px-2 py-1 dark:border-slate-700">
+                        {r["Nome dos Colaboradores:"]}
+                      </td>
+                      <td className="px-2 py-1 whitespace-normal dark:border-slate-700">
+                        {r["Serviço Executado:"]}
+                      </td>
+                      <td className="px-2 py-1 whitespace-normal dark:border-slate-700">
+                        {r["Observação:"]}
+                      </td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                        {r["Tensão ( V )"] ?? ""}
+                      </td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                        {r["Corrente ( A )"] ?? ""}
+                      </td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                        {r.Recalque ?? ""}
+                      </td>
+                      <td className="px-2 py-1 whitespace-nowrap dark:border-slate-700">
+                        {r.Retaguarda ?? ""}
+                      </td>
                     </tr>
                   );
                 })}
@@ -1166,7 +1196,9 @@ function ExpandableCell({
 function Kpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
       <div className="text-xl font-bold text-[#0b3a73] dark:text-white">{value}</div>
       {hint && <div className="text-[10px] text-slate-400 dark:text-slate-400">{hint}</div>}
     </div>
@@ -1255,7 +1287,9 @@ function SearchableSelect({
                 </li>
               ))}
               {!filtered.length && (
-                <li className="px-3 py-2 text-xs text-slate-400 dark:text-slate-400">Nenhum resultado</li>
+                <li className="px-3 py-2 text-xs text-slate-400 dark:text-slate-400">
+                  Nenhum resultado
+                </li>
               )}
             </ul>
           </div>
@@ -1342,7 +1376,9 @@ function ScrollChart({
             className="h-7 w-36 rounded border border-slate-200 bg-white px-2 text-xs focus:border-[#0b3a73] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <SortSelect value={sort} onChange={setSort} />
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">{sorted.length} ativos</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+            {sorted.length} ativos
+          </span>
           {onExpand && (
             <button
               type="button"
@@ -1516,7 +1552,9 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}>
+    <div
+      className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}
+    >
       <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
       {children}
     </div>
@@ -1559,7 +1597,9 @@ function MetricEvolutionChart({
   };
 
   return (
-    <div className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}>
+    <div
+      className={`rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 ${className ?? ""}`}
+    >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</h2>
         <div className="relative flex items-center gap-2">

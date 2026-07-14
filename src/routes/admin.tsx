@@ -324,10 +324,28 @@ function AdminPage() {
     if (dbPerms && dbPerms.length > 0) return dbPerms;
     // Fallback: retorna permissões genéricas virtuais (não persistem no BD)
     const genericas: PermissaoRow[] = [
-      { id: -1, key: `${painelChave}.ver`, label: 'Ver', panel_key: painelChave, is_generic: true },
-      { id: -2, key: `${painelChave}.editar`, label: 'Editar', panel_key: painelChave, is_generic: true },
-      { id: -3, key: `${painelChave}.excluir`, label: 'Excluir', panel_key: painelChave, is_generic: true },
-      { id: -4, key: `${painelChave}.exportar`, label: 'Exportar', panel_key: painelChave, is_generic: true },
+      { id: -1, key: `${painelChave}.ver`, label: "Ver", panel_key: painelChave, is_generic: true },
+      {
+        id: -2,
+        key: `${painelChave}.editar`,
+        label: "Editar",
+        panel_key: painelChave,
+        is_generic: true,
+      },
+      {
+        id: -3,
+        key: `${painelChave}.excluir`,
+        label: "Excluir",
+        panel_key: painelChave,
+        is_generic: true,
+      },
+      {
+        id: -4,
+        key: `${painelChave}.exportar`,
+        label: "Exportar",
+        panel_key: painelChave,
+        is_generic: true,
+      },
     ];
     return genericas;
   };
@@ -357,12 +375,15 @@ function AdminPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-[#f8fafc]">
+    <div className="min-h-screen bg-white text-slate-900 dark:bg-[#0f172a] dark:text-[#f8fafc]">
       <div className="mx-auto max-w-6xl p-4 md:p-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/" className="text-[#94a3b8] hover:text-[#f8fafc]">
+            <Link
+              to="/"
+              className="text-slate-400 hover:text-slate-900 dark:text-[#94a3b8] dark:hover:text-[#f8fafc]"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <Shield className="h-6 w-6 text-[#0ea5e9]" />
@@ -370,14 +391,14 @@ function AdminPage() {
           </div>
           <button
             onClick={signOut}
-            className="text-sm text-[#94a3b8] hover:text-[#f8fafc] cursor-pointer bg-transparent border-none"
+            className="text-sm text-slate-400 hover:text-slate-900 dark:text-[#94a3b8] dark:hover:text-[#f8fafc] cursor-pointer bg-transparent border-none"
           >
             Sair
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-1 rounded-lg bg-[#1e293b] p-1">
+        <div className="mb-6 flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-[#1e293b]">
           {(
             [
               { k: "usuarios", label: "Usuários" },
@@ -389,7 +410,9 @@ function AdminPage() {
               key={k}
               onClick={() => setTab(k)}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition cursor-pointer ${
-                tab === k ? "bg-[#0ea5e9] text-white" : "text-[#94a3b8] hover:text-[#f8fafc]"
+                tab === k
+                  ? "bg-[#0ea5e9] text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-[#94a3b8] dark:hover:text-[#f8fafc]"
               }`}
             >
               {label}
@@ -406,19 +429,19 @@ function AdminPage() {
             {/* Filtros */}
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-[#64748b]" />
                 <input
                   type="text"
                   placeholder="Buscar por nome ou e-mail..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-lg border border-[#334155] bg-[#1e293b] py-2 pl-10 pr-3 text-sm text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc]"
                 />
               </div>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="rounded-lg border border-[#334155] bg-[#1e293b] px-3 py-2 text-sm text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc]"
               >
                 <option value="TODOS">Todos status</option>
                 <option value="pendente">Pendente</option>
@@ -428,7 +451,7 @@ function AdminPage() {
               <select
                 value={filterCargo}
                 onChange={(e) => setFilterCargo(e.target.value)}
-                className="rounded-lg border border-[#334155] bg-[#1e293b] px-3 py-2 text-sm text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc]"
               >
                 <option value="TODOS">Todos cargos</option>
                 {cargos.map((c) => (
@@ -440,9 +463,9 @@ function AdminPage() {
             </div>
 
             {/* Tabela */}
-            <div className="overflow-x-auto rounded-lg border border-[#334155]">
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-[#334155]">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#1e293b] text-[#94a3b8]">
+                <thead className="bg-slate-100 text-slate-500 dark:bg-[#1e293b] dark:text-[#94a3b8]">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Nome</th>
                     <th className="px-4 py-3 font-semibold">E-mail</th>
@@ -452,18 +475,18 @@ function AdminPage() {
                     <th className="px-4 py-3 font-semibold">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#334155]">
+                <tbody className="divide-y divide-slate-200 dark:divide-[#334155]">
                   {filteredProfiles.map((p) => (
-                    <tr key={p.id} className="hover:bg-[#1e293b]/50">
+                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-[#1e293b]/50">
                       <td className="px-4 py-3">{p.nome_completo}</td>
-                      <td className="px-4 py-3 text-[#94a3b8]">{p.email}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-[#94a3b8]">{p.email}</td>
                       <td className="px-4 py-3">
                         <select
                           value={p.cargo_id ?? ""}
                           onChange={(e) =>
                             updateCargo(p.id, e.target.value ? Number(e.target.value) : null)
                           }
-                          className="rounded border border-[#334155] bg-[#0f172a] px-2 py-1 text-xs text-[#f8fafc] outline-none"
+                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 outline-none dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
                         >
                           <option value="">Sem cargo</option>
                           {cargos.map((c) => (
@@ -486,7 +509,7 @@ function AdminPage() {
                           {p.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-[#64748b]">
+                      <td className="px-4 py-3 text-xs text-slate-400 dark:text-[#64748b]">
                         {p.criado_em ? new Date(p.criado_em).toLocaleDateString("pt-BR") : "—"}
                       </td>
                       <td className="px-4 py-3">
@@ -561,7 +584,7 @@ function AdminPage() {
               {cargos.map((c) => (
                 <div
                   key={c.id}
-                  className="rounded-lg border border-[#334155] bg-[#1e293b] p-4 hover:border-[#0ea5e9] transition-colors cursor-pointer"
+                  className="rounded-lg border border-slate-200 bg-white p-4 transition-colors cursor-pointer dark:border-[#334155] dark:bg-[#1e293b] dark:hover:border-[#0ea5e9]"
                   onClick={() => {
                     setEditingCargo(c);
                     setNewCargoNome(c.nome);
@@ -574,8 +597,10 @@ function AdminPage() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-semibold">{c.nome}</h3>
-                      <p className="text-sm text-[#94a3b8]">{c.descricao || "Sem descrição"}</p>
+                      <h3 className="font-semibold text-slate-900 dark:text-[#f8fafc]">{c.nome}</h3>
+                      <p className="text-sm text-slate-500 dark:text-[#94a3b8]">
+                        {c.descricao || "Sem descrição"}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -618,9 +643,7 @@ function AdminPage() {
                         >
                           {painel.nome_exibicao}
                           {permsCount > 0 && (
-                            <span className="ml-1 text-[10px] text-[#38bdf8]">
-                              ({permsCount})
-                            </span>
+                            <span className="ml-1 text-[10px] text-[#38bdf8]">({permsCount})</span>
                           )}
                         </span>
                       );
@@ -633,35 +656,35 @@ function AdminPage() {
             {/* Modal Criar/Editar Cargo */}
             {(showNewCargo || editingCargo) && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-lg rounded-xl bg-[#1e293b] p-6 shadow-2xl">
-                  <h2 className="mb-4 text-lg font-bold">
+                <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-[#334155] dark:bg-[#1e293b]">
+                  <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-[#f8fafc]">
                     {editingCargo ? "Editar cargo" : "Novo cargo"}
                   </h2>
                   <div className="flex flex-col gap-3">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#94a3b8]">
+                      <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
                         Nome
                       </label>
                       <input
                         type="text"
                         value={newCargoNome}
                         onChange={(e) => setNewCargoNome(e.target.value)}
-                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2 text-[14px]"
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 text-[14px] dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#94a3b8]">
+                      <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
                         Descrição
                       </label>
                       <input
                         type="text"
                         value={newCargoDesc}
                         onChange={(e) => setNewCargoDesc(e.target.value)}
-                        className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2 text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2 text-[14px]"
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 text-[14px] dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-xs font-semibold text-[#94a3b8]">
+                      <label className="mb-2 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
                         Painéis e permissões
                       </label>
                       <div className="grid gap-2">
@@ -671,12 +694,12 @@ function AdminPage() {
                           return (
                             <div
                               key={p.id}
-                              className="rounded-lg border border-[#334155] bg-[#0f172a]"
+                              className="rounded-lg border border-slate-200 bg-slate-50 dark:border-[#334155] dark:bg-[#0f172a]"
                             >
                               <div className="flex items-center gap-2 px-3 py-2">
                                 <button
                                   onClick={() => toggleExpandPainelPerms(p.id)}
-                                  className="text-[#64748b] hover:text-[#f8fafc] cursor-pointer bg-transparent border-none p-0"
+                                  className="text-slate-400 hover:text-slate-900 dark:text-[#64748b] dark:hover:text-[#f8fafc] cursor-pointer bg-transparent border-none p-0"
                                 >
                                   {expanded ? (
                                     <ChevronDown className="h-3.5 w-3.5" />
@@ -690,10 +713,12 @@ function AdminPage() {
                                   onChange={() => togglePainelCargo(p.id)}
                                   className="h-4 w-4 accent-[#0ea5e9]"
                                 />
-                                <span className="text-sm text-[#f8fafc]">{p.nome_exibicao}</span>
+                                <span className="text-sm text-slate-900 dark:text-[#f8fafc]">
+                                  {p.nome_exibicao}
+                                </span>
                               </div>
                               {expanded && newCargoPaineis.includes(p.id) && (
-                                <div className="border-t border-[#334155] px-6 py-2">
+                                <div className="border-t border-slate-200 px-6 py-2 dark:border-[#334155]">
                                   {permissoesPorPainel[p.chave]?.length ? (
                                     <>
                                       <div className="mb-1 flex items-center gap-2">
@@ -703,10 +728,12 @@ function AdminPage() {
                                         >
                                           Marcar todas
                                         </button>
-                                        <span className="text-[#334155]">|</span>
+                                        <span className="text-slate-300 dark:text-[#334155]">
+                                          |
+                                        </span>
                                         <button
                                           onClick={() => selectAllPermissoesPainel(p.chave, false)}
-                                          className="text-[10px] font-medium text-[#64748b] hover:text-[#94a3b8] bg-transparent border-none cursor-pointer"
+                                          className="text-[10px] font-medium text-slate-400 hover:text-slate-600 dark:text-[#64748b] dark:hover:text-[#94a3b8] bg-transparent border-none cursor-pointer"
                                         >
                                           Desmarcar todas
                                         </button>
@@ -717,7 +744,7 @@ function AdminPage() {
                                           return (
                                             <label
                                               key={perm.key}
-                                              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
+                                              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 hover:border-[#0ea5e9] dark:border-[#334155] dark:bg-[#1e293b]"
                                             >
                                               <input
                                                 type="checkbox"
@@ -728,14 +755,17 @@ function AdminPage() {
                                                 }
                                                 onChange={() => {
                                                   if (isVirtual) {
-                                                    togglePermissaoVirtual(perm.panel_key, perm.label);
+                                                    togglePermissaoVirtual(
+                                                      perm.panel_key,
+                                                      perm.label,
+                                                    );
                                                   } else {
                                                     togglePermissaoCargo(perm.id);
                                                   }
                                                 }}
                                                 className="h-3.5 w-3.5 accent-[#0ea5e9]"
                                               />
-                                              <span className="text-[11px] text-[#cbd5e1]">
+                                              <span className="text-[11px] text-slate-600 dark:text-[#cbd5e1]">
                                                 {perm.label}
                                               </span>
                                             </label>
@@ -750,7 +780,7 @@ function AdminPage() {
                                         return (
                                           <label
                                             key={perm.key}
-                                            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[#334155] bg-[#1e293b] px-2 py-1 hover:border-[#0ea5e9]"
+                                            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 hover:border-[#0ea5e9] dark:border-[#334155] dark:bg-[#1e293b]"
                                           >
                                             <input
                                               type="checkbox"
@@ -761,21 +791,25 @@ function AdminPage() {
                                               }
                                               onChange={() => {
                                                 if (isVirtual) {
-                                                  togglePermissaoVirtual(perm.panel_key, perm.label);
+                                                  togglePermissaoVirtual(
+                                                    perm.panel_key,
+                                                    perm.label,
+                                                  );
                                                 } else {
                                                   togglePermissaoCargo(perm.id);
                                                 }
                                               }}
                                               className="h-3.5 w-3.5 accent-[#0ea5e9]"
                                             />
-                                            <span className="text-[11px] text-[#cbd5e1]">
+                                            <span className="text-[11px] text-slate-600 dark:text-[#cbd5e1]">
                                               {perm.label}
                                             </span>
                                           </label>
                                         );
                                       })}
-                                      <p className="w-full text-[10px] text-[#64748b] italic pt-1">
-                                        Permissões genéricas. Ao marcar, serão criadas automaticamente no banco.
+                                      <p className="w-full text-[10px] text-slate-400 italic pt-1 dark:text-[#64748b]">
+                                        Permissões genéricas. Ao marcar, serão criadas
+                                        automaticamente no banco.
                                       </p>
                                     </div>
                                   )}
@@ -793,7 +827,7 @@ function AdminPage() {
                         setShowNewCargo(false);
                         setEditingCargo(null);
                       }}
-                      className="rounded-lg border border-[#334155] px-4 py-2 text-sm font-medium text-[#94a3b8] hover:bg-[#334155] cursor-pointer"
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:border-[#334155] dark:text-[#94a3b8] dark:hover:bg-[#334155] cursor-pointer"
                     >
                       Cancelar
                     </button>
@@ -811,30 +845,34 @@ function AdminPage() {
         ) : (
           /* Painéis tab */
           <>
-            <h2 className="mb-4 text-lg font-bold">Painéis do Sistema</h2>
+            <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-[#f8fafc]">
+              Painéis do Sistema
+            </h2>
             <div className="grid gap-3">
               {paineis.map((p) => {
                 const panelPerms = permissoesPorPainel[p.chave] || [];
                 return (
                   <div
                     key={p.id}
-                    className="rounded-lg border border-[#334155] bg-[#1e293b] p-4"
+                    className="rounded-lg border border-slate-200 bg-white dark:border-[#334155] dark:bg-[#1e293b] p-4"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold">{p.nome_exibicao}</h3>
-                        <p className="text-xs text-[#64748b]">
+                        <h3 className="font-semibold text-slate-900 dark:text-[#f8fafc]">
+                          {p.nome_exibicao}
+                        </h3>
+                        <p className="text-xs text-slate-400 dark:text-[#64748b]">
                           Chave: <code className="text-[#0ea5e9]">{p.chave}</code>
                         </p>
-                        <p className="text-sm text-[#94a3b8]">{p.descricao}</p>
+                        <p className="text-sm text-slate-500 dark:text-[#94a3b8]">{p.descricao}</p>
                       </div>
                       <span className="rounded-full bg-[#0ea5e9]/10 px-2 py-0.5 text-[11px] text-[#0ea5e9]">
                         {p.icone}
                       </span>
                     </div>
                     {panelPerms.length > 0 && (
-                      <div className="mt-3 border-t border-[#334155] pt-2">
-                        <p className="mb-1 text-[11px] font-semibold text-[#64748b]">
+                      <div className="mt-3 border-t border-slate-200 pt-2 dark:border-[#334155]">
+                        <p className="mb-1 text-[11px] font-semibold text-slate-400 dark:text-[#64748b]">
                           Permissões cadastradas ({panelPerms.length})
                         </p>
                         <div className="flex flex-wrap gap-1">
@@ -846,7 +884,9 @@ function AdminPage() {
                                   ? "bg-[#6366f1]/10 text-[#a5b4fc]"
                                   : "bg-[#0ea5e9]/10 text-[#38bdf8]"
                               }`}
-                              title={perm.is_generic ? "Permissão genérica" : "Permissão específica"}
+                              title={
+                                perm.is_generic ? "Permissão genérica" : "Permissão específica"
+                              }
                             >
                               {perm.label}
                             </span>

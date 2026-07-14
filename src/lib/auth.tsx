@@ -83,7 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (authUser) {
         const nomeCompleto = String(
-          authUser.user_metadata?.nome_completo ?? authUser.user_metadata?.full_name ?? authUser.email ?? "",
+          authUser.user_metadata?.nome_completo ??
+            authUser.user_metadata?.full_name ??
+            authUser.email ??
+            "",
         );
         const email = authUser.email ?? "";
         const { data: createdProfile, error: upsertError } = await supabase

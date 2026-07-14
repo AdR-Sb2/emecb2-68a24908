@@ -34,7 +34,7 @@ function RegisterPage() {
 
   if (authLoading || profileLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
+      <div className="flex min-h-screen items-center justify-center bg-white px-4 dark:bg-[#0f172a]">
         <Loader2 className="h-8 w-8 animate-spin text-[#0ea5e9]" />
       </div>
     );
@@ -63,7 +63,8 @@ function RegisterPage() {
     }
 
     setSubmitting(true);
-    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
+    const redirectTo =
+      typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
@@ -79,13 +80,15 @@ function RegisterPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
-        <div className="w-full max-w-sm rounded-xl bg-[#1e293b] p-8 text-center shadow-2xl">
+      <div className="flex min-h-screen items-center justify-center bg-white px-4 dark:bg-[#0f172a]">
+        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 text-center shadow-2xl dark:border-[#334155] dark:bg-[#1e293b]">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#0ea5e9]/20">
             <UserPlus className="h-7 w-7 text-[#0ea5e9]" />
           </div>
-          <h1 className="text-xl font-bold text-[#f8fafc]">Cadastro enviado!</h1>
-          <p className="mt-2 text-sm text-[#94a3b8]">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-[#f8fafc]">
+            Cadastro enviado!
+          </h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-[#94a3b8]">
             Um administrador precisa aprovar seu acesso antes que você possa entrar.
           </p>
           <Link
@@ -100,52 +103,58 @@ function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0f172a] px-4">
-      <div className="w-full max-w-sm rounded-xl bg-[#1e293b] p-8 shadow-2xl">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4 dark:bg-[#0f172a]">
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-2xl dark:border-[#334155] dark:bg-[#1e293b]">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-[#f8fafc]">Criar Conta</h1>
-          <p className="mt-1 text-sm text-[#94a3b8]">Cadastre-se no Hub Eletromecânica</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-[#f8fafc]">Criar Conta</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-[#94a3b8]">
+            Cadastre-se no Hub Eletromecânica
+          </p>
         </div>
 
         <form onSubmit={handleRegister} className="flex flex-col gap-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#94a3b8]">Nome completo</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
+              Nome completo
+            </label>
             <input
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2 text-[14px]"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 text-[14px] dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
               placeholder="Seu nome"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#94a3b8]">
+            <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
               E-mail corporativo
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2 text-[14px]"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 text-[14px] dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
               placeholder="seu@empresa.com"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#94a3b8]">Senha</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
+              Senha
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 pr-10 text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2 text-[14px]"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 text-[14px] dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#94a3b8] cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-[#64748b] dark:hover:text-[#94a3b8] cursor-pointer"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -153,31 +162,33 @@ function RegisterPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#94a3b8]">
+            <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-[#94a3b8]">
               Confirmar senha
             </label>
             <input
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-lg border border-[#334155] bg-[#0f172a] px-3 py-2.5 text-[#f8fafc] outline-none ring-[#0ea5e9] focus:ring-2 text-[14px]"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 text-[14px] dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#f8fafc]"
               placeholder="••••••••"
             />
           </div>
 
           {supabaseConfigSummary.error && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-300">
               {supabaseConfigSummary.error}
             </div>
           )}
 
-          <div className="rounded-lg border border-[#334155] bg-[#0f172a]/80 px-3 py-2 text-xs text-[#94a3b8]">
-            <div className="font-medium text-[#e2e8f0]">Supabase ativo</div>
-            <div className="mt-1 break-all">{supabaseConfigSummary.url || "não configurado"}</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-[#334155] dark:bg-[#0f172a]/80 dark:text-[#94a3b8]">
+            <div className="font-medium text-slate-700 dark:text-[#e2e8f0]">Supabase ativo</div>
+            <div className="mt-1 break-all text-slate-400 dark:text-[#94a3b8]">
+              {supabaseConfigSummary.url || "não configurado"}
+            </div>
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
               {error}
             </div>
           )}
@@ -196,7 +207,7 @@ function RegisterPage() {
           </button>
         </form>
 
-        <div className="mt-4 text-center text-sm text-[#64748b]">
+        <div className="mt-4 text-center text-sm text-slate-400 dark:text-[#64748b]">
           Já tem conta?{" "}
           <Link to="/login" className="text-[#0ea5e9] hover:underline">
             Entrar

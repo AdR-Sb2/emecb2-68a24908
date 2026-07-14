@@ -15,7 +15,8 @@ const supabaseAnonKey = readEnv(
   "PUBLIC_SUPABASE_ANON_KEY",
 );
 
-const isLocalDev = import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
+const isLocalDev =
+  import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
 const fallbackSupabaseUrl = "https://byxmnmebvqdxpzcuutak.supabase.co";
 const fallbackSupabaseAnonKey = "sb_publishable_ltY4BfcrdlBw91KH5BHfgg_ZHDurfuZ";
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);

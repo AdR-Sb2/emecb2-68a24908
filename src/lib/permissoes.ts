@@ -61,10 +61,7 @@ export function temPermissao(
   return panelPerms.has(`${panelKey}.${permissionKey}`);
 }
 
-export function temPainel(
-  permissoes: Map<string, Set<string>>,
-  panelKey: string,
-): boolean {
+export function temPainel(permissoes: Map<string, Set<string>>, panelKey: string): boolean {
   return permissoes.has(panelKey);
 }
 

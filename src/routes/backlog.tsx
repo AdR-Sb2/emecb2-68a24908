@@ -265,7 +265,7 @@ function enrich(rows: Row[], now: Date): Enriched[] {
   });
 }
 
-  // ---------- multi-select simples ----------
+// ---------- multi-select simples ----------
 function MultiSelect({
   label,
   options,
@@ -292,7 +292,9 @@ function MultiSelect({
         className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
       >
         <span className="truncate">
-          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">{label}:</span>}
+          {!hideInlineLabel && (
+            <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">{label}:</span>
+          )}
           <span className="font-medium text-slate-800 dark:text-slate-100">
             {value.length === 0
               ? "Todos"
@@ -357,7 +359,9 @@ function ComboboxSearch({
         className="flex min-h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-left text-[15px] shadow-sm hover:border-[#1f7ad6] cursor-pointer"
       >
         <span className="truncate">
-          {!hideInlineLabel && <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">{label}:</span>}
+          {!hideInlineLabel && (
+            <span className="mr-1 text-xs text-slate-500 dark:text-slate-400">{label}:</span>
+          )}
           <span className="font-medium text-slate-800 dark:text-slate-100">{selectedLabel}</span>
         </span>
         <Search className="ml-2 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-400" />
@@ -382,7 +386,10 @@ function ComboboxSearch({
                 className="min-h-9 w-full border-none text-[14px] outline-none"
               />
               {q && (
-                <button onClick={() => setQ("")} className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200">
+                <button
+                  onClick={() => setQ("")}
+                  className="text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200"
+                >
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -399,7 +406,9 @@ function ComboboxSearch({
                 {allLabel}
               </button>
               {filtered.length === 0 && (
-                <div className="px-2 py-2 text-xs text-slate-400 dark:text-slate-400">Nenhum resultado.</div>
+                <div className="px-2 py-2 text-xs text-slate-400 dark:text-slate-400">
+                  Nenhum resultado.
+                </div>
               )}
               {filtered.map((o) => (
                 <button
@@ -1013,8 +1022,7 @@ function BacklogPage() {
       if (e.lat === null || e.lon === null) return false;
       if (skip !== "tipo" && rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || ""))
         return false;
-      if (skip !== "resp" && rbResps.length && !rbResps.includes(e.responsabilidade))
-        return false;
+      if (skip !== "resp" && rbResps.length && !rbResps.includes(e.responsabilidade)) return false;
       if (skip !== "elevatoria" && rbElevatorias.length && !rbElevatorias.includes(e.planta))
         return false;
       if (skip !== "cidade" && rbCidades.length && !rbCidades.includes(e.r.Cidade || ""))
@@ -1120,24 +1128,36 @@ function BacklogPage() {
             const origDistI = stopI.distKm;
             const origDistJ = stopJ.distKm;
 
-            const prevForJinI = ri.details.length > 1
-              ? haversineKm(
-                  { lat: ri.details[ri.details.length - 2].oss[0].lat!, lon: ri.details[ri.details.length - 2].oss[0].lon! },
-                  { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! },
-                )
-              : haversineKm(ri.start, { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! });
-            const prevForIinJ = jIdx > 0
-              ? haversineKm(
-                  { lat: rj.details[jIdx - 1].oss[0].lat!, lon: rj.details[jIdx - 1].oss[0].lon! },
-                  { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! },
-                )
-              : haversineKm(rj.start, { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! });
-            const nextForIinJ = jIdx < rj.details.length - 1
-              ? haversineKm(
-                  { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! },
-                  { lat: rj.details[jIdx + 1].oss[0].lat!, lon: rj.details[jIdx + 1].oss[0].lon! },
-                )
-              : 0;
+            const prevForJinI =
+              ri.details.length > 1
+                ? haversineKm(
+                    {
+                      lat: ri.details[ri.details.length - 2].oss[0].lat!,
+                      lon: ri.details[ri.details.length - 2].oss[0].lon!,
+                    },
+                    { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! },
+                  )
+                : haversineKm(ri.start, { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! });
+            const prevForIinJ =
+              jIdx > 0
+                ? haversineKm(
+                    {
+                      lat: rj.details[jIdx - 1].oss[0].lat!,
+                      lon: rj.details[jIdx - 1].oss[0].lon!,
+                    },
+                    { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! },
+                  )
+                : haversineKm(rj.start, { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! });
+            const nextForIinJ =
+              jIdx < rj.details.length - 1
+                ? haversineKm(
+                    { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! },
+                    {
+                      lat: rj.details[jIdx + 1].oss[0].lat!,
+                      lon: rj.details[jIdx + 1].oss[0].lon!,
+                    },
+                  )
+                : 0;
 
             const newDistJ = prevForIinJ + nextForIinJ;
             const totalOrig = origDistI + origDistJ;
@@ -1146,41 +1166,62 @@ function BacklogPage() {
             if (totalNew < totalOrig - 0.5) {
               // Recalculate distances properly for new route I
               const newDetailsI = ri.details.slice(0, -1).map((d) => ({ ...d }));
-              const lastPrev = newDetailsI.length > 0
-                ? { lat: newDetailsI[newDetailsI.length - 1].oss[0].lat!, lon: newDetailsI[newDetailsI.length - 1].oss[0].lon! }
-                : ri.start;
-              const dToJ = haversineKm(lastPrev, { lat: stopJ.oss[0].lat!, lon: stopJ.oss[0].lon! });
+              const lastPrev =
+                newDetailsI.length > 0
+                  ? {
+                      lat: newDetailsI[newDetailsI.length - 1].oss[0].lat!,
+                      lon: newDetailsI[newDetailsI.length - 1].oss[0].lon!,
+                    }
+                  : ri.start;
+              const dToJ = haversineKm(lastPrev, {
+                lat: stopJ.oss[0].lat!,
+                lon: stopJ.oss[0].lon!,
+              });
               newDetailsI.push({
                 ...stopJ,
                 ordem: newDetailsI.length + 1,
                 distKm: dToJ,
-                cumKm: (newDetailsI.length > 0 ? newDetailsI[newDetailsI.length - 1].cumKm : 0) + dToJ,
+                cumKm:
+                  (newDetailsI.length > 0 ? newDetailsI[newDetailsI.length - 1].cumKm : 0) + dToJ,
               });
 
               // Recalculate distances for new route J
               const newDetailsJ: GeneratedRoute["details"] = [];
               for (let k = 0; k < rj.details.length; k++) {
                 if (k === jIdx) {
-                  const prev = newDetailsJ.length > 0
-                    ? { lat: newDetailsJ[newDetailsJ.length - 1].oss[0].lat!, lon: newDetailsJ[newDetailsJ.length - 1].oss[0].lon! }
-                    : rj.start;
+                  const prev =
+                    newDetailsJ.length > 0
+                      ? {
+                          lat: newDetailsJ[newDetailsJ.length - 1].oss[0].lat!,
+                          lon: newDetailsJ[newDetailsJ.length - 1].oss[0].lon!,
+                        }
+                      : rj.start;
                   const d = haversineKm(prev, { lat: stopI.oss[0].lat!, lon: stopI.oss[0].lon! });
                   newDetailsJ.push({
                     ...stopI,
                     ordem: k + 1,
                     distKm: d,
-                    cumKm: (newDetailsJ.length > 0 ? newDetailsJ[newDetailsJ.length - 1].cumKm : 0) + d,
+                    cumKm:
+                      (newDetailsJ.length > 0 ? newDetailsJ[newDetailsJ.length - 1].cumKm : 0) + d,
                   });
                 } else {
-                  const prev = newDetailsJ.length > 0
-                    ? { lat: newDetailsJ[newDetailsJ.length - 1].oss[0].lat!, lon: newDetailsJ[newDetailsJ.length - 1].oss[0].lon! }
-                    : rj.start;
-                  const d = haversineKm(prev, { lat: rj.details[k].oss[0].lat!, lon: rj.details[k].oss[0].lon! });
+                  const prev =
+                    newDetailsJ.length > 0
+                      ? {
+                          lat: newDetailsJ[newDetailsJ.length - 1].oss[0].lat!,
+                          lon: newDetailsJ[newDetailsJ.length - 1].oss[0].lon!,
+                        }
+                      : rj.start;
+                  const d = haversineKm(prev, {
+                    lat: rj.details[k].oss[0].lat!,
+                    lon: rj.details[k].oss[0].lon!,
+                  });
                   newDetailsJ.push({
                     ...rj.details[k],
                     ordem: k + 1,
                     distKm: d,
-                    cumKm: (newDetailsJ.length > 0 ? newDetailsJ[newDetailsJ.length - 1].cumKm : 0) + d,
+                    cumKm:
+                      (newDetailsJ.length > 0 ? newDetailsJ[newDetailsJ.length - 1].cumKm : 0) + d,
                   });
                 }
               }
@@ -1604,7 +1645,9 @@ function BacklogPage() {
             </div>
             <div className="min-w-0 text-white">
               <p className="truncate text-lg font-semibold">Águas do Rio</p>
-              <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Backlog e programação</p>
+              <p className="truncate text-sm text-cyan-50/90">
+                Eletromecânica · Backlog e programação
+              </p>
             </div>
           </div>
           <Link
@@ -1621,7 +1664,9 @@ function BacklogPage() {
       {/* Title + actions */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">Backlog BI</h1>
+          <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">
+            Backlog BI
+          </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Bucket Field/SAP · {data.length} O.S. · atualizado {fmtDate(now)}
           </p>
@@ -1691,7 +1736,9 @@ function BacklogPage() {
             O.S. no bucket
           </div>
           <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{kTotal}</div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-400">clique para limpar filtros</div>
+          <div className="text-[11px] text-slate-400 dark:text-slate-400">
+            clique para limpar filtros
+          </div>
         </button>
         <button
           onClick={() => setOnlyLate((v) => !v)}
@@ -1999,7 +2046,9 @@ function BacklogPage() {
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
                       Total
                     </div>
-                    <div className="text-2xl font-bold text-[#0b3a73] dark:text-white">{totalTipo}</div>
+                    <div className="text-2xl font-bold text-[#0b3a73] dark:text-white">
+                      {totalTipo}
+                    </div>
                   </div>
                 </div>
                 <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
@@ -2038,7 +2087,9 @@ function BacklogPage() {
 
         {/* Cidade */}
         <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">Distribuição por Cidade</div>
+          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
+            Distribuição por Cidade
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dataCidade} layout="vertical" margin={{ left: 10, right: 30 }}>
               <XAxis type="number" hide />
@@ -2096,7 +2147,9 @@ function BacklogPage() {
           </div>
           <ul className="space-y-1 text-xs">
             {topPlantasBacklog.length === 0 && (
-              <li className="text-slate-400 dark:text-slate-400">Nenhuma planta com backlog crítico.</li>
+              <li className="text-slate-400 dark:text-slate-400">
+                Nenhuma planta com backlog crítico.
+              </li>
             )}
             {topPlantasBacklog.map((p) => (
               <li key={p.planta}>
@@ -2174,7 +2227,9 @@ function BacklogPage() {
           <div className="grid gap-3 py-2 text-sm">
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Fim SLA anterior a *</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Fim SLA anterior a *
+                </span>
                 <input
                   type="datetime-local"
                   value={rbSlaBefore}
@@ -2186,7 +2241,9 @@ function BacklogPage() {
                 </span>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Ponto de partida *</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Ponto de partida *
+                </span>
                 <select
                   value={rbStart}
                   onChange={(e) => setRbStart(e.target.value)}
@@ -2222,7 +2279,9 @@ function BacklogPage() {
 
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Quantidade de rotas *</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Quantidade de rotas *
+                </span>
                 <input
                   type="number"
                   min={1}
@@ -2231,7 +2290,9 @@ function BacklogPage() {
                   onChange={(e) => setRbRouteCount(Math.max(1, Number(e.target.value) || 1))}
                   className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
                 />
-                <span className="text-[10px] text-slate-400 dark:text-slate-400">divide as O.S. entre N rotas</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                  divide as O.S. entre N rotas
+                </span>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -2282,7 +2343,9 @@ function BacklogPage() {
             {!rbUseIndividualConfig && (
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Equipe</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    Equipe
+                  </span>
                   <select
                     value={rbEquipe}
                     onChange={(e) => setRbEquipe(e.target.value)}
@@ -2322,7 +2385,9 @@ function BacklogPage() {
                       Rota {idx + 1}
                     </span>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Equipe</span>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        Equipe
+                      </span>
                       <select
                         value={cfg.equipe}
                         onChange={(e) => {
@@ -2338,7 +2403,9 @@ function BacklogPage() {
                       </select>
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Cidade</span>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        Cidade
+                      </span>
                       <select
                         value={cfg.cidades[0] || ""}
                         onChange={(e) => {
@@ -2486,7 +2553,9 @@ function BacklogPage() {
                     </div>
                     <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
                       <span className="text-slate-500 dark:text-slate-400">Tempo est.:</span>{" "}
-                      <span className="font-bold text-[#0b3a73] dark:text-white">~{activeRoute.etaMin} min</span>
+                      <span className="font-bold text-[#0b3a73] dark:text-white">
+                        ~{activeRoute.etaMin} min
+                      </span>
                     </div>
                     <button
                       onClick={() => exportRouteCSV(activeRouteTab)}
@@ -2505,7 +2574,9 @@ function BacklogPage() {
                         style={{ color: activeRoute.color || "#0b3a73" }}
                       />{" "}
                       Ponto de partida:{" "}
-                      <span className="font-normal text-slate-700 dark:text-slate-200">{activeRoute.start.label}</span>
+                      <span className="font-normal text-slate-700 dark:text-slate-200">
+                        {activeRoute.start.label}
+                      </span>
                     </div>
                     <ol className="space-y-1 max-h-[380px] overflow-auto pr-1">
                       {activeRoute.details.map((d) => (
@@ -2522,13 +2593,19 @@ function BacklogPage() {
                                 {d.ordem}
                               </span>
                               <div>
-                                <div className="font-semibold text-[#0b3a73] dark:text-white">{d.plantaShort}</div>
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400">{d.cidade}</div>
+                                <div className="font-semibold text-[#0b3a73] dark:text-white">
+                                  {d.plantaShort}
+                                </div>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {d.cidade}
+                                </div>
                               </div>
                             </div>
                             <div className="text-right text-[10px] text-slate-500 dark:text-slate-400">
                               <div>+{d.distKm.toFixed(1)} km</div>
-                              <div className="text-slate-400 dark:text-slate-400">Σ {d.cumKm.toFixed(1)} km</div>
+                              <div className="text-slate-400 dark:text-slate-400">
+                                Σ {d.cumKm.toFixed(1)} km
+                              </div>
                             </div>
                             <div className="flex items-center gap-1 ml-2">
                               <button
@@ -2541,14 +2618,21 @@ function BacklogPage() {
                                   const newStops = r.stops.filter((_, i) => i !== idx);
                                   // Recalculate cumulative distances
                                   let cumKm = 0;
-                                  let prev = activeRoute.start;
+                                  const prev = activeRoute.start;
                                   const recalcDetails = newDetails.map((x, i) => {
-                                    const dist = i === 0
-                                      ? haversineKm(prev, { lat: x.oss[0].lat!, lon: x.oss[0].lon! })
-                                      : haversineKm(
-                                          { lat: newDetails[i - 1].oss[0].lat!, lon: newDetails[i - 1].oss[0].lon! },
-                                          { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
-                                        );
+                                    const dist =
+                                      i === 0
+                                        ? haversineKm(prev, {
+                                            lat: x.oss[0].lat!,
+                                            lon: x.oss[0].lon!,
+                                          })
+                                        : haversineKm(
+                                            {
+                                              lat: newDetails[i - 1].oss[0].lat!,
+                                              lon: newDetails[i - 1].oss[0].lon!,
+                                            },
+                                            { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
+                                          );
                                     cumKm += dist;
                                     return { ...x, ordem: i + 1, distKm: dist, cumKm };
                                   });
@@ -2583,14 +2667,21 @@ function BacklogPage() {
                                     src.stops = src.stops.filter((_, i) => i !== idx);
                                     // Recalc source route
                                     let cumKm = 0;
-                                    let prev = activeRoute.start;
+                                    const prev = activeRoute.start;
                                     src.details = src.details.map((x, i) => {
-                                      const dist = i === 0
-                                        ? haversineKm(prev, { lat: x.oss[0].lat!, lon: x.oss[0].lon! })
-                                        : haversineKm(
-                                            { lat: src.details[i - 1].oss[0].lat!, lon: src.details[i - 1].oss[0].lon! },
-                                            { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
-                                          );
+                                      const dist =
+                                        i === 0
+                                          ? haversineKm(prev, {
+                                              lat: x.oss[0].lat!,
+                                              lon: x.oss[0].lon!,
+                                            })
+                                          : haversineKm(
+                                              {
+                                                lat: src.details[i - 1].oss[0].lat!,
+                                                lon: src.details[i - 1].oss[0].lon!,
+                                              },
+                                              { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
+                                            );
                                       cumKm += dist;
                                       return { ...x, ordem: i + 1, distKm: dist, cumKm };
                                     });
@@ -2600,20 +2691,36 @@ function BacklogPage() {
 
                                     // Add to target route at the end
                                     const tgt = { ...routes[targetIdx] };
-                                    const tgtPrev = tgt.details.length > 0
-                                      ? { lat: tgt.details[tgt.details.length - 1].oss[0].lat!, lon: tgt.details[tgt.details.length - 1].oss[0].lon! }
-                                      : tgt.start;
-                                    const distToNew = haversineKm(tgtPrev, { lat: movedDetail.oss[0].lat!, lon: movedDetail.oss[0].lon! });
+                                    const tgtPrev =
+                                      tgt.details.length > 0
+                                        ? {
+                                            lat: tgt.details[tgt.details.length - 1].oss[0].lat!,
+                                            lon: tgt.details[tgt.details.length - 1].oss[0].lon!,
+                                          }
+                                        : tgt.start;
+                                    const distToNew = haversineKm(tgtPrev, {
+                                      lat: movedDetail.oss[0].lat!,
+                                      lon: movedDetail.oss[0].lon!,
+                                    });
                                     const newDetail = {
                                       ...movedDetail,
                                       ordem: tgt.details.length + 1,
                                       distKm: distToNew,
-                                      cumKm: (tgt.details.length > 0 ? tgt.details[tgt.details.length - 1].cumKm : 0) + distToNew,
+                                      cumKm:
+                                        (tgt.details.length > 0
+                                          ? tgt.details[tgt.details.length - 1].cumKm
+                                          : 0) + distToNew,
                                     };
                                     tgt.details = [...tgt.details, newDetail];
                                     tgt.stops = [
                                       ...tgt.stops,
-                                      { planta: movedDetail.planta, lat: movedDetail.oss[0].lat!, lon: movedDetail.oss[0].lon!, ordem: tgt.stops.length + 1, osCount: movedDetail.oss.length },
+                                      {
+                                        planta: movedDetail.planta,
+                                        lat: movedDetail.oss[0].lat!,
+                                        lon: movedDetail.oss[0].lon!,
+                                        ordem: tgt.stops.length + 1,
+                                        osCount: movedDetail.oss.length,
+                                      },
                                     ];
                                     tgt.totalKm = tgt.details.reduce((s, x) => s + x.distKm, 0);
                                     tgt.etaMin = Math.round((tgt.totalKm / AVG_KMH) * 60);
@@ -2728,7 +2835,10 @@ function BacklogPage() {
             </thead>
             <tbody>
               {sortedRows.map((e, i) => (
-                <tr key={`${e.om}-${i}`} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700">
+                <tr
+                  key={`${e.om}-${i}`}
+                  className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
                   <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
                     <button
                       type="button"
@@ -2772,10 +2882,10 @@ function BacklogPage() {
                             const val = ev.target.value;
                             if (!val) return;
                             setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
-                            supabase.from("equipe_overrides").upsert(
-                              { om: e.om, equipe: val },
-                              { ignoreDuplicates: false },
-                            ).then(({ error }) => error && console.warn("Falha ao salvar", error));
+                            supabase
+                              .from("equipe_overrides")
+                              .upsert({ om: e.om, equipe: val }, { ignoreDuplicates: false })
+                              .then(({ error }) => error && console.warn("Falha ao salvar", error));
                           }}
                           className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
                             e.equipe === "EMEC"
@@ -2799,8 +2909,14 @@ function BacklogPage() {
                                 delete next[e.om];
                                 return next;
                               });
-                              supabase.from("equipe_overrides").delete().eq("om", e.om)
-                                .then(({ error }) => error && console.warn("Falha ao remover override", error));
+                              supabase
+                                .from("equipe_overrides")
+                                .delete()
+                                .eq("om", e.om)
+                                .then(
+                                  ({ error }) =>
+                                    error && console.warn("Falha ao remover override", error),
+                                );
                             }}
                             className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
                             title="Reverter ao cálculo automático"
@@ -2857,7 +2973,10 @@ function BacklogPage() {
               </thead>
               <tbody>
                 {sortedRows.map((e, i) => (
-                  <tr key={`${e.om}-${i}`} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700">
+                  <tr
+                    key={`${e.om}-${i}`}
+                    className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
                     <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
                       <button
                         type="button"
@@ -2903,10 +3022,12 @@ function BacklogPage() {
                               const val = ev.target.value;
                               if (!val) return;
                               setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
-                              supabase.from("equipe_overrides").upsert(
-                                { om: e.om, equipe: val },
-                                { ignoreDuplicates: false },
-                              ).then(({ error }) => error && console.warn("Falha ao salvar", error));
+                              supabase
+                                .from("equipe_overrides")
+                                .upsert({ om: e.om, equipe: val }, { ignoreDuplicates: false })
+                                .then(
+                                  ({ error }) => error && console.warn("Falha ao salvar", error),
+                                );
                             }}
                             className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
                               e.equipe === "EMEC"
@@ -2930,8 +3051,14 @@ function BacklogPage() {
                                   delete next[e.om];
                                   return next;
                                 });
-                                supabase.from("equipe_overrides").delete().eq("om", e.om)
-                                  .then(({ error }) => error && console.warn("Falha ao remover override", error));
+                                supabase
+                                  .from("equipe_overrides")
+                                  .delete()
+                                  .eq("om", e.om)
+                                  .then(
+                                    ({ error }) =>
+                                      error && console.warn("Falha ao remover override", error),
+                                  );
                               }}
                               className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
                               title="Reverter ao cálculo automático"
