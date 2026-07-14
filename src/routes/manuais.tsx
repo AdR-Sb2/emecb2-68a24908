@@ -26,6 +26,8 @@ import {
   FolderPlus,
   ArrowRight,
   Save,
+  Trash2,
+  Filter,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
@@ -48,6 +50,7 @@ type Manual = {
   titulo: string;
   descricao: string;
   categoria_id: number;
+  fabricante: string | null;
 };
 
 type ManualArquivo = {
@@ -132,6 +135,7 @@ function ManuaisPage() {
   const [editTitulo, setEditTitulo] = useState("");
   const [editDescricao, setEditDescricao] = useState("");
   const [editCategoriaId, setEditCategoriaId] = useState<number | null>(null);
+  const [editFabricante, setEditFabricante] = useState<string>("");
 
   // Nova categoria
   const [showNovaCategoria, setShowNovaCategoria] = useState(false);
@@ -146,6 +150,20 @@ function ManuaisPage() {
 
   // Ver manuais modal
   const [verManuaisManualId, setVerManuaisManualId] = useState<number | null>(null);
+
+  // Delete categoria
+  const [deleteCategoria, setDeleteCategoria] = useState<{
+    id: number;
+    nome: string;
+    manuaisCount: number;
+  } | null>(null);
+
+  // Fabricante filter
+  const [filtroFabricante, setFiltroFabricante] = useState<string>("TODOS");
+
+  // Gerenciar fabricantes
+  const [showGerFabricantes, setShowGerFabricantes] = useState(false);
+  const [novoFabricanteNome, setNovoFabricanteNome] = useState("");
 
   // Histórico
   const [showHistory, setShowHistory] = useState(false);
@@ -195,18 +213,6 @@ function ManuaisPage() {
     list.push({ chave: "__em_breve", label: "Em breve" });
     return list;
   }, [categorias]);
-
-  // --- Manuais filtrados ---
-  const manuaisFiltrados = useMemo(() => {
-    const cat = categorias.find((c) => c.chave === abaAtiva);
-    if (!cat) return [];
-    let lista = manuais.filter((m) => m.categoria_id === cat.id);
-    if (search) {
-      const q = search.toLowerCase();
-      lista = lista.filter((m) => m.titulo.toLowerCase().includes(q));
-    }
-    return lista;
-  }, [manuais, categorias, abaAtiva, search]);
 
   const isEmBreve = abaAtiva === "__em_breve";
 
@@ -388,6 +394,11 @@ function ManuaisPage() {
       detalhes.categoria_antiga = catAntiga?.nome_exibicao;
       detalhes.categoria_nova = catNova?.nome_exibicao;
     }
+    if ((editFabricante || null) !== (manual.fabricante || null)) {
+      updates.fabricante = editFabricante || null;
+      detalhes.fabricante_antigo = manual.fabricante;
+      detalhes.fabricante_novo = editFabricante || null;
+    }
 
     if (Object.keys(updates).length === 0) {
       setEditManualId(null);
@@ -412,6 +423,7 @@ function ManuaisPage() {
     setEditTitulo(manual.titulo);
     setEditDescricao(manual.descricao);
     setEditCategoriaId(manual.categoria_id);
+    setEditFabricante(manual.fabricante ?? "");
   };
 
   // --- Mover manual para outra categoria (atalho rápido) ---
@@ -499,6 +511,44 @@ function ManuaisPage() {
     await carregarDados();
   };
 
+  // --- Excluir categoria ---
+  const handleExcluirCategoria = async () => {
+    if (!deleteCategoria) return;
+    const { error } = await supabase
+      .from("manuais_categorias")
+      .delete()
+      .eq("id", deleteCategoria.id);
+    if (error) {
+      toast.error("Erro ao excluir categoria: " + error.message);
+      setDeleteCategoria(null);
+      return;
+    }
+    await adicionarLog("removeu_categoria", { nome: deleteCategoria.nome });
+    toast.success(`Categoria "${deleteCategoria.nome}" excluída!`);
+    if (abaAtiva === categorias.find((c) => c.id === deleteCategoria.id)?.chave) {
+      setAbaAtiva("nrs");
+    }
+    setDeleteCategoria(null);
+    await carregarDados();
+  };
+
+  // --- Remover fabricante de todos os manuais ---
+  const handleRemoverFabricante = async (fabricante: string) => {
+    const count = manuais.filter((m) => m.fabricante === fabricante).length;
+    if (!confirm(`Remover o filtro "${fabricante}" de todos os ${count} manuais?`)) return;
+    const { error } = await supabase
+      .from("manuais")
+      .update({ fabricante: null })
+      .eq("fabricante", fabricante);
+    if (error) {
+      toast.error("Erro ao remover fabricante: " + error.message);
+      return;
+    }
+    toast.success(`Filtro "${fabricante}" removido de ${count} manuais.`);
+    setShowGerFabricantes(false);
+    await carregarDados();
+  };
+
   const carregarLogs = async () => {
     const { data } = await supabase
       .from("manuais_log")
@@ -509,6 +559,32 @@ function ManuaisPage() {
   };
 
   const podeMostrar = profile?.cargo_id && permissoes.size > 0;
+
+  // --- Fabricantes únicos da categoria ativa ---
+  const fabricantesDaCategoria = useMemo(() => {
+    const cat = categorias.find((c) => c.chave === abaAtiva);
+    if (!cat) return [];
+    const set = new Set<string>();
+    manuais
+      .filter((m) => m.categoria_id === cat.id && m.fabricante)
+      .forEach((m) => set.add(m.fabricante!));
+    return Array.from(set).sort();
+  }, [manuais, categorias, abaAtiva]);
+
+  // --- Manuais filtrados (incluindo por fabricante) ---
+  const manuaisFiltrados = useMemo(() => {
+    const cat = categorias.find((c) => c.chave === abaAtiva);
+    if (!cat) return [];
+    let lista = manuais.filter((m) => m.categoria_id === cat.id);
+    if (filtroFabricante !== "TODOS") {
+      lista = lista.filter((m) => m.fabricante === filtroFabricante);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      lista = lista.filter((m) => m.titulo.toLowerCase().includes(q));
+    }
+    return lista;
+  }, [manuais, categorias, abaAtiva, filtroFabricante, search]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
@@ -610,19 +686,39 @@ function ManuaisPage() {
 
       {/* Abas */}
       <div className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700">
-        {abas.map((aba) => (
-          <button
-            key={aba.chave}
-            onClick={() => setAbaAtiva(aba.chave)}
-            className={`px-4 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer border-b-2 ${
-              abaAtiva === aba.chave
-                ? "border-[#1f7ad6] text-[#1f7ad6]"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
-          >
-            {aba.label}
-          </button>
-        ))}
+        {abas.map((aba) => {
+          const isRealCategory = aba.chave !== "__em_breve";
+          const cat = categorias.find((c) => c.chave === aba.chave);
+          return (
+            <div key={aba.chave} className="relative flex items-center">
+              <button
+                onClick={() => setAbaAtiva(aba.chave)}
+                className={`px-4 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer border-b-2 ${
+                  abaAtiva === aba.chave
+                    ? "border-[#1f7ad6] text-[#1f7ad6]"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                {aba.label}
+              </button>
+              {editMode && isRealCategory && cat && (
+                <button
+                  onClick={() =>
+                    setDeleteCategoria({
+                      id: cat.id,
+                      nome: cat.nome_exibicao,
+                      manuaisCount: manuais.filter((m) => m.categoria_id === cat.id).length,
+                    })
+                  }
+                  className="ml-0.5 rounded-full p-0.5 text-red-300 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/40 cursor-pointer"
+                  title={`Excluir "${cat.nome_exibicao}"`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
         {editMode && (
           <button
             onClick={() => setShowNovaCategoria(true)}
@@ -646,6 +742,38 @@ function ManuaisPage() {
           </button>
         )}
       </div>
+
+      {/* Fabricante filter pills */}
+      {fabricantesDaCategoria.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          {["TODOS", ...fabricantesDaCategoria].map((fab) => (
+            <button
+              key={fab}
+              onClick={() => setFiltroFabricante(fab)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
+                filtroFabricante === fab
+                  ? "bg-[#1f7ad6] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+              }`}
+            >
+              {fab === "TODOS" ? "Todos" : fab}
+            </button>
+          ))}
+          {editMode && (
+            <button
+              onClick={() => {
+                setNovoFabricanteNome("");
+                setShowGerFabricantes(true);
+              }}
+              className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition cursor-pointer"
+              title="Gerenciar fabricantes"
+            >
+              <Plus className="h-3 w-3 inline" /> Editar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Conteúdo */}
       {loading ? (
@@ -715,7 +843,7 @@ function ManuaisPage() {
                             onChange={(e) => setEditDescricao(e.target.value)}
                             className="w-full rounded border border-slate-300 px-2 py-1 text-[12px] text-slate-600 outline-none ring-[#1f7ad6] focus:ring-2 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-300"
                           />
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap gap-1">
                             <select
                               value={editCategoriaId ?? ""}
                               onChange={(e) => setEditCategoriaId(Number(e.target.value))}
@@ -726,6 +854,27 @@ function ManuaisPage() {
                                   {cat.nome_exibicao}
                                 </option>
                               ))}
+                            </select>
+                            <select
+                              value={editFabricante}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "__novo") {
+                                  const nome = prompt("Nome do novo fabricante:");
+                                  if (nome && nome.trim()) {
+                                    setEditFabricante(nome.trim().toUpperCase());
+                                  }
+                                } else {
+                                  setEditFabricante(val);
+                                }
+                              }}
+                              className="flex-1 rounded border border-slate-300 px-1 py-1 text-[11px] outline-none dark:border-slate-500 dark:bg-slate-700 dark:text-slate-200"
+                            >
+                              <option value="">Sem fabricante</option>
+                              {[...new Set(manuais.map((m) => m.fabricante).filter((x): x is string => !!x))].sort().map((f) => (
+                                <option key={f} value={f}>{f}</option>
+                              ))}
+                              <option value="__novo">+ Novo fabricante</option>
                             </select>
                             <button
                               onClick={handleSalvarManual}
@@ -752,6 +901,11 @@ function ManuaisPage() {
                             <p className="text-[12px] text-slate-500 dark:text-slate-400">
                               {manual.descricao}
                             </p>
+                            {manual.fabricante && (
+                              <span className="mt-0.5 inline-block rounded bg-slate-200/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-600/60 dark:text-slate-300">
+                                {manual.fabricante}
+                              </span>
+                            )}
                           </div>
                           {editMode && (
                             <button
@@ -1089,6 +1243,9 @@ function ManuaisPage() {
                       {log.acao === "criou_manual" && (
                         <Plus className="h-4 w-4 text-blue-500" />
                       )}
+                      {log.acao === "removeu_categoria" && (
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] text-slate-700 dark:text-slate-200">
@@ -1109,6 +1266,8 @@ function ManuaisPage() {
                           `Criou categoria "${log.detalhes?.nome}"`}
                         {log.acao === "criou_manual" &&
                           `Criou manual "${log.detalhes?.titulo}" em "${log.detalhes?.categoria}"`}
+                        {log.acao === "removeu_categoria" &&
+                          `Removeu categoria "${log.detalhes?.nome}"`}
                       </p>
                       <p className="text-[11px] text-slate-400">
                         {log.usuario} · {new Date(log.criado_em).toLocaleString("pt-BR")}
@@ -1226,6 +1385,153 @@ function ManuaisPage() {
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Excluir Categoria */}
+      {deleteCategoria && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-slate-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Excluir Categoria
+              </h3>
+              <button
+                onClick={() => setDeleteCategoria(null)}
+                className="cursor-pointer text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-2 text-sm text-slate-600 dark:text-slate-300">
+              Tem certeza que deseja excluir a categoria{" "}
+              <span className="font-bold text-slate-800 dark:text-slate-100">
+                "{deleteCategoria.nome}"
+              </span>
+              ?
+            </p>
+            <p className="mb-6 text-sm text-red-500">
+              {deleteCategoria.manuaisCount > 0
+                ? `${deleteCategoria.manuaisCount} manual(is) serão excluídos permanentemente, incluindo todos os PDFs vinculados.`
+                : "Nenhum manual vinculado. A categoria vazia será removida."}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExcluirCategoria}
+                className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 cursor-pointer"
+              >
+                Sim, excluir
+              </button>
+              <button
+                onClick={() => setDeleteCategoria(null)}
+                className="flex-1 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gerenciar Fabricantes */}
+      {showGerFabricantes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-slate-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#0b3a73] dark:text-white flex items-center gap-2">
+                <Filter className="h-5 w-5 text-[#1f7ad6]" />
+                Gerenciar Fabricantes
+              </h3>
+              <button
+                onClick={() => setShowGerFabricantes(false)}
+                className="cursor-pointer text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
+              {fabricantesDaCategoria.length === 0 ? (
+                <p className="py-4 text-center text-sm text-slate-400">
+                  Nenhum fabricante configurado. Adicione um novo abaixo.
+                </p>
+              ) : (
+                fabricantesDaCategoria.map((fab) => {
+                  const count = manuais.filter((m) => m.fabricante === fab).length;
+                  return (
+                    <div
+                      key={fab}
+                      className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-600"
+                    >
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {fab}
+                        <span className="ml-2 text-[11px] text-slate-400">({count} manuais)</span>
+                      </span>
+                      <button
+                        onClick={() => handleRemoverFabricante(fab)}
+                        className="flex h-7 w-7 items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 cursor-pointer"
+                        title={`Remover "${fab}" de todos os manuais`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={novoFabricanteNome}
+                onChange={(e) => setNovoFabricanteNome(e.target.value.toUpperCase())}
+                placeholder="Novo fabricante (ex: ABB)"
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-blue-400 focus:ring-2 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const nome = novoFabricanteNome.trim();
+                    if (nome) {
+                      const cat = categorias.find((c) => c.chave === abaAtiva);
+                      if (cat) {
+                        const manual = manuais.find((m) => m.categoria_id === cat.id);
+                        if (manual) {
+                          supabase
+                            .from("manuais")
+                            .update({ fabricante: nome })
+                            .eq("id", manual.id)
+                            .then(() => carregarDados());
+                        }
+                      }
+                      setNovoFabricanteNome("");
+                    }
+                  }
+                }}
+              />
+              <button
+                onClick={async () => {
+                  const nome = novoFabricanteNome.trim();
+                  if (!nome) return;
+                  const cat = categorias.find((c) => c.chave === abaAtiva);
+                  if (!cat) return;
+                  const algumManual = manuais.find((m) => m.categoria_id === cat.id);
+                  if (algumManual) {
+                    await supabase
+                      .from("manuais")
+                      .update({ fabricante: nome })
+                      .eq("id", algumManual.id);
+                    await carregarDados();
+                  }
+                  setNovoFabricanteNome("");
+                  toast.success(`Fabricante "${nome}" adicionado à lista.`);
+                }}
+                className="rounded-md bg-[#1f7ad6] px-3 py-2 text-sm font-semibold text-white hover:bg-[#0b3a73] cursor-pointer"
+              >
+                Adicionar
+              </button>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">
+              Digite o nome e clique em "Adicionar" ou pressione Enter. O fabricante será atribuído
+              ao primeiro manual da categoria para ficar disponível na lista.
+            </p>
           </div>
         </div>
       )}

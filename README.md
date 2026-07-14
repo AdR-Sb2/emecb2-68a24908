@@ -239,6 +239,15 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 
 ## 5. Histórico de Mudanças
 
+### [2026-07-14] — Manuais: Inversores unificado, exclusão de categorias, filtro por fabricante
+
+- **Manuais**: Unifica "Inversores WEG" + "Inversores Danfoss" em categoria única **"Inversores"** com filtro por fabricante (WEG, DANFOSS, SIEMENS, POWERELETRONICS) — migration `00032`
+- **Manuais**: Adicionados dezenas de novos manuais (CFW100, CFW700, SINAMICS G120/G110/S120/V20, MICROMASTER, SD700/500/800, FR500/700, etc.)
+- **Manuais**: Modo edição agora mostra **"X" ao lado do nome** de cada aba para **excluir categoria** com modal de confirmação (exclui manuais + PDFs em cascata)
+- **Manuais**: **Filtro por fabricante** — pills de fabricantes logo abaixo das abas; em modo edição, botão **"Editar filtros"** abre modal para adicionar/remover fabricantes
+- **Manuais**: Cada card exibe badge do fabricante; na edição inline, select para alterar fabricante com opção "+ Novo fabricante"
+- **Manuais**: Histórico agora registra `removeu_categoria`
+
 ### [2026-07-14] — Manuais: Inversores, "Ver manuais", criação de cards, Backlog: responsável editável
 
 - **Manuais**: Novas categorias "Inversores WEG" e "Inversores Danfoss" com manuais (CFW500, CFW300, CFW900, CFW11, FC-51, FC-360, FC-302, VLT AQUA Drive) — migration `00031`
