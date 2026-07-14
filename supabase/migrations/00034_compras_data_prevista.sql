@@ -1,0 +1,1 @@
+ALTER TABLE compras ADD COLUMN IF NOT EXISTS data_prevista DATE;

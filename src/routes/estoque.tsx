@@ -115,6 +115,8 @@ function EstoquePage() {
   const [dialogCompra, setDialogCompra] = useState(false);
   const [dialogDataRetirada, setDialogDataRetirada] = useState<number | null>(null);
   const [dataRetiradaInput, setDataRetiradaInput] = useState("");
+  const [dialogDataChegada, setDialogDataChegada] = useState<number | null>(null);
+  const [dataChegadaInput, setDataChegadaInput] = useState("");
   const [filtroStatusCompra, setFiltroStatusCompra] = useState<string>("TODOS");
   const [filtroCompradorCompra, setFiltroCompradorCompra] = useState<string>("TODOS");
   const [filtroChegou, setFiltroChegou] = useState<"TODOS" | "sim" | "nao">("TODOS");
@@ -506,12 +508,46 @@ function EstoquePage() {
   ]);
 
   const handleToggleChegou = async (id: number, current: boolean) => {
-    const { error } = await supabase.from("compras").update({ chegou: !current }).eq("id", id);
+    if (!current) {
+      setDialogDataChegada(id);
+      setDataChegadaInput(new Date().toISOString().split("T")[0]);
+      return;
+    }
+    const { error } = await supabase
+      .from("compras")
+      .update({ chegou: false, data_chegou: null })
+      .eq("id", id);
     if (error) {
       toast.error("Erro: " + error.message);
       return;
     }
-    setCompras((prev) => prev.map((c) => (c.id === id ? { ...c, chegou: !current } : c)));
+    setCompras((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, chegou: false, data_chegou: null } : c)),
+    );
+  };
+
+  const confirmarChegada = async () => {
+    if (!dialogDataChegada) return;
+    const { error } = await supabase
+      .from("compras")
+      .update({
+        chegou: true,
+        data_chegou: dataChegadaInput || null,
+      })
+      .eq("id", dialogDataChegada);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    toast.success("Chegada registrada!");
+    setCompras((prev) =>
+      prev.map((c) =>
+        c.id === dialogDataChegada
+          ? { ...c, chegou: true, data_chegou: dataChegadaInput || null }
+          : c,
+      ),
+    );
+    setDialogDataChegada(null);
   };
 
   const handleToggleFoiRetirado = async (id: number, current: boolean, afeta_saldo: boolean) => {
@@ -3457,15 +3493,23 @@ function EstoquePage() {
                   <th className="px-2 py-2">Fornecedor</th>
                   <th className="px-2 py-2 text-center">Chegou?</th>
                   <th className="px-2 py-2 text-center">Retirado?</th>
-                  <th className="px-2 py-2 text-center">Data Prevista</th>
+                  <th className="px-2 py-2 text-center">Data de Chegada</th>
+                  <th className="px-2 py-2 text-center">Data prevista</th>
                   <th className="px-2 py-2 text-right">Dias aberto</th>
+                  <th className="px-2 py-2 text-right">Dias p/ retirar</th>
                 </tr>
               </thead>
               <tbody>
                 {comprasFiltradas.map((c) => {
-                  const diasAberto =
-                    !c.foi_retirado && c.dt_criacao_rc
-                      ? Math.floor((Date.now() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
+                  const diasAberto = c.dt_criacao_rc
+                    ? c.chegou && c.data_chegou
+                      ? Math.floor((new Date(c.data_chegou).getTime() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
+                      : Math.floor((Date.now() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
+                    : null;
+
+                  const diasParaRetirar =
+                    c.chegou && c.data_chegou && c.foi_retirado && c.data_retirado
+                      ? Math.floor((new Date(c.data_retirado).getTime() - new Date(c.data_chegou).getTime()) / 86400000)
                       : null;
                   const editando = editandoCompraId === c.id;
                   return (
@@ -3573,20 +3617,23 @@ function EstoquePage() {
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        {editando && editandoCampo === "data_confirmada" ? (
+                        {c.data_chegou || "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {editando && editandoCampo === "data_prevista" ? (
                           <input
                             type="date"
                             value={editandoValorCompra}
                             onChange={(e) => setEditandoValorCompra(e.target.value)}
                             onBlur={() =>
                               handleUpdateCompra(c.id, {
-                                data_confirmada: editandoValorCompra || null,
+                                data_prevista: editandoValorCompra || null,
                               })
                             }
                             onKeyDown={(e) =>
                               e.key === "Enter" &&
                               handleUpdateCompra(c.id, {
-                                data_confirmada: editandoValorCompra || null,
+                                data_prevista: editandoValorCompra || null,
                               })
                             }
                             className="w-full rounded border border-blue-300 px-1 py-0.5 text-[12px]"
@@ -3598,11 +3645,11 @@ function EstoquePage() {
                             onClick={(e) => {
                               if (e.ctrlKey || e.metaKey) return;
                               setEditandoCompraId(c.id);
-                              setEditandoCampo("data_confirmada");
-                              setEditandoValorCompra(c.data_confirmada || "");
+                              setEditandoCampo("data_prevista");
+                              setEditandoValorCompra(c.data_prevista || "");
                             }}
                           >
-                            {c.data_confirmada || "—"}
+                            {c.data_prevista || "—"}
                           </span>
                         )}
                       </td>
@@ -3630,12 +3677,19 @@ function EstoquePage() {
                           )}
                         </div>
                       </td>
+                      <td className="px-2 py-1.5 text-right">
+                        {diasParaRetirar !== null ? (
+                          <span>{diasParaRetirar}d</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
                 {comprasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={13} className="py-8 text-center text-slate-400">
+                    <td colSpan={15} className="py-8 text-center text-slate-400">
                       Nenhuma compra encontrada com os filtros selecionados.
                     </td>
                   </tr>
@@ -3746,6 +3800,7 @@ function EstoquePage() {
               />
               <LabelValor label="Dt. remessa" valor={dialogDetalheCompra.dt_remessa_pedido} />
               <LabelValor label="Data confirmada" valor={dialogDetalheCompra.data_confirmada} />
+              <LabelValor label="Data prevista" valor={dialogDetalheCompra.data_prevista} />
               <LabelValor label="Emissão NF" valor={dialogDetalheCompra.emissao_nf} />
               <LabelValor label="Dt. pagamento" valor={dialogDetalheCompra.dt_pagamento} />
               <LabelValor label="Chegou" valor={dialogDetalheCompra.chegou ? "Sim" : "Não"} />
@@ -3828,6 +3883,40 @@ function EstoquePage() {
               className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6]"
             >
               Confirmar Retirada
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={dialogDataChegada !== null}
+        onOpenChange={(o) => {
+          if (!o) setDialogDataChegada(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73]">
+              <CheckCircle2 className="mr-1 inline h-4 w-4" /> Confirmar Chegada
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 text-sm">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                Data da chegada
+              </span>
+              <input
+                type="date"
+                value={dataChegadaInput}
+                onChange={(e) => setDataChegadaInput(e.target.value)}
+                className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </label>
+            <button
+              onClick={confirmarChegada}
+              className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6]"
+            >
+              Confirmar Chegada
             </button>
           </div>
         </DialogContent>

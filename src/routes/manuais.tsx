@@ -161,14 +161,6 @@ function ManuaisPage() {
   // Fabricante filter
   const [filtroFabricante, setFiltroFabricante] = useState<string>("TODOS");
 
-  // Apenas com PDF (default baseado na permissão, mas qualquer um pode alternar)
-  const [apenasComPdf, setApenasComPdf] = useState(false);
-  useEffect(() => {
-    const perms = permissoes;
-    const temPerm = temPermissao(perms, "manuais", "ver_com_pdf");
-    setApenasComPdf(temPerm);
-  }, [permissoes]);
-
   // Gerenciar fabricantes
   const [showGerFabricantes, setShowGerFabricantes] = useState(false);
   const [novoFabricanteNome, setNovoFabricanteNome] = useState("");
@@ -592,7 +584,7 @@ function ManuaisPage() {
     if (filtroFabricante !== "TODOS") {
       lista = lista.filter((m) => m.fabricante === filtroFabricante);
     }
-    if (apenasComPdf) {
+    if (podeVerApenasComPdf) {
       const manualsComPdf = new Set(
         arquivos.filter((a) => a.status === "ativo").map((a) => a.manual_id),
       );
@@ -603,7 +595,7 @@ function ManuaisPage() {
       lista = lista.filter((m) => m.titulo.toLowerCase().includes(q));
     }
     return lista;
-  }, [manuais, categorias, abaAtiva, filtroFabricante, search, arquivos, apenasComPdf]);
+  }, [manuais, categorias, abaAtiva, filtroFabricante, search, arquivos, podeVerApenasComPdf]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
@@ -657,7 +649,7 @@ function ManuaisPage() {
               MODO EDIÇÃO
             </span>
           )}
-          {apenasComPdf && (
+          {podeVerApenasComPdf && (
             <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-400" title="Você está vendo apenas manuais que possuem PDF">
               APENAS COM PDF
             </span>
@@ -799,17 +791,7 @@ function ManuaisPage() {
           )}
         </>
       )}
-      <button
-        onClick={() => setApenasComPdf((p) => !p)}
-        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
-          apenasComPdf
-            ? "bg-sky-500 text-white shadow-sm"
-            : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600"
-        }`}
-        title="Mostrar apenas manuais que possuem PDF"
-      >
-        {apenasComPdf ? "✓" : "○"} Apenas com PDF
-      </button>
+
       </div>
 
       {/* Conteúdo */}

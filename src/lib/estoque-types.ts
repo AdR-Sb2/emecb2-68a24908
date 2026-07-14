@@ -99,6 +99,7 @@ export interface Compra {
   dt_criacao_pedido: string | null;
   dt_remessa_pedido: string | null;
   data_confirmada: string | null;
+  data_prevista: string | null;
   emissao_nf: string | null;
   dt_pagamento: string | null;
   chegou: boolean;
