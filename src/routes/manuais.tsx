@@ -179,6 +179,10 @@ function ManuaisPage() {
     return temPermissao(permissoes, "manuais", "remover_arquivo");
   }, [permissoes]);
 
+  const podeVerApenasComPdf = useMemo(() => {
+    return temPermissao(permissoes, "manuais", "ver_com_pdf");
+  }, [permissoes]);
+
   // --- Carregar dados ---
   const carregarDados = async () => {
     setLoading(true);
@@ -571,7 +575,7 @@ function ManuaisPage() {
     return Array.from(set).sort();
   }, [manuais, categorias, abaAtiva]);
 
-  // --- Manuais filtrados (incluindo por fabricante) ---
+  // --- Manuais filtrados (incluindo por fabricante e PDF) ---
   const manuaisFiltrados = useMemo(() => {
     const cat = categorias.find((c) => c.chave === abaAtiva);
     if (!cat) return [];
@@ -579,12 +583,18 @@ function ManuaisPage() {
     if (filtroFabricante !== "TODOS") {
       lista = lista.filter((m) => m.fabricante === filtroFabricante);
     }
+    if (podeVerApenasComPdf) {
+      const manualsComPdf = new Set(
+        arquivos.filter((a) => a.status === "ativo").map((a) => a.manual_id),
+      );
+      lista = lista.filter((m) => manualsComPdf.has(m.id));
+    }
     if (search) {
       const q = search.toLowerCase();
       lista = lista.filter((m) => m.titulo.toLowerCase().includes(q));
     }
     return lista;
-  }, [manuais, categorias, abaAtiva, filtroFabricante, search]);
+  }, [manuais, categorias, abaAtiva, filtroFabricante, search, arquivos, podeVerApenasComPdf]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
@@ -636,6 +646,11 @@ function ManuaisPage() {
           {editMode && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
               MODO EDIÇÃO
+            </span>
+          )}
+          {podeVerApenasComPdf && (
+            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-400" title="Você está vendo apenas manuais que possuem PDF">
+              APENAS COM PDF
             </span>
           )}
         </div>

@@ -239,6 +239,12 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 
 ## 5. Histórico de Mudanças
 
+### [2026-07-14] — Manuais: permissão "Ver apenas com PDF" para Técnicos
+
+- **Permissão `manuais.ver_com_pdf`**: Técnicos com esta permissão enxergam **somente manuais que já possuem PDF ativo** — ideal para o dia a dia operacional
+- **Badge "APENAS COM PDF"** visível no cabeçalho quando o filtro está ativo
+- Migration `00033` cria a permissão e a atribui ao cargo Técnico
+
 ### [2026-07-14] — Manuais: Inversores unificado, exclusão de categorias, filtro por fabricante
 
 - **Manuais**: Unifica "Inversores WEG" + "Inversores Danfoss" em categoria única **"Inversores"** com filtro por fabricante (WEG, DANFOSS, SIEMENS, POWERELETRONICS) — migration `00032`
