@@ -872,38 +872,60 @@ function BacklogPage() {
         alert("Planilha vazia ou inválida.");
         return;
       }
-      const dateFields = new Set(["Início do SLA", "Fim do SLA"]);
-      // Converte serial number do Excel para string BR "DD/MM/YYYY HH:MM"
+      // Normaliza nome da coluna para matching (ignora acentos, encoding, BOM, espaços)
+      function normKey(s: string): string {
+        return s
+          .replace(/^\uFEFF/, "")             // BOM
+          .replace(/\n/g, "")
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")    // remove acentos
+          .replace(/\u00A0/g, " ")            // non-breaking space → espaço
+          .replace(/\s+/g, " ")               // whitespace → um espaço
+          .toLowerCase();
+      }
+      // Colunas que contêm datas: mapeia qualquer variação para o nome padrão
+      const dateFieldMap: Record<string, string> = {};
+      for (const name of ["Início do SLA", "Fim do SLA"]) {
+        dateFieldMap[normKey(name)] = name;
+      }
+
+      const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
       function serialToBR(v: number): string {
-        // Corrige bug do Lotus 123 (Excel trata 1900 como bissexto)
         const adjusted = v > 60 ? v - 1 : v;
-        const d = new Date((adjusted - 25569) * 86_400_000);
+        const d = new Date(EXCEL_EPOCH_MS + adjusted * 86_400_000);
         return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} 00:00`;
       }
-      // Regex para detectar string no formato BR ou US com dia/mês
+
       const dateStrRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
-      function normalizeDate(v: unknown): unknown {
-        if (typeof v === "number") return serialToBR(v);
-        if (typeof v !== "string") return v;
-        const m = v.trim().match(dateStrRe);
-        if (!m) return v;
+      function normalizeDateStr(s: string): string {
+        const m = s.trim().match(dateStrRe);
+        if (!m) return s;
         let a = +m[1], b = +m[2];
-        // Se a > 12 é BR (dia > 12), se b > 12 é US (dia na 2ª pos)
         if (b > 12 && a <= 12) [a, b] = [b, a];
         const y = +m[3] < 100 ? +m[3] + 2000 : +m[3];
-        const hh = v.trim().match(/(\d{1,2}):(\d{2})$/);
+        const hh = s.trim().match(/(\d{1,2}):(\d{2})$/);
         const time = hh ? `${hh[1]}:${hh[2]}` : "00:00";
         return `${String(a).padStart(2, "0")}/${String(b).padStart(2, "0")}/${y} ${time}`;
       }
+
       const norm = json.map((r) => {
         const out: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(r)) {
-          const key = k.replace(/\n/g, "").trim();
-          out[key] = dateFields.has(key) ? normalizeDate(v) : v;
+        for (let [k, v] of Object.entries(r)) {
+          k = k.replace(/\n/g, "").trim();
+          const canon = dateFieldMap[normKey(k)];
+          if (canon) {
+            out[canon] = typeof v === "number"
+              ? serialToBR(v)
+              : typeof v === "string"
+              ? normalizeDateStr(v)
+              : v;
+          } else {
+            out[k] = v;
+          }
         }
         return out;
       });
-      // Salva versão raw no backup e versão normalizada no storage principal
       localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
       setData(norm as Row[]);
       setHasCustomData(true);
