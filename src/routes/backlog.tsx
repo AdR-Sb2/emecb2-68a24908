@@ -864,15 +864,49 @@ function BacklogPage() {
   // ---------- upload ----------
   const handleUpload = async (file: File) => {
     try {
-      const buf = await file.arrayBuffer();
-      // cellDates:true → xlsx converte serial numbers para Date objects
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (!json.length) {
+      const name = file.name.toLowerCase();
+      const isCSV = name.endsWith(".csv");
+      let rows: Record<string, unknown>[];
+
+      if (isCSV) {
+        // CSV: lê como texto e parseia manualmente para evitar que o xlsx
+        // interprete datas BR como US e converta para serial number.
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length < 2) {
+          alert("CSV vazio ou inválido.");
+          return;
+        }
+        // Detecta delimitador (; ou ,)
+        const delim = lines[0].includes(";") ? ";" : ",";
+        const parseLine = (line: string) =>
+          line.split(delim).map((s) => {
+            s = s.trim();
+            if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
+            return s;
+          });
+        const headers = parseLine(lines[0]);
+        rows = lines.slice(1).map((line) => {
+          const cols = parseLine(line);
+          const r: Record<string, unknown> = {};
+          headers.forEach((h, i) => {
+            r[h] = cols[i] ?? null;
+          });
+          return r;
+        });
+      } else {
+        // XLSX/XLS: usa a biblioteca com cellDates:false para obter valores crus
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array", cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+      }
+
+      if (!rows.length) {
         alert("Planilha vazia ou inválida.");
         return;
       }
+
       // Normaliza nome da coluna para matching (ignora acentos, encoding, BOM, espaços)
       function normKey(s: string): string {
         return s
@@ -891,10 +925,12 @@ function BacklogPage() {
         dateFieldMap[normKey(name)] = name;
       }
 
-      // Formata um Date como string BR "DD/MM/YYYY HH:MM"
-      function fmtDateBR(d: Date): string {
-        // d é um Date UTC (vem do xlsx com cellDates:true)
-        return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} 00:00`;
+      function serialToBR(v: number): string {
+        const adjusted = v > 60 ? v - 1 : v;
+        const d = new Date(Date.UTC(1899, 11, 30) + adjusted * 86_400_000);
+        const hh = String(d.getUTCHours()).padStart(2, "0");
+        const mi = String(d.getUTCMinutes()).padStart(2, "0");
+        return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} ${hh}:${mi}`;
       }
 
       const dateStrRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
@@ -909,32 +945,23 @@ function BacklogPage() {
         return `${String(a).padStart(2, "0")}/${String(b).padStart(2, "0")}/${y} ${time}`;
       }
 
-      const norm = json.map((r) => {
+      const norm = rows.map((r) => {
         const out: Record<string, unknown> = {};
         for (let [k, v] of Object.entries(r)) {
           k = k.replace(/\n/g, "").trim();
           const canon = dateFieldMap[normKey(k)];
           if (canon) {
-            const raw = v;
-            out[canon] = v instanceof Date
-              ? fmtDateBR(v)
+            out[canon] = typeof v === "number"
+              ? serialToBR(v)
               : typeof v === "string"
               ? normalizeDateStr(v)
               : v;
-            if (v instanceof Date)
-              console.log(`[import] coluna="${k}" Date → "${out[canon]}"`);
-            else if (typeof raw === "string" && raw !== out[canon])
-              console.log(`[import] coluna="${k}" raw="${raw}" → "${out[canon]}"`);
           } else {
-            // Fallback: mesmo em coluna não-mapeada, converte Date para string BR
-            out[k] = v instanceof Date ? fmtDateBR(v) : v;
+            out[k] = v;
           }
         }
         return out;
       });
-      console.log("[import] colunas encontradas:", Object.keys(json[0] ?? {}));
-      console.log("[import] normKey delas:", Object.keys(json[0] ?? {}).map(normKey));
-      console.log("[import] dateFieldMap:", dateFieldMap);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
       setData(norm as Row[]);
       setHasCustomData(true);
