@@ -564,6 +564,7 @@ function BacklogPage() {
   const [fCidade, setFCidade] = useState<string>("TODAS");
   const [fFaixa, setFFaixa] = useState<string>("TODAS");
   const [fTipo, setFTipo] = useState<string>("TODOS");
+  const [fSearch, setFSearch] = useState("");
   const [onlyLate, setOnlyLate] = useState(false);
   const [onlyEmerg, setOnlyEmerg] = useState(false);
   const [fSlaBefore, setFSlaBefore] = useState<string>("");
@@ -587,7 +588,29 @@ function BacklogPage() {
     | "tipo";
   const applyFilters = (rows: Enriched[], skip?: FilterKey) => {
     const slaLimit = fSlaBefore ? new Date(fSlaBefore + "T00:00:00") : null;
+    const q = fSearch.toLowerCase().trim();
     return rows.filter((e) => {
+      if (q) {
+        const haystack = [
+          e.om,
+          e.planta,
+          e.r["TEXTO BREVE"],
+          e.r.Cidade,
+          e.r["Status da Atividade"],
+          e.responsabilidade,
+          e.equipe,
+          e.r["Tipo de Atividade"],
+          e.r.PRIORIDADE,
+          e.r.NOTA,
+          e.r["DESCRIÇÃO EQUIPAMENTO"],
+          e.r.Endereço,
+          e.r.BAIRRO,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       if (skip !== "planta" && fPlantas.length && !fPlantas.includes(e.planta)) return false;
       if (skip !== "resp" && fResp.length && !fResp.includes(e.responsabilidade)) return false;
       if (
@@ -611,6 +634,7 @@ function BacklogPage() {
     () => applyFilters(enriched),
     [
       enriched,
+      fSearch,
       fPlantas,
       fResp,
       fStatus,
@@ -985,6 +1009,7 @@ function BacklogPage() {
   };
 
   const clearAllFilters = () => {
+    setFSearch("");
     setFPlantas([]);
     setFResp([]);
     setFStatus("TODOS");
@@ -1774,6 +1799,29 @@ function BacklogPage() {
             />
             Auto-refresh SLA
           </label>
+        </div>
+      </div>
+
+      {/* Barra de busca */}
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
+          <input
+            type="text"
+            value={fSearch}
+            onChange={(e) => setFSearch(e.target.value)}
+            placeholder="Buscar por O.S., planta, cidade, texto breve, responsabilidade, equipe…"
+            className="w-full rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 py-3.5 pl-12 pr-10 text-[15px] shadow-sm placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none dark:text-white"
+          />
+          {fSearch && (
+            <button
+              type="button"
+              onClick={() => setFSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-200 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
