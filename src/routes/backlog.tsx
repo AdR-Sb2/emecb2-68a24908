@@ -865,7 +865,8 @@ function BacklogPage() {
   const handleUpload = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: false });
+      // cellDates:true → xlsx converte serial numbers para Date objects
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
       if (!json.length) {
@@ -884,16 +885,15 @@ function BacklogPage() {
           .replace(/\s+/g, " ")               // whitespace → um espaço
           .toLowerCase();
       }
-      // Colunas que contêm datas: mapeia qualquer variação para o nome padrão
+      // Mapeia qualquer variação do nome da coluna para o nome padrão
       const dateFieldMap: Record<string, string> = {};
       for (const name of ["Início do SLA", "Fim do SLA"]) {
         dateFieldMap[normKey(name)] = name;
       }
 
-      const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
-      function serialToBR(v: number): string {
-        const adjusted = v > 60 ? v - 1 : v;
-        const d = new Date(EXCEL_EPOCH_MS + adjusted * 86_400_000);
+      // Formata um Date como string BR "DD/MM/YYYY HH:MM"
+      function fmtDateBR(d: Date): string {
+        // d é um Date UTC (vem do xlsx com cellDates:true)
         return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} 00:00`;
       }
 
@@ -915,17 +915,26 @@ function BacklogPage() {
           k = k.replace(/\n/g, "").trim();
           const canon = dateFieldMap[normKey(k)];
           if (canon) {
-            out[canon] = typeof v === "number"
-              ? serialToBR(v)
+            const raw = v;
+            out[canon] = v instanceof Date
+              ? fmtDateBR(v)
               : typeof v === "string"
               ? normalizeDateStr(v)
               : v;
+            if (v instanceof Date)
+              console.log(`[import] coluna="${k}" Date → "${out[canon]}"`);
+            else if (typeof raw === "string" && raw !== out[canon])
+              console.log(`[import] coluna="${k}" raw="${raw}" → "${out[canon]}"`);
           } else {
-            out[k] = v;
+            // Fallback: mesmo em coluna não-mapeada, converte Date para string BR
+            out[k] = v instanceof Date ? fmtDateBR(v) : v;
           }
         }
         return out;
       });
+      console.log("[import] colunas encontradas:", Object.keys(json[0] ?? {}));
+      console.log("[import] normKey delas:", Object.keys(json[0] ?? {}).map(normKey));
+      console.log("[import] dateFieldMap:", dateFieldMap);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
       setData(norm as Row[]);
       setHasCustomData(true);
