@@ -621,7 +621,10 @@ function EstoquePage() {
     setDialogCompra(false);
   };
 
-  const handleStatusFila = async (id: number, status_fila: string) => {
+  const STATUS_FILA_STAGES = ["Pendente", "Em Andamento", "RC Criada"] as const;
+  type StatusFila = (typeof STATUS_FILA_STAGES)[number];
+
+  const handleStatusFila = async (id: number, status_fila: StatusFila) => {
     if (status_fila === "RC Criada") {
       setFilaStatusConfirmId(id);
       setFilaRcNumero("");
@@ -635,6 +638,28 @@ function EstoquePage() {
     }
     await carregarDados();
     toast.success(`Status alterado para "${status_fila}"`);
+  };
+
+  const avancarStatusFila = async (id: number, currentStatus: StatusFila) => {
+    const currentIndex = STATUS_FILA_STAGES.indexOf(currentStatus);
+    if (currentIndex < STATUS_FILA_STAGES.length - 1) {
+      const nextStatus = STATUS_FILA_STAGES[currentIndex + 1];
+      if (nextStatus === "RC Criada") {
+        setFilaStatusConfirmId(id);
+        setFilaRcNumero("");
+        setFilaRcItem("");
+        return;
+      }
+      await handleStatusFila(id, nextStatus);
+    }
+  };
+
+  const voltarStatusFila = async (id: number, currentStatus: StatusFila) => {
+    const currentIndex = STATUS_FILA_STAGES.indexOf(currentStatus);
+    if (currentIndex > 0) {
+      const prevStatus = STATUS_FILA_STAGES[currentIndex - 1];
+      await handleStatusFila(id, prevStatus);
+    }
   };
 
   const handleConfirmarRcCriada = async (id: number) => {
@@ -653,7 +678,7 @@ function EstoquePage() {
       rc_em_fila: false,
       requisicao,
       item_rc,
-      status_geral: "Cotação a agregar",
+      status_geral: "PC - Em Aprovação",
     }).eq("id", id);
     if (error) {
       toast.error("Erro ao confirmar RC: " + error.message);
@@ -663,7 +688,7 @@ function EstoquePage() {
     setFilaStatusConfirmId(null);
     setFilaRcNumero("");
     setFilaRcItem("");
-    toast.success("RC criada com sucesso!");
+    toast.success("RC Criada! Pedido movido para PC - Em Aprovação.");
   };
 
   const handleAdicionarFila = async (data: {
@@ -4045,8 +4070,8 @@ function EstoquePage() {
           {(() => {
             const filaItems = compras.filter((c) => c.rc_em_fila);
             const pendentes = filaItems.filter((c) => (c.status_fila || "Pendente") === "Pendente").length;
-            const elaboracao = filaItems.filter((c) => c.status_fila === "Em Elaboração").length;
-            const emConfirmacao = filaItems.filter((c) => c.status_fila === "RC Criada").length;
+            const emAndamento = filaItems.filter((c) => c.status_fila === "Em Andamento").length;
+            const rcCriada = filaItems.filter((c) => c.status_fila === "RC Criada").length;
             return (
               <div className="mb-3 flex flex-wrap gap-2 text-xs">
                 {pendentes > 0 && (
@@ -4054,17 +4079,17 @@ function EstoquePage() {
                     {pendentes} Pendente{pendentes !== 1 ? "s" : ""}
                   </span>
                 )}
-                {elaboracao > 0 && (
+                {emAndamento > 0 && (
                   <span className="rounded-full bg-blue-100 px-2.5 py-0.5 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                    {elaboracao} Em Elaboração
+                    {emAndamento} Em Andamento
                   </span>
                 )}
-                {emConfirmacao > 0 && (
+                {rcCriada > 0 && (
                   <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                    {emConfirmacao} pronto{emConfirmacao !== 1 ? "s" : ""} pra confirmar
+                    {rcCriada} RC Criada{rcCriada !== 1 ? "s" : ""}
                   </span>
                 )}
-                {pendentes === 0 && elaboracao === 0 && emConfirmacao === 0 && (
+                {pendentes === 0 && emAndamento === 0 && rcCriada === 0 && (
                   <span className="text-slate-400">Nenhum item na fila</span>
                 )}
               </div>
@@ -4179,11 +4204,27 @@ function EstoquePage() {
                 .filter((c) => c.rc_em_fila)
                 .sort((a, b) => ((b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1))
                 .map((c) => {
-                  const STATUS_FILA_OPCOES = ["Pendente", "Em Elaboração", "RC Criada"];
-                  const STATUS_FILA_CORES: Record<string, string> = {
+                  const STATUS_FILA_STAGES = ["Pendente", "Em Andamento", "RC Criada"] as const;
+                  type StatusFila = (typeof STATUS_FILA_STAGES)[number];
+                  const currentStatus = (c.status_fila || "Pendente") as StatusFila;
+                  const STATUS_FILA_CORES: Record<StatusFila, string> = {
                     Pendente: "bg-amber-100 text-amber-700 border-amber-200",
-                    "Em Elaboração": "bg-blue-100 text-blue-700 border-blue-200",
+                    "Em Andamento": "bg-blue-100 text-blue-700 border-blue-200",
                     "RC Criada": "bg-emerald-100 text-emerald-700 border-emerald-200",
+                  };
+                  const handleBadgeClick = (e: React.MouseEvent) => {
+                    if (!permissoes.gerenciarFila) return;
+                    e.preventDefault();
+                    if (e.button === 2) {
+                      // Botão direito = voltar
+                      voltarStatusFila(c.id, currentStatus);
+                    } else {
+                      // Botão esquerdo = avançar
+                      avancarStatusFila(c.id, currentStatus);
+                    }
+                  };
+                  const handleContextMenu = (e: React.MouseEvent) => {
+                    e.preventDefault();
                   };
                   return (
                     <div key={c.id}>
@@ -4202,22 +4243,19 @@ function EstoquePage() {
                           {c.dt_criacao_rc || "—"}
                         </span>
                         {permissoes.gerenciarFila ? (
-                          <select
-                            value={c.status_fila || "Pendente"}
-                            onChange={(e) => handleStatusFila(c.id, e.target.value)}
-                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold outline-none ${STATUS_FILA_CORES[c.status_fila || "Pendente"] || "bg-slate-100 text-slate-600"}`}
+                          <span
+                            onClick={handleBadgeClick}
+                            onContextMenu={handleContextMenu}
+                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold cursor-pointer select-none transition-colors ${STATUS_FILA_CORES[currentStatus]}`}
+                            title="Clique esquerdo: avançar | Clique direito: voltar"
                           >
-                            {STATUS_FILA_OPCOES.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
+                            {currentStatus}
+                          </span>
                         ) : (
                           <span
-                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${STATUS_FILA_CORES[c.status_fila || "Pendente"] || "bg-slate-100 text-slate-600"}`}
+                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${STATUS_FILA_CORES[currentStatus]}`}
                           >
-                            {c.status_fila || "Pendente"}
+                            {currentStatus}
                           </span>
                         )}
                       </div>
