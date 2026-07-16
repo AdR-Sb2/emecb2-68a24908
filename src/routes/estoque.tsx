@@ -3474,16 +3474,6 @@ function EstoquePage() {
               </div>
               <div className="text-[11px] text-orange-500">remessa vencida</div>
             </div>
-            {/* Total Recebido KPI */}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">
-                <Package className="h-3 w-3" /> Total Recebido
-              </div>
-              <div className="mt-1 text-3xl font-bold text-emerald-600">
-                {compras.filter((c) => c.chegou && c.valor_total).reduce((s, c) => s + (c.valor_total || 0), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </div>
-              <div className="text-[11px] text-emerald-500">valor total recebido</div>
-            </div>
           </div>
 
           {/* Filtros */}
