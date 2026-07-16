@@ -117,6 +117,8 @@ function EstoquePage() {
   const [dataRetiradaInput, setDataRetiradaInput] = useState("");
   const [dialogDataChegada, setDialogDataChegada] = useState<number | null>(null);
   const [dataChegadaInput, setDataChegadaInput] = useState("");
+  const [chegadaValorUnitario, setChegadaValorUnitario] = useState<string>("");
+  const [chegadaQtdeRecebida, setChegadaQtdeRecebida] = useState<string>("");
   const [filtroStatusCompra, setFiltroStatusCompra] = useState<string>("TODOS");
   const [filtroCompradorCompra, setFiltroCompradorCompra] = useState<string>("TODOS");
   const [filtroChegou, setFiltroChegou] = useState<"TODOS" | "sim" | "nao">("TODOS");
@@ -514,28 +516,38 @@ function EstoquePage() {
     if (!current) {
       setDialogDataChegada(id);
       setDataChegadaInput(new Date().toISOString().split("T")[0]);
+      const compra = compras.find((c) => c.id === id);
+      setChegadaQtdeRecebida(String(compra?.qtde_rc || 1));
+      setChegadaValorUnitario("");
       return;
     }
     const { error } = await supabase
       .from("compras")
-      .update({ chegou: false, data_chegou: null })
+      .update({ chegou: false, data_chegou: null, valor_unitario: null, valor_total: null })
       .eq("id", id);
     if (error) {
       toast.error("Erro: " + error.message);
       return;
     }
     setCompras((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, chegou: false, data_chegou: null } : c)),
+      prev.map((c) => (c.id === id ? { ...c, chegou: false, data_chegou: null, valor_unitario: null, valor_total: null } : c)),
     );
   };
 
   const confirmarChegada = async () => {
     if (!dialogDataChegada) return;
+    const compra = compras.find((c) => c.id === dialogDataChegada);
+    const qtdeRecebida = parseFloat(chegadaQtdeRecebida) || (compra?.qtde_rc || 1);
+    const valorUnitario = parseFloat(chegadaValorUnitario) || 0;
+    const valorTotal = valorUnitario * qtdeRecebida;
+
     const { error } = await supabase
       .from("compras")
       .update({
         chegou: true,
         data_chegou: dataChegadaInput || null,
+        valor_unitario: valorUnitario || null,
+        valor_total: valorTotal || null,
       })
       .eq("id", dialogDataChegada);
     if (error) {
@@ -546,11 +558,13 @@ function EstoquePage() {
     setCompras((prev) =>
       prev.map((c) =>
         c.id === dialogDataChegada
-          ? { ...c, chegou: true, data_chegou: dataChegadaInput || null }
+          ? { ...c, chegou: true, data_chegou: dataChegadaInput || null, valor_unitario: valorUnitario || null, valor_total: valorTotal || null }
           : c,
       ),
     );
     setDialogDataChegada(null);
+    setChegadaValorUnitario("");
+    setChegadaQtdeRecebida("");
   };
 
   const handleToggleFoiRetirado = async (id: number, current: boolean, afeta_saldo: boolean) => {
@@ -3460,6 +3474,16 @@ function EstoquePage() {
               </div>
               <div className="text-[11px] text-orange-500">remessa vencida</div>
             </div>
+            {/* Total Recebido KPI */}
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                <Package className="h-3 w-3" /> Total Recebido
+              </div>
+              <div className="mt-1 text-3xl font-bold text-emerald-600">
+                {compras.filter((c) => c.chegou && c.valor_total).reduce((s, c) => s + (c.valor_total || 0), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </div>
+              <div className="text-[11px] text-emerald-500">valor total recebido</div>
+            </div>
           </div>
 
           {/* Filtros */}
@@ -3549,6 +3573,8 @@ function EstoquePage() {
                   <th className="px-2 py-2 text-center">Chegou?</th>
                   <th className="px-2 py-2 text-center">Retirado?</th>
                   <th className="px-2 py-2 text-center">Data de Chegada</th>
+                  <th className="px-2 py-2 text-right">Vlr Unit.</th>
+                  <th className="px-2 py-2 text-right">Vlr Total</th>
                   <th className="px-2 py-2 text-center">Data prevista</th>
                   <th className="px-2 py-2 text-right">Dias aberto</th>
                   <th className="px-2 py-2 text-right">Dias p/ retirar</th>
@@ -3674,6 +3700,16 @@ function EstoquePage() {
                       <td className="px-2 py-1.5 text-center">
                         {c.data_chegou || "—"}
                       </td>
+                      <td className="px-2 py-1.5 text-right text-slate-600 dark:text-slate-300">
+                        {c.valor_unitario !== null && c.valor_unitario !== undefined
+                          ? `R$ ${Number(c.valor_unitario).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-slate-600 dark:text-slate-300 font-semibold">
+                        {c.valor_total !== null && c.valor_total !== undefined
+                          ? `R$ ${Number(c.valor_total).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "—"}
+                      </td>
                       <td className="px-2 py-1.5 text-center">
                         {editando && editandoCampo === "data_prevista" ? (
                           <input
@@ -3744,7 +3780,7 @@ function EstoquePage() {
                 })}
                 {comprasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={15} className="py-8 text-center text-slate-400">
+                    <td colSpan={17} className="py-8 text-center text-slate-400">
                       Nenhuma compra encontrada com os filtros selecionados.
                     </td>
                   </tr>
@@ -3946,7 +3982,11 @@ function EstoquePage() {
       <Dialog
         open={dialogDataChegada !== null}
         onOpenChange={(o) => {
-          if (!o) setDialogDataChegada(null);
+          if (!o) {
+            setDialogDataChegada(null);
+            setChegadaValorUnitario("");
+            setChegadaQtdeRecebida("");
+          }
         }}
       >
         <DialogContent className="max-w-sm">
@@ -3967,9 +4007,37 @@ function EstoquePage() {
                 className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               />
             </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                Valor Unitário (R$) <span className="text-red-500">*</span>
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={chegadaValorUnitario}
+                onChange={(e) => setChegadaValorUnitario(e.target.value)}
+                placeholder="0,00"
+                required
+                className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                Qtde Recebida
+              </span>
+              <input
+                type="number"
+                min="1"
+                value={chegadaQtdeRecebida}
+                onChange={(e) => setChegadaQtdeRecebida(e.target.value)}
+                className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </label>
             <button
               onClick={confirmarChegada}
-              className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6]"
+              disabled={!chegadaValorUnitario.trim()}
+              className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
             >
               Confirmar Chegada
             </button>

@@ -116,6 +116,8 @@ export interface Compra {
   criado_por: string;
   criado_em: string;
   atualizado_em: string;
+  valor_unitario: number | null;
+  valor_total: number | null;
 }
 
 export type StatusEstoque = "normal" | "atencao" | "baixo" | "sem_estoque";
