@@ -1,7 +1,6 @@
 -- ============================================================
 -- Migration: Gerador de OI (Ordem de Intervenção / Relatório Fotográfico)
 -- ============================================================
-Q
 -- 1. Tabela: ordens_intervencao (cabeçalho de cada OI)
 CREATE TABLE IF NOT EXISTS ordens_intervencao (
   id BIGSERIAL PRIMARY KEY,
