@@ -650,7 +650,10 @@ function ManuaisPage() {
             </span>
           )}
           {podeVerApenasComPdf && (
-            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-400" title="Você está vendo apenas manuais que possuem PDF">
+            <span
+              className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-400"
+              title="Você está vendo apenas manuais que possuem PDF"
+            >
               APENAS COM PDF
             </span>
           )}
@@ -765,33 +768,32 @@ function ManuaisPage() {
           <>
             <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
             {["TODOS", ...fabricantesDaCategoria].map((fab) => (
-            <button
-              key={fab}
-              onClick={() => setFiltroFabricante(fab)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
-                filtroFabricante === fab
-                  ? "bg-[#1f7ad6] text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-              }`}
-            >
-              {fab === "TODOS" ? "Todos" : fab}
-            </button>
-          ))}
-          {editMode && (
-            <button
-              onClick={() => {
-                setNovoFabricanteNome("");
-                setShowGerFabricantes(true);
-              }}
-              className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition cursor-pointer"
-              title="Gerenciar fabricantes"
-            >
-              <Plus className="h-3 w-3 inline" /> Editar filtros
-            </button>
-          )}
-        </>
-      )}
-
+              <button
+                key={fab}
+                onClick={() => setFiltroFabricante(fab)}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
+                  filtroFabricante === fab
+                    ? "bg-[#1f7ad6] text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                }`}
+              >
+                {fab === "TODOS" ? "Todos" : fab}
+              </button>
+            ))}
+            {editMode && (
+              <button
+                onClick={() => {
+                  setNovoFabricanteNome("");
+                  setShowGerFabricantes(true);
+                }}
+                className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition cursor-pointer"
+                title="Gerenciar fabricantes"
+              >
+                <Plus className="h-3 w-3 inline" /> Editar filtros
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {/* Conteúdo */}
@@ -890,9 +892,17 @@ function ManuaisPage() {
                               className="flex-1 rounded border border-slate-300 px-1 py-1 text-[11px] outline-none dark:border-slate-500 dark:bg-slate-700 dark:text-slate-200"
                             >
                               <option value="">Sem fabricante</option>
-                              {[...new Set(manuais.map((m) => m.fabricante).filter((x): x is string => !!x))].sort().map((f) => (
-                                <option key={f} value={f}>{f}</option>
-                              ))}
+                              {[
+                                ...new Set(
+                                  manuais.map((m) => m.fabricante).filter((x): x is string => !!x),
+                                ),
+                              ]
+                                .sort()
+                                .map((f) => (
+                                  <option key={f} value={f}>
+                                    {f}
+                                  </option>
+                                ))}
                               <option value="__novo">+ Novo fabricante</option>
                             </select>
                             <button
@@ -1259,9 +1269,7 @@ function ManuaisPage() {
                       {log.acao === "criou_categoria" && (
                         <FolderPlus className="h-4 w-4 text-emerald-500" />
                       )}
-                      {log.acao === "criou_manual" && (
-                        <Plus className="h-4 w-4 text-blue-500" />
-                      )}
+                      {log.acao === "criou_manual" && <Plus className="h-4 w-4 text-blue-500" />}
                       {log.acao === "removeu_categoria" && (
                         <Trash2 className="h-4 w-4 text-red-500" />
                       )}

@@ -17,7 +17,18 @@ import {
 import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/testes.json";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Maximize2, X, Home, SlidersHorizontal } from "lucide-react";
+import {
+  Maximize2,
+  X,
+  Home,
+  SlidersHorizontal,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/testes")({
   head: () => ({
@@ -156,9 +167,83 @@ function fmtDate(iso: string | null): string {
 }
 
 function TestesPage() {
-  const [data, setData] = useState<Row[]>(DATA);
+  const [data, setData] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
   const [hasCustomData, setHasCustomData] = useState(false);
+
+  // Import modal state
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{
+    novos: number;
+    atualizados: number;
+    ignorados: number;
+    erros: { linha: number; motivo: string }[];
+    rows: Row[];
+  } | null>(null);
+  const [importConfirming, setImportConfirming] = useState(false);
+
+  // Fetch data from Supabase
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: supabaseData, error } = await supabase
+          .from("testes_afericoes")
+          .select("*")
+          .order("data_teste", { ascending: false });
+
+        if (error) {
+          console.error("Erro ao buscar dados:", error);
+          // Fallback to local data
+          setData(DATA);
+        } else if (supabaseData && supabaseData.length > 0) {
+          // Convert from Supabase format to Row format
+          const mappedData = (supabaseData as Array<Record<string, unknown>>).map((row) => {
+            const r: Row = {
+              Id: typeof row.id === "number" ? row.id : row.id ? Number(row.id) : null,
+              "Hora de início": (row.hora_inicio as string) ?? null,
+              "Hora de conclusão": (row.hora_conclusao as string) ?? null,
+              Email: (row.email as string) ?? null,
+              Nome: (row.nome as string) ?? null,
+              "Data do Teste": (row.data_teste as string) ?? null,
+              "Tipo de Serviço": (row.tipo_servico as string) ?? null,
+              Elevatória: (row.elevatoria as string) ?? null,
+              Grupo: (row.grupo as string) ?? null,
+              "Tensão ( V )": (row.tensao_v as string) ?? null,
+              "Corrente ( A )": (row.corrente_a as string) ?? null,
+              Retaguarda: (row.retaguarda as string) ?? null,
+              Recalque: (row.recalque as string) ?? null,
+              "Corrente ShutOff": (row.corrente_shutoff as string) ?? null,
+              "Retaguarda ShutOff": (row.retaguarda_shutoff as string) ?? null,
+              "Recalque ShutOff": (row.recalque_shutoff as string) ?? null,
+              "Impossibilidade:": (row.impossibilidade as string) ?? null,
+              "Serviço Executado:": (row.servico_executado as string) ?? null,
+              "Nome dos Colaboradores:": (row.nome_colaboradores as string) ?? null,
+              "Observação:": (row.observacao as string) ?? null,
+              "Na Chegada": (row.na_chegada as string) ?? null,
+              "Na saida": (row.na_saida as string) ?? null,
+              Status: (row.status as string) ?? null,
+            };
+            return r;
+          });
+          setData(mappedData);
+        } else {
+          setData(DATA);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+        setData(DATA);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Check for localStorage data as fallback
+  useEffect(() => {
+    if (!loading) return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -171,7 +256,7 @@ function TestesPage() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [loading]);
 
   const TIPOS = useMemo(
     () =>
@@ -457,6 +542,321 @@ function TestesPage() {
     }
   };
 
+  // --- Import from Microsoft Forms Excel ---
+  const COLUNAS_ESPERADAS = [
+    "ID",
+    "Hora de início",
+    "Hora de conclusão",
+    "Email",
+    "Nome",
+    "Hora da última modificação",
+    "Data do Teste",
+    "Tipo de Serviço",
+    "Elevatória",
+    "Grupo",
+    "Tensão ( V )",
+    "Corrente ( A )",
+    "Retaguarda",
+    "Recalque",
+    "Corrente ShutOff",
+    "Retaguarda ShutOff",
+    "Recalque ShutOff",
+    "Impossibilidade:",
+    "Serviço Executado:",
+    "Nome dos Colaboradores:",
+    "Observação:",
+    "Na Chegada",
+    "Na saida",
+    "Status",
+  ];
+
+  const COLUNA_MAP: Record<string, keyof Row> = {
+    ID: "Id",
+    "Hora de início": "Hora de início",
+    "Hora de conclusão": "Hora de conclusão",
+    Email: "Email",
+    Nome: "Nome",
+    "Data do Teste": "Data do Teste",
+    "Tipo de Serviço": "Tipo de Serviço",
+    Elevatória: "Elevatória",
+    Grupo: "Grupo",
+    "Tensão ( V )": "Tensão ( V )",
+    "Corrente ( A )": "Corrente ( A )",
+    Retaguarda: "Retaguarda",
+    Recalque: "Recalque",
+    "Corrente ShutOff": "Corrente ShutOff",
+    "Retaguarda ShutOff": "Retaguarda ShutOff",
+    "Recalque ShutOff": "Recalque ShutOff",
+    "Impossibilidade:": "Impossibilidade:",
+    "Serviço Executado:": "Serviço Executado:",
+    "Nome dos Colaboradores:": "Nome dos Colaboradores:",
+    "Observação:": "Observação:",
+    "Na Chegada": "Na Chegada",
+    "Na saida": "Na saida",
+    Status: "Status",
+  };
+
+  function linhaVazia(row: Record<string, unknown>): boolean {
+    const camposTeste = [
+      "Data do Teste",
+      "Tipo de Serviço",
+      "Elevatória",
+      "Grupo",
+      "Tensão ( V )",
+      "Corrente ( A )",
+      "Retaguarda",
+      "Recalque",
+      "Corrente ShutOff",
+      "Retaguarda ShutOff",
+      "Recalque ShutOff",
+      "Impossibilidade:",
+      "Serviço Executado:",
+      "Nome dos Colaboradores:",
+      "Observação:",
+      "Na Chegada",
+      "Na saida",
+      "Status",
+    ];
+    return camposTeste.every((c) => {
+      const v = row[c];
+      return v === null || v === undefined || String(v).trim() === "";
+    });
+  }
+
+  function mapearLinha(row: Record<string, unknown>): Row {
+    const out: Record<string, unknown> = {};
+    for (const [colForms, colInternal] of Object.entries(COLUNA_MAP)) {
+      const v = row[colForms];
+      if (v !== null && v !== undefined) {
+        if (v instanceof Date) {
+          out[colInternal] = v.toISOString();
+        } else {
+          out[colInternal] = v;
+        }
+      }
+    }
+    if (out.Id !== undefined && out.Id !== null) {
+      out.Id = Number(out.Id);
+    }
+    return out as unknown as Row;
+  }
+
+  async function carregarIdsExistentes(): Promise<Set<number>> {
+    try {
+      const { data, error } = await supabase.from("testes_afericoes").select("id");
+      if (error) throw error;
+      return new Set((data || []).map((r) => Number(r.id)));
+    } catch {
+      return new Set();
+    }
+  }
+
+  async function upsertTestes(rows: Row[]): Promise<{
+    inseridos: number;
+    atualizados: number;
+    erros: { linha: number; motivo: string }[];
+  }> {
+    const idsExistentes = await carregarIdsExistentes();
+    let inseridos = 0;
+    let atualizados = 0;
+    const erros: { linha: number; motivo: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const id = row.Id;
+      if (!id || isNaN(id)) {
+        erros.push({ linha: i + 2, motivo: "ID inválido ou ausente" });
+        continue;
+      }
+
+      const payload = {
+        id: id,
+        hora_inicio: row["Hora de início"] || null,
+        hora_conclusao: row["Hora de conclusão"] || null,
+        email: row.Email || null,
+        nome: row.Nome || null,
+        data_teste: row["Data do Teste"]
+          ? new Date(row["Data do Teste"]).toISOString().split("T")[0]
+          : null,
+        tipo_servico: row["Tipo de Serviço"] || null,
+        elevatoria: row.Elevatória || null,
+        grupo: row.Grupo ? String(row.Grupo) : null,
+        tensao_v: row["Tensão ( V )"] || null,
+        corrente_a: row["Corrente ( A )"] || null,
+        retaguarda: row.Retaguarda || null,
+        recalque: row.Recalque || null,
+        corrente_shutoff: row["Corrente ShutOff"] || null,
+        retaguarda_shutoff: row["Retaguarda ShutOff"] || null,
+        recalque_shutoff: row["Recalque ShutOff"] || null,
+        impossibilidade: row["Impossibilidade:"] || null,
+        servico_executado: row["Serviço Executado:"] || null,
+        nome_colaboradores: row["Nome dos Colaboradores:"] || null,
+        observacao: row["Observação:"] || null,
+        na_chegada: row["Na Chegada"] || null,
+        na_saida: row["Na saida"] || null,
+        status: row.Status || null,
+        criado_por: "IMPORTACAO_PLANILHA",
+        atualizado_em: new Date().toISOString(),
+      };
+
+      try {
+        const { error } = await supabase
+          .from("testes_afericoes")
+          .upsert(payload, { onConflict: "id" });
+
+        if (error) throw error;
+
+        if (idsExistentes.has(id)) {
+          atualizados++;
+        } else {
+          inseridos++;
+          idsExistentes.add(id);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Erro desconhecido";
+        erros.push({ linha: i + 2, motivo: message });
+      }
+    }
+
+    return { inseridos, atualizados, erros };
+  }
+
+  const handleImportFileSelect = async (file: File) => {
+    setImportFile(file);
+    setImportPreview(null);
+
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+
+      if (!json.length) {
+        alert("Planilha vazia ou inválida.");
+        return;
+      }
+
+      // Normalize column names
+      const normalized = json.map((r) => {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(r)) {
+          const nk = k.replace(/\n/g, "").trim();
+          let nv: unknown = v;
+          if (v instanceof Date) nv = v.toISOString();
+          out[nk] = nv;
+        }
+        return out;
+      });
+
+      // Check columns
+      const firstRow = normalized[0];
+      const cols = Object.keys(firstRow);
+      const missing = COLUNAS_ESPERADAS.filter((c) => !cols.includes(c));
+      if (missing.length > 0) {
+        alert(
+          `Formato de planilha não reconhecido. Colunas faltando: ${missing.join(", ")}. Verifique se é a exportação padrão do Microsoft Forms.`,
+        );
+        return;
+      }
+
+      // Process rows
+      let ignorados = 0;
+      const erros: { linha: number; motivo: string }[] = [];
+      const rowsParaImportar: Row[] = [];
+
+      for (let i = 0; i < normalized.length; i++) {
+        const row = normalized[i];
+
+        // Skip empty rows (only metadata filled)
+        if (linhaVazia(row)) {
+          ignorados++;
+          continue;
+        }
+
+        const id = row["ID"];
+        if (!id || isNaN(Number(id))) {
+          erros.push({ linha: i + 2, motivo: "ID inválido ou ausente" });
+          continue;
+        }
+
+        const mapped = mapearLinha(row);
+        rowsParaImportar.push(mapped);
+      }
+
+      // Show preview
+      setImportPreview({
+        novos: rowsParaImportar.filter((r) => !data.some((d) => d.Id === r.Id)).length,
+        atualizados: rowsParaImportar.filter((r) => data.some((d) => d.Id === r.Id)).length,
+        ignorados,
+        erros,
+        rows: rowsParaImportar,
+      });
+      setImportModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      alert("Falha ao ler a planilha.");
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+
+    setImportConfirming(true);
+    try {
+      const resultado = await upsertTestes(importPreview.rows);
+
+      // Reload data from Supabase
+      const { data: supabaseData, error } = await supabase
+        .from("testes_afericoes")
+        .select("*")
+        .order("data_teste", { ascending: false });
+
+      if (!error && supabaseData) {
+        const mappedData = (supabaseData as Array<Record<string, unknown>>).map((row) => {
+          const r: Row = {
+            Id: typeof row.id === "number" ? row.id : row.id ? Number(row.id) : null,
+            "Hora de início": (row.hora_inicio as string) ?? null,
+            "Hora de conclusão": (row.hora_conclusao as string) ?? null,
+            Email: (row.email as string) ?? null,
+            Nome: (row.nome as string) ?? null,
+            "Data do Teste": (row.data_teste as string) ?? null,
+            "Tipo de Serviço": (row.tipo_servico as string) ?? null,
+            Elevatória: (row.elevatoria as string) ?? null,
+            Grupo: (row.grupo as string) ?? null,
+            "Tensão ( V )": (row.tensao_v as string) ?? null,
+            "Corrente ( A )": (row.corrente_a as string) ?? null,
+            Retaguarda: (row.retaguarda as string) ?? null,
+            Recalque: (row.recalque as string) ?? null,
+            "Corrente ShutOff": (row.corrente_shutoff as string) ?? null,
+            "Retaguarda ShutOff": (row.retaguarda_shutoff as string) ?? null,
+            "Recalque ShutOff": (row.recalque_shutoff as string) ?? null,
+            "Impossibilidade:": (row.impossibilidade as string) ?? null,
+            "Serviço Executado:": (row.servico_executado as string) ?? null,
+            "Nome dos Colaboradores:": (row.nome_colaboradores as string) ?? null,
+            "Observação:": (row.observacao as string) ?? null,
+            "Na Chegada": (row.na_chegada as string) ?? null,
+            "Na saida": (row.na_saida as string) ?? null,
+            Status: (row.status as string) ?? null,
+          };
+          return r;
+        });
+        setData(mappedData);
+      }
+
+      setImportModalOpen(false);
+      setImportPreview(null);
+      setImportFile(null);
+
+      const msg = `${resultado.inseridos} registros importados, ${resultado.atualizados} atualizados${resultado.erros.length > 0 ? `, ${resultado.erros.length} erros` : ""}`;
+      alert(msg);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao importar dados.");
+    } finally {
+      setImportConfirming(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 md:p-6">
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
@@ -563,6 +963,14 @@ function TestesPage() {
               Limpar filtros
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setImportModalOpen(true)}
+            className="min-h-11 inline-flex items-center gap-1.5 rounded border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          >
+            <Upload className="h-4 w-4" />
+            Importar
+          </button>
         </div>
       </details>
 
@@ -615,6 +1023,14 @@ function TestesPage() {
             Limpar filtros
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setImportModalOpen(true)}
+          className="ml-2 inline-flex items-center gap-1.5 rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+        >
+          <Upload className="h-4 w-4" />
+          Importar
+        </button>
       </div>
 
       {(crossElev || crossMes) && (
@@ -1104,6 +1520,126 @@ function TestesPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Modal - File Selection */}
+      <Dialog open={importModalOpen && !importPreview} onOpenChange={setImportModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Importar Planilha (Excel)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mb-2">
+              Envie a planilha exportada do Microsoft Forms no formato padrão (mesmas colunas do
+              formulário de Testes & Aferições).
+            </p>
+            <p className="mb-4 text-xs text-slate-400">
+              O arquivo deve conter as colunas: ID, Hora de início, Hora de conclusão, Email, Nome,
+              Hora da última modificação, Data do Teste, Tipo de Serviço, Elevatória, Grupo, Tensão
+              ( V ), Corrente ( A ), Retaguarda, Recalque, Corrente ShutOff, Retaguarda ShutOff,
+              Recalque ShutOff, Impossibilidade:, Serviço Executado:, Nome dos Colaboradores:,
+              Observação:, Na Chegada, Na saida, Status
+            </p>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImportFileSelect(f);
+                e.target.value = "";
+              }}
+              className="block w-full text-sm file:mr-2 file:rounded file:border-0 file:bg-[#0b3a73] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-[#1f7ad6]"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Modal - Preview/Confirm */}
+      <Dialog
+        open={importPreview !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setImportPreview(null);
+            setImportFile(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Confirmar Importação
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                  {importPreview!.novos}
+                </div>
+                <div className="text-xs text-green-600 dark:text-green-400">Novos</div>
+              </div>
+              <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                  {importPreview!.atualizados}
+                </div>
+                <div className="text-xs text-blue-600 dark:text-blue-400">Atualizados</div>
+              </div>
+              <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
+                <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                  {importPreview!.ignorados}
+                </div>
+                <div className="text-xs text-amber-600 dark:text-amber-400">Ignorados (vazios)</div>
+              </div>
+            </div>
+
+            {importPreview!.erros.length > 0 && (
+              <div className="mb-4 rounded-md bg-red-50 p-3 dark:bg-red-900/20">
+                <h4 className="mb-2 text-sm font-medium text-red-700 dark:text-red-400">
+                  Erros de validação ({importPreview!.erros.length}):
+                </h4>
+                <ul className="text-xs text-red-600 dark:text-red-400 max-h-32 overflow-auto">
+                  {importPreview!.erros.map((e, i) => (
+                    <li key={i}>
+                      Linha {e.linha}: {e.motivo}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportPreview(null);
+                  setImportFile(null);
+                }}
+                className="rounded border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={importConfirming}
+                className="rounded bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+              >
+                {importConfirming ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importando...
+                  </span>
+                ) : (
+                  "Confirmar importação"
+                )}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1732,5 +2268,219 @@ function MetricEvolutionChart({
         </>
       )}
     </div>
+  );
+}
+
+// Import Modal
+function ImportModal({
+  open,
+  onOpenChange,
+  onFileSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onFileSelect: (file: File) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
+      onFileSelect(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      onFileSelect(e.target.files[0]);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-[#0b3a73] flex items-center gap-2">
+            <Upload className="h-5 w-5" /> Importar Planilha do Microsoft Forms
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+            Envie a planilha exportada do Microsoft Forms no formato padrão (mesmas colunas do
+            formulário de Testes & Aferições).
+          </p>
+
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragActive
+                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                : "border-slate-300 dark:border-slate-600"
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            <Upload className="mx-auto h-12 w-12 text-slate-400" />
+            <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              Arraste e solte ou clique para selecionar
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Arquivo .xlsx ou .xls</p>
+            {file && (
+              <p className="mt-2 text-sm font-medium text-[#0b3a73] dark:text-blue-300">
+                {file.name}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                onOpenChange(false);
+              }}
+              className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Import Preview Modal
+function ImportPreviewModal({
+  open,
+  onOpenChange,
+  preview,
+  onConfirm,
+  confirming,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  preview: {
+    novos: number;
+    atualizados: number;
+    ignorados: number;
+    erros: { linha: number; motivo: string }[];
+  } | null;
+  onConfirm: () => void;
+  confirming: boolean;
+}) {
+  if (!preview) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle className="text-[#0b3a73]">Confirmar Importação</DialogTitle>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+              <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                {preview.novos}
+              </div>
+              <div className="text-xs text-emerald-600 dark:text-emerald-400">Novos registros</div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                {preview.atualizados}
+              </div>
+              <div className="text-xs text-blue-600 dark:text-blue-400">Atualizados</div>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/20">
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                {preview.ignorados}
+              </div>
+              <div className="text-xs text-amber-600 dark:text-amber-400">Ignorados (vazios)</div>
+            </div>
+          </div>
+
+          {preview.erros.length > 0 && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950/20">
+              <h4 className="mb-2 text-sm font-medium text-rose-700 dark:text-rose-400">
+                Erros encontrados ({preview.erros.length}):
+              </h4>
+              <ul className="space-y-1 text-xs text-rose-600 dark:text-rose-400 max-h-40 overflow-auto">
+                {preview.erros.slice(0, 20).map((e, i) => (
+                  <li key={i}>
+                    Linha {e.linha}: {e.motivo}
+                  </li>
+                ))}
+                {preview.erros.length > 20 && <li>... e mais {preview.erros.length - 20} erros</li>}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex gap-2 justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={confirming}
+              className="rounded bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+            >
+              {confirming ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Importando...
+                </span>
+              ) : (
+                "Confirmar importação"
+              )}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

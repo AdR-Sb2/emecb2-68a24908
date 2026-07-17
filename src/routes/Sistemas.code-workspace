@@ -1,12 +1,12 @@
 {
-	"folders": [
-		{
-			"path": "../../.."
-		},
-		{
-			"name": "emecbx2",
-			"path": "../.."
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": "../../..",
+    },
+    {
+      "name": "emecbx2",
+      "path": "../..",
+    },
+  ],
+  "settings": {},
 }

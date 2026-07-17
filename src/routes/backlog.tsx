@@ -514,10 +514,7 @@ function BacklogPage() {
   });
   useEffect(() => {
     try {
-      localStorage.setItem(
-        "responsabilidadeOverrides",
-        JSON.stringify(responsabilidadeOverrides),
-      );
+      localStorage.setItem("responsabilidadeOverrides", JSON.stringify(responsabilidadeOverrides));
     } catch {}
   }, [responsabilidadeOverrides]);
   useEffect(() => {
@@ -910,13 +907,13 @@ function BacklogPage() {
       // Normaliza nome da coluna para matching (ignora acentos, encoding, BOM, espaços)
       function normKey(s: string): string {
         return s
-          .replace(/^\uFEFF/, "")             // BOM
+          .replace(/^\uFEFF/, "") // BOM
           .replace(/\n/g, "")
           .trim()
           .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")    // remove acentos
-          .replace(/\u00A0/g, " ")            // non-breaking space → espaço
-          .replace(/\s+/g, " ")               // whitespace → um espaço
+          .replace(/[\u0300-\u036f]/g, "") // remove acentos
+          .replace(/\u00A0/g, " ") // non-breaking space → espaço
+          .replace(/\s+/g, " ") // whitespace → um espaço
           .toLowerCase();
       }
       // Mapeia qualquer variação do nome da coluna para o nome padrão
@@ -937,7 +934,8 @@ function BacklogPage() {
       function normalizeDateStr(s: string): string {
         const m = s.trim().match(dateStrRe);
         if (!m) return s;
-        let a = +m[1], b = +m[2];
+        let a = +m[1],
+          b = +m[2];
         if (b > 12 && a <= 12) [a, b] = [b, a];
         const y = +m[3] < 100 ? +m[3] + 2000 : +m[3];
         const hh = s.trim().match(/(\d{1,2}):(\d{2})$/);
@@ -951,11 +949,12 @@ function BacklogPage() {
           k = k.replace(/\n/g, "").trim();
           const canon = dateFieldMap[normKey(k)];
           if (canon) {
-            out[canon] = typeof v === "number"
-              ? serialToBR(v)
-              : typeof v === "string"
-              ? normalizeDateStr(v)
-              : v;
+            out[canon] =
+              typeof v === "number"
+                ? serialToBR(v)
+                : typeof v === "string"
+                  ? normalizeDateStr(v)
+                  : v;
           } else {
             out[k] = v;
           }
@@ -3078,8 +3077,7 @@ function BacklogPage() {
                               { ignoreDuplicates: false },
                             )
                             .then(
-                              ({ error }) =>
-                                error && console.warn("Falha ao salvar resp", error),
+                              ({ error }) => error && console.warn("Falha ao salvar resp", error),
                             );
                         }}
                         className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
@@ -3114,8 +3112,7 @@ function BacklogPage() {
                               .eq("om", e.om)
                               .then(
                                 ({ error }) =>
-                                  error &&
-                                  console.warn("Falha ao remover resp override", error),
+                                  error && console.warn("Falha ao remover resp override", error),
                               );
                           }}
                           className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
@@ -3281,8 +3278,7 @@ function BacklogPage() {
                                 { ignoreDuplicates: false },
                               )
                               .then(
-                                ({ error }) =>
-                                  error && console.warn("Falha ao salvar resp", error),
+                                ({ error }) => error && console.warn("Falha ao salvar resp", error),
                               );
                           }}
                           className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
@@ -3317,8 +3313,7 @@ function BacklogPage() {
                                 .eq("om", e.om)
                                 .then(
                                   ({ error }) =>
-                                    error &&
-                                    console.warn("Falha ao remover resp override", error),
+                                    error && console.warn("Falha ao remover resp override", error),
                                 );
                             }}
                             className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"

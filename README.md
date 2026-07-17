@@ -8,26 +8,26 @@ Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **
 
 ### Público-alvo
 
-| Cargo | Acesso principal |
-|---|---|
-| **Técnico** | Estoque (entrada/saída), Escala, Backlog, Manuais |
-| **Almoxarife** | Gestão completa de Estoque e Compras |
-| **Supervisor** | Todos os módulos operacionais (sem painel admin) |
+| Cargo             | Acesso principal                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **Técnico**       | Estoque (entrada/saída), Escala, Backlog, Manuais                                       |
+| **Almoxarife**    | Gestão completa de Estoque e Compras                                                    |
+| **Supervisor**    | Todos os módulos operacionais (sem painel admin)                                        |
 | **Administrador** | Acesso total, incluindo Painel Administrativo (gestão de usuários, cargos e permissões) |
 
 ### Módulos existentes
 
-| Módulo | Rota | Descrição |
-|---|---|---|
-| **Dashboard de Automação** | `/dashboard` | KPIs de elevatórias, sensores CLP/PCP, gráficos por município/tipo |
-| **Testes & Aferições** | `/testes` | Ensaios elétricos e hidráulicos com KPIs BT/MT e recalque |
-| **Backlog BI** | `/backlog` | OS do Field/SAP com SLA, mapa Leaflet, roteirização multi-parada |
-| **Estoque / Almoxarifado** | `/estoque` | Inventário, movimentações (entrada/saída/ajuste), compras, registros |
-| **Escala de Trabalho** | `/escala` | Escala semanal, fórmula automática de plantão, importação/exportação XLSX |
-| **Manuais Técnicos** | `/manuais` | Biblioteca de manuais com abas por categoria, upload de PDF, sugestões |
-| **Relatórios** | `/relatorio` | Relatórios técnicos e de planta |
-| **Painel Administrativo** | `/admin` | Gestão de usuários, cargos, painéis e permissões granulares |
-| **Home (Hub)** | `/` | Grid de cards com acesso a todos os módulos conforme permissão do cargo |
+| Módulo                     | Rota         | Descrição                                                                 |
+| -------------------------- | ------------ | ------------------------------------------------------------------------- |
+| **Dashboard de Automação** | `/dashboard` | KPIs de elevatórias, sensores CLP/PCP, gráficos por município/tipo        |
+| **Testes & Aferições**     | `/testes`    | Ensaios elétricos e hidráulicos com KPIs BT/MT e recalque                 |
+| **Backlog BI**             | `/backlog`   | OS do Field/SAP com SLA, mapa Leaflet, roteirização multi-parada          |
+| **Estoque / Almoxarifado** | `/estoque`   | Inventário, movimentações (entrada/saída/ajuste), compras, registros      |
+| **Escala de Trabalho**     | `/escala`    | Escala semanal, fórmula automática de plantão, importação/exportação XLSX |
+| **Manuais Técnicos**       | `/manuais`   | Biblioteca de manuais com abas por categoria, upload de PDF, sugestões    |
+| **Relatórios**             | `/relatorio` | Relatórios técnicos e de planta                                           |
+| **Painel Administrativo**  | `/admin`     | Gestão de usuários, cargos, painéis e permissões granulares               |
+| **Home (Hub)**             | `/`          | Grid de cards com acesso a todos os módulos conforme permissão do cargo   |
 
 ---
 
@@ -35,30 +35,30 @@ Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **
 
 ### Frontend
 
-| Camada | Tecnologia |
-|---|---|
-| Framework | **React 19** + **TypeScript** |
-| Build / Dev Server | **Vite 8** via `@lovable.dev/vite-tanstack-config` |
-| Roteamento | **TanStack Start** (SSR) + **TanStack Router** (file-based) |
-| Query / Cache | **TanStack Query** |
-| Estilização | **Tailwind CSS v4** + `tw-animate-css` |
-| Componentes | **Radix UI** (dialog, select, dropdown, tabs, etc.) |
-| Gráficos | **Recharts** |
-| Mapas | **Leaflet** + **react-leaflet** |
-| Ícones | **Lucide React** |
-| Formulários | **React Hook Form** + **Zod** |
-| Planilhas | **ExcelJS** (export) + **xlsx** (import) |
-| Toasts | **Sonner** |
+| Camada             | Tecnologia                                                  |
+| ------------------ | ----------------------------------------------------------- |
+| Framework          | **React 19** + **TypeScript**                               |
+| Build / Dev Server | **Vite 8** via `@lovable.dev/vite-tanstack-config`          |
+| Roteamento         | **TanStack Start** (SSR) + **TanStack Router** (file-based) |
+| Query / Cache      | **TanStack Query**                                          |
+| Estilização        | **Tailwind CSS v4** + `tw-animate-css`                      |
+| Componentes        | **Radix UI** (dialog, select, dropdown, tabs, etc.)         |
+| Gráficos           | **Recharts**                                                |
+| Mapas              | **Leaflet** + **react-leaflet**                             |
+| Ícones             | **Lucide React**                                            |
+| Formulários        | **React Hook Form** + **Zod**                               |
+| Planilhas          | **ExcelJS** (export) + **xlsx** (import)                    |
+| Toasts             | **Sonner**                                                  |
 
 ### Backend / Banco
 
-| Camada | Tecnologia |
-|---|---|
-| Banco de dados | **PostgreSQL** via **Supabase** |
-| Projeto | `byxmnmebvqdxpzcuutak` |
-| Cliente | `@supabase/supabase-js` com fallback para credenciais públicas |
-| Autenticação | Supabase Auth (email/senha) + tabela `profiles` |
-| Storage | Supabase Storage (bucket `manuais` para PDFs) |
+| Camada         | Tecnologia                                                     |
+| -------------- | -------------------------------------------------------------- |
+| Banco de dados | **PostgreSQL** via **Supabase**                                |
+| Projeto        | `byxmnmebvqdxpzcuutak`                                         |
+| Cliente        | `@supabase/supabase-js` com fallback para credenciais públicas |
+| Autenticação   | Supabase Auth (email/senha) + tabela `profiles`                |
+| Storage        | Supabase Storage (bucket `manuais` para PDFs)                  |
 
 ### Deploy
 
@@ -90,67 +90,67 @@ O projeto usa **TanStack Start** com SSR, empacotado via **Nitro** com alvo **Cl
 
 #### `materiais` — Cadastro mestre
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `id` | BIGSERIAL PK | |
-| `cod_sap` | TEXT UNIQUE | Código SAP do material |
-| `descricao` | TEXT | Nome do material |
-| `unidade_medida` | TEXT | `UN`, `PC`, `M`, `KG` etc. |
-| `categoria_id` | BIGINT FK → `categorias.id` | Categoria dinâmica (Elétrico, Mecânico, etc.) |
-| `fabricante` | TEXT | |
-| `local_armazenagem` | TEXT | |
-| `estoque_minimo` | NUMERIC | Gatilho para alerta de estoque baixo |
-| `material_critico` | BOOLEAN | Se true, aparece destacado na interface |
-| `ativo` | BOOLEAN | Desativação lógica |
-| `saldo_atual` | NUMERIC | **Saldo calculado automaticamente** por triggers |
-| `custo_unitario` | NUMERIC | |
-| `criado_em` / `atualizado_em` | TIMESTAMPTZ | |
+| Coluna                        | Tipo                        | Descrição                                        |
+| ----------------------------- | --------------------------- | ------------------------------------------------ |
+| `id`                          | BIGSERIAL PK                |                                                  |
+| `cod_sap`                     | TEXT UNIQUE                 | Código SAP do material                           |
+| `descricao`                   | TEXT                        | Nome do material                                 |
+| `unidade_medida`              | TEXT                        | `UN`, `PC`, `M`, `KG` etc.                       |
+| `categoria_id`                | BIGINT FK → `categorias.id` | Categoria dinâmica (Elétrico, Mecânico, etc.)    |
+| `fabricante`                  | TEXT                        |                                                  |
+| `local_armazenagem`           | TEXT                        |                                                  |
+| `estoque_minimo`              | NUMERIC                     | Gatilho para alerta de estoque baixo             |
+| `material_critico`            | BOOLEAN                     | Se true, aparece destacado na interface          |
+| `ativo`                       | BOOLEAN                     | Desativação lógica                               |
+| `saldo_atual`                 | NUMERIC                     | **Saldo calculado automaticamente** por triggers |
+| `custo_unitario`              | NUMERIC                     |                                                  |
+| `criado_em` / `atualizado_em` | TIMESTAMPTZ                 |                                                  |
 
 #### `movimentacoes` — Histórico de operações
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `cod_sap` | TEXT FK → `materiais.cod_sap` | |
-| `tipo` | TEXT | `ENTRADA`, `SAIDA`, ou `AJUSTE` |
-| `quantidade` | NUMERIC | Quantidade (positiva para entrada, positiva para saída — o trigger decide o sinal) |
-| `data` | TIMESTAMPTZ | Data da movimentação |
-| `destino` | TEXT | Para onde o material foi (saídas) |
-| `solicitante` | TEXT | Quem solicitou |
-| `responsavel` | TEXT | Quem retirou/entregou |
-| `motivo_ajuste` | TEXT | Justificativa do ajuste |
-| `origem` | TEXT | `SISTEMA` (movimentação real) ou `HISTORICO_PLANILHA` (dado importado) |
-| `afeta_saldo` | BOOLEAN | Se `false`, a movimentação não altera `saldo_atual` |
-| `divergencia_cod_sap` | BOOLEAN | Marcador para divergências detectadas em importação |
-| `aba_origem` | TEXT | Qual aba do sistema gerou (ex: "Registros", "Estoque") |
+| Coluna                | Tipo                          | Descrição                                                                          |
+| --------------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
+| `cod_sap`             | TEXT FK → `materiais.cod_sap` |                                                                                    |
+| `tipo`                | TEXT                          | `ENTRADA`, `SAIDA`, ou `AJUSTE`                                                    |
+| `quantidade`          | NUMERIC                       | Quantidade (positiva para entrada, positiva para saída — o trigger decide o sinal) |
+| `data`                | TIMESTAMPTZ                   | Data da movimentação                                                               |
+| `destino`             | TEXT                          | Para onde o material foi (saídas)                                                  |
+| `solicitante`         | TEXT                          | Quem solicitou                                                                     |
+| `responsavel`         | TEXT                          | Quem retirou/entregou                                                              |
+| `motivo_ajuste`       | TEXT                          | Justificativa do ajuste                                                            |
+| `origem`              | TEXT                          | `SISTEMA` (movimentação real) ou `HISTORICO_PLANILHA` (dado importado)             |
+| `afeta_saldo`         | BOOLEAN                       | Se `false`, a movimentação não altera `saldo_atual`                                |
+| `divergencia_cod_sap` | BOOLEAN                       | Marcador para divergências detectadas em importação                                |
+| `aba_origem`          | TEXT                          | Qual aba do sistema gerou (ex: "Registros", "Estoque")                             |
 
 #### `compras` — Pedidos / Requisições de Compra
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `requisicao` / `item_rc` | BIGINT / BIGINT | Chave única composta |
-| `cod_sap` | TEXT | Material (snapshot — não é FK estrita) |
-| `descricao_material` | TEXT | |
-| `qtde_rc` | NUMERIC | Quantidade solicitada |
-| `comprador_cotacao` | TEXT | |
-| `deposito_rc` | TEXT | |
-| `pedido` | TEXT | Número do pedido |
-| `fornecedor` | TEXT | |
-| `status_geral` | TEXT | Status livre (ex: "Aprovado", "A Caminho") |
-| `chegou` / `data_chegou` | BOOLEAN / DATE | Controle físico de recebimento |
-| `foi_retirado` / `data_retirado` | BOOLEAN / DATE | **Dispara entrada automática no estoque** |
-| `rc_em_fila` | BOOLEAN | Se está na fila de acompanhamento |
-| `afeta_saldo` | BOOLEAN | Se `true`, a entrada automática altera o saldo |
-| `status_fila` | TEXT | `Pendente`, `Visto`, `Em Processo`, `Aguardando Retorno`, `Finalizado` |
-| `cobrado_via_email` / `dt_pagamento` | BOOLEAN / DATE | Controle financeiro |
-| `solicitante` / `previsao_uso` | TEXT | |
+| Coluna                               | Tipo            | Descrição                                                              |
+| ------------------------------------ | --------------- | ---------------------------------------------------------------------- |
+| `requisicao` / `item_rc`             | BIGINT / BIGINT | Chave única composta                                                   |
+| `cod_sap`                            | TEXT            | Material (snapshot — não é FK estrita)                                 |
+| `descricao_material`                 | TEXT            |                                                                        |
+| `qtde_rc`                            | NUMERIC         | Quantidade solicitada                                                  |
+| `comprador_cotacao`                  | TEXT            |                                                                        |
+| `deposito_rc`                        | TEXT            |                                                                        |
+| `pedido`                             | TEXT            | Número do pedido                                                       |
+| `fornecedor`                         | TEXT            |                                                                        |
+| `status_geral`                       | TEXT            | Status livre (ex: "Aprovado", "A Caminho")                             |
+| `chegou` / `data_chegou`             | BOOLEAN / DATE  | Controle físico de recebimento                                         |
+| `foi_retirado` / `data_retirado`     | BOOLEAN / DATE  | **Dispara entrada automática no estoque**                              |
+| `rc_em_fila`                         | BOOLEAN         | Se está na fila de acompanhamento                                      |
+| `afeta_saldo`                        | BOOLEAN         | Se `true`, a entrada automática altera o saldo                         |
+| `status_fila`                        | TEXT            | `Pendente`, `Visto`, `Em Processo`, `Aguardando Retorno`, `Finalizado` |
+| `cobrado_via_email` / `dt_pagamento` | BOOLEAN / DATE  | Controle financeiro                                                    |
+| `solicitante` / `previsao_uso`       | TEXT            |                                                                        |
 
 #### `categorias` — Categorias de materiais
 
-| Coluna | Descrição |
-|---|---|
-| `id` | BIGINT PK |
-| `nome` | TEXT UNIQUE — ex: Elétrico, Mecânico, Hidráulico, EPI, Consumível, Outros |
-| `ativo` | BOOLEAN |
+| Coluna  | Descrição                                                                 |
+| ------- | ------------------------------------------------------------------------- |
+| `id`    | BIGINT PK                                                                 |
+| `nome`  | TEXT UNIQUE — ex: Elétrico, Mecânico, Hidráulico, EPI, Consumível, Outros |
+| `ativo` | BOOLEAN                                                                   |
 
 ### 3.2 Lógica de Saldo
 
@@ -268,6 +268,7 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 **Commits:** `469ad7f`
 
 Correções aplicadas no módulo de manuais:
+
 - **Link "Avaliar" quebrado:** `to="/manuais/avaliacao"` → `to="/manuais-avaliacao"` (rota correta com hífen)
 - **Sanitização de nome de arquivo no upload:** Remove espaços e caracteres especiais dos nomes de arquivo enviados ao Supabase Storage, evitando erro `Invalid key`
 - **Preservação de comentário na rejeição:** `handleRejeitar` agora anexa o motivo da rejeição como `[Motivo da rejeição: ...]` ao invés de sobrescrever o `comentario` original da sugestão, e adiciona tratamento de erro na query
@@ -323,6 +324,7 @@ Corrige o trigger `atualizar_saldo_material` para que o tipo `AJUSTE` defina `sa
 **Commit:** `e036776`
 
 Criação do sistema de permissões granulares:
+
 - Tabela `permissions` (`key`, `label`, `panel_key`, `is_generic`)
 - Tabela `cargo_panel_permissions` (relacionamento cargo → permissão)
 - UI no admin para gerenciar permissões por cargo com checkbox tree
@@ -415,6 +417,7 @@ Criação do sistema de permissões granulares:
 ## 7. Tema Dark/Light
 
 Implementado via `TemaProvider` em `src/lib/tema.tsx`:
+
 - Preferência salva em `localStorage` (chave `tema_preferido`) e no banco (coluna `tema_preferido` em `profiles`)
 - A classe `dark` é aplicada/removida no `<html>` element
 - Tema carregado do banco no login do usuário

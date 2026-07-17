@@ -530,14 +530,18 @@ function EstoquePage() {
       return;
     }
     setCompras((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, chegou: false, data_chegou: null, valor_unitario: null, valor_total: null } : c)),
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, chegou: false, data_chegou: null, valor_unitario: null, valor_total: null }
+          : c,
+      ),
     );
   };
 
   const confirmarChegada = async () => {
     if (!dialogDataChegada) return;
     const compra = compras.find((c) => c.id === dialogDataChegada);
-    const qtdeRecebida = parseFloat(chegadaQtdeRecebida) || (compra?.qtde_rc || 1);
+    const qtdeRecebida = parseFloat(chegadaQtdeRecebida) || compra?.qtde_rc || 1;
     const valorUnitario = parseFloat(chegadaValorUnitario) || 0;
     const valorTotal = valorUnitario * qtdeRecebida;
 
@@ -558,7 +562,13 @@ function EstoquePage() {
     setCompras((prev) =>
       prev.map((c) =>
         c.id === dialogDataChegada
-          ? { ...c, chegou: true, data_chegou: dataChegadaInput || null, valor_unitario: valorUnitario || null, valor_total: valorTotal || null }
+          ? {
+              ...c,
+              chegou: true,
+              data_chegou: dataChegadaInput || null,
+              valor_unitario: valorUnitario || null,
+              valor_total: valorTotal || null,
+            }
           : c,
       ),
     );
@@ -687,13 +697,16 @@ function EstoquePage() {
       toast.error("Nº da Requisição e Item devem ser números.");
       return;
     }
-    const { error } = await supabase.from("compras").update({
-      status_fila: "RC Criada",
-      rc_em_fila: false,
-      requisicao,
-      item_rc,
-      status_geral: "PC - Em Aprovação",
-    }).eq("id", id);
+    const { error } = await supabase
+      .from("compras")
+      .update({
+        status_fila: "RC Criada",
+        rc_em_fila: false,
+        requisicao,
+        item_rc,
+        status_geral: "PC - Em Aprovação",
+      })
+      .eq("id", id);
     if (error) {
       toast.error("Erro ao confirmar RC: " + error.message);
       return;
@@ -3574,13 +3587,21 @@ function EstoquePage() {
                 {comprasFiltradas.map((c) => {
                   const diasAberto = c.dt_criacao_rc
                     ? c.chegou && c.data_chegou
-                      ? Math.floor((new Date(c.data_chegou).getTime() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
+                      ? Math.floor(
+                          (new Date(c.data_chegou).getTime() -
+                            new Date(c.dt_criacao_rc).getTime()) /
+                            86400000,
+                        )
                       : Math.floor((Date.now() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
                     : null;
 
                   const diasParaRetirar =
                     c.chegou && c.data_chegou && c.foi_retirado && c.data_retirado
-                      ? Math.floor((new Date(c.data_retirado).getTime() - new Date(c.data_chegou).getTime()) / 86400000)
+                      ? Math.floor(
+                          (new Date(c.data_retirado).getTime() -
+                            new Date(c.data_chegou).getTime()) /
+                            86400000,
+                        )
                       : null;
                   const editando = editandoCompraId === c.id;
                   return (
@@ -3687,9 +3708,7 @@ function EstoquePage() {
                           <span>{c.foi_retirado ? "✓" : "—"}</span>
                         )}
                       </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {c.data_chegou || "—"}
-                      </td>
+                      <td className="px-2 py-1.5 text-center">{c.data_chegou || "—"}</td>
                       <td className="px-2 py-1.5 text-right text-slate-600 dark:text-slate-300">
                         {c.valor_unitario !== null && c.valor_unitario !== undefined
                           ? `R$ ${Number(c.valor_unitario).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -4127,7 +4146,9 @@ function EstoquePage() {
           {/* Indicador visual de progresso */}
           {(() => {
             const filaItems = compras.filter((c) => c.rc_em_fila);
-            const pendentes = filaItems.filter((c) => (c.status_fila || "Pendente") === "Pendente").length;
+            const pendentes = filaItems.filter(
+              (c) => (c.status_fila || "Pendente") === "Pendente",
+            ).length;
             const emAndamento = filaItems.filter((c) => c.status_fila === "Em Andamento").length;
             const rcCriada = filaItems.filter((c) => c.status_fila === "RC Criada").length;
             return (
