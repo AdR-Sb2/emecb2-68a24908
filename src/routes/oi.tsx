@@ -166,101 +166,129 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
   const COL_W = [3111, 80, 345, 1174, 1519, 80, 4456];
   const FULL_W = COL_W.reduce((a, b) => a + b, 0);
 
-  const cell = (text: string, span: number, opts: { bold?: boolean; size?: number } = {}) =>
-    new TableCell({
-      width: { size: COL_W.slice(0, span).reduce((a, b) => a + b, 0), type: WidthType.DXA },
+  function sumWidth(span: number): number {
+    return COL_W.slice(0, span).reduce((a, b) => a + b, 0);
+  }
+
+  function txtCell(text: string, span: number, rowSpan?: number, opts: { bold?: boolean; size?: number } = {}) {
+    return new TableCell({
+      width: { size: sumWidth(span), type: WidthType.DXA },
       columnSpan: span,
+      rowSpan,
       children: [P([R(text, { bold: opts.bold ?? false, size: opts.size ?? 18 })], { spacing: { after: 0 } })],
     });
+  }
 
-  const emptyCell = (span: number = 1) =>
-    new TableCell({
-      width: { size: COL_W.slice(0, span).reduce((a, b) => a + b, 0), type: WidthType.DXA },
+  function emptyCell(span: number = 1) {
+    return new TableCell({
+      width: { size: sumWidth(span), type: WidthType.DXA },
       columnSpan: span,
       children: [new Paragraph({ children: [], spacing: { after: 0 } })],
     });
+  }
 
   const logo = await getLogoBuffer();
-  const logoCell = new TableCell({
-    width: { size: COL_W[0] + COL_W[1] + COL_W[2] + COL_W[3] + COL_W[4], type: WidthType.DXA },
-    columnSpan: 5,
-    children: [
-      new Paragraph({
-        children: [
-          new ImageRun({
-            data: logo,
-            transformation: { width: 310, height: 128 },
-            type: "png",
-          }),
-        ],
-        spacing: { after: 0 },
-      }),
-    ],
-  });
 
   const rows: TableRow[] = [];
 
-  /* Header section: logo + N° OI / Período */
-  rows.push(
-    new TableRow({
-      children: [
-        logoCell,
-        emptyCell(1),
-        cell(`N° Ordem de Início:\n${data.numero_oi}`, 1, { size: 18 }),
-      ],
-    }),
-    new TableRow({
-      children: [
-        emptyCell(5),
-        emptyCell(1),
-        cell(`Período:\n${periodoFormatado(data.periodo_inicio, data.periodo_fim)}`, 1, { size: 18 }),
-      ],
-    }),
-  );
-
-  /* spacer row */
+  /* Row 0: Logo (rowSpan=4) | Sep | N° Ordem (rowSpan=2) */
   rows.push(new TableRow({
-    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+    children: [
+      new TableCell({
+        width: { size: sumWidth(5), type: WidthType.DXA },
+        columnSpan: 5,
+        rowSpan: 4,
+        children: [
+          new Paragraph({
+            children: [new ImageRun({ data: logo, transformation: { width: 310, height: 128 }, type: "png" })],
+            spacing: { after: 0 },
+          }),
+        ],
+      }),
+      emptyCell(1),
+      txtCell(`N° Ordem de Início:\n${data.numero_oi}`, 1, 2, { size: 18 }),
+    ],
   }));
 
-  /* Superintendência / Bloco / Resp. AEGEA */
-  rows.push(
-    new TableRow({
-      children: [
-        cell(`Superintendência:\n${data.superintendencia || "—"}`, 1, { size: 18 }),
-        emptyCell(1),
-        cell(`Bloco: ${data.bloco || "—"}`, 2, { size: 18 }),
-        emptyCell(1),
-        cell(`Resp. Técnico AEGEA:\n${data.responsavel_aegea || "—"}`, 1, { size: 18 }),
-      ],
-    }),
-  );
+  /* Row 1: auto-continue fills logo and N°Ordem; just add separator */
+  rows.push(new TableRow({ children: [emptyCell(1)] }));
 
-  /* spacer */
+  /* Row 2: auto-fills logo; add separator + Período (rowSpan=2) */
   rows.push(new TableRow({
-    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+    children: [
+      emptyCell(1),
+      txtCell(`Período:\n${periodoFormatado(data.periodo_inicio, data.periodo_fim)}`, 1, 2, { size: 18 }),
+    ],
   }));
 
-  /* Município / Checkboxes / Resp. Águas do Rio */
-  const checkboxText = `${chk(data.tipo_agua)} Água   ${chk(data.tipo_esgoto)} Esgoto   ${chk(data.tipo_outros_investimentos)} Outros Inv.`;
-  rows.push(
-    new TableRow({
-      children: [
-        cell(`Município:\n${data.municipio || "—"}`, 1, { size: 18 }),
-        emptyCell(1),
-        cell(checkboxText, 3, { size: 17 }),
-        emptyCell(1),
-        cell(`Resp. Técnico Águas do Rio:\n${data.responsavel_aguas_do_rio || "—"}`, 1, { size: 18 }),
-      ],
-    }),
-  );
+  /* Row 3: auto-fills logo and Período; just separator */
+  rows.push(new TableRow({ children: [emptyCell(1)] }));
 
-  /* spacer */
+  /* Row 4: spacer */
   rows.push(new TableRow({
-    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+    children: [new TableCell({
+      width: { size: FULL_W, type: WidthType.DXA },
+      columnSpan: 7,
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    })],
   }));
 
-  /* Objeto */
+  /* Row 5: Superintendência | Sep | Bloco | Sep | Resp. AEGEA */
+  rows.push(new TableRow({
+    children: [
+      txtCell(`Superintendência:\n${data.superintendencia || "—"}`, 1, undefined, { size: 18 }),
+      emptyCell(1),
+      txtCell(`Bloco: ${data.bloco || "—"}`, 2, undefined, { size: 18 }),
+      emptyCell(1),
+      txtCell(`Resp. Técnico AEGEA:\n${data.responsavel_aegea || "—"}`, 1, undefined, { size: 18 }),
+    ],
+  }));
+
+  /* Row 6: spacer */
+  rows.push(new TableRow({
+    children: [new TableCell({
+      width: { size: FULL_W, type: WidthType.DXA },
+      columnSpan: 7,
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    })],
+  }));
+
+  /* Row 7: Município | Sep | Sistema + Água/Esgoto/Outros | Sep | Resp. Águas */
+  const checkAgua = `${chk(data.tipo_agua)} Água`;
+  const checkEsgoto = `${chk(data.tipo_esgoto)} Esgoto`;
+  const checkOutros = `${chk(data.tipo_outros_investimentos)} Outros Inv.`;
+  rows.push(new TableRow({
+    children: [
+      txtCell(`Município:\n${data.municipio || "—"}`, 1, undefined, { size: 18 }),
+      emptyCell(1),
+      txtCell(checkAgua, 2, undefined, { size: 17 }),
+      txtCell(checkEsgoto, 1, undefined, { size: 17 }),
+      emptyCell(1),
+      txtCell(`Resp. Técnico Águas do Rio:\n${data.responsavel_aguas_do_rio || "—"}`, 1, undefined, { size: 18 }),
+    ],
+  }));
+
+  /* Row 8: empty | Sep | Outros (span 3) | Sep | empty */
+  rows.push(new TableRow({
+    children: [
+      emptyCell(1),
+      emptyCell(1),
+      txtCell(checkOutros, 3, undefined, { size: 17 }),
+      emptyCell(1),
+      emptyCell(1),
+    ],
+  }));
+
+  /* Row 9: spacer */
+  rows.push(new TableRow({
+    children: [new TableCell({
+      width: { size: FULL_W, type: WidthType.DXA },
+      columnSpan: 7,
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    })],
+  }));
+
+  /* Row 10: Objeto */
   rows.push(new TableRow({
     children: [
       new TableCell({
@@ -271,12 +299,16 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
     ],
   }));
 
-  /* spacer */
+  /* Row 11: spacer */
   rows.push(new TableRow({
-    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+    children: [new TableCell({
+      width: { size: FULL_W, type: WidthType.DXA },
+      columnSpan: 7,
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    })],
   }));
 
-  /* Objetivo/Escopo/Local */
+  /* Row 12: Objetivo/Escopo/Local */
   rows.push(new TableRow({
     children: [
       new TableCell({
@@ -287,12 +319,16 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
     ],
   }));
 
-  /* spacer */
+  /* Row 13: spacer */
   rows.push(new TableRow({
-    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+    children: [new TableCell({
+      width: { size: FULL_W, type: WidthType.DXA },
+      columnSpan: 7,
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    })],
   }));
 
-  /* FOLHA (static) */
+  /* Row 14: FOLHA */
   rows.push(new TableRow({
     children: [
       new TableCell({
@@ -380,11 +416,18 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
       for (let i = 0; i < iv.fotos.length; i += 2) {
         const f1 = iv.fotos[i];
         const f2 = iv.fotos[i + 1];
-        const rowCells: TableCell[] = [];
+        const imgRowCells: TableCell[] = [];
+        const textRowCells: TableCell[] = [];
 
         for (const f of [f1, f2]) {
           if (!f) {
-            rowCells.push(
+            imgRowCells.push(
+              new TableCell({
+                width: { size: 5200, type: WidthType.DXA },
+                children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+              }),
+            );
+            textRowCells.push(
               new TableCell({
                 width: { size: 5200, type: WidthType.DXA },
                 children: [new Paragraph({ children: [], spacing: { after: 0 } })],
@@ -393,43 +436,49 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
             continue;
           }
 
-          const cellChildren: Paragraph[] = [];
-
           if (f.file) {
             const ab = await f.file.arrayBuffer();
             const ext = f.file.type === "image/png" ? "png" : "jpg";
-            cellChildren.push(
-              new Paragraph({
+            imgRowCells.push(
+              new TableCell({
+                width: { size: 5200, type: WidthType.DXA },
                 children: [
-                  new ImageRun({
-                    data: ab,
-                    transformation: { width: 450, height: 338 },
-                    type: ext,
+                  new Paragraph({
+                    children: [
+                      new ImageRun({
+                        data: ab,
+                        transformation: { width: 450, height: 338 },
+                        type: ext,
+                      }),
+                    ],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 0 },
                   }),
                 ],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 40 },
+              }),
+            );
+          } else {
+            imgRowCells.push(
+              new TableCell({
+                width: { size: 5200, type: WidthType.DXA },
+                children: [new Paragraph({ children: [], spacing: { after: 0 } })],
               }),
             );
           }
 
-          cellChildren.push(
-            new Paragraph({
-              children: [R("Evento: ", { bold: true, size: 18 }), R(f.evento || "—", { size: 18 })],
-              spacing: { after: 20 },
-            }),
-          );
-          cellChildren.push(
-            new Paragraph({
-              children: [R("Descrição: ", { bold: true, size: 18 }), R(f.descricao || "—", { size: 18 })],
-              spacing: { after: 60 },
-            }),
-          );
-
-          rowCells.push(
+          textRowCells.push(
             new TableCell({
               width: { size: 5200, type: WidthType.DXA },
-              children: cellChildren,
+              children: [
+                new Paragraph({
+                  children: [R("Evento: ", { bold: true, size: 18 }), R(f.evento || "—", { size: 18 })],
+                  spacing: { after: 20 },
+                }),
+                new Paragraph({
+                  children: [R("Descrição: ", { bold: true, size: 18 }), R(f.descricao || "—", { size: 18 })],
+                  spacing: { after: 0 },
+                }),
+              ],
             }),
           );
         }
@@ -438,7 +487,10 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
           new Table({
             width: { size: 10400, type: WidthType.DXA },
             columnWidths: [5200, 5200],
-            rows: [new TableRow({ children: rowCells })],
+            rows: [
+              new TableRow({ children: imgRowCells }),
+              new TableRow({ children: textRowCells }),
+            ],
           }),
         );
         children.push(new Paragraph({ spacing: { after: 100 } }));
