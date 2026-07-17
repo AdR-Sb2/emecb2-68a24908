@@ -44,7 +44,8 @@ import {
   AlignmentType,
   BorderStyle,
 } from "docx";
-import { saveAs } from "file-saver";
+import pkg from "file-saver";
+const { saveAs } = pkg;
 
 export const Route = createFileRoute("/oi")({
   component: OIPage,
