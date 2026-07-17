@@ -13,6 +13,7 @@ import { Route as TestesRouteImport } from './routes/testes'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as OiRouteImport } from './routes/oi'
 import { Route as ManuaisAvaliacaoRouteImport } from './routes/manuais-avaliacao'
 import { Route as ManuaisRouteImport } from './routes/manuais'
 import { Route as LoginRouteImport } from './routes/login'
@@ -43,6 +44,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const PendingRoute = PendingRouteImport.update({
   id: '/pending',
   path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OiRoute = OiRouteImport.update({
+  id: '/oi',
+  path: '/oi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManuaisAvaliacaoRoute = ManuaisAvaliacaoRouteImport.update({
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/manuais': typeof ManuaisRoute
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
+  '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/manuais': typeof ManuaisRoute
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
+  '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/manuais': typeof ManuaisRoute
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
+  '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
   '/relatorio': typeof RelatorioRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/manuais'
     | '/manuais-avaliacao'
+    | '/oi'
     | '/pending'
     | '/register'
     | '/relatorio'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/manuais'
     | '/manuais-avaliacao'
+    | '/oi'
     | '/pending'
     | '/register'
     | '/relatorio'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/manuais'
     | '/manuais-avaliacao'
+    | '/oi'
     | '/pending'
     | '/register'
     | '/relatorio'
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ManuaisRoute: typeof ManuaisRoute
   ManuaisAvaliacaoRoute: typeof ManuaisAvaliacaoRoute
+  OiRoute: typeof OiRoute
   PendingRoute: typeof PendingRoute
   RegisterRoute: typeof RegisterRoute
   RelatorioRoute: typeof RelatorioRoute
@@ -253,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oi': {
+      id: '/oi'
+      path: '/oi'
+      fullPath: '/oi'
+      preLoaderRoute: typeof OiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/manuais-avaliacao': {
@@ -346,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ManuaisRoute: ManuaisRoute,
   ManuaisAvaliacaoRoute: ManuaisAvaliacaoRoute,
+  OiRoute: OiRoute,
   PendingRoute: PendingRoute,
   RegisterRoute: RegisterRoute,
   RelatorioRoute: RelatorioRoute,
