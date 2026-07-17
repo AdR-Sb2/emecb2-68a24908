@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Upload,
@@ -21,11 +21,11 @@ import {
   TableCell,
   ImageRun,
   HeadingLevel,
+  Header,
   Footer,
   PageNumber,
   AlignmentType,
   WidthType,
-  BorderStyle,
 } from "docx";
 import saveAs from "file-saver";
 
@@ -134,124 +134,192 @@ function sugerirNomeArquivo(data: FormData): string {
 
 /* ──────────────────── DOCX Generation ───────────────────────────── */
 
-async function generateDocx(
-  data: FormData,
-  intervencoes: Intervencao[],
-): Promise<Blob> {
-  const periodoStr =
-    data.periodo_inicio && data.periodo_fim
-      ? `${new Date(data.periodo_inicio + "T12:00:00").toLocaleDateString("pt-BR")} a ${new Date(data.periodo_fim + "T12:00:00").toLocaleDateString("pt-BR")}`
-      : "";
+let logoBuffer: ArrayBuffer | null = null;
 
-  const R = (text: string, opts: Record<string, unknown> = {}) =>
-    new TextRun({ text, size: 20, font: "Calibri", ...opts });
-  const P = (children: TextRun[], opts: Record<string, unknown> = {}) =>
-    new Paragraph({ children, spacing: { after: 60 }, ...opts });
+async function getLogoBuffer(): Promise<ArrayBuffer> {
+  if (logoBuffer) return logoBuffer;
+  const resp = await fetch("/logo-oi.png");
+  logoBuffer = await resp.arrayBuffer();
+  return logoBuffer;
+}
 
-  const children: (Paragraph | Table)[] = [];
+function R(text: string, opts: Record<string, unknown> = {}) {
+  return new TextRun({ text, size: 20, font: "Calibri", ...opts });
+}
 
-  /* ── Title ───────────────────────────────────────────────────── */
-  children.push(
-    new Paragraph({
-      children: [R("RELATÓRIO FOTOGRÁFICO", { bold: true, size: 24 })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-    }),
-  );
+function P(children: TextRun[], opts: Record<string, unknown> = {}) {
+  return new Paragraph({ children, spacing: { after: 60 }, ...opts });
+}
 
-  /* ── Header Table (4 columns: label | value | label | value) ── */
-  const cellW = 2600;
-  const fullW = cellW * 4;
+function periodoFormatado(inicio: string, fim: string): string {
+  if (!inicio || !fim) return "";
+  return `${new Date(inicio + "T12:00:00").toLocaleDateString("pt-BR")} a ${new Date(fim + "T12:00:00").toLocaleDateString("pt-BR")}`;
+}
 
-  const hdrCell = (text: string, bold = false, colspan?: number) =>
+function chk(v: boolean): string {
+  return v ? "☒" : "☐";
+}
+
+/* ──────────────────── Build header table ────────────────────────── */
+
+async function criarTabelaCabecalho(data: FormData): Promise<Table> {
+  const COL_W = [3111, 80, 345, 1174, 1519, 80, 4456];
+  const FULL_W = COL_W.reduce((a, b) => a + b, 0);
+
+  const cell = (text: string, span: number, opts: { bold?: boolean; size?: number } = {}) =>
     new TableCell({
-      width: { size: colspan ? cellW * colspan : cellW, type: WidthType.DXA },
-      children: [new Paragraph({ children: [R(text, { bold, size: 18 })], spacing: { after: 0 } })],
+      width: { size: COL_W.slice(0, span).reduce((a, b) => a + b, 0), type: WidthType.DXA },
+      columnSpan: span,
+      children: [P([R(text, { bold: opts.bold ?? false, size: opts.size ?? 18 })], { spacing: { after: 0 } })],
     });
 
-  const checkbox = (checked: boolean) => (checked ? "☒" : "☐");
+  const emptyCell = (span: number = 1) =>
+    new TableCell({
+      width: { size: COL_W.slice(0, span).reduce((a, b) => a + b, 0), type: WidthType.DXA },
+      columnSpan: span,
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    });
 
-  children.push(
-    new Table({
-      width: { size: fullW, type: WidthType.DXA },
-      columnWidths: [cellW, cellW, cellW, cellW],
-      rows: [
-        new TableRow({
-          tableHeader: true,
-          children: [
-            hdrCell("N° Ordem de Início", true),
-            hdrCell(data.numero_oi),
-            hdrCell("Período", true),
-            hdrCell(periodoStr),
-          ],
-        }),
-        new TableRow({
-          children: [
-            hdrCell("Superintendência", true),
-            hdrCell(data.superintendencia || "—"),
-            hdrCell("Município", true),
-            hdrCell(data.municipio || "—"),
-          ],
-        }),
-        new TableRow({
-          children: [
-            hdrCell("Tipo", true),
-            new TableCell({
-              width: { size: cellW * 3, type: WidthType.DXA },
-              children: [
-                new Paragraph({
-                  children: [
-                    R(`${checkbox(data.tipo_agua)} Água  `, { size: 18 }),
-                    R(`${checkbox(data.tipo_esgoto)} Esgoto  `, { size: 18 }),
-                    R(`${checkbox(data.tipo_outros_investimentos)} Outros Investimentos`, { size: 18 }),
-                  ],
-                  spacing: { after: 0 },
-                }),
-              ],
-            }),
-          ],
-        }),
-        new TableRow({
-          children: [
-            hdrCell("Resp. AEGEA", true),
-            hdrCell(data.responsavel_aegea || "—"),
-            hdrCell("Resp. Águas do Rio", true),
-            hdrCell(data.responsavel_aguas_do_rio || "—"),
-          ],
-        }),
+  const logo = await getLogoBuffer();
+  const logoCell = new TableCell({
+    width: { size: COL_W[0] + COL_W[1] + COL_W[2] + COL_W[3] + COL_W[4], type: WidthType.DXA },
+    columnSpan: 5,
+    children: [
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: logo,
+            transformation: { width: 310, height: 128 },
+            type: "png",
+          }),
+        ],
+        spacing: { after: 0 },
+      }),
+    ],
+  });
+
+  const rows: TableRow[] = [];
+
+  /* Header section: logo + N° OI / Período */
+  rows.push(
+    new TableRow({
+      children: [
+        logoCell,
+        emptyCell(1),
+        cell(`N° Ordem de Início:\n${data.numero_oi}`, 1, { size: 18 }),
+      ],
+    }),
+    new TableRow({
+      children: [
+        emptyCell(5),
+        emptyCell(1),
+        cell(`Período:\n${periodoFormatado(data.periodo_inicio, data.periodo_fim)}`, 1, { size: 18 }),
       ],
     }),
   );
 
-  children.push(new Paragraph({ spacing: { after: 200 } }));
+  /* spacer row */
+  rows.push(new TableRow({
+    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+  }));
 
-  /* ── OBJETO ──────────────────────────────────────────────────── */
-  children.push(
-    new Paragraph({
-      children: [R("OBJETO", { bold: true, size: 22 })],
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 200, after: 100 },
+  /* Superintendência / Bloco / Resp. AEGEA */
+  rows.push(
+    new TableRow({
+      children: [
+        cell(`Superintendência:\n${data.superintendencia || "—"}`, 1, { size: 18 }),
+        emptyCell(1),
+        cell(`Bloco: ${data.bloco || "—"}`, 2, { size: 18 }),
+        emptyCell(1),
+        cell(`Resp. Técnico AEGEA:\n${data.responsavel_aegea || "—"}`, 1, { size: 18 }),
+      ],
     }),
   );
-  children.push(P([R("Relatório Fotográfico – Contrato EPC AEGEA X Águas do Rio")]));
-  children.push(new Paragraph({ spacing: { after: 100 } }));
 
-  /* ── Sumário ─────────────────────────────────────────────────── */
-  children.push(
-    new Paragraph({
-      children: [R("SUMÁRIO", { bold: true, size: 22 })],
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 200, after: 100 },
+  /* spacer */
+  rows.push(new TableRow({
+    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+  }));
+
+  /* Município / Checkboxes / Resp. Águas do Rio */
+  const checkboxText = `${chk(data.tipo_agua)} Água   ${chk(data.tipo_esgoto)} Esgoto   ${chk(data.tipo_outros_investimentos)} Outros Inv.`;
+  rows.push(
+    new TableRow({
+      children: [
+        cell(`Município:\n${data.municipio || "—"}`, 1, { size: 18 }),
+        emptyCell(1),
+        cell(checkboxText, 3, { size: 17 }),
+        emptyCell(1),
+        cell(`Resp. Técnico Águas do Rio:\n${data.responsavel_aguas_do_rio || "—"}`, 1, { size: 18 }),
+      ],
     }),
   );
-  children.push(P([R("1. OBJETIVO")]));
-  children.push(P([R("2. INTERVENÇÕES")]));
-  for (const iv of intervencoes) {
-    children.push(P([R(`     ${iv.ordem + 2}. ${iv.titulo_ativo || `Intervenção ${iv.ordem}`}`)]));
-  }
+
+  /* spacer */
+  rows.push(new TableRow({
+    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+  }));
+
+  /* Objeto */
+  rows.push(new TableRow({
+    children: [
+      new TableCell({
+        width: { size: FULL_W, type: WidthType.DXA },
+        columnSpan: 7,
+        children: [P([R("Objeto:", { bold: true, size: 18 }), R(" Relatório Fotográfico – Contrato EPC AEGEA X Águas do Rio", { size: 18 })], { spacing: { after: 0 } })],
+      }),
+    ],
+  }));
+
+  /* spacer */
+  rows.push(new TableRow({
+    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+  }));
+
+  /* Objetivo/Escopo/Local */
+  rows.push(new TableRow({
+    children: [
+      new TableCell({
+        width: { size: FULL_W, type: WidthType.DXA },
+        columnSpan: 7,
+        children: [P([R("Objetivo/ Escopo / Local:", { bold: true, size: 18 }), R(` ${data.objetivo_escopo_local || "—"}`, { size: 18 })], { spacing: { after: 0 } })],
+      }),
+    ],
+  }));
+
+  /* spacer */
+  rows.push(new TableRow({
+    children: Array.from({ length: 7 }, (_, i) => emptyCell(1)),
+  }));
+
+  /* FOLHA (static) */
+  rows.push(new TableRow({
+    children: [
+      new TableCell({
+        width: { size: FULL_W, type: WidthType.DXA },
+        columnSpan: 7,
+        children: [P([R("FOLHA ", { size: 16 }), R("1/1", { size: 16 })], { spacing: { after: 0 } })],
+      }),
+    ],
+  }));
+
+  return new Table({
+    width: { size: FULL_W, type: WidthType.DXA },
+    columnWidths: COL_W,
+    rows,
+  });
+}
+
+/* ──────────────────── Main DOCX generator ──────────────────────── */
+
+async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promise<Blob> {
+  const children: (Paragraph | Table)[] = [];
+
+  /* ── Header table ───────────────────────────────────────────── */
+  children.push(await criarTabelaCabecalho(data));
   children.push(new Paragraph({ spacing: { after: 200 } }));
 
-  /* ── OBJETIVO ────────────────────────────────────────────────── */
+  /* ── OBJETIVO ───────────────────────────────────────────────── */
   children.push(
     new Paragraph({
       children: [R("OBJETIVO", { bold: true, size: 22 })],
@@ -260,35 +328,54 @@ async function generateDocx(
     }),
   );
   children.push(
-    P([
-      R(
-        "O presente documento tem como objetivo evidenciar os serviços medidos no período de referência.",
-      ),
-    ]),
+    new Paragraph({
+      children: [R("O presente documento tem como objetivo evidenciar os serviços medidos no período de referência.")],
+      spacing: { after: 200 },
+    }),
   );
-  children.push(new Paragraph({ spacing: { after: 100 } }));
 
-  /* ── INTERVENÇÕES ────────────────────────────────────────────── */
+  /* ── INTERVENÇÕES ───────────────────────────────────────────── */
+  children.push(
+    new Paragraph({
+      children: [R("INTERVENÇÕES", { bold: true, size: 22 })],
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 300, after: 200 },
+    }),
+  );
+
   for (const iv of intervencoes) {
-    const tituloNum = `${iv.ordem + 2}. ${iv.titulo_ativo}`;
+    /* title */
     children.push(
       new Paragraph({
-        children: [R(tituloNum, { bold: true, size: 22 })],
+        children: [R(`TÍTULO DO ATIVO: ${iv.titulo_ativo}`, { bold: true, size: 22 })],
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 300, after: 100 },
       }),
     );
+    /* address */
+    children.push(
+      new Paragraph({
+        children: [R(`Endereço da obra: ${iv.endereco_obra || "—"}`, { bold: false, size: 20 })],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { after: 40 },
+      }),
+    );
+    /* QUF */
+    children.push(
+      new Paragraph({
+        children: [R(`Rubrica QUF: ${iv.rubrica_quf || "—"}`, { size: 20 })],
+        spacing: { after: 100 },
+      }),
+    );
 
-    if (iv.endereco_obra) {
-      children.push(P([R("Endereço da obra: ", { bold: true }), R(iv.endereco_obra)]));
-    }
-    if (iv.rubrica_quf) {
-      children.push(P([R("Rubrica QUF: ", { bold: true }), R(iv.rubrica_quf)]));
-    }
-    children.push(new Paragraph({ spacing: { after: 100 } }));
-
+    /* Photos */
     if (iv.fotos.length === 0) {
-      children.push(P([R("Nenhuma foto registrada para esta intervenção.", { italics: true, color: "999999" })]));
+      children.push(
+        new Paragraph({
+          children: [R("Nenhuma foto registrada para esta intervenção.", { italics: true, color: "999999" })],
+          spacing: { after: 200 },
+        }),
+      );
     } else {
       for (let i = 0; i < iv.fotos.length; i += 2) {
         const f1 = iv.fotos[i];
@@ -359,11 +446,11 @@ async function generateDocx(
     }
   }
 
-  /* ── Signature ───────────────────────────────────────────────── */
+  /* ── Signature ──────────────────────────────────────────────── */
   children.push(new Paragraph({ spacing: { before: 400 } }));
   children.push(
     new Paragraph({
-      children: [R("AEGEA - Águas do Rio", { bold: true, size: 22 })],
+      children: [R("AEGEA SANEAMENTO E PARTICIPAÇÕES S.A.", { bold: true, size: 22 })],
       alignment: AlignmentType.CENTER,
     }),
   );
@@ -383,7 +470,7 @@ async function generateDocx(
     );
   }
 
-  /* ── Build document ──────────────────────────────────────────── */
+  /* ── Build document ─────────────────────────────────────────── */
   const doc = new Document({
     styles: {
       default: {
@@ -399,16 +486,61 @@ async function generateDocx(
             margin: { top: 720, bottom: 720, left: 720, right: 720 },
           },
         },
+        headers: {
+          default: new Header({
+            children: [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        children: [
+                          new Paragraph({
+                            children: [R("RELATÓRIO FOTOGRÁFICO", { size: 16, bold: true }), new TextRun({ break: 1 }), R("CONTRATO EPC AEGEA X ÁGUAS DO RIO", { size: 14 })],
+                            spacing: { after: 0 },
+                          }),
+                        ],
+                      }),
+                      new TableCell({
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        children: [
+                          new Paragraph({
+                            children: [R(`N° da O.I: ${data.numero_oi || ""}`, { size: 16 })],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { after: 0 },
+                          }),
+                          new Paragraph({
+                            children: [R("Revisão: 00", { size: 14 })],
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { after: 0 },
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
         footers: {
           default: new Footer({
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
+                spacing: { after: 0 },
+                children: [R("Relatório Fotográfico Contrato EPC AEGEA x Águas do Rio – Revisão 01", { size: 16 })],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 0 },
                 children: [
-                  new TextRun({ text: "FOLHA ", size: 18 }),
-                  new TextRun({ children: [PageNumber.CURRENT], size: 18 }),
-                  new TextRun({ text: "/", size: 18 }),
-                  new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 18 }),
+                  new TextRun({ text: "Página ", size: 16 }),
+                  new TextRun({ children: [PageNumber.CURRENT], size: 16 }),
+                  new TextRun({ text: " de ", size: 16 }),
+                  new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16 }),
                 ],
               }),
             ],
