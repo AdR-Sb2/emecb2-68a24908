@@ -59,6 +59,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_atualizado_em_oi ON ordens_intervencao;
 CREATE TRIGGER trg_atualizado_em_oi
   BEFORE UPDATE ON ordens_intervencao
   FOR EACH ROW
