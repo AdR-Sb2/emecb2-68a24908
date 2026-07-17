@@ -14,6 +14,7 @@ import {
   Package,
   CalendarCheck,
   BookOpen,
+  FileImage,
 } from "lucide-react";
 import {
   Dialog,
@@ -55,6 +56,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   estoque: { bg: "bg-cyan-100", icon: "text-cyan-600", ring: "hover:ring-cyan-300" },
   escala: { bg: "bg-rose-100", icon: "text-rose-600", ring: "hover:ring-rose-300" },
   manuais: { bg: "bg-orange-100", icon: "text-orange-600", ring: "hover:ring-orange-300" },
+  oi: { bg: "bg-indigo-100", icon: "text-indigo-600", ring: "hover:ring-indigo-300" },
 };
 
 function getCardColor(chave: string) {
@@ -65,6 +67,7 @@ function getCardColor(chave: string) {
   if (chave.startsWith("dashboard_os")) return CARD_COLORS.backlog;
   if (chave.startsWith("escala")) return CARD_COLORS.escala;
   if (chave.startsWith("manuais")) return CARD_COLORS.manuais;
+  if (chave === "oi") return CARD_COLORS.oi;
   return CARD_COLORS.dashboard;
 }
 
@@ -137,6 +140,7 @@ function Index() {
   const shouldShowEscala = hasPanel("escala_trabalho") || hasFallbackPanels;
   const shouldShowEstoque = hasPanel("estoque");
   const shouldShowManuais = hasPanel("manuais") || hasFallbackPanels;
+  const shouldShowOI = hasFallbackPanels;
   const canAdmin = hasPanel("admin");
 
   return (
@@ -257,9 +261,19 @@ function Index() {
               </CardLink>
             )}
 
+            {/* OI — Ordem de Início */}
+            {shouldShowOI && (
+              <CardLink to="/oi" chave="oi" delay={6}>
+              <CardIcon chave="oi" icon={FileImage} />
+              <CardTitle>Ordem de Início</CardTitle>
+              <CardDesc>Relatório Fotográfico — gerar DOCX direto no navegador.</CardDesc>
+              <CardCta>Abrir gerador</CardCta>
+            </CardLink>
+            )}
+
             {/* Manuais */}
             {shouldShowManuais && (
-              <CardLink to="/manuais" chave="manuais" delay={6}>
+              <CardLink to="/manuais" chave="manuais" delay={7}>
                 <CardIcon chave="manuais" icon={BookOpen} />
                 <CardTitle>Manuais</CardTitle>
                 <CardDesc>Normas, manuais técnicos e procedimentos.</CardDesc>
