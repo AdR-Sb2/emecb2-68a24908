@@ -1260,10 +1260,13 @@ function OIPage() {
   /* ─── Load list ─── */
   const carregarLista = useCallback(async () => {
     setCarregandoLista(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("ordens_intervencao")
       .select("*")
       .order("criado_em", { ascending: false });
+    if (error) {
+      console.error("Erro ao carregar lista de OIs:", error.message);
+    }
     if (data) setListaOIs(data as OIRecord[]);
     setCarregandoLista(false);
   }, []);
@@ -1275,19 +1278,13 @@ function OIPage() {
   /* ─── Load suggestions ─── */
   useEffect(() => {
     (async () => {
-      const { data: a } = await supabase
-        .from("ordens_intervencao")
-        .select("responsavel_aegea")
-        .not("responsavel_aegea", "is", null);
-      const { data: r } = await supabase
-        .from("ordens_intervencao")
-        .select("responsavel_aguas_do_rio")
-        .not("responsavel_aguas_do_rio", "is", null);
+      const { data: a } = await supabase.from("ordens_intervencao").select("responsavel_aegea").not("responsavel_aegea", "is", null);
+      const { data: r } = await supabase.from("ordens_intervencao").select("responsavel_aguas_do_rio").not("responsavel_aguas_do_rio", "is", null);
       setSugestoesResponsaveis({
         aegea: [...new Set((a || []).map((x) => x.responsavel_aegea as string))],
         rio: [...new Set((r || []).map((x) => x.responsavel_aguas_do_rio as string))],
       });
-    })();
+    })().catch(() => {});
   }, []);
 
   /* ─── Auto-save ─── */
@@ -1353,7 +1350,7 @@ function OIPage() {
 
   /* ─── Create new OI ─── */
   const criarNovo = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("ordens_intervencao")
       .insert({
         numero_oi: "",
@@ -1365,8 +1362,8 @@ function OIPage() {
       })
       .select("id")
       .single();
-    if (!data) {
-      toast.error("Erro ao criar OI");
+    if (error || !data) {
+      toast.error("Erro ao criar OI: " + (error?.message || "resposta vazia"));
       return;
     }
     setEditandoId(data.id);
