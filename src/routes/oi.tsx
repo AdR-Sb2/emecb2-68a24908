@@ -29,6 +29,8 @@ import {
   BorderStyle,
   TableOfContents,
   PageBreak,
+  LevelFormat,
+  VerticalMergeType,
 } from "docx";
 import saveAs from "file-saver";
 
@@ -155,7 +157,7 @@ async function getLogoBuffer2(): Promise<ArrayBuffer> {
 }
 
 function R(text: string, opts: Record<string, unknown> = {}) {
-  return new TextRun({ text, size: 24, font: "Calibri", ...opts });
+  return new TextRun({ text, size: 24, font: "Arial", ...opts });
 }
 
 function P(children: TextRun[], opts: Record<string, unknown> = {}) {
@@ -183,175 +185,168 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
     return COL_OFF[start + span] - COL_OFF[start];
   }
 
-  function txtCell(text: string, start: number, span: number, rowSpan?: number, opts: { bold?: boolean; size?: number } = {}) {
+  function cell(text: string | undefined, start: number, span: number, overrides: Record<string, unknown> = {}) {
     return new TableCell({
       width: { size: widthAt(start, span), type: WidthType.DXA },
       columnSpan: span,
-      rowSpan,
       children: [
         new Paragraph({
-          children: [R(text, { bold: opts.bold ?? false, size: opts.size ?? 24 })],
+          children: text ? [R(text, { size: 24 })] : [],
           spacing: { after: 0 },
         }),
       ],
+      ...overrides,
     });
   }
 
-  function emptyCell(start: number, span: number = 1) {
+  function verticalMergeCont(start: number, span: number = 1) {
     return new TableCell({
       width: { size: widthAt(start, span), type: WidthType.DXA },
+      columnSpan: span,
+      verticalMerge: "continue",
+      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
+    });
+  }
+
+  function empty(w?: number, span: number = 1) {
+    return new TableCell({
+      width: { size: w ?? widthAt(0, span), type: WidthType.DXA },
       columnSpan: span,
       children: [new Paragraph({ children: [], spacing: { after: 0 } })],
     });
   }
 
-  function sepCell() {
+  function sepCell(vm?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType]) {
     return new TableCell({
       width: { size: 80, type: WidthType.DXA },
       columnSpan: 1,
+      verticalMerge: vm,
       children: [new Paragraph({ children: [], spacing: { after: 0 } })],
     });
   }
 
   const logo = await getLogoBuffer();
   const logo2 = await getLogoBuffer2();
+  const bloco1checked = data.bloco === "Bloco 1";
+  const bloco4checked = data.bloco === "Bloco 4";
 
-  const BORDER = {
-    style: BorderStyle.SINGLE as any,
-    size: 4,
-    color: "000000",
-  };
+  const BORDER = { style: BorderStyle.SINGLE as any, size: 4, color: "000000" };
 
   const rows: TableRow[] = [];
 
-  /* Row 0: Logo AEGEA (col1,row4) | Logo AD (col4,row4) | Sep | N° Ordem (row2) */
+  /* Row 0: Logo AEGEA (col1 rs4) | Logo AD (col1-4 rs4) | sep | N° OI (col7 rs2) */
   rows.push(new TableRow({
     children: [
       new TableCell({
         width: { size: 3111, type: WidthType.DXA },
-        columnSpan: 1,
-        rowSpan: 4,
-        borders: { right: BORDER },
-        children: [
-          new Paragraph({
-            children: [new ImageRun({ data: logo, transformation: { width: 200, height: 82 }, type: "png" })],
-            spacing: { after: 0 },
-          }),
-        ],
+        rowSpan: 4, borders: { right: BORDER },
+        children: [new Paragraph({ children: [new ImageRun({ data: logo, transformation: { width: 1572895, height: 646430 }, type: "png" })], spacing: { after: 0 } })],
       }),
       new TableCell({
-        width: { size: widthAt(1, 4), type: WidthType.DXA },
-        columnSpan: 4,
-        rowSpan: 4,
-        borders: { right: BORDER },
-        children: [
-          new Paragraph({
-            children: [new ImageRun({ data: logo2, transformation: { width: 200, height: 82 }, type: "png" })],
-            spacing: { after: 0 },
-          }),
-        ],
+        width: { size: 3118, type: WidthType.DXA }, columnSpan: 4,
+        rowSpan: 4, borders: { right: BORDER },
+        children: [new Paragraph({ children: [new ImageRun({ data: logo2, transformation: { width: 1611630, height: 695960 }, type: "png" })], spacing: { after: 0 } })],
       }),
       sepCell(),
-      txtCell(`N° Ordem de Início:\n${data.numero_oi}`, 6, 1, 2),
+      cell(`N° Ordem de Início:\n${data.numero_oi || ""}`, 6, 1, { rowSpan: 2 }),
     ],
   }));
 
-  /* Row 1: Sep (col 5) */
-  rows.push(new TableRow({ children: [sepCell()] }));
-
-  /* Row 2: Sep (col 5) | Período (col 6, row2) */
+  /* Row 1: verticalMerge logos | sep */
   rows.push(new TableRow({
     children: [
-      sepCell(),
-      txtCell(`Período:\n${periodoFormatado(data.periodo_inicio, data.periodo_fim)}`, 6, 1, 2),
+      verticalMergeCont(0, 1),
+      verticalMergeCont(1, 4),
+      cell(periodoFormatado(data.periodo_inicio, data.periodo_fim) ? `Período:\n${periodoFormatado(data.periodo_inicio, data.periodo_fim)}` : undefined, 6, 1, { rowSpan: 2 }),
     ],
   }));
 
-  /* Row 3: Sep (col 5) */
-  rows.push(new TableRow({ children: [sepCell()] }));
+  /* Row 2: verticalMerge logos | sep | (empty for rowSpan period) */
+  rows.push(new TableRow({
+    children: [
+      verticalMergeCont(0, 1),
+      verticalMergeCont(1, 4),
+      sepCell(),
+      empty(4456, 1),
+    ],
+  }));
+
+  /* Row 3: verticalMerge logos | sep */
+  rows.push(new TableRow({
+    children: [
+      verticalMergeCont(0, 1),
+      verticalMergeCont(1, 4),
+      sepCell(),
+      empty(4456, 1),
+    ],
+  }));
 
   /* Row 4: spacer */
   rows.push(new TableRow({
-    children: [new TableCell({
-      width: { size: FULL_W, type: WidthType.DXA },
-      columnSpan: 7,
-      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
-    })],
+    children: [new TableCell({ width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7, children: [new Paragraph({ children: [], spacing: { after: 0 } })] })],
   }));
 
-  /* Row 5: Superintendência | Sep | ☒ Bloco1 | ☒ Bloco4 | Sep | Resp. AEGEA */
-  const bloco1checked = data.bloco === "Bloco 1";
-  const bloco4checked = data.bloco === "Bloco 4";
+  /* Row 5: Superintendência (verticalMerge restart) | sep (verticalMerge) | ☒ Bloco 1 check | Bloco 1 text | Bloco 4 check+text | sep (verticalMerge) | Resp AEGEA (verticalMerge) */
   rows.push(new TableRow({
     children: [
-      txtCell(`Superintendência:\n${data.superintendencia || "—"}`, 0, 1),
-      sepCell(),
-      txtCell(bloco1checked ? "☒" : "☐", 2, 1),
-      txtCell("Bloco 1", 3, 1, undefined, bloco1checked ? { bold: true } : {}),
-      txtCell(`${bloco4checked ? "☒" : "☐"} Bloco 4`, 4, 1, undefined, bloco4checked ? { bold: true } : {}),
-      sepCell(),
-      txtCell(`Responsável Técnico AEGEA:\n${data.responsavel_aegea || "—"}`, 6, 1),
+      cell(data.superintendencia || "", 0, 1, { verticalMerge: "restart" as any }),
+      sepCell("restart" as any),
+      cell(bloco1checked ? "☒" : "☐", 2, 1),
+      cell("Bloco 1", 3, 2, bloco1checked ? { bold: true } as any : {}),
+      cell(`${bloco4checked ? "☒" : "☐"} Bloco 4`, 5, 1),
+      cell(data.responsavel_aegea || "", 6, 1, { verticalMerge: "restart" as any }),
     ],
   }));
 
   /* Row 6: spacer */
   rows.push(new TableRow({
-    children: [new TableCell({
-      width: { size: FULL_W, type: WidthType.DXA },
-      columnSpan: 7,
-      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
-    })],
+    children: [new TableCell({ width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7, children: [new Paragraph({ children: [], spacing: { after: 0 } })] })],
   }));
 
-  /* Row 7: Município (col0) | Sep | Sistema (cols2-4) | Sep | Resp. Águas (col6) */
+  /* Row 7: Município (verticalMerge) | sep (verticalMerge) | Sistema | sep (verticalMerge) | Resp AD (verticalMerge) */
   rows.push(new TableRow({
     children: [
-      txtCell(`Município:\n${data.municipio || "—"}`, 0, 1),
-      sepCell(),
-      txtCell("Sistema", 2, 3),
-      sepCell(),
-      txtCell(`Responsável Técnico Águas do Rio:\n${data.responsavel_aguas_do_rio || "—"}`, 6, 1),
+      cell(data.municipio || "", 0, 1, { verticalMerge: "restart" as any }),
+      sepCell("restart" as any),
+      cell("Sistema", 2, 3),
+      sepCell("restart" as any),
+      cell(data.responsavel_aguas_do_rio || "", 6, 1, { verticalMerge: "restart" as any }),
     ],
   }));
 
-  /* Row 8: empty(0) | empty(1) | ☒/☐ Água(2-3) | ☒/☐ Esgoto(4) | empty(5) | empty(6) */
+  /* Row 8: verticalMerge conts | ☒/☐ Água | ☒/☐ Esgoto | verticalMerge conts */
   rows.push(new TableRow({
     children: [
-      emptyCell(0, 1),
-      emptyCell(1, 1),
-      txtCell(`${chk(data.tipo_agua)} Água`, 2, 2),
-      txtCell(`${chk(data.tipo_esgoto)} Esgoto`, 4, 1),
-      emptyCell(5, 1),
-      emptyCell(6, 1),
+      verticalMergeCont(0, 1),
+      verticalMergeCont(1, 1),
+      cell(`${chk(data.tipo_agua)} Água`, 2, 2),
+      cell(`${chk(data.tipo_esgoto)} Esgoto`, 4, 1),
+      verticalMergeCont(5, 1),
+      verticalMergeCont(6, 1),
     ],
   }));
 
-  /* Row 9: empty(0) | empty(1) | ☒/☐ Outros Inv.(2-4) | empty(5) | empty(6) */
+  /* Row 9: verticalMerge conts | ☒/☐ Outros Invest | verticalMerge conts */
   rows.push(new TableRow({
     children: [
-      emptyCell(0, 1),
-      emptyCell(1, 1),
-      txtCell(`${chk(data.tipo_outros_investimentos)} Outros Investimentos`, 2, 3),
-      emptyCell(5, 1),
-      emptyCell(6, 1),
+      verticalMergeCont(0, 1),
+      verticalMergeCont(1, 1),
+      cell(`${chk(data.tipo_outros_investimentos)} Outros Investimentos`, 2, 3),
+      verticalMergeCont(5, 1),
+      verticalMergeCont(6, 1),
     ],
   }));
 
   /* Row 10: spacer */
   rows.push(new TableRow({
-    children: [new TableCell({
-      width: { size: FULL_W, type: WidthType.DXA },
-      columnSpan: 7,
-      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
-    })],
+    children: [new TableCell({ width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7, children: [new Paragraph({ children: [], spacing: { after: 0 } })] })],
   }));
 
   /* Row 11: Objeto */
   rows.push(new TableRow({
     children: [
       new TableCell({
-        width: { size: FULL_W, type: WidthType.DXA },
-        columnSpan: 7,
+        width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7,
         children: [P([R("Objeto:", { bold: true }), R(" Relatório Fotográfico – Contrato EPC AEGEA X Águas do Rio")], { spacing: { after: 0 } })],
       }),
     ],
@@ -359,37 +354,25 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
 
   /* Row 12: spacer */
   rows.push(new TableRow({
-    children: [new TableCell({
-      width: { size: FULL_W, type: WidthType.DXA },
-      columnSpan: 7,
-      children: [new Paragraph({ children: [], spacing: { after: 0 } })],
-    })],
+    children: [new TableCell({ width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7, children: [new Paragraph({ children: [], spacing: { after: 0 } })] })],
   }));
 
   /* Row 13: Objetivo/Escopo/Local */
   rows.push(new TableRow({
     children: [
       new TableCell({
-        width: { size: FULL_W, type: WidthType.DXA },
-        columnSpan: 7,
-        children: [P([R("Objetivo/ Escopo / Local:", { bold: true }), R(` ${data.objetivo_escopo_local || "—"}`)], { spacing: { after: 0 } })],
+        width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7,
+        children: [P([R("Objetivo/ Escopo / Local:", { bold: true }), R(` ${data.objetivo_escopo_local || ""}`)], { spacing: { after: 0 } })],
       }),
     ],
   }));
 
-  /* Row 14: FOLHA 1/4 (alinhado à direita) */
+  /* Row 14: FOLHA 1/4 (right-aligned) */
   rows.push(new TableRow({
     children: [
       new TableCell({
-        width: { size: FULL_W, type: WidthType.DXA },
-        columnSpan: 7,
-        children: [
-          new Paragraph({
-            children: [R("FOLHA 1/4")],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 0 },
-          }),
-        ],
+        width: { size: FULL_W, type: WidthType.DXA }, columnSpan: 7,
+        children: [new Paragraph({ children: [R("FOLHA 1/4")], alignment: AlignmentType.RIGHT, spacing: { after: 0 } })],
       }),
     ],
   }));
@@ -399,20 +382,34 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
     columnWidths: COL_W,
     rows,
     borders: {
-      top: BORDER,
-      bottom: BORDER,
-      left: BORDER,
-      right: BORDER,
-      insideHorizontal: BORDER,
-      insideVertical: BORDER,
+      top: BORDER, bottom: BORDER, left: BORDER, right: BORDER,
+      insideHorizontal: BORDER, insideVertical: BORDER,
     },
   });
+}
+
+/* ──────────────────── Image aspect-ratio helper ──────────────────── */
+
+function calcImageSize(naturalW: number, naturalH: number): { width: number; height: number } {
+  const MAX_W = 2560000;
+  const aspect = naturalW / naturalH;
+  return { width: MAX_W, height: Math.round(MAX_W / aspect) };
 }
 
 /* ──────────────────── Main DOCX generator ──────────────────────── */
 
 async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promise<Blob> {
   const children: (Paragraph | Table)[] = [];
+
+  const numberingConfig = [{
+    levels: [{
+      level: 0,
+      format: LevelFormat.DECIMAL,
+      text: "%1.",
+      alignment: AlignmentType.LEFT,
+    }],
+    reference: "interventions",
+  }];
 
   /* ── Cover table ────────────────────────────────────────────── */
   children.push(await criarTabelaCabecalho(data));
@@ -429,10 +426,10 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
     new TableOfContents("Sumário", {
       headingStyleRange: "1-2",
       cachedEntries: [
-        { title: "OBJETIVO", level: 1, page: 3 },
-        { title: "INTERVENÇÕES", level: 1, page: 3 },
-        ...intervencoes.map((iv, i) => ({
-          title: `${i + 1}.  TÍTULO DO ATIVO: ${iv.titulo_ativo}`,
+        { title: "OBJETIVO", level: 1, page: 2 },
+        { title: "INTERVENÇÕES", level: 1, page: 2 },
+        ...intervencoes.map((iv) => ({
+          title: `TÍTULO DO ATIVO: ${iv.titulo_ativo}`,
           level: 2,
           page: 3,
         })),
@@ -470,25 +467,27 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
       new Paragraph({
         children: [R(`TÍTULO DO ATIVO: ${iv.titulo_ativo}`, { bold: true })],
         heading: HeadingLevel.HEADING_2,
+        numbering: { reference: "interventions", level: 0 },
         spacing: { before: 300, after: 100 },
       }),
     );
-    /* Endereço da obra com sublinhado */
-    children.push(
-      new Paragraph({
-        children: [R("Endereço da obra: ", { bold: false, underline: { type: "single" } }), R(iv.endereco_obra || "—")],
-        spacing: { after: 40 },
-      }),
-    );
-    /* Rubrica QUF com sublinhado */
-    children.push(
-      new Paragraph({
-        children: [R("Rubrica QUF: ", { underline: { type: "single" } }), R(iv.rubrica_quf || "—")],
-        spacing: { after: 100 },
-      }),
-    );
+    if (iv.endereco_obra) {
+      children.push(
+        new Paragraph({
+          children: [R("Endereço da obra: ", { underline: { type: "single" } }), R(iv.endereco_obra)],
+          spacing: { after: 40 },
+        }),
+      );
+    }
+    if (iv.rubrica_quf) {
+      children.push(
+        new Paragraph({
+          children: [R("Rubrica QUF: ", { underline: { type: "single" } }), R(iv.rubrica_quf)],
+          spacing: { after: 100 },
+        }),
+      );
+    }
 
-    /* Photos */
     if (iv.fotos.length === 0) {
       children.push(
         new Paragraph({
@@ -523,6 +522,11 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
           if (f.file) {
             const ab = await f.file.arrayBuffer();
             const ext = f.file.type === "image/png" ? "png" : "jpg";
+
+            const img = await createImageBitmap(f.file);
+            const { width: imgW, height: imgH } = calcImageSize(img.width, img.height);
+            img.close();
+
             imgRowCells.push(
               new TableCell({
                 width: { size: 4253, type: WidthType.DXA },
@@ -531,7 +535,7 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
                     children: [
                       new ImageRun({
                         data: ab,
-                        transformation: { width: 380, height: 285 },
+                        transformation: { width: imgW, height: imgH },
                         type: ext,
                       }),
                     ],
@@ -550,19 +554,27 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
             );
           }
 
+          const textParas: Paragraph[] = [];
+          if (f.evento) {
+            textParas.push(new Paragraph({
+              children: [R("Evento: ", { bold: true }), R(f.evento)],
+              spacing: { after: 20 },
+            }));
+          }
+          if (f.descricao) {
+            textParas.push(new Paragraph({
+              children: [R("Descrição: ", { bold: true }), R(f.descricao)],
+              spacing: { after: 0 },
+            }));
+          }
+          if (textParas.length === 0) {
+            textParas.push(new Paragraph({ children: [], spacing: { after: 0 } }));
+          }
+
           textRowCells.push(
             new TableCell({
               width: { size: 4253, type: WidthType.DXA },
-              children: [
-                new Paragraph({
-                  children: [R("Evento: ", { bold: true }), R(f.evento || "—")],
-                  spacing: { after: 20 },
-                }),
-                new Paragraph({
-                  children: [R("Descrição: ", { bold: true }), R(f.descricao || "—")],
-                  spacing: { after: 0 },
-                }),
-              ],
+              children: textParas,
             }),
           );
         }
@@ -601,7 +613,6 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
   }
 
   /* ── Build document ─────────────────────────────────────────── */
-  /* Preload logos for header */
   const logoHdr = await getLogoBuffer();
   const logo2Hdr = await getLogoBuffer2();
 
@@ -609,10 +620,11 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
     styles: {
       default: {
         document: {
-          run: { size: 24, font: "Calibri" },
+          run: { size: 24, font: "Arial" },
         },
       },
     },
+    numbering: { config: numberingConfig },
     sections: [
       {
         properties: {
@@ -681,9 +693,9 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
                         children: [
                           new Paragraph({
                             children: [
-                              new TextRun({ text: "RELATÓRIO FOTOGRÁFICO", bold: true, size: 18, font: "Calibri" }),
+                              new TextRun({ text: "RELATÓRIO FOTOGRÁFICO", bold: true, size: 18, font: "Arial" }),
                               new TextRun({ break: 1 }),
-                              new TextRun({ text: "CONTRATO EPC AEGEA X ÁGUAS DO RIO", size: 16, font: "Calibri" }),
+                              new TextRun({ text: "CONTRATO EPC AEGEA X ÁGUAS DO RIO", size: 16, font: "Arial" }),
                               new TextRun({ break: 1 }),
                             ],
                             alignment: AlignmentType.CENTER,
@@ -691,14 +703,14 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
                           }),
                           new Paragraph({
                             children: [
-                              new TextRun({ text: `N° da O.I: ${data.numero_oi || ""}`, size: 16, font: "Calibri" }),
+                              new TextRun({ text: `N° da O.I: ${data.numero_oi || ""}`, size: 16, font: "Arial" }),
                             ],
                             alignment: AlignmentType.RIGHT,
                             spacing: { after: 0 },
                           }),
                           new Paragraph({
                             children: [
-                              new TextRun({ text: "Revisão: 00", size: 16, font: "Calibri" }),
+                              new TextRun({ text: "Revisão: 00", size: 16, font: "Arial" }),
                             ],
                             alignment: AlignmentType.RIGHT,
                             spacing: { after: 0 },
@@ -732,10 +744,10 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 0 },
                 children: [
-                  new TextRun({ text: "Página ", size: 24, font: "Calibri" }),
-                  new TextRun({ children: [PageNumber.CURRENT], size: 24, font: "Calibri" }),
-                  new TextRun({ text: " de ", size: 24, font: "Calibri" }),
-                  new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 24, font: "Calibri" }),
+                  new TextRun({ text: "Página ", size: 24, font: "Arial" }),
+                  new TextRun({ children: [PageNumber.CURRENT], size: 24, font: "Arial" }),
+                  new TextRun({ text: " de ", size: 24, font: "Arial" }),
+                  new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 24, font: "Arial" }),
                 ],
               }),
             ],
