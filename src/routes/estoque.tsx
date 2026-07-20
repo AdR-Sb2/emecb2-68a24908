@@ -43,6 +43,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -154,6 +161,15 @@ function EstoquePage() {
   const [editandoMinimo, setEditandoMinimo] = useState<string | null>(null);
   const [editandoValor, setEditandoValor] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dialogRevisar, setDialogRevisar] = useState(false);
+  const [revisarData, setRevisarData] = useState<{
+    baseCode: string;
+    itens: Material[];
+    escolhido: string;
+    novaDescricao: string;
+    novoSaldo: number;
+  }[]>([]);
+  const [savingRevisar, setSavingRevisar] = useState<Record<string, boolean>>({});
 
   const [permissoes, setPermissoes] = useState<PermissoesEstoque>({
     acessarModulo: false,
@@ -1443,6 +1459,148 @@ function EstoquePage() {
     "Material danificado/descartado",
     "Outro",
   ] as const;
+
+  const carregarDuplicados = () => {
+    const suffixPattern = /^(.+)_([A-Z])$/;
+    const sufMap = new Map<string, Material[]>();
+    for (const m of materiais) {
+      const match = m.cod_sap.match(suffixPattern);
+      if (match) {
+        const base = match[1];
+        if (!sufMap.has(base)) sufMap.set(base, []);
+        sufMap.get(base)!.push(m);
+      }
+    }
+    const grupos: typeof revisarData = [];
+    for (const [baseCode, variants] of sufMap) {
+      const baseMat = materiais.find((m) => m.cod_sap === baseCode);
+      const itens = baseMat ? [baseMat, ...variants] : [...variants];
+      const escolhido = itens[0].cod_sap;
+      const descLimpa = itens[0].descricao.replace(/^\[REVISAR\]\s*/i, "");
+      grupos.push({
+        baseCode,
+        itens,
+        escolhido,
+        novaDescricao: descLimpa,
+        novoSaldo: itens[0].saldo_atual,
+      });
+    }
+    setRevisarData(grupos);
+  };
+
+  const salvarRevisao = async (
+    grupo: (typeof revisarData)[number],
+    salvarTodos = false,
+  ) => {
+    const { baseCode, itens, escolhido, novaDescricao, novoSaldo } = grupo;
+    const winnerCod = escolhido;
+    const loserCods = itens.filter((m) => m.cod_sap !== winnerCod).map((m) => m.cod_sap);
+    const chave = baseCode + "_" + (salvarTodos ? "all" : "single");
+
+    setSavingRevisar((prev) => ({ ...prev, [chave]: true }));
+    try {
+      // 1. Mover movimentacoes e compras dos perdedores para o vencedor
+      for (const loser of loserCods) {
+        const { error: errMov } = await supabase
+          .from("movimentacoes")
+          .update({ cod_sap: winnerCod })
+          .eq("cod_sap", loser);
+        if (errMov) throw new Error(`Erro ao mover movimentações de ${loser}: ${errMov.message}`);
+
+        const { error: errComp } = await supabase
+          .from("compras")
+          .update({ cod_sap: winnerCod })
+          .eq("cod_sap", loser);
+        if (errComp) console.warn(`Aviso ao atualizar compras de ${loser}:`, errComp.message);
+
+        const { error: errDel } = await supabase
+          .from("materiais")
+          .delete()
+          .eq("cod_sap", loser);
+        if (errDel) throw new Error(`Erro ao deletar ${loser}: ${errDel.message}`);
+      }
+
+      // 2. Se o vencedor tem sufixo, mover registros da base (se ainda existe)
+      const suffixMatch = winnerCod.match(/^(.+)_([A-Z])$/);
+      const finalCod = suffixMatch ? suffixMatch[1] : winnerCod;
+
+      if (suffixMatch && !loserCods.includes(baseCode)) {
+        const { error: errMov } = await supabase
+          .from("movimentacoes")
+          .update({ cod_sap: winnerCod })
+          .eq("cod_sap", baseCode);
+        if (errMov) throw new Error(`Erro ao mover movimentações de ${baseCode}: ${errMov.message}`);
+
+        const { error: errComp } = await supabase
+          .from("compras")
+          .update({ cod_sap: winnerCod })
+          .eq("cod_sap", baseCode);
+        if (errComp) console.warn(`Aviso ao atualizar compras de ${baseCode}:`, errComp.message);
+
+        const { error: errDel } = await supabase
+          .from("materiais")
+          .delete()
+          .eq("cod_sap", baseCode);
+        if (errDel) throw new Error(`Erro ao deletar ${baseCode}: ${errDel.message}`);
+      }
+
+      // 3. Atualizar descricao e saldo do vencedor
+      const { error: errUpd } = await supabase
+        .from("materiais")
+        .update({ descricao: novaDescricao, saldo_atual: novoSaldo, atualizado_em: new Date().toISOString() })
+        .eq("cod_sap", winnerCod);
+      if (errUpd) throw new Error(`Erro ao atualizar ${winnerCod}: ${errUpd.message}`);
+
+      // 4. Se vencedor tinha sufixo, renomear para o codigo base
+      if (suffixMatch) {
+        const winnerData = itens.find((m) => m.cod_sap === winnerCod)!;
+
+        const { error: errIns } = await supabase.from("materiais").insert({
+          cod_sap: finalCod,
+          descricao: novaDescricao,
+          unidade_medida: winnerData.unidade_medida,
+          categoria_id: winnerData.categoria_id,
+          fabricante: winnerData.fabricante || "",
+          local_armazenagem: winnerData.local_armazenagem || "",
+          estoque_minimo: winnerData.estoque_minimo,
+          material_critico: winnerData.material_critico,
+          vinculo_elevatoria: winnerData.vinculo_elevatoria || "",
+          ativo: winnerData.ativo,
+          saldo_atual: novoSaldo,
+          custo_unitario: winnerData.custo_unitario || 0,
+        });
+        if (errIns) throw new Error(`Erro ao criar ${finalCod}: ${errIns.message}`);
+
+        const { error: errMov2 } = await supabase
+          .from("movimentacoes")
+          .update({ cod_sap: finalCod })
+          .eq("cod_sap", winnerCod);
+        if (errMov2) throw new Error(`Erro ao mover movimentações de ${winnerCod}: ${errMov2.message}`);
+
+        const { error: errComp2 } = await supabase
+          .from("compras")
+          .update({ cod_sap: finalCod })
+          .eq("cod_sap", winnerCod);
+        if (errComp2) console.warn(`Aviso ao atualizar compras de ${winnerCod}:`, errComp2.message);
+
+        const { error: errDel2 } = await supabase
+          .from("materiais")
+          .delete()
+          .eq("cod_sap", winnerCod);
+        if (errDel2) throw new Error(`Erro ao deletar ${winnerCod}: ${errDel2.message}`);
+      }
+
+      toast.success(`Código ${finalCod} revisado com sucesso!`);
+      if (!salvarTodos) {
+        await carregarDados();
+        carregarDuplicados();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar revisão");
+    } finally {
+      setSavingRevisar((prev) => ({ ...prev, [chave]: false }));
+    }
+  };
 
   const FormAjuste = () => {
     const [selected, setSelected] = useState<Material | null>(null);
@@ -2873,6 +3031,17 @@ function EstoquePage() {
                   className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   <Plus className="h-4 w-4" /> Novo Material
+                </button>
+              )}
+              {permissoes.registrarAjuste && (
+                <button
+                  onClick={() => {
+                    carregarDuplicados();
+                    setDialogRevisar(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-purple-300 bg-white px-3 py-2 text-[13px] font-semibold text-purple-700 hover:bg-purple-50 shadow-sm dark:border-purple-600 dark:bg-slate-800 dark:text-purple-200 dark:hover:bg-slate-700"
+                >
+                  <AlertCircle className="h-4 w-4" /> Revisar
                 </button>
               )}
               {permissoes.gerenciarCategorias && (
@@ -4532,6 +4701,179 @@ function EstoquePage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Revisar Códigos Duplicados */}
+      <Dialog open={dialogRevisar} onOpenChange={setDialogRevisar}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-purple-700">
+              <AlertCircle className="mr-1 inline h-4 w-4" /> Revisar Códigos Duplicados
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            {revisarData.length === 0 ? (
+              <p className="text-slate-400">Nenhum código duplicado encontrado.</p>
+            ) : (
+              <>
+                <p className="mb-3 text-slate-500">
+                  {revisarData.length} grupo(s) com códigos duplicados. Selecione qual variante está
+                  correta e ajuste a descrição/saldo.
+                </p>
+                <div className="space-y-4">
+                  {revisarData.map((grupo) => {
+                    const chave = grupo.baseCode + "_single";
+                    const salvando = savingRevisar[chave] || savingRevisar[grupo.baseCode + "_all"];
+                    return (
+                      <div
+                        key={grupo.baseCode}
+                        className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">
+                            {grupo.baseCode}
+                            {grupo.itens.length > 2
+                              ? ` (${grupo.itens.length} variações)`
+                              : ""}
+                          </span>
+                          <button
+                            onClick={() => salvarRevisao(grupo)}
+                            disabled={salvando}
+                            className="rounded-md bg-purple-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-purple-700 disabled:opacity-50 cursor-pointer"
+                          >
+                            {salvando ? "Salvando..." : "Salvar"}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
+                              Código correto
+                            </label>
+                            <Select
+                              value={grupo.escolhido}
+                              onValueChange={(val) => {
+                                setRevisarData((prev) =>
+                                  prev.map((g) =>
+                                    g.baseCode === grupo.baseCode
+                                      ? {
+                                          ...g,
+                                          escolhido: val,
+                                          novaDescricao: (g.itens.find((i) => i.cod_sap === val)
+                                            ?.descricao || "")
+                                            .replace(/^\[REVISAR\]\s*/i, ""),
+                                          novoSaldo:
+                                            g.itens.find((i) => i.cod_sap === val)?.saldo_atual ||
+                                            0,
+                                        }
+                                      : g,
+                                  ),
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="min-h-9 text-[13px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {grupo.itens.map((item) => (
+                                  <SelectItem key={item.cod_sap} value={item.cod_sap}>
+                                    <span className="font-mono">{item.cod_sap}</span> —{" "}
+                                    {item.descricao.replace(/^\[REVISAR\]\s*/i, "")}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
+                              Descrição final
+                            </label>
+                            <input
+                              value={grupo.novaDescricao}
+                              onChange={(e) => {
+                                setRevisarData((prev) =>
+                                  prev.map((g) =>
+                                    g.baseCode === grupo.baseCode
+                                      ? { ...g, novaDescricao: e.target.value }
+                                      : g,
+                                  ),
+                                );
+                              }}
+                              className="min-h-9 w-full rounded-md border border-slate-300 px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div>
+                            <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
+                              Saldos disponíveis
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {grupo.itens.map((item) => (
+                                <span
+                                  key={item.cod_sap}
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-mono dark:border-slate-600 dark:bg-slate-700"
+                                >
+                                  {item.cod_sap}: {item.saldo_atual}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
+                              Novo saldo
+                            </label>
+                            <input
+                              type="number"
+                              value={grupo.novoSaldo}
+                              onChange={(e) => {
+                                setRevisarData((prev) =>
+                                  prev.map((g) =>
+                                    g.baseCode === grupo.baseCode
+                                      ? { ...g, novoSaldo: Number(e.target.value) || 0 }
+                                      : g,
+                                  ),
+                                );
+                              }}
+                              className="min-h-9 w-full rounded-md border border-slate-300 px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white pb-2 pt-4 dark:border-slate-700 dark:bg-slate-900">
+                  <button
+                    onClick={() => {
+                      (async () => {
+                        setSavingRevisar((prev) => ({ ...prev, all: true }));
+                        try {
+                          for (const grupo of revisarData) {
+                            await salvarRevisao(grupo, true);
+                          }
+                          await carregarDados();
+                          carregarDuplicados();
+                          toast.success("Todos os códigos foram revisados!");
+                          setDialogRevisar(false);
+                        } catch {
+                          // erro já tratado no salvarRevisao
+                        } finally {
+                          setSavingRevisar((prev) => ({ ...prev, all: false }));
+                        }
+                      })();
+                    }}
+                    disabled={savingRevisar["all"]}
+                    className="rounded-md bg-purple-700 px-5 py-2 text-[13px] font-semibold text-white hover:bg-purple-800 disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingRevisar["all"]
+                      ? "Salvando todos..."
+                      : `Salvar Todos (${revisarData.length})`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
