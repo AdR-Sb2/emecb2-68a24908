@@ -43,13 +43,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -4748,11 +4741,12 @@ function EstoquePage() {
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                           <div>
                             <label className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
-                              Código correto
+                              Nome Correto
                             </label>
-                            <Select
+                            <select
                               value={grupo.escolhido}
-                              onValueChange={(val) => {
+                              onChange={(e) => {
+                                const val = e.target.value;
                                 setRevisarData((prev) =>
                                   prev.map((g) =>
                                     g.baseCode === grupo.baseCode
@@ -4770,19 +4764,14 @@ function EstoquePage() {
                                   ),
                                 );
                               }}
+                              className="min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-[13px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
                             >
-                              <SelectTrigger className="min-h-9 text-[13px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {grupo.itens.map((item) => (
-                                  <SelectItem key={item.cod_sap} value={item.cod_sap}>
-                                    <span className="font-mono">{item.cod_sap}</span> —{" "}
-                                    {item.descricao.replace(/^\[REVISAR\]\s*/i, "")}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              {grupo.itens.map((item) => (
+                                <option key={item.cod_sap} value={item.cod_sap}>
+                                  {item.cod_sap} — {item.descricao.replace(/^\[REVISAR\]\s*/i, "")}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="mb-1 block text-[11px] font-semibold uppercase text-slate-500">
