@@ -67,7 +67,7 @@ function getCardColor(chave: string) {
   if (chave.startsWith("dashboard_os")) return CARD_COLORS.backlog;
   if (chave.startsWith("escala")) return CARD_COLORS.escala;
   if (chave.startsWith("manuais")) return CARD_COLORS.manuais;
-  if (chave === "oi") return CARD_COLORS.oi;
+  if (chave === "oi" || chave === "gerador_oi") return CARD_COLORS.oi;
   return CARD_COLORS.dashboard;
 }
 
@@ -140,7 +140,7 @@ function Index() {
   const shouldShowEscala = hasPanel("escala_trabalho") || hasFallbackPanels;
   const shouldShowEstoque = hasPanel("estoque");
   const shouldShowManuais = hasPanel("manuais") || hasFallbackPanels;
-  const shouldShowOI = hasFallbackPanels;
+  const shouldShowOI = hasPanel("gerador_oi") || hasFallbackPanels;
   const canAdmin = hasPanel("admin");
 
   return (
