@@ -180,7 +180,7 @@ CREATE TRIGGER trg_recalcular_datas_itens_insert
 
 DROP TRIGGER IF EXISTS trg_recalcular_datas_itens_update ON cronograma_itens;
 CREATE TRIGGER trg_recalcular_datas_itens_update
-  AFTER UPDATE OF ordem, duracao_dias, data_inicio_travada, data_inicio_calculada ON cronograma_itens
+  AFTER UPDATE OF ordem, duracao_dias, data_inicio_travada ON cronograma_itens
   FOR EACH ROW
   EXECUTE FUNCTION trigger_recalcular_datas_cronograma();
 
