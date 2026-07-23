@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS cronograma_itens (
   rc_referencia TEXT,
   responsavel_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   metadados JSONB,
+  criado_por UUID REFERENCES profiles(id) ON DELETE SET NULL,
   criado_em TIMESTAMPTZ DEFAULT now(),
   atualizado_em TIMESTAMPTZ DEFAULT now()
 );
@@ -113,7 +114,7 @@ CREATE TRIGGER trg_atualizado_em_cronograma_itens
   EXECUTE FUNCTION atualizar_atualizado_em_cronograma_itens();
 
 -- 9. Função: recalcular datas dos itens de um projeto
-CREATE OR REPLACE FUNCTION recalcular_datas_cronograma(projeto_id BIGINT)
+CREATE OR REPLACE FUNCTION recalcular_datas_cronograma(p_projeto_id BIGINT)
 RETURNS void AS $$
 DECLARE
   v_data_base DATE;
@@ -123,19 +124,19 @@ DECLARE
   v_duracao NUMERIC;
 BEGIN
   SELECT data_inicio_base, duracao_padrao_dias INTO v_data_base, v_duracao_padrao
-  FROM cronograma_projetos WHERE id = projeto_id;
+  FROM cronograma_projetos WHERE id = p_projeto_id;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Projeto não encontrado: %', projeto_id;
+    RAISE EXCEPTION 'Projeto não encontrado: %', p_projeto_id;
   END IF;
 
   v_data_atual := v_data_base;
 
   FOR v_item IN
-    SELECT id, duracao_dias, data_inicio_travada, data_inicio_calculada
-    FROM cronograma_itens
-    WHERE projeto_id = recalcular_datas_cronograma.projeto_id
-    ORDER BY ordem ASC
+    SELECT ci.id, ci.duracao_dias, ci.data_inicio_travada, ci.data_inicio_calculada
+    FROM cronograma_itens ci
+    WHERE ci.projeto_id = p_projeto_id
+    ORDER BY ci.ordem ASC
   LOOP
     IF v_item.data_inicio_travada AND v_item.data_inicio_calculada IS NOT NULL THEN
       v_data_atual := v_item.data_inicio_calculada;
@@ -199,6 +200,8 @@ CREATE TRIGGER trg_recalcular_datas_projeto
 CREATE OR REPLACE FUNCTION trigger_auditoria_cronograma_itens()
 RETURNS TRIGGER AS $$
 DECLARE
+  v_old_json JSONB := to_jsonb(OLD);
+  v_new_json JSONB := to_jsonb(NEW);
   campos TEXT[] := ARRAY['nome', 'grupo', 'ordem', 'duracao_dias', 'data_inicio_calculada', 'data_termino_calculada', 'status', 'data_inicio_travada', 'cor_grupo', 'os_referencia', 'rc_referencia', 'responsavel_id'];
   v_campo TEXT;
   v_old_val TEXT;
@@ -206,8 +209,8 @@ DECLARE
 BEGIN
   FOREACH v_campo IN ARRAY campos
   LOOP
-    v_old_val := COALESCE(trim(TEXT(OLD[v_campo])), '');
-    v_new_val := COALESCE(trim(TEXT(NEW[v_campo])), '');
+    v_old_val := COALESCE(trim(v_old_json->>v_campo), '');
+    v_new_val := COALESCE(trim(v_new_json->>v_campo), '');
     IF v_old_val IS DISTINCT FROM v_new_val THEN
       INSERT INTO cronograma_auditoria (item_id, projeto_id, usuario_id, campo_alterado, valor_anterior, valor_novo)
       VALUES (NEW.id, NEW.projeto_id, NEW.criado_por, v_campo, v_old_val, v_new_val);
@@ -227,6 +230,8 @@ CREATE TRIGGER trg_auditoria_cronograma_itens
 CREATE OR REPLACE FUNCTION trigger_auditoria_cronograma_projetos()
 RETURNS TRIGGER AS $$
 DECLARE
+  v_old_json JSONB := to_jsonb(OLD);
+  v_new_json JSONB := to_jsonb(NEW);
   campos TEXT[] := ARRAY['nome', 'descricao', 'data_inicio_base', 'duracao_padrao_dias', 'campo_agrupamento_label', 'visibilidade'];
   v_campo TEXT;
   v_old_val TEXT;
@@ -234,8 +239,8 @@ DECLARE
 BEGIN
   FOREACH v_campo IN ARRAY campos
   LOOP
-    v_old_val := COALESCE(trim(TEXT(OLD[v_campo])), '');
-    v_new_val := COALESCE(trim(TEXT(NEW[v_campo])), '');
+    v_old_val := COALESCE(trim(v_old_json->>v_campo), '');
+    v_new_val := COALESCE(trim(v_new_json->>v_campo), '');
     IF v_old_val IS DISTINCT FROM v_new_val THEN
       INSERT INTO cronograma_auditoria (item_id, projeto_id, usuario_id, campo_alterado, valor_anterior, valor_novo)
       VALUES (NULL, NEW.id, NEW.criado_por, v_campo, v_old_val, v_new_val);
