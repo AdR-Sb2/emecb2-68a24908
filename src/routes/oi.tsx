@@ -240,12 +240,11 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
       new TableCell({
         width: { size: 3111, type: WidthType.DXA },
         rowSpan: 4, borders: { right: BORDER },
-        children: [new Paragraph({ children: [new ImageRun({ data: logo, transformation: { width: 1572895, height: 646430 }, type: "png" })], spacing: { after: 0 } })],
-      }),
+        children: [new Paragraph({ children: [new ImageRun({ data: logo, transformation: { width: 165, height: 68 }, type: "png" })], spacing: { after: 0 } })]}),
       new TableCell({
         width: { size: 3118, type: WidthType.DXA }, columnSpan: 4,
         rowSpan: 4, borders: { right: BORDER },
-        children: [new Paragraph({ children: [new ImageRun({ data: logo2, transformation: { width: 1611630, height: 695960 }, type: "png" })], spacing: { after: 0 } })],
+        children: [new Paragraph({ children: [new ImageRun({ data: logo2, transformation: { width: 169, height: 73 }, type: "png" })], spacing: { after: 0 } })],
       }),
       sepCell(),
       cell(`N° Ordem de Início:\n${data.numero_oi || ""}`, 6, 1, { rowSpan: 2 }),
@@ -391,7 +390,7 @@ async function criarTabelaCabecalho(data: FormData): Promise<Table> {
 /* ──────────────────── Image aspect-ratio helper ──────────────────── */
 
 function calcImageSize(naturalW: number, naturalH: number): { width: number; height: number } {
-  const MAX_W = 2560000;
+  const MAX_W = 269;
   const aspect = naturalW / naturalH;
   return { width: MAX_W, height: Math.round(MAX_W / aspect) };
 }
@@ -555,15 +554,17 @@ async function generateDocx(data: FormData, intervencoes: Intervencao[]): Promis
           }
 
           const textParas: Paragraph[] = [];
-          if (f.evento) {
+          const eventoStr = String(f.evento ?? "");
+          const descricaoStr = String(f.descricao ?? "");
+          if (eventoStr) {
             textParas.push(new Paragraph({
-              children: [R("Evento: ", { bold: true }), R(f.evento)],
+              children: [R("Evento: ", { bold: true }), R(eventoStr)],
               spacing: { after: 20 },
             }));
           }
-          if (f.descricao) {
+          if (descricaoStr) {
             textParas.push(new Paragraph({
-              children: [R("Descrição: ", { bold: true }), R(f.descricao)],
+              children: [R("Descrição: ", { bold: true }), R(descricaoStr)],
               spacing: { after: 0 },
             }));
           }
