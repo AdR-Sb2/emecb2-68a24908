@@ -15,6 +15,7 @@ import {
   CalendarCheck,
   BookOpen,
   FileImage,
+  CalendarRange,
 } from "lucide-react";
 import {
   Dialog,
@@ -57,6 +58,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   escala: { bg: "bg-rose-100", icon: "text-rose-600", ring: "hover:ring-rose-300" },
   manuais: { bg: "bg-orange-100", icon: "text-orange-600", ring: "hover:ring-orange-300" },
   oi: { bg: "bg-indigo-100", icon: "text-indigo-600", ring: "hover:ring-indigo-300" },
+  cronograma: { bg: "bg-teal-100", icon: "text-teal-600", ring: "hover:ring-teal-300" },
 };
 
 function getCardColor(chave: string) {
@@ -68,6 +70,7 @@ function getCardColor(chave: string) {
   if (chave.startsWith("escala")) return CARD_COLORS.escala;
   if (chave.startsWith("manuais")) return CARD_COLORS.manuais;
   if (chave === "oi" || chave === "gerador_oi") return CARD_COLORS.oi;
+  if (chave === "cronograma") return CARD_COLORS.cronograma;
   return CARD_COLORS.dashboard;
 }
 
@@ -141,6 +144,7 @@ function Index() {
   const shouldShowEstoque = hasPanel("estoque");
   const shouldShowManuais = hasPanel("manuais") || hasFallbackPanels;
   const shouldShowOI = hasPanel("gerador_oi") || hasFallbackPanels;
+  const shouldShowCronograma = hasPanel("cronograma") || hasFallbackPanels;
   const canAdmin = hasPanel("admin");
 
   return (
@@ -264,11 +268,11 @@ function Index() {
             {/* OI — Ordem de Início */}
             {shouldShowOI && (
               <CardLink to="/oi" chave="oi" delay={6}>
-              <CardIcon chave="oi" icon={FileImage} />
-              <CardTitle>Ordem de Início</CardTitle>
-              <CardDesc>Relatório Fotográfico — gerar DOCX direto no navegador.</CardDesc>
-              <CardCta>Abrir gerador</CardCta>
-            </CardLink>
+                <CardIcon chave="oi" icon={FileImage} />
+                <CardTitle>Ordem de Início</CardTitle>
+                <CardDesc>Relatório Fotográfico — gerar DOCX direto no navegador.</CardDesc>
+                <CardCta>Abrir gerador</CardCta>
+              </CardLink>
             )}
 
             {/* Manuais */}
@@ -278,6 +282,16 @@ function Index() {
                 <CardTitle>Manuais</CardTitle>
                 <CardDesc>Normas, manuais técnicos e procedimentos.</CardDesc>
                 <CardCta>Abrir manuais</CardCta>
+              </CardLink>
+            )}
+
+            {/* Cronograma */}
+            {shouldShowCronograma && (
+              <CardLink to="/cronograma" chave="cronograma" delay={8}>
+                <CardIcon chave="cronograma" icon={CalendarRange} />
+                <CardTitle>Cronograma</CardTitle>
+                <CardDesc>Planejamento e cronograma de instalações, obras e manutenções.</CardDesc>
+                <CardCta>Abrir cronograma</CardCta>
               </CardLink>
             )}
           </div>

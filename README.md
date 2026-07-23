@@ -1,6 +1,6 @@
 # EMEC BAIXADA 2 — Sistema de Gestão de Eletromecânica
 
-Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **Águas do Rio**). Unifica estoque, compras, escala de trabalho, backlog de OS, dashboards de automação/testes, relatórios técnicos, manuais e gerador de OI (Ordem de Intervenção / Relatório Fotográfico) em uma única plataforma web.
+Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **Águas do Rio**). Unifica estoque, compras, escala de trabalho, backlog de OS, dashboards de automação/testes, relatórios técnicos, manuais, gerador de OI (Ordem de Intervenção / Relatório Fotográfico) e cronograma de instalação em uma única plataforma web.
 
 ---
 
@@ -17,18 +17,19 @@ Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **
 
 ### Módulos existentes
 
-| Módulo                     | Rota         | Descrição                                                                 |
-| -------------------------- | ------------ | ------------------------------------------------------------------------- |
-| **Dashboard de Automação** | `/dashboard` | KPIs de elevatórias, sensores CLP/PCP, gráficos por município/tipo        |
-| **Testes & Aferições**     | `/testes`    | Ensaios elétricos e hidráulicos com KPIs BT/MT e recalque                 |
-| **Backlog BI**             | `/backlog`   | OS do Field/SAP com SLA, mapa Leaflet, roteirização multi-parada          |
-| **Estoque / Almoxarifado** | `/estoque`   | Inventário, movimentações (entrada/saída/ajuste), compras, registros      |
-| **Escala de Trabalho**     | `/escala`    | Escala semanal, fórmula automática de plantão, importação/exportação XLSX |
-| **Manuais Técnicos**       | `/manuais`   | Biblioteca de manuais com abas por categoria, upload de PDF, sugestões    |
-| **Gerador de OI**          | `/oi`        | Ordem de Intervenção / Relatório Fotográfico com wizard completo e geração de .docx |
-| **Relatórios**             | `/relatorio` | Relatórios técnicos e de planta                                           |
-| **Painel Administrativo**  | `/admin`     | Gestão de usuários, cargos, painéis e permissões granulares               |
-| **Home (Hub)**             | `/`          | Grid de cards com acesso a todos os módulos conforme permissão do cargo   |
+| Módulo                       | Rota          | Descrição                                                                                                                                                |
+| ---------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard de Automação**   | `/dashboard`  | KPIs de elevatórias, sensores CLP/PCP, gráficos por município/tipo                                                                                       |
+| **Testes & Aferições**       | `/testes`     | Ensaios elétricos e hidráulicos com KPIs BT/MT e recalque                                                                                                |
+| **Backlog BI**               | `/backlog`    | OS do Field/SAP com SLA, mapa Leaflet, roteirização multi-parada                                                                                         |
+| **Estoque / Almoxarifado**   | `/estoque`    | Inventário, movimentações (entrada/saída/ajuste), compras, registros                                                                                     |
+| **Escala de Trabalho**       | `/escala`     | Escala semanal, fórmula automática de plantão, importação/exportação XLSX                                                                                |
+| **Manuais Técnicos**         | `/manuais`    | Biblioteca de manuais com abas por categoria, upload de PDF, sugestões                                                                                   |
+| **Gerador de OI**            | `/oi`         | Ordem de Intervenção / Relatório Fotográfico com wizard completo e geração de .docx                                                                      |
+| **Cronograma de Instalação** | `/cronograma` | Planejamento e cronograma de instalações, obras e manutenções com Gantt interativo, drag-and-drop, autosave, exportação XLSX/CSV/PDF e modo apresentação |
+| **Relatórios**               | `/relatorio`  | Relatórios técnicos e de planta                                                                                                                          |
+| **Painel Administrativo**    | `/admin`      | Gestão de usuários, cargos, painéis e permissões granulares                                                                                              |
+| **Home (Hub)**               | `/`           | Grid de cards com acesso a todos os módulos conforme permissão do cargo                                                                                  |
 
 ---
 
@@ -78,7 +79,7 @@ O projeto usa **TanStack Start** com SSR, empacotado via **Nitro** com alvo **Cl
 │   ├── styles.css       # Estilos globais
 │   └── server.ts        # Entry point SSR com error handling
 ├── supabase/
-│   └── migrations/      # Migrações SQL numeradas (00001 .. 00038)
+│   └── migrations/      # Migrações SQL numeradas (00001 .. 00039)
 ├── AGENTS.md            # Instruções para agentes de IA
 └── README.md            # Este arquivo
 ```
@@ -143,10 +144,10 @@ O projeto usa **TanStack Start** com SSR, empacotado via **Nitro** com alvo **Cl
 | `afeta_saldo`                        | BOOLEAN         | Se `true`, a entrada automática altera o saldo                         |
 | `status_fila`                        | TEXT            | `Pendente`, `Visto`, `Em Processo`, `Aguardando Retorno`, `Finalizado` |
 | `cobrado_via_email` / `dt_pagamento` | BOOLEAN / DATE  | Controle financeiro                                                    |
-| `solicitante` / `previsao_uso`       | TEXT            |                                                                                    |
-| `data_prevista`                      | DATE            | Data prevista para entrega                                                        |
-| `valor_unitario`                     | NUMERIC         | Valor unitário do material na compra                                               |
-| `valor_total`                        | NUMERIC         | Valor total do item na compra                                                      |
+| `solicitante` / `previsao_uso`       | TEXT            |                                                                        |
+| `data_prevista`                      | DATE            | Data prevista para entrega                                             |
+| `valor_unitario`                     | NUMERIC         | Valor unitário do material na compra                                   |
+| `valor_total`                        | NUMERIC         | Valor total do item na compra                                          |
 
 #### `categorias` — Categorias de materiais
 
@@ -213,7 +214,7 @@ O campo `rc_em_fila` + tabela separada de `status_fila` permite acompanhamento d
 
 ### RLS (Row Level Security)
 
-**RLS deve permanecer DESABILITADO** em todas as tabelas do projeto (`materiais`, `movimentacoes`, `compras`, `profiles`, `cargos`, `permissions`, `cargo_panel_permissions`, `manuais_*`, `colaboradores_escala`, `escala_dias`, etc.). O controle de acesso é feito **via aplicação** (frontend + funções server-side validando permissões do cargo).
+**RLS deve permanecer DESABILITADO** em todas as tabelas do projeto (`materiais`, `movimentacoes`, `compras`, `profiles`, `cargos`, `permissions`, `cargo_panel_permissions`, `manuais_*`, `colaboradores_escala`, `escala_dias`, `cronograma_*`, `notificacoes`, etc.). O controle de acesso é feito **via aplicação** (frontend + funções server-side validando permissões do cargo).
 
 **Motivo:** O controle de acesso é implementado pelo sistema de painéis e permissões no frontend (`temPermissao` / `temPainel`). Ativar RLS causa falha silenciosa em todas as queries — já aconteceu como bug.
 
@@ -242,6 +243,17 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 ---
 
 ## 5. Histórico de Mudanças
+
+### [2026-07-23] — Cronograma de Instalação: módulo completo de planejamento
+
+- **Migration `00039_cronograma_instalacao.sql`**: tabelas `cronograma_projetos`, `cronograma_itens`, `cronograma_comentarios`, `cronograma_auditoria`, `notificacoes` com triggers de recálculo de datas, auditoria e desabilitação de RLS
+- **Painel `cronograma`** com permissões: `ver`, `criar_projeto`, `editar`, `excluir`, `exportar`, `comentar`, `gerar_link_publico`
+- Rota `/cronograma` com Gantt interativo, drag-and-drop, edição inline, autosave, zoom semana/mês, legenda de grupos por cor, metric cards, excluir com confirmação, exportação XLSX/CSV/PDF e importação de planilha
+- Rota `/cronograma/publico/$token` para modo apresentação (link público externo, somente leitura, sem login)
+- Drawer lateral com abas Detalhes, Comentários (com @menção e autocomplete) e Histórico (audit log)
+- Modelo genérico com `campo_agrupamento_label` configurável por projeto, permitindo reuso para qualquer tipo de cronograma
+- Sistema de notificações (`notificacoes`) com menções e responsável
+- Duplicar projeto, toggle público/privado, visibilidade somente leitura para cronogramas de outros usuários
 
 ### [2026-07-23] — Estoque: botão Revisar para unificar códigos duplicados
 
