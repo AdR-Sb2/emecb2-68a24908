@@ -1,6 +1,6 @@
 # EMEC BAIXADA 2 — Sistema de Gestão de Eletromecânica
 
-Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **Águas do Rio**). Unifica estoque, compras, escala de trabalho, backlog de OS, dashboards de automação/testes, relatórios técnicos, manuais, gerador de OI (Ordem de Intervenção / Relatório Fotográfico) e cronograma de instalação em uma única plataforma web.
+Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **Águas do Rio**). Unifica estoque, compras, escala de trabalho, backlog de OS, dashboards de automação/testes, relatórios técnicos, manuais, gerador de OI (Ordem de Intervenção / Relatório Fotográfico), cronograma de instalação e ficha técnica de elevatórias em uma única plataforma web.
 
 ---
 
@@ -10,8 +10,8 @@ Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **
 
 | Cargo             | Acesso principal                                                                        |
 | ----------------- | --------------------------------------------------------------------------------------- |
-| **Técnico**       | Estoque (entrada/saída), Escala, Backlog, Manuais                                       |
-| **Almoxarife**    | Gestão completa de Estoque e Compras                                                    |
+| **Técnico**       | Estoque (entrada/saída), Escala, Backlog, Manuais, Ficha da Elevatória (dados básicos)  |
+| **Almoxarife**    | Gestão completa de Estoque e Compras, Ficha da Elevatória (dados mestres completos)     |
 | **Supervisor**    | Todos os módulos operacionais (sem painel admin)                                        |
 | **Administrador** | Acesso total, incluindo Painel Administrativo (gestão de usuários, cargos e permissões) |
 
@@ -27,6 +27,7 @@ Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **
 | **Manuais Técnicos**         | `/manuais`    | Biblioteca de manuais com abas por categoria, upload de PDF, sugestões                                                                                   |
 | **Gerador de OI**            | `/oi`         | Ordem de Intervenção / Relatório Fotográfico com wizard completo e geração de .docx                                                                      |
 | **Cronograma de Instalação** | `/cronograma` | Planejamento e cronograma de instalações, obras e manutenções com Gantt interativo, drag-and-drop, autosave, exportação XLSX/CSV/PDF e modo apresentação |
+| **Ficha da Elevatória**      | `/elevatorias` | Ficha técnica completa de elevatórias: dados de equipamento, elétrica/automação, hidráulica, rolamentos/selos, área de influência, implantação e histórico de alterações |
 | **Relatórios**               | `/relatorio`  | Relatórios técnicos e de planta                                                                                                                          |
 | **Painel Administrativo**    | `/admin`      | Gestão de usuários, cargos, painéis e permissões granulares                                                                                              |
 | **Home (Hub)**               | `/`           | Grid de cards com acesso a todos os módulos conforme permissão do cargo                                                                                  |
@@ -417,6 +418,24 @@ Criação do sistema de permissões granulares:
 - Dropdown de `motivo_ajuste` no formulário
 - Separação de ajustes do ranking de destinos
 - Correção do trigger `recalcular_saldo_material` para preservar saldo ao invés de zerar
+
+### [2026-07-23] — Módulo Ficha da Elevatória
+
+**Migration:** `00040_ficha_elevatoria.sql`
+
+- Tabelas: `elevatorias`, `elevatoria_equipamento`, `elevatoria_eletrica`, `elevatoria_hidraulica`, `elevatoria_area_influencia`, `elevatoria_rolamentos_selos`, `elevatoria_implantacao`, `elevatoria_implantacao_etapas`, `elevatoria_dados_mestres_auditoria`, `elevatoria_campo_na`
+- RLS desabilitado (padrão do projeto)
+- Triggers de `atualizado_em` e auditoria (`AFTER UPDATE`) em todas as tabelas de dados mestres
+- Permissões: `ficha_elevatoria.ver`, `ficha_elevatoria.editar`, `ficha_elevatoria.dados_mestres.ver`, `ficha_elevatoria.dados_mestres.editar`, `ficha_elevatoria.exportar`, `ficha_elevatoria.importar`
+- Rotas: `/elevatorias` (listagem) e `/elevatorias/:id` (ficha individual)
+- Cards de métricas no topo (total, completude média, críticas, em implantação)
+- Indicador de completude do cadastro por elevatória (badge verde/amarelo/vermelho)
+- Abas de dados mestres: Equipamento, Elétrica & Automação, Hidráulica, Rolamentos & Selos, Área de Influência, Implantação e Histórico
+- Edição inline com autosave e indicador discreto de salvamento
+- Toggle "não aplicável" (N/A) por campo
+- Importação de planilha Excel
+- Mapa OpenStreetMap com coordenadas da elevatória
+- Card no Hub condicionado à permissão `ficha_elevatoria`
 
 ### [2026-07-13] — Várias melhorias no estoque
 

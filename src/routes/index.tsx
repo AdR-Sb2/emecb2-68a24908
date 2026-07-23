@@ -16,6 +16,7 @@ import {
   BookOpen,
   FileImage,
   CalendarRange,
+  Building2,
 } from "lucide-react";
 import {
   Dialog,
@@ -59,6 +60,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   manuais: { bg: "bg-orange-100", icon: "text-orange-600", ring: "hover:ring-orange-300" },
   oi: { bg: "bg-indigo-100", icon: "text-indigo-600", ring: "hover:ring-indigo-300" },
   cronograma: { bg: "bg-teal-100", icon: "text-teal-600", ring: "hover:ring-teal-300" },
+  ficha_elevatoria: { bg: "bg-sky-100", icon: "text-sky-600", ring: "hover:ring-sky-300" },
 };
 
 function getCardColor(chave: string) {
@@ -71,6 +73,7 @@ function getCardColor(chave: string) {
   if (chave.startsWith("manuais")) return CARD_COLORS.manuais;
   if (chave === "oi" || chave === "gerador_oi") return CARD_COLORS.oi;
   if (chave === "cronograma") return CARD_COLORS.cronograma;
+  if (chave === "ficha_elevatoria") return CARD_COLORS.ficha_elevatoria;
   return CARD_COLORS.dashboard;
 }
 
@@ -145,6 +148,7 @@ function Index() {
   const shouldShowManuais = hasPanel("manuais") || hasFallbackPanels;
   const shouldShowOI = hasPanel("gerador_oi") || hasFallbackPanels;
   const shouldShowCronograma = hasPanel("cronograma") || hasFallbackPanels;
+  const shouldShowFichaElevatoria = hasPanel("ficha_elevatoria");
   const canAdmin = hasPanel("admin");
 
   return (
@@ -292,6 +296,16 @@ function Index() {
                 <CardTitle>Cronograma</CardTitle>
                 <CardDesc>Planejamento e cronograma de instalações, obras e manutenções.</CardDesc>
                 <CardCta>Abrir cronograma</CardCta>
+              </CardLink>
+            )}
+
+            {/* Ficha da Elevatória */}
+            {shouldShowFichaElevatoria && (
+              <CardLink to="/elevatorias" chave="ficha_elevatoria" delay={9}>
+                <CardIcon chave="ficha_elevatoria" icon={Building2} />
+                <CardTitle>Ficha da Elevatória</CardTitle>
+                <CardDesc>Ficha técnica completa de elevatórias, equipamentos, elétrica e hidráulica.</CardDesc>
+                <CardCta>Abrir fichas</CardCta>
               </CardLink>
             )}
           </div>
