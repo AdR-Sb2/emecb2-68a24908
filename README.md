@@ -1,6 +1,6 @@
 # EMEC BAIXADA 2 — Sistema de Gestão de Eletromecânica
 
-Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **Águas do Rio**). Unifica estoque, compras, escala de trabalho, backlog de OS, dashboards de automação/testes, relatórios técnicos e manuais em uma única plataforma web.
+Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **Águas do Rio**). Unifica estoque, compras, escala de trabalho, backlog de OS, dashboards de automação/testes, relatórios técnicos, manuais e gerador de OI (Ordem de Intervenção / Relatório Fotográfico) em uma única plataforma web.
 
 ---
 
@@ -25,6 +25,7 @@ Sistema de uso interno da equipe de **Eletromecânica da Baixada 2** (empresa **
 | **Estoque / Almoxarifado** | `/estoque`   | Inventário, movimentações (entrada/saída/ajuste), compras, registros      |
 | **Escala de Trabalho**     | `/escala`    | Escala semanal, fórmula automática de plantão, importação/exportação XLSX |
 | **Manuais Técnicos**       | `/manuais`   | Biblioteca de manuais com abas por categoria, upload de PDF, sugestões    |
+| **Gerador de OI**          | `/oi`        | Ordem de Intervenção / Relatório Fotográfico com wizard completo e geração de .docx |
 | **Relatórios**             | `/relatorio` | Relatórios técnicos e de planta                                           |
 | **Painel Administrativo**  | `/admin`     | Gestão de usuários, cargos, painéis e permissões granulares               |
 | **Home (Hub)**             | `/`          | Grid de cards com acesso a todos os módulos conforme permissão do cargo   |
@@ -77,7 +78,7 @@ O projeto usa **TanStack Start** com SSR, empacotado via **Nitro** com alvo **Cl
 │   ├── styles.css       # Estilos globais
 │   └── server.ts        # Entry point SSR com error handling
 ├── supabase/
-│   └── migrations/      # Migrações SQL numeradas (00001 .. 00024)
+│   └── migrations/      # Migrações SQL numeradas (00001 .. 00038)
 ├── AGENTS.md            # Instruções para agentes de IA
 └── README.md            # Este arquivo
 ```
@@ -142,7 +143,10 @@ O projeto usa **TanStack Start** com SSR, empacotado via **Nitro** com alvo **Cl
 | `afeta_saldo`                        | BOOLEAN         | Se `true`, a entrada automática altera o saldo                         |
 | `status_fila`                        | TEXT            | `Pendente`, `Visto`, `Em Processo`, `Aguardando Retorno`, `Finalizado` |
 | `cobrado_via_email` / `dt_pagamento` | BOOLEAN / DATE  | Controle financeiro                                                    |
-| `solicitante` / `previsao_uso`       | TEXT            |                                                                        |
+| `solicitante` / `previsao_uso`       | TEXT            |                                                                                    |
+| `data_prevista`                      | DATE            | Data prevista para entrega                                                        |
+| `valor_unitario`                     | NUMERIC         | Valor unitário do material na compra                                               |
+| `valor_total`                        | NUMERIC         | Valor total do item na compra                                                      |
 
 #### `categorias` — Categorias de materiais
 
@@ -238,6 +242,52 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 ---
 
 ## 5. Histórico de Mudanças
+
+### [2026-07-23] — Estoque: botão Revisar para unificar códigos duplicados
+
+- Botão "Revisar" que unifica materiais com códigos SAP duplicados usando sufixo `_A` / `_B`, permitindo merge de saldos e movimentações
+- Select nativo nos formulários substituindo Radix Select para melhor compatibilidade
+
+### [2026-07-23] — OI: correção da chave do painel no hub
+
+- **Commit:** `f1c5596`
+- Card OI no hub não aparecia — corrigido: a chave do painel é `gerador_oi` (não `oi`)
+
+### [2026-07-23] — OI: geração de DOCX idêntico ao modelo LAGOS
+
+**Commits:** `2bc69c7`, `13d0bdd`, `5ae2b63`, `11110ba`, `a2d5673`
+
+- Geração de DOCX visualmente idêntico ao modelo oficial RF-OI-B1-003-2026-FEV-2026-LAGOS
+- Margens, cabeçalho/rodapé, capa com 7 colunas, checkboxes, sumário (TOC real), fotos 4253×4253, assinatura
+- Fonte Arial, numeração Título 2, proporção de fotos, campos vazios, tabela capa 15 linhas
+
+### [2026-07-23] — Gerador de OI / Relatório Fotográfico
+
+**Commits:** `73d9468`, `4456c03`, `8cf196b`, `94a4f10`, `d4574a8`
+
+- Página `/oi` com formulário completo para gerar Ordem de Intervenção / Relatório Fotográfico
+- **5 passos integrados:** dados da OI (número, bloco, período, responsáveis), dados complementares (superintendência, município, tipo, objetivo), intervenções com ativos/endereço, fotos com evento/descrição, geração do documento
+- Geração de `.docx` no navegador via `docx` + `file-saver`, sem backend
+- Tabelas: `ordens_intervencao`, `oi_intervencoes`, `oi_fotos` — migration `00038`
+- Bucket `oi-fotos` para upload de imagens (JPEG, PNG, WebP, 20MB)
+- Painel `gerador_oi` com permissões: `criar`, `editar`, `excluir`, `gerar_docx`
+- Atribuído a Administrador (todas) e Supervisor (criar, editar, gerar — sem excluir)
+
+### [2026-07-23] — Testes: tabela no banco e importação do Forms
+
+**Commits:** `6988410`, `3fb6777`
+
+- Criação da tabela `testes_afericoes` no banco com todos os campos do formulário — migration `00037`
+- Botão "Importar Planilha" que lê XLSX do Google Forms e envia para o Supabase
+- Tratamento de erro SSR para `importPreview` nulo
+
+### [2026-07-22] — Compras: valor e data prevista
+
+**Commits:**
+
+- Migração `00034_compras_data_prevista.sql`: coluna `data_prevista` (DATE) em `compras`
+- Migração `00035_add_valor_compras.sql`: colunas `valor_unitario` e `valor_total` (NUMERIC) em `compras`
+- Migração `00036_permissao_gerenciar_fila.sql`: permissão `estoque.gerenciar_fila` para Gerenciar Fila de RC (Administrador, Comprador, Almoxarife, Gerente)
 
 ### [2026-07-14] — Manuais: filtro PDF fixo por permissão
 
