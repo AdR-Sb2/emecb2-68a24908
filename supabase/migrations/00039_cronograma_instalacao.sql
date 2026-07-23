@@ -147,10 +147,10 @@ BEGIN
     UPDATE cronograma_itens
     SET
       data_inicio_calculada = v_data_atual,
-      data_termino_calculada = v_data_atual + (v_duracao - 1)
+      data_termino_calculada = v_data_atual + ((v_duracao - 1)::integer)
     WHERE id = v_item.id;
 
-    v_data_atual := v_data_atual + v_duracao;
+    v_data_atual := v_data_atual + (v_duracao::integer);
   END LOOP;
 END;
 $$ LANGUAGE plpgsql;
