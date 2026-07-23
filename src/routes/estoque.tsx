@@ -155,13 +155,15 @@ function EstoquePage() {
   const [editandoValor, setEditandoValor] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogRevisar, setDialogRevisar] = useState(false);
-  const [revisarData, setRevisarData] = useState<{
-    baseCode: string;
-    itens: Material[];
-    escolhido: string;
-    novaDescricao: string;
-    novoSaldo: number;
-  }[]>([]);
+  const [revisarData, setRevisarData] = useState<
+    {
+      baseCode: string;
+      itens: Material[];
+      escolhido: string;
+      novaDescricao: string;
+      novoSaldo: number;
+    }[]
+  >([]);
   const [savingRevisar, setSavingRevisar] = useState<Record<string, boolean>>({});
 
   const [permissoes, setPermissoes] = useState<PermissoesEstoque>({
@@ -1481,10 +1483,7 @@ function EstoquePage() {
     setRevisarData(grupos);
   };
 
-  const salvarRevisao = async (
-    grupo: (typeof revisarData)[number],
-    salvarTodos = false,
-  ) => {
+  const salvarRevisao = async (grupo: (typeof revisarData)[number], salvarTodos = false) => {
     const { baseCode, itens, escolhido, novaDescricao, novoSaldo } = grupo;
     const winnerCod = escolhido;
     const loserCods = itens.filter((m) => m.cod_sap !== winnerCod).map((m) => m.cod_sap);
@@ -1506,10 +1505,7 @@ function EstoquePage() {
           .eq("cod_sap", loser);
         if (errComp) console.warn(`Aviso ao atualizar compras de ${loser}:`, errComp.message);
 
-        const { error: errDel } = await supabase
-          .from("materiais")
-          .delete()
-          .eq("cod_sap", loser);
+        const { error: errDel } = await supabase.from("materiais").delete().eq("cod_sap", loser);
         if (errDel) throw new Error(`Erro ao deletar ${loser}: ${errDel.message}`);
       }
 
@@ -1522,7 +1518,8 @@ function EstoquePage() {
           .from("movimentacoes")
           .update({ cod_sap: winnerCod })
           .eq("cod_sap", baseCode);
-        if (errMov) throw new Error(`Erro ao mover movimentações de ${baseCode}: ${errMov.message}`);
+        if (errMov)
+          throw new Error(`Erro ao mover movimentações de ${baseCode}: ${errMov.message}`);
 
         const { error: errComp } = await supabase
           .from("compras")
@@ -1530,17 +1527,18 @@ function EstoquePage() {
           .eq("cod_sap", baseCode);
         if (errComp) console.warn(`Aviso ao atualizar compras de ${baseCode}:`, errComp.message);
 
-        const { error: errDel } = await supabase
-          .from("materiais")
-          .delete()
-          .eq("cod_sap", baseCode);
+        const { error: errDel } = await supabase.from("materiais").delete().eq("cod_sap", baseCode);
         if (errDel) throw new Error(`Erro ao deletar ${baseCode}: ${errDel.message}`);
       }
 
       // 3. Atualizar descricao e saldo do vencedor
       const { error: errUpd } = await supabase
         .from("materiais")
-        .update({ descricao: novaDescricao, saldo_atual: novoSaldo, atualizado_em: new Date().toISOString() })
+        .update({
+          descricao: novaDescricao,
+          saldo_atual: novoSaldo,
+          atualizado_em: new Date().toISOString(),
+        })
         .eq("cod_sap", winnerCod);
       if (errUpd) throw new Error(`Erro ao atualizar ${winnerCod}: ${errUpd.message}`);
 
@@ -1568,7 +1566,8 @@ function EstoquePage() {
           .from("movimentacoes")
           .update({ cod_sap: finalCod })
           .eq("cod_sap", winnerCod);
-        if (errMov2) throw new Error(`Erro ao mover movimentações de ${winnerCod}: ${errMov2.message}`);
+        if (errMov2)
+          throw new Error(`Erro ao mover movimentações de ${winnerCod}: ${errMov2.message}`);
 
         const { error: errComp2 } = await supabase
           .from("compras")
@@ -4726,9 +4725,7 @@ function EstoquePage() {
                         <div className="mb-3 flex items-center justify-between">
                           <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-200">
                             {grupo.baseCode}
-                            {grupo.itens.length > 2
-                              ? ` (${grupo.itens.length} variações)`
-                              : ""}
+                            {grupo.itens.length > 2 ? ` (${grupo.itens.length} variações)` : ""}
                           </span>
                           <button
                             onClick={() => salvarRevisao(grupo)}
@@ -4753,9 +4750,9 @@ function EstoquePage() {
                                       ? {
                                           ...g,
                                           escolhido: val,
-                                          novaDescricao: (g.itens.find((i) => i.cod_sap === val)
-                                            ?.descricao || "")
-                                            .replace(/^\[REVISAR\]\s*/i, ""),
+                                          novaDescricao: (
+                                            g.itens.find((i) => i.cod_sap === val)?.descricao || ""
+                                          ).replace(/^\[REVISAR\]\s*/i, ""),
                                           novoSaldo:
                                             g.itens.find((i) => i.cod_sap === val)?.saldo_atual ||
                                             0,
