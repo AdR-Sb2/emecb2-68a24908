@@ -233,7 +233,9 @@ function ElevatoriasPage() {
 
   const criarElevatoria = async () => {
     if (!permissoes.podeEditar) return;
-    const { data, error } = await supabase.from("elevatorias").insert({ nome: "Nova Elevatória" }).select().single();
+    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const nome = `Nova Elevatória ${rand}`;
+    const { data, error } = await supabase.from("elevatorias").insert({ nome }).select().single();
     if (error) { toast.error("Erro ao criar: " + error.message); return; }
     if (data) { toast.success("Elevatória criada"); navigate({ to: `/elevatorias/${data.id}` }); }
   };
