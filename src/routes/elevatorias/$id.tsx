@@ -20,6 +20,7 @@ import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui/badge";
 import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import type {
@@ -100,67 +101,85 @@ function ElevatoriaFichaPage() {
   useEffect(() => {
     if (!profile?.cargo_id || !elevId) return;
     const init = async () => {
-      const { data: panelData } = await supabase
-        .from("cargo_paineis")
-        .select("paineis!inner(chave)")
-        .eq("cargo_id", profile.cargo_id)
-        .eq("paineis.chave", "ficha_elevatoria")
-        .maybeSingle();
-      if (!panelData) { navigate({ to: "/", replace: true }); return; }
+      try {
+        const { data: panelData } = await supabase
+          .from("cargo_paineis")
+          .select("paineis!inner(chave)")
+          .eq("cargo_id", profile.cargo_id)
+          .eq("paineis.chave", "ficha_elevatoria")
+          .maybeSingle();
+        if (!panelData) { toast.error("Acesso não autorizado ao painel Ficha da Elevatória"); navigate({ to: "/", replace: true }); return; }
 
-      const perms = await getPermissoesCargo(profile.cargo_id);
-      setPermissoes({
-        podeVer: temPermissao(perms, "ficha_elevatoria", "ver"),
-        podeEditar: temPermissao(perms, "ficha_elevatoria", "editar"),
-        podeVerMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.ver"),
-        podeEditarMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.editar"),
-        podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
-      });
+        const perms = await getPermissoesCargo(profile.cargo_id);
+        setPermissoes({
+          podeVer: temPermissao(perms, "ficha_elevatoria", "ver"),
+          podeEditar: temPermissao(perms, "ficha_elevatoria", "editar"),
+          podeVerMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.ver"),
+          podeEditarMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.editar"),
+          podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
+        });
 
-      await carregarTudo();
+        await carregarTudo();
+      } catch (err) {
+        toast.error("Erro ao carregar ficha: " + (err instanceof Error ? err.message : "desconhecido"));
+        setLoading(false);
+      }
     };
     init();
   }, [profile?.cargo_id, elevId]);
 
   const carregarTudo = async () => {
     setLoading(true);
-    const [elevRes, equipRes, eletRes, hidrRes, areaRes, rolaRes, impRes, etapasRes, audRes, naRes] = await Promise.all([
-      supabase.from("elevatorias").select("*").eq("id", elevId).single(),
-      supabase.from("elevatoria_equipamento").select("*").eq("elevatoria_id", elevId).maybeSingle(),
-      supabase.from("elevatoria_eletrica").select("*").eq("elevatoria_id", elevId).maybeSingle(),
-      supabase.from("elevatoria_hidraulica").select("*").eq("elevatoria_id", elevId).maybeSingle(),
-      supabase.from("elevatoria_area_influencia").select("*").eq("elevatoria_id", elevId).maybeSingle(),
-      supabase.from("elevatoria_rolamentos_selos").select("*").eq("elevatoria_id", elevId).order("id"),
-      supabase.from("elevatoria_implantacao").select("*").eq("elevatoria_id", elevId).maybeSingle(),
-      supabase.from("elevatoria_implantacao_etapas").select("*").order("ordem"),
-      supabase.from("elevatoria_dados_mestres_auditoria").select("*, profiles:usuario_id(nome_completo)").eq("elevatoria_id", elevId).order("criado_em", { ascending: false }).limit(200),
-      supabase.from("elevatoria_campo_na").select("*").eq("elevatoria_id", elevId),
-    ]);
+    try {
+      const [elevRes, equipRes, eletRes, hidrRes, areaRes, rolaRes, impRes, etapasRes, audRes, naRes] = await Promise.all([
+        supabase.from("elevatorias").select("*").eq("id", elevId).single(),
+        supabase.from("elevatoria_equipamento").select("*").eq("elevatoria_id", elevId).maybeSingle(),
+        supabase.from("elevatoria_eletrica").select("*").eq("elevatoria_id", elevId).maybeSingle(),
+        supabase.from("elevatoria_hidraulica").select("*").eq("elevatoria_id", elevId).maybeSingle(),
+        supabase.from("elevatoria_area_influencia").select("*").eq("elevatoria_id", elevId).maybeSingle(),
+        supabase.from("elevatoria_rolamentos_selos").select("*").eq("elevatoria_id", elevId).order("id"),
+        supabase.from("elevatoria_implantacao").select("*").eq("elevatoria_id", elevId).maybeSingle(),
+        supabase.from("elevatoria_implantacao_etapas").select("*").order("ordem"),
+        supabase.from("elevatoria_dados_mestres_auditoria").select("*, profiles:usuario_id(nome_completo)").eq("elevatoria_id", elevId).order("criado_em", { ascending: false }).limit(200),
+        supabase.from("elevatoria_campo_na").select("*").eq("elevatoria_id", elevId),
+      ]);
 
-    if (elevRes.data) setElevatoria(elevRes.data);
-    if (equipRes.data) setEquipamento(equipRes.data);
-    if (eletRes.data) setEletrica(eletRes.data);
-    if (hidrRes.data) setHidraulica(hidrRes.data);
-    if (areaRes.data) setAreaInfluencia(areaRes.data);
-    if (rolaRes.data) setRolamentos(rolaRes.data);
-    if (impRes.data) setImplantacao(impRes.data);
-    if (etapasRes.data) setEtapas(etapasRes.data);
+      if (elevRes.error) {
+        console.error("Erro Supabase:", elevRes.error);
+        toast.error("Erro ao buscar elevatória: " + elevRes.error.message);
+        navigate({ to: "/elevatorias", replace: true });
+        return;
+      }
 
-    if (audRes.data) {
-      setAuditoria(audRes.data.map((a: Record<string, unknown>) => ({
-        ...a,
-        usuario_nome: (a.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
-      })) as ElevatoriaAuditoria[]);
+      if (elevRes.data) setElevatoria(elevRes.data);
+      if (equipRes.data) setEquipamento(equipRes.data);
+      if (eletRes.data) setEletrica(eletRes.data);
+      if (hidrRes.data) setHidraulica(hidrRes.data);
+      if (areaRes.data) setAreaInfluencia(areaRes.data);
+      if (rolaRes.data) setRolamentos(rolaRes.data);
+      if (impRes.data) setImplantacao(impRes.data);
+      if (etapasRes.data) setEtapas(etapasRes.data);
+
+      if (audRes.data) {
+        setAuditoria(audRes.data.map((a: Record<string, unknown>) => ({
+          ...a,
+          usuario_nome: (a.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
+        })) as ElevatoriaAuditoria[]);
+      }
+
+      if (naRes.data) setCamposNA(naRes.data);
+
+      if (!elevRes.data) {
+        toast.error("Elevatória não encontrada no banco de dados");
+        navigate({ to: "/elevatorias", replace: true });
+        return;
+      }
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+      toast.error("Erro inesperado ao carregar ficha");
+    } finally {
+      setLoading(false);
     }
-
-    if (naRes.data) setCamposNA(naRes.data);
-
-    if (!elevRes.data) {
-      toast.error("Elevatória não encontrada");
-      navigate({ to: "/elevatorias", replace: true });
-      return;
-    }
-    setLoading(false);
   };
 
   const isNA = (tabela: string, campo: string) =>
@@ -329,7 +348,34 @@ function ElevatoriaFichaPage() {
             )}
             {permissoes.podeExportar && (
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  try {
+                    const wb = XLSX.utils.book_new();
+                    const data: Record<string, string | number | null>[] = [];
+                    const addFields = (prefix: string, fields: Record<string, unknown>) => {
+                      for (const [k, v] of Object.entries(fields)) {
+                        if (k !== "id" && k !== "elevatoria_id" && k !== "criado_em" && k !== "atualizado_em") {
+                          const row: Record<string, string | number | null> = {};
+                          row["Campo"] = prefix + " · " + k;
+                          row["Valor"] = v as string | number | null;
+                          data.push(row);
+                        }
+                      }
+                    };
+                    addFields("Básico", elevatoria || {});
+                    if (equipamento) addFields("Equipamento", equipamento);
+                    if (eletrica) addFields("Elétrica", eletrica);
+                    if (hidraulica) addFields("Hidráulica", hidraulica);
+                    if (areaInfluencia) addFields("Área Influência", areaInfluencia);
+                    if (implantacao) addFields("Implantação", implantacao);
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    XLSX.utils.book_append_sheet(wb, ws, elevatoria?.nome || "Ficha");
+                    XLSX.writeFile(wb, `ficha_${elevatoria?.nome || "elevatoria"}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                    toast.success("Exportação concluída!");
+                  } catch (err) {
+                    toast.error("Erro ao exportar: " + (err instanceof Error ? err.message : "desconhecido"));
+                  }
+                }}
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-medium transition hover:bg-white/25"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" /> Exportar
