@@ -12,11 +12,13 @@ import {
   CheckCircle2,
   TrendingUp,
   HardHat,
+  Plus,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -229,13 +231,89 @@ function ElevatoriasPage() {
     return list;
   }, [elevatorias, search, filtroMunicipio, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f0f4f8] dark:bg-slate-900">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1f7ad6]" />
-      </div>
-    );
-  }
+  const criarElevatoria = async () => {
+    if (!permissoes.podeEditar) return;
+    const { data, error } = await supabase.from("elevatorias").insert({ nome: "Nova Elevatória" }).select().single();
+    if (error) { toast.error("Erro ao criar: " + error.message); return; }
+    if (data) { toast.success("Elevatória criada"); navigate({ to: `/elevatorias/${data.id}` }); }
+  };
+
+  const importarPlanilha = async (file: File) => {
+    try {
+      setLoading(true);
+      toast.info("Importando planilha...");
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes("RELAÇÃO DE ELEVATÓRIAS") || n.toUpperCase().includes("RELAÇÃO"));
+      if (!sheetName) { toast.error("Aba 'RELAÇÃO DE ELEVATÓRIAS' não encontrada"); setLoading(false); return; }
+
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "" }) as unknown[][];
+      if (rows.length < 3) { toast.error("Planilha vazia ou formato inválido"); setLoading(false); return; }
+
+      const headerRow = rows[1];
+      const headers = headerRow.map(h => String(h).trim().toUpperCase().replace(/\t/g, ""));
+
+      const COL_MAP: Record<string, string> = {
+        "ELEVATORIAS": "nome", "PLANTA": "planta", "TIPO": "tipo",
+        "SUPERINTENDÊNCIA": "superintendencia", "SUPERINTENDENCIA": "superintendencia",
+        "ENDEREÇO": "endereco", "BAIRRO": "bairro", "MUNICIPIO": "municipio",
+        "CEP": "cep", "LATITUDE": "latitude", "LONGITUDE": "longitude",
+        "INICIO DE OPERAÇÃO": "inicio_operacao", "INICIO DE OPERACAO": "inicio_operacao",
+        "CARACTERÍSTICAS DA ÁREA": "caracteristicas_area", "CARACTERISTICAS DA AREA": "caracteristicas_area",
+        "GRUPO": "grupo", "FUNÇÃO": "funcao", "FUNCAO": "funcao",
+      };
+
+      const colIndexes: Record<string, number> = {};
+      headers.forEach((h, i) => {
+        const clean = h.replace(/[^A-ZÀ-Ú\s]/g, "").trim();
+        for (const [key, field] of Object.entries(COL_MAP)) {
+          if (clean.startsWith(key) || key.startsWith(clean)) { colIndexes[field] = i; break; }
+        }
+      });
+
+      if (!colIndexes.nome) { toast.error("Coluna 'ELEVATORIAS' não encontrada"); setLoading(false); return; }
+
+      const dataRows = rows.slice(2);
+      const novas: Array<Record<string, unknown>> = [];
+
+      for (const row of dataRows) {
+        const nome = String(row[colIndexes.nome] || "").trim();
+        if (!nome || nome.toUpperCase().includes("TOTAL") || nome.toUpperCase().includes("SUBTOTAL")) continue;
+
+        const elev: Record<string, unknown> = { nome };
+        for (const [field, idx] of Object.entries(colIndexes)) {
+          if (field === "nome") continue;
+          let val = row[idx];
+          if (val === null || val === undefined || val === "") continue;
+          val = String(val).trim();
+          if (field === "latitude" || field === "longitude") {
+            const num = parseFloat(String(row[idx]));
+            if (!isNaN(num)) elev[field] = num;
+            continue;
+          }
+          if (field === "inicio_operacao") {
+            if (val && !String(val).includes("/")) {
+              const d = new Date(String(val));
+              if (!isNaN(d.getTime())) { elev[field] = d.toISOString().slice(0, 10); continue; }
+            }
+          }
+          elev[field] = val;
+        }
+        novas.push(elev);
+      }
+
+      if (novas.length === 0) { toast.error("Nenhuma elevatória válida encontrada na planilha"); setLoading(false); return; }
+
+      const { error } = await supabase.from("elevatorias").upsert(novas, { onConflict: "nome", ignoreDuplicates: false });
+      if (error) { toast.error("Erro ao inserir: " + error.message); setLoading(false); return; }
+
+      toast.success(`${novas.length} elevatória(s) importada(s) com sucesso!`);
+      await carregarDados();
+    } catch (err) {
+      toast.error("Erro ao processar planilha: " + (err instanceof Error ? err.message : "desconhecido"));
+      setLoading(false);
+    }
+  };
 
   const BadgeCompletude = ({ nivel, percentual }: { nivel: CompletudeNivel; percentual: number }) => {
     const cls = nivel === "bom" ? "bg-emerald-100 text-emerald-700 border-emerald-300"
@@ -298,7 +376,14 @@ function ElevatoriasPage() {
                   <Upload className="h-4 w-4" /> Importar Planilha
                 </button>
               )}
-
+              {permissoes.podeEditar && (
+                <button
+                  onClick={criarElevatoria}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-[#0b3a73] transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+                >
+                  <Plus className="h-4 w-4" /> Cadastrar manualmente
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -508,8 +593,9 @@ function ElevatoriasPage() {
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                toast.success("Arquivo recebido. Iniciando importação...");
                 setDialogImportar(false);
+                await importarPlanilha(file);
+                if (fileInputRef.current) fileInputRef.current.value = "";
               }}
               className="block w-full text-sm text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-[#eaf3fb] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#1f7ad6] hover:file:bg-[#d4e6f7]"
             />
