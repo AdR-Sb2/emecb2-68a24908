@@ -233,8 +233,8 @@ function ElevatoriasPage() {
 
   const criarElevatoria = async () => {
     if (!permissoes.podeEditar) return;
-    const ts = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
-    const nome = `Nova Elevatória (${ts})`;
+    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const nome = `Nova Elevatória ${rand}`;
     const { data, error } = await supabase.from("elevatorias").insert({ nome }).select().single();
     if (error) { toast.error("Erro ao criar: " + error.message); return; }
     if (data) { toast.success("Elevatória criada"); navigate({ to: `/elevatorias/${data.id}` }); }
