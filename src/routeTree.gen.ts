@@ -26,7 +26,7 @@ import { Route as BloqueadoRouteImport } from './routes/bloqueado'
 import { Route as BacklogRouteImport } from './routes/backlog'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias/$id'
+import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
 import { Route as ApiEquipeOverrideRouteImport } from './routes/api/equipe-override'
 import { Route as CronogramaPublicoTokenRouteImport } from './routes/cronograma/publico/$token'
 
@@ -116,9 +116,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ElevatoriasIdRoute = ElevatoriasIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ElevatoriasRoute,
+  id: '/elevatorias_/$id',
+  path: '/elevatorias/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEquipeOverrideRoute = ApiEquipeOverrideRouteImport.update({
   id: '/api/equipe-override',
@@ -138,7 +138,7 @@ export interface FileRoutesByFullPath {
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/elevatorias': typeof ElevatoriasRouteWithChildren
+  '/elevatorias': typeof ElevatoriasRoute
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
@@ -160,7 +160,7 @@ export interface FileRoutesByTo {
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/elevatorias': typeof ElevatoriasRouteWithChildren
+  '/elevatorias': typeof ElevatoriasRoute
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
@@ -183,7 +183,7 @@ export interface FileRoutesById {
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/elevatorias': typeof ElevatoriasRouteWithChildren
+  '/elevatorias': typeof ElevatoriasRoute
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
@@ -195,7 +195,7 @@ export interface FileRoutesById {
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
-  '/elevatorias/$id': typeof ElevatoriasIdRoute
+  '/elevatorias_/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
 }
 export interface FileRouteTypes {
@@ -263,7 +263,7 @@ export interface FileRouteTypes {
     | '/relatorio'
     | '/testes'
     | '/api/equipe-override'
-    | '/elevatorias/$id'
+    | '/elevatorias_/$id'
     | '/cronograma/publico/$token'
   fileRoutesById: FileRoutesById
 }
@@ -274,7 +274,7 @@ export interface RootRouteChildren {
   BloqueadoRoute: typeof BloqueadoRoute
   CronogramaRoute: typeof CronogramaRouteWithChildren
   DashboardRoute: typeof DashboardRoute
-  ElevatoriasRoute: typeof ElevatoriasRouteWithChildren
+  ElevatoriasRoute: typeof ElevatoriasRoute
   EscalaRoute: typeof EscalaRoute
   EstoqueRoute: typeof EstoqueRoute
   LoginRoute: typeof LoginRoute
@@ -286,6 +286,7 @@ export interface RootRouteChildren {
   RelatorioRoute: typeof RelatorioRoute
   TestesRoute: typeof TestesRoute
   ApiEquipeOverrideRoute: typeof ApiEquipeOverrideRoute
+  ElevatoriasIdRoute: typeof ElevatoriasIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -409,12 +410,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/elevatorias/$id': {
-      id: '/elevatorias/$id'
-      path: '/$id'
+    '/elevatorias_/$id': {
+      id: '/elevatorias_/$id'
+      path: '/elevatorias/$id'
       fullPath: '/elevatorias/$id'
       preLoaderRoute: typeof ElevatoriasIdRouteImport
-      parentRoute: typeof ElevatoriasRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/equipe-override': {
       id: '/api/equipe-override'
@@ -445,18 +446,6 @@ const CronogramaRouteWithChildren = CronogramaRoute._addFileChildren(
   CronogramaRouteChildren,
 )
 
-interface ElevatoriasRouteChildren {
-  ElevatoriasIdRoute: typeof ElevatoriasIdRoute
-}
-
-const ElevatoriasRouteChildren: ElevatoriasRouteChildren = {
-  ElevatoriasIdRoute: ElevatoriasIdRoute,
-}
-
-const ElevatoriasRouteWithChildren = ElevatoriasRoute._addFileChildren(
-  ElevatoriasRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -464,7 +453,7 @@ const rootRouteChildren: RootRouteChildren = {
   BloqueadoRoute: BloqueadoRoute,
   CronogramaRoute: CronogramaRouteWithChildren,
   DashboardRoute: DashboardRoute,
-  ElevatoriasRoute: ElevatoriasRouteWithChildren,
+  ElevatoriasRoute: ElevatoriasRoute,
   EscalaRoute: EscalaRoute,
   EstoqueRoute: EstoqueRoute,
   LoginRoute: LoginRoute,
@@ -476,6 +465,7 @@ const rootRouteChildren: RootRouteChildren = {
   RelatorioRoute: RelatorioRoute,
   TestesRoute: TestesRoute,
   ApiEquipeOverrideRoute: ApiEquipeOverrideRoute,
+  ElevatoriasIdRoute: ElevatoriasIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

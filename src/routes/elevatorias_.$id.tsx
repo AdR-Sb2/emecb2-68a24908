@@ -15,6 +15,9 @@ import {
   Cog,
   FileSpreadsheet,
   ExternalLink,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
@@ -38,7 +41,7 @@ import type {
 } from "@/lib/elevatoria-types";
 import { IMPLANTACAO_STATUS_OPCOES } from "@/lib/elevatoria-types";
 
-export const Route = createFileRoute("/elevatorias/$id")({
+export const Route = createFileRoute("/elevatorias_/$id")({
   head: () => ({
     meta: [{ title: "Eletromecânica · Ficha da Elevatória" }],
   }),
@@ -75,6 +78,9 @@ function ElevatoriaFichaPage() {
   });
 
   const [aba, setAba] = useState<AbaDadosMestres>("equipamento");
+  const [editMode, setEditMode] = useState(false);
+  const [editingNome, setEditingNome] = useState(false);
+  const [nomeTemp, setNomeTemp] = useState("");
 
   const [equipamento, setEquipamento] = useState<ElevatoriaEquipamento | null>(null);
   const [eletrica, setEletrica] = useState<ElevatoriaEletrica | null>(null);
@@ -242,12 +248,13 @@ function ElevatoriaFichaPage() {
     setEtapas(prev => prev.map(e => e.id === etapaId ? { ...e, concluida } : e));
   };
 
-  const InputField = ({ tabela, campo, label, tipo = "text", opcoes, valor, onChange }: {
+  const InputField = ({ tabela, campo, label, tipo = "text", opcoes, valor, onChange, editOnly }: {
     tabela: string; campo: string; label: string; tipo?: string; opcoes?: string[];
-    valor: string | null | undefined; onChange?: (v: string) => void;
+    valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean;
   }) => {
     const na = isNA(tabela, campo);
-    const podeEditar = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
+    const podeEditarBase = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
+    const podeEditar = editOnly ? (podeEditarBase && editMode) : podeEditarBase;
     const podeVer = tabela === "elevatoria" ? permissoes.podeVer : permissoes.podeVerMestres;
 
     if (!podeVer) return null;
@@ -305,7 +312,7 @@ function ElevatoriaFichaPage() {
   const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <h3 className="mb-4 text-sm font-bold text-[#0b3a73] dark:text-white">{title}</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {children}
       </div>
     </div>
@@ -324,7 +331,7 @@ function ElevatoriaFichaPage() {
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-slate-900">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] text-white shadow-lg">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <img src={logoHeader} alt="Águas do Rio" className="h-10 w-auto shrink-0" />
             <Link to="/" className="rounded-full border border-white/20 bg-white/10 p-1.5 transition hover:bg-white/20 shrink-0">
@@ -333,7 +340,55 @@ function ElevatoriaFichaPage() {
             <Link to="/elevatorias" className="rounded-full border border-white/20 bg-white/10 p-1.5 transition hover:bg-white/20 shrink-0">
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <h1 className="truncate text-lg font-semibold">{elevatoria.nome}</h1>
+            <h1
+              className={`truncate text-lg font-semibold ${editMode ? "cursor-pointer rounded px-1.5 py-0.5 hover:bg-white/20" : ""}`}
+              onClick={() => {
+                if (editMode && permissoes.podeEditar) {
+                  setEditingNome(true);
+                  setNomeTemp(elevatoria.nome);
+                }
+              }}
+              title={editMode ? "Clique para editar o nome" : ""}
+            >
+              {editingNome ? (
+                <span className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    value={nomeTemp}
+                    onChange={e => setNomeTemp(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        salvarField("elevatoria", "nome", nomeTemp);
+                        setElevatoria(prev => prev ? { ...prev, nome: nomeTemp } : prev);
+                        setEditingNome(false);
+                      } else if (e.key === "Escape") {
+                        setEditingNome(false);
+                      }
+                    }}
+                    className="rounded border border-white/40 bg-white/20 px-1.5 py-0.5 text-lg font-semibold text-white outline-none placeholder:text-white/50"
+                    placeholder="Nome..."
+                  />
+                  <button
+                    onClick={() => {
+                      salvarField("elevatoria", "nome", nomeTemp);
+                      setElevatoria(prev => prev ? { ...prev, nome: nomeTemp } : prev);
+                      setEditingNome(false);
+                    }}
+                    className="rounded-full bg-emerald-500 p-0.5 text-white hover:bg-emerald-600"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setEditingNome(false)}
+                    className="rounded-full bg-red-500 p-0.5 text-white hover:bg-red-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              ) : (
+                elevatoria.nome
+              )}
+            </h1>
             {elevatoria.planta && (
               <Badge variant="outline" className="border-white/20 bg-white/10 text-white text-[10px] shrink-0">
                 {elevatoria.planta}
@@ -345,6 +400,20 @@ function ElevatoriaFichaPage() {
               <span className="flex items-center gap-1 text-[11px] text-cyan-200">
                 <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
               </span>
+            )}
+            {permissoes.podeEditar && (
+              <button
+                onClick={() => setEditMode(prev => !prev)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  editMode
+                    ? "border-amber-400 bg-amber-500 text-white shadow-md"
+                    : "border-white/20 bg-white/15 text-white hover:bg-white/25"
+                }`}
+                title={editMode ? "Sair do modo edição" : "Ativar modo edição"}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                {editMode ? "Editando" : "Editar"}
+              </button>
             )}
             {permissoes.podeExportar && (
               <button
@@ -385,15 +454,15 @@ function ElevatoriaFichaPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+      <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 lg:px-8">
         {/* Basic Info Card */}
         <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <InputField tabela="elevatoria" campo="nome" label="Nome" valor={elevatoria.nome} />
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div className="xl:col-span-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <InputField tabela="elevatoria" campo="nome" label="Nome" valor={elevatoria.nome} editOnly />
                 <InputField tabela="elevatoria" campo="planta" label="Planta" valor={elevatoria.planta} />
-                <InputField tabela="elevatoria" campo="tipo" label="Tipo" valor={elevatoria.tipo} opcoes={["EAT", "Booster", "Container"]} tipo="select" />
+                <InputField tabela="elevatoria" campo="tipo" label="Tipo" valor={elevatoria.tipo} opcoes={["EAT", "Booster", "Container"]} tipo="select" editOnly />
                 <InputField tabela="elevatoria" campo="superintendencia" label="Superintendência" valor={elevatoria.superintendencia} />
                 <InputField tabela="elevatoria" campo="endereco" label="Endereço" valor={elevatoria.endereco} />
                 <InputField tabela="elevatoria" campo="bairro" label="Bairro" valor={elevatoria.bairro} />
@@ -404,12 +473,12 @@ function ElevatoriaFichaPage() {
                 <InputField tabela="elevatoria" campo="grupo" label="Grupo" valor={elevatoria.grupo} />
                 <InputField tabela="elevatoria" campo="funcao" label="Função" valor={elevatoria.funcao} />
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-4 sm:w-1/2">
+              <div className="mt-4 grid grid-cols-2 gap-4 sm:w-1/2 lg:w-1/3">
                 <InputField tabela="elevatoria" campo="latitude" label="Latitude" tipo="number" valor={elevatoria.latitude?.toString()} />
                 <InputField tabela="elevatoria" campo="longitude" label="Longitude" tipo="number" valor={elevatoria.longitude?.toString()} />
               </div>
             </div>
-            <div className="lg:col-span-1">
+            <div className="xl:col-span-1">
               <div className="flex h-full min-h-[200px] items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
                 {elevatoria.latitude && elevatoria.longitude ? (
                   <iframe
@@ -582,7 +651,7 @@ function ElevatoriaFichaPage() {
                     </SectionCard>
                   ))
                 )}
-                {permissoes.podeEditarMestres && (
+                {permissoes.podeEditarMestres && editMode && (
                   <button
                     onClick={async () => {
                       const { data } = await supabase.from("elevatoria_rolamentos_selos").insert({ elevatoria_id: elevId }).select().single();
@@ -603,10 +672,10 @@ function ElevatoriaFichaPage() {
               <SectionCard title="Área de Influência">
                 <InputField tabela="elevatoria_area_influencia" campo="populacao_beneficiada_habitantes" label="População Beneficiada" valor={areaInfluencia?.populacao_beneficiada_habitantes} />
                 <InputField tabela="elevatoria_area_influencia" campo="domicilios" label="Domicílios" valor={areaInfluencia?.domicilios} />
-                <div className="sm:col-span-2 lg:col-span-3">
+                <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
                   <InputField tabela="elevatoria_area_influencia" campo="comunidades_hospitais_locais_importantes" label="Comunidades/Hospitais/Localidades" valor={areaInfluencia?.comunidades_hospitais_locais_importantes} />
                 </div>
-                <div className="sm:col-span-2 lg:col-span-3">
+                <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
                   <InputField tabela="elevatoria_area_influencia" campo="area_influencia" label="Área de Influência" valor={areaInfluencia?.area_influencia} />
                 </div>
               </SectionCard>
@@ -615,14 +684,16 @@ function ElevatoriaFichaPage() {
             {aba === "implantacao" && (
               <div className="space-y-4">
                 <SectionCard title="Status de Implantação">
-                  <div className="sm:col-span-2 lg:col-span-3">
+                  <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
                     <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</label>
                     <div className="mt-1 flex flex-wrap gap-2">
                       {IMPLANTACAO_STATUS_OPCOES.map(opt => (
                         <button
                           key={opt.value}
-                          onClick={() => salvarImplantacaoStatus(opt.value)}
-                          disabled={!permissoes.podeEditarMestres}
+                          onClick={() => {
+                            if (permissoes.podeEditarMestres && editMode) salvarImplantacaoStatus(opt.value);
+                          }}
+                          disabled={!(permissoes.podeEditarMestres && editMode)}
                           className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
                             implantacao?.status === opt.value
                               ? "border-[#1f7ad6] bg-[#eaf3fb] text-[#1f7ad6] dark:border-[#38bdf8] dark:bg-slate-700 dark:text-[#38bdf8]"
@@ -634,21 +705,21 @@ function ElevatoriaFichaPage() {
                       ))}
                     </div>
                   </div>
-                  <InputField tabela="elevatoria_implantacao" campo="tipo" label="Tipo" valor={implantacao?.tipo} opcoes={["EEAT", "Elevatória", "Booster", "Container"]} tipo="select" />
-                  <InputField tabela="elevatoria_implantacao" campo="segmento" label="Segmento" valor={implantacao?.segmento} opcoes={["Água", "Esgoto"]} tipo="select" />
-                  <InputField tabela="elevatoria_implantacao" campo="fase_atual" label="Fase Atual" valor={implantacao?.fase_atual} />
-                  <div className="sm:col-span-2 lg:col-span-3">
-                    <InputField tabela="elevatoria_implantacao" campo="observacoes_inconformidades" label="Observações/Inconformidades" valor={implantacao?.observacoes_inconformidades} />
+                  <InputField tabela="elevatoria_implantacao" campo="tipo" label="Tipo" valor={implantacao?.tipo} opcoes={["EEAT", "Elevatória", "Booster", "Container"]} tipo="select" editOnly />
+                  <InputField tabela="elevatoria_implantacao" campo="segmento" label="Segmento" valor={implantacao?.segmento} opcoes={["Água", "Esgoto"]} tipo="select" editOnly />
+                  <InputField tabela="elevatoria_implantacao" campo="fase_atual" label="Fase Atual" valor={implantacao?.fase_atual} editOnly />
+                  <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                    <InputField tabela="elevatoria_implantacao" campo="observacoes_inconformidades" label="Observações/Inconformidades" valor={implantacao?.observacoes_inconformidades} editOnly />
                   </div>
                 </SectionCard>
 
                 {implantacao && (
                   <SectionCard title="Etapas Restantes">
-                    {etapas.filter(e => e.implantacao_id === implantacao.id).length === 0 ? (
-                      <div className="sm:col-span-2 lg:col-span-3 text-sm text-slate-400">Nenhuma etapa cadastrada.</div>
+                    {                      etapas.filter(e => e.implantacao_id === implantacao.id).length === 0 ? (
+                      <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4 text-sm text-slate-400">Nenhuma etapa cadastrada.</div>
                     ) : (
                       etapas.filter(e => e.implantacao_id === implantacao.id).map(etapa => (
-                        <div key={etapa.id} className="flex items-center gap-3 sm:col-span-2 lg:col-span-3">
+                        <div key={etapa.id} className="flex items-center gap-3 sm:col-span-2 lg:col-span-3 xl:col-span-4">
                           <input
                             type="checkbox"
                             checked={etapa.concluida}
@@ -662,7 +733,7 @@ function ElevatoriaFichaPage() {
                         </div>
                       ))
                     )}
-                    {permissoes.podeEditarMestres && (
+                    {permissoes.podeEditarMestres && editMode && (
                       <button
                         onClick={async () => {
                           const desc = prompt("Descrição da etapa:");
