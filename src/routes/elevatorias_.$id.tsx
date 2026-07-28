@@ -252,6 +252,8 @@ function ElevatoriaFichaPage() {
     let error;
     if (tabela === "elevatoria") {
       ({ error } = await supabase.from(tabelaReal).update({ [campo]: valor || null }).eq("id", elevId));
+    } else if (rowId !== undefined) {
+      ({ error } = await supabase.from(tabelaReal).update({ [campo]: valor || null }).eq("id", rowId));
     } else {
       ({ error } = await supabase.from(tabelaReal).upsert({ ...filtro, [campo]: valor || null } as Record<string, unknown>, {
         onConflict,
