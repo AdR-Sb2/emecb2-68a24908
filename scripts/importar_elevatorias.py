@@ -68,23 +68,25 @@ EQUIP_COLS = {
     "AMT_APROXIMADA": ("elevatoria_equipamento", "amt_aproximada"),
     "CAPACIDADE_TRATAMENTO": ("elevatoria_equipamento", "capacidade_tratamento"),
     "PROCEDENCIA_MCA": ("elevatoria_equipamento", "procedencia_mca"),
-    "COD_SAP": ("elevatoria_equipamento", "cod_sap"),
 }
 
 ELETR_COLS = {
-    "BT_MT": ("elevatoria_eletrica", "bt_mt"),
-    "TRAFO_KVA": ("elevatoria_eletrica", "trafo_kva"),
-    "NUM_CLIENTE": ("elevatoria_eletrica", "num_cliente"),
-    "MEDIDOR": ("elevatoria_eletrica", "medidor"),
-    "MEDIDOR_APURADO": ("elevatoria_eletrica", "medidor_apurado"),
-    "UNIDADE_CONSUMO": ("elevatoria_eletrica", "unidade_consumo"),
-    "ENDERECO_CONCESSIONARIA": ("elevatoria_eletrica", "endereco_concessionaria"),
     "TAG_PAINEL": ("elevatoria_eletrica", "tag_painel"),
     "TIPO_ACIONAMENTO": ("elevatoria_eletrica", "tipo_acionamento"),
     "FABRICANTE_ACIONAMENTO": ("elevatoria_eletrica", "fabricante_acionamento"),
     "MODELO_ACIONAMENTO": ("elevatoria_eletrica", "modelo_acionamento"),
-    "CLP": ("elevatoria_eletrica", "clp"),
-    "PCP": ("elevatoria_eletrica", "pcp"),
+}
+
+ELETR_GERAL_COLS = {
+    "BT_MT": ("elevatoria_eletrica_geral", "bt_mt"),
+    "TRAFO_KVA": ("elevatoria_eletrica_geral", "trafo_kva"),
+    "NUM_CLIENTE": ("elevatoria_eletrica_geral", "num_cliente"),
+    "MEDIDOR": ("elevatoria_eletrica_geral", "medidor"),
+    "MEDIDOR_APURADO": ("elevatoria_eletrica_geral", "medidor_apurado"),
+    "UNIDADE_CONSUMO": ("elevatoria_eletrica_geral", "unidade_consumo"),
+    "ENDERECO_CONCESSIONARIA": ("elevatoria_eletrica_geral", "endereco_concessionaria"),
+    "CLP": ("elevatoria_eletrica_geral", "clp"),
+    "PCP": ("elevatoria_eletrica_geral", "pcp"),
 }
 
 HIDRA_COLS = {
@@ -227,6 +229,21 @@ def importar_elevatorias():
                 headers=HEADERS,
                 json={k: v for k, v in equip_data.items() if k.startswith("elevatoria_id") or
                       k in dict(EQUIP_COLS).values() or False},
+            )
+
+        # ---- Dados gerais de elétrica (Alimentação, Concessionária) ----
+        geral_data = {"elevatoria_id": elev_id}
+        for planilha_col, (tabela, campo) in ELETR_GERAL_COLS.items():
+            if planilha_col in df.columns:
+                v = clean_val(row.get(planilha_col))
+                if v is not None:
+                    geral_data[campo] = v
+
+        if len(geral_data) > 1:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/elevatoria_eletrica_geral",
+                headers=HEADERS,
+                json=geral_data,
             )
 
         # ---- Rolamentos (cruzar pelo nome) ----

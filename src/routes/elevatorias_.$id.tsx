@@ -30,6 +30,7 @@ import type {
   Elevatoria,
   ElevatoriaEquipamento,
   ElevatoriaEletrica,
+  ElevatoriaEletricaGeral,
   ElevatoriaHidraulica,
   ElevatoriaAreaInfluencia,
   ElevatoriaRolamentoSelo,
@@ -84,6 +85,7 @@ function ElevatoriaFichaPage() {
 
   const [equipamentos, setEquipamentos] = useState<ElevatoriaEquipamento[]>([]);
   const [eletricas, setEletricas] = useState<ElevatoriaEletrica[]>([]);
+  const [eletricaGeral, setEletricaGeral] = useState<ElevatoriaEletricaGeral | null>(null);
   const [hidraulica, setHidraulica] = useState<ElevatoriaHidraulica | null>(null);
   const [areaInfluencia, setAreaInfluencia] = useState<ElevatoriaAreaInfluencia | null>(null);
   const [rolamentos, setRolamentos] = useState<ElevatoriaRolamentoSelo[]>([]);
@@ -94,6 +96,7 @@ function ElevatoriaFichaPage() {
 
   const [salvando, setSalvando] = useState(false);
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const lastSavedNome = useRef<string>("");
 
   const elevId = Number(id);
 
@@ -137,10 +140,11 @@ function ElevatoriaFichaPage() {
   const carregarTudo = async () => {
     setLoading(true);
     try {
-      const [elevRes, equipRes, eletRes, hidrRes, areaRes, rolaRes, impRes, etapasRes, audRes, naRes] = await Promise.all([
+      const [elevRes, equipRes, eletRes, eletGeralRes, hidrRes, areaRes, rolaRes, impRes, etapasRes, audRes, naRes] = await Promise.all([
         supabase.from("elevatorias").select("*").eq("id", elevId).single(),
         supabase.from("elevatoria_equipamento").select("*").eq("elevatoria_id", elevId).order("grupo"),
         supabase.from("elevatoria_eletrica").select("*").eq("elevatoria_id", elevId).order("grupo"),
+        supabase.from("elevatoria_eletrica_geral").select("*").eq("elevatoria_id", elevId).maybeSingle(),
         supabase.from("elevatoria_hidraulica").select("*").eq("elevatoria_id", elevId).maybeSingle(),
         supabase.from("elevatoria_area_influencia").select("*").eq("elevatoria_id", elevId).maybeSingle(),
         supabase.from("elevatoria_rolamentos_selos").select("*").eq("elevatoria_id", elevId).order("id"),
@@ -157,9 +161,13 @@ function ElevatoriaFichaPage() {
         return;
       }
 
-      if (elevRes.data) setElevatoria(elevRes.data);
+      if (elevRes.data) {
+        setElevatoria(elevRes.data);
+        lastSavedNome.current = elevRes.data.nome;
+      }
       if (equipRes.data) setEquipamentos(equipRes.data);
       if (eletRes.data) setEletricas(eletRes.data);
+      if (eletGeralRes.data) setEletricaGeral(eletGeralRes.data);
       if (hidrRes.data) setHidraulica(hidrRes.data);
       if (areaRes.data) setAreaInfluencia(areaRes.data);
       if (rolaRes.data) setRolamentos(rolaRes.data);
@@ -202,11 +210,26 @@ function ElevatoriaFichaPage() {
     }
   };
 
+  const NOT_NULL_COLS: Record<string, string[]> = {
+    elevatorias: ["nome"],
+  };
+
   const salvarField = useCallback(async (tabela: string, campo: string, valor: string | null, grupo?: number, rowId?: number) => {
     if (!permissoes.podeEditarMestres) return;
-    setSalvando(true);
     const tabelaReal = tabela === "elevatoria" ? "elevatorias" : tabela;
+
+    const notNullCols = NOT_NULL_COLS[tabelaReal];
+    if (notNullCols?.includes(campo) && (valor === null || valor === "")) {
+      if (tabelaReal === "elevatorias" && campo === "nome") {
+        setElevatoria(prev => prev ? { ...prev, nome: lastSavedNome.current } : prev);
+      }
+      toast.error("Este campo não pode ficar vazio");
+      return;
+    }
+
+    setSalvando(true);
     const isMultiGrupo = tabela === "elevatoria_equipamento" || tabela === "elevatoria_eletrica";
+    const isGeral = tabela === "elevatoria_eletrica_geral";
 
     let filtro: Record<string, unknown>;
     let onConflict: string;
@@ -217,6 +240,9 @@ function ElevatoriaFichaPage() {
     } else if (isMultiGrupo && grupo !== undefined) {
       filtro = { elevatoria_id: elevId, grupo };
       onConflict = "elevatoria_id,grupo";
+    } else if (isGeral) {
+      filtro = { elevatoria_id: elevId };
+      onConflict = "elevatoria_id";
     } else if (rowId !== undefined) {
       filtro = { id: rowId };
       onConflict = "id";
@@ -234,10 +260,13 @@ function ElevatoriaFichaPage() {
       const newVal = valor || null;
       if (tabela === "elevatoria") {
         setElevatoria(prev => prev ? { ...prev, [campo]: newVal } : prev);
+        if (campo === "nome") lastSavedNome.current = valor || "";
       } else if (tabela === "elevatoria_equipamento" && grupo !== undefined) {
         setEquipamentos(prev => prev.map(e => e.grupo === grupo ? { ...e, [campo]: newVal } : e));
       } else if (tabela === "elevatoria_eletrica" && grupo !== undefined) {
         setEletricas(prev => prev.map(e => e.grupo === grupo ? { ...e, [campo]: newVal } : e));
+      } else if (tabela === "elevatoria_eletrica_geral") {
+        setEletricaGeral(prev => prev ? { ...prev, [campo]: newVal } : prev);
       } else if (tabela === "elevatoria_rolamentos_selos" && rowId !== undefined) {
         setRolamentos(prev => prev.map(r => r.id === rowId ? { ...r, [campo]: newVal } : r));
       } else if (tabela === "elevatoria_hidraulica") {
@@ -246,12 +275,25 @@ function ElevatoriaFichaPage() {
         setAreaInfluencia(prev => prev ? { ...prev, [campo]: newVal } : prev);
       }
     } else {
-      toast.error("Erro ao salvar: " + error.message);
+      if (error.message?.includes("violates not-null constraint")) {
+        toast.error("Este campo não pode ficar vazio");
+        if (tabelaReal === "elevatorias" && campo === "nome") {
+          setElevatoria(prev => prev ? { ...prev, nome: lastSavedNome.current } : prev);
+        }
+      } else {
+        toast.error("Erro ao salvar: " + error.message);
+      }
     }
     setSalvando(false);
-  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setHidraulica, setAreaInfluencia, setRolamentos]);
+  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setEletricaGeral, setHidraulica, setAreaInfluencia, setRolamentos]);
 
   const handleFieldChange = (tabela: string, campo: string, valor: string, grupo?: number, rowId?: number) => {
+    const tabelaReal = tabela === "elevatoria" ? "elevatorias" : tabela;
+    const notNullCols = NOT_NULL_COLS[tabelaReal];
+    if (notNullCols?.includes(campo) && !valor.trim()) {
+      toast.error("Este campo não pode ficar vazio");
+      return;
+    }
     const cacheKey = `${tabela}:${campo}:${grupo ?? ""}:${rowId ?? ""}`;
     if (saveTimers.current.has(cacheKey)) {
       clearTimeout(saveTimers.current.get(cacheKey));
@@ -422,6 +464,7 @@ function ElevatoriaFichaPage() {
                     onChange={e => setNomeTemp(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === "Enter") {
+                        if (!nomeTemp.trim()) { toast.error("Nome não pode ficar vazio"); return; }
                         salvarField("elevatoria", "nome", nomeTemp);
                         setElevatoria(prev => prev ? { ...prev, nome: nomeTemp } : prev);
                         setEditingNome(false);
@@ -434,6 +477,7 @@ function ElevatoriaFichaPage() {
                   />
                   <button
                     onClick={() => {
+                      if (!nomeTemp.trim()) { toast.error("Nome não pode ficar vazio"); return; }
                       salvarField("elevatoria", "nome", nomeTemp);
                       setElevatoria(prev => prev ? { ...prev, nome: nomeTemp } : prev);
                       setEditingNome(false);
@@ -498,6 +542,7 @@ function ElevatoriaFichaPage() {
                   };
                   addFields("Básico", elevatoria || {});
                   for (const eq of equipamentos) addFields(`Equipamento G${eq.grupo}`, eq);
+                  if (eletricaGeral) addFields("Elétrica Geral", eletricaGeral);
                   for (const el of eletricas) addFields(`Elétrica G${el.grupo}`, el);
                   if (hidraulica) addFields("Hidráulica", hidraulica);
                   if (areaInfluencia) addFields("Área Influência", areaInfluencia);
@@ -632,14 +677,11 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_equipamento" campo="bomba_dreno" label="Bomba Dreno" valor={eq.bomba_dreno} opcoes={["Sim", "Não"]} tipo="select" grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="flange" label="Flange" valor={eq.flange} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="forma_construtiva_bomba" label="Forma Construtiva da Bomba" valor={eq.forma_construtiva_bomba} grupo={eq.grupo} />
-                        <InputField tabela="elevatoria_equipamento" campo="cod_sap_bomba" label="Cód. SAP Bomba" valor={eq.cod_sap_bomba} grupo={eq.grupo} />
-                      </SectionCard>
-                      <SectionCard title="Desempenho">
                         <InputField tabela="elevatoria_equipamento" campo="vazao_aproximada_m3h" label="Vazão Aproximada (m³/h)" valor={eq.vazao_aproximada_m3h} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="amt_aproximada" label="AMT Aproximada" valor={eq.amt_aproximada} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="capacidade_tratamento" label="Capacidade de Tratamento" valor={eq.capacidade_tratamento} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="procedencia_mca" label="Procedência do MCA" valor={eq.procedencia_mca} grupo={eq.grupo} />
-                        <InputField tabela="elevatoria_equipamento" campo="cod_sap" label="Cód. SAP" valor={eq.cod_sap} grupo={eq.grupo} />
+                        <InputField tabela="elevatoria_equipamento" campo="cod_sap_bomba" label="Cód. SAP Bomba" valor={eq.cod_sap_bomba} grupo={eq.grupo} />
                       </SectionCard>
                     </div>
                   ))
@@ -665,10 +707,36 @@ function ElevatoriaFichaPage() {
 
             {aba === "eletrica" && (
               <div className="space-y-4">
+                {/* Cards Gerais (fora do loop de grupo) */}
+                <SectionCard title="Alimentação">
+                  <InputField tabela="elevatoria_eletrica_geral" campo="bt_mt" label="BT/MT" valor={eletricaGeral?.bt_mt} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="trafo_kva" label="TRAFO (KVA)" valor={eletricaGeral?.trafo_kva} />
+                </SectionCard>
+                <SectionCard title="Concessionária de Energia">
+                  <InputField tabela="elevatoria_eletrica_geral" campo="num_cliente" label="N° Cliente" valor={eletricaGeral?.num_cliente} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="medidor" label="Medidor" valor={eletricaGeral?.medidor} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="medidor_apurado" label="Medidor Apurado" valor={eletricaGeral?.medidor_apurado} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="medidor_apurado_data" label="Data Medição" tipo="date" valor={eletricaGeral?.medidor_apurado_data} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="unidade_consumo" label="Unidade de Consumo" valor={eletricaGeral?.unidade_consumo} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="endereco_concessionaria" label="Endereço (Concessionária)" valor={eletricaGeral?.endereco_concessionaria} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="custo_medio_kwh" label="Custo Médio (R$/kWh)" valor={eletricaGeral?.custo_medio_kwh} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="meses_media_kwh" label="Meses da Média (ex: Jan-Jun)" valor={eletricaGeral?.meses_media_kwh} />
+                </SectionCard>
+                <SectionCard title="Automação">
+                  <InputField tabela="elevatoria_eletrica_geral" campo="tag_painel_aut" label="TAG do Painel AUT" valor={eletricaGeral?.tag_painel_aut} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="pcp" label="PCP" valor={eletricaGeral?.pcp} opcoes={["Sim", "Não"]} tipo="select" />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="clp" label="CLP" valor={eletricaGeral?.clp} opcoes={["Sim", "Não"]} tipo="select" />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="modelo_clp" label="Modelo CLP" valor={eletricaGeral?.modelo_clp} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="versao_tea_portal" label="Versão TEA Portal" valor={eletricaGeral?.versao_tea_portal} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="serial_chip" label="Serial do CHIP" valor={eletricaGeral?.serial_chip} />
+                  <InputField tabela="elevatoria_eletrica_geral" campo="operadora" label="Operadora" valor={eletricaGeral?.operadora} />
+                </SectionCard>
+
+                {/* Cards por Grupo (Painéis + Setpoint) */}
                 {eletricas.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-600 dark:bg-slate-800">
                     <Zap className="mx-auto mb-2 h-8 w-8 text-slate-300 dark:text-slate-500" />
-                    <p className="text-sm text-slate-400">Nenhum dado elétrico registrado.</p>
+                    <p className="text-sm text-slate-400">Nenhum grupo de painéis registrado.</p>
                     {permissoes.podeEditarMestres && (
                       <p className="mt-1 text-xs text-slate-400">Use o botão abaixo para adicionar.</p>
                     )}
@@ -677,20 +745,6 @@ function ElevatoriaFichaPage() {
                   eletricas.map(el => (
                     <div key={el.id} className="space-y-4">
                       <h4 className="text-sm font-bold text-[#0b3a73] dark:text-white">Grupo {el.grupo}</h4>
-                      <SectionCard title="Alimentação">
-                        <InputField tabela="elevatoria_eletrica" campo="bt_mt" label="BT/MT" valor={el.bt_mt} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="trafo_kva" label="TRAFO (KVA)" valor={el.trafo_kva} grupo={el.grupo} />
-                      </SectionCard>
-                      <SectionCard title="Concessionária de Energia">
-                        <InputField tabela="elevatoria_eletrica" campo="num_cliente" label="N° Cliente" valor={el.num_cliente} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="medidor" label="Medidor" valor={el.medidor} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="medidor_apurado" label="Medidor Apurado" valor={el.medidor_apurado} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="medidor_apurado_data" label="Data Medição" tipo="date" valor={el.medidor_apurado_data} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="unidade_consumo" label="Unidade de Consumo" valor={el.unidade_consumo} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="endereco_concessionaria" label="Endereço (Concessionária)" valor={el.endereco_concessionaria} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="custo_medio_kwh" label="Custo Médio (R$/kWh)" valor={el.custo_medio_kwh} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="meses_media_kwh" label="Meses da Média (ex: Jan-Jun)" valor={el.meses_media_kwh} grupo={el.grupo} />
-                      </SectionCard>
                       <SectionCard title="Painéis">
                         <InputField tabela="elevatoria_eletrica" campo="fusivel_pc" label="Fusível (PC)" valor={el.fusivel_pc} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="disjuntor_pc" label="Disjuntor (PC)" valor={el.disjuntor_pc} grupo={el.grupo} />
@@ -701,16 +755,12 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_eletrica" campo="tamanho_fusivel_nh" label="Tamanho do Fusível NH" valor={el.tamanho_fusivel_nh} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="corrente_fusivel_nh" label="Corrente do Fusível NH" valor={el.corrente_fusivel_nh} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="corrente_fusivel_dz" label="Corrente do Fusível DZ" valor={el.corrente_fusivel_dz} grupo={el.grupo} />
-                      </SectionCard>
-                      <SectionCard title="Automação">
-                        <InputField tabela="elevatoria_eletrica" campo="tag_painel" label="TAG Painel" valor={el.tag_painel} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="tipo_acionamento" label="Tipo de Acionamento" valor={el.tipo_acionamento} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="fabricante_acionamento" label="Fabricante do Acionamento" valor={el.fabricante_acionamento} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="modelo_acionamento" label="Modelo de Acionamento" valor={el.modelo_acionamento} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="corrente_a_acionamento" label="Corrente (A) do Acionamento" valor={el.corrente_a_acionamento} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="tag_acionamento" label="TAG do Acionamento" valor={el.tag_acionamento} grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="clp" label="CLP" valor={el.clp} opcoes={["Sim", "Não"]} tipo="select" grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="pcp" label="PCP" valor={el.pcp} opcoes={["Sim", "Não"]} tipo="select" grupo={el.grupo} />
+                        <InputField tabela="elevatoria_eletrica" campo="tag_painel" label="TAG do Painel" valor={el.tag_painel} grupo={el.grupo} />
                       </SectionCard>
                       <SectionCard title="Setpoint">
                         <InputField tabela="elevatoria_eletrica" campo="retaguarda_liga" label="Retaguarda Liga" valor={el.retaguarda_liga} grupo={el.grupo} />
@@ -728,7 +778,7 @@ function ElevatoriaFichaPage() {
                       if (error) { toast.error("Erro ao adicionar grupo: " + error.message); return; }
                       if (data) {
                         setEletricas(prev => [...prev, data]);
-                        toast.success("Grupo elétrico adicionado");
+                        toast.success("Grupo de painéis adicionado");
                       }
                     }}
                     className="inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-500 transition hover:border-[#1f7ad6] hover:text-[#1f7ad6] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400"
