@@ -552,39 +552,69 @@ function ElevatoriasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f0f4f8] dark:bg-slate-900">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] text-white shadow-lg">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
-          <div className="flex items-center gap-3">
-            <img src={logoHeader} alt="Águas do Rio" className="h-10 w-auto" />
-            <Link to="/" className="rounded-full border border-white/20 bg-white/10 p-1.5 transition hover:bg-white/20">
-              <Home className="h-4 w-4" />
-            </Link>
-            <h1 className="text-lg font-semibold tracking-tight">Ficha da Elevatória</h1>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
+      {/* Header */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
+              <img
+                src={logoHeader}
+                alt="Águas do Rio"
+                className="h-14 w-auto object-contain"
+                loading="eager"
+              />
+            </div>
+            <div className="min-w-0 text-white">
+              <p className="truncate text-lg font-semibold">Águas do Rio</p>
+              <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Ficha da Elevatória</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {permissoes.podeImportar && (
-              <button
-                onClick={() => setDialogImportar(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-4 py-1.5 text-sm font-medium transition hover:bg-white/25"
-              >
-                <Upload className="h-4 w-4" /> Importar
-              </button>
-            )}
-            {permissoes.podeExportar && (
-              <button
-                onClick={exportarPlanilha}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-4 py-1.5 text-sm font-medium transition hover:bg-white/25"
-              >
-                <Download className="h-4 w-4" /> Exportar
-              </button>
-            )}
-          </div>
+          <Link
+            to="/"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
+          >
+            <Home className="h-5 w-5" />
+          </Link>
         </div>
-      </header>
+      </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
-        {elevatorias.length === 0 ? (
+      {/* Title + actions */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">
+            Ficha da Elevatória
+          </h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {permissoes.podeEditar && (
+            <button
+              onClick={criarElevatoria}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
+            >
+              <Plus className="h-4 w-4" /> Nova Elevatória
+            </button>
+          )}
+          {permissoes.podeImportar && (
+            <button
+              onClick={() => setDialogImportar(true)}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
+            >
+              <Upload className="h-4 w-4" /> Importar
+            </button>
+          )}
+          {permissoes.podeExportar && (
+            <button
+              onClick={exportarPlanilha}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <Download className="h-4 w-4" /> Exportar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {elevatorias.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-16 text-center dark:border-slate-600 dark:bg-slate-800">
             <Building2 className="mb-4 h-16 w-16 text-slate-300 dark:text-slate-500" />
             <h2 className="text-xl font-bold text-[#0b3a73] dark:text-white">Nenhuma elevatória cadastrada</h2>
@@ -793,7 +823,6 @@ function ElevatoriasPage() {
             </div>
           </>
         )}
-      </div>
 
       {/* Import Dialog */}
       <Dialog open={dialogImportar} onOpenChange={setDialogImportar}>

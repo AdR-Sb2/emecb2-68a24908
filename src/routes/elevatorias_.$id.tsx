@@ -367,19 +367,45 @@ function ElevatoriaFichaPage() {
   if (!elevatoria) return null;
 
   return (
-    <div className="min-h-screen bg-[#f0f4f8] dark:bg-slate-900">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] text-white shadow-lg">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
+      {/* Header */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <img src={logoHeader} alt="Águas do Rio" className="h-10 w-auto shrink-0" />
-            <Link to="/" className="rounded-full border border-white/20 bg-white/10 p-1.5 transition hover:bg-white/20 shrink-0">
-              <Home className="h-4 w-4" />
-            </Link>
-            <Link to="/elevatorias" className="rounded-full border border-white/20 bg-white/10 p-1.5 transition hover:bg-white/20 shrink-0">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+            <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
+              <img
+                src={logoHeader}
+                alt="Águas do Rio"
+                className="h-14 w-auto object-contain"
+                loading="eager"
+              />
+            </div>
+            <div className="min-w-0 text-white">
+              <p className="truncate text-lg font-semibold">Águas do Rio</p>
+              <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Ficha da Elevatória</p>
+            </div>
+          </div>
+          <Link
+            to="/"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
+          >
+            <Home className="h-5 w-5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Title + actions */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            to="/elevatorias"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="min-w-0">
             <h1
-              className={`truncate text-lg font-semibold ${editMode ? "cursor-pointer rounded px-1.5 py-0.5 hover:bg-white/20" : ""}`}
+              className={`truncate text-lg font-bold text-[#0b3a73] dark:text-white ${editMode ? "cursor-pointer" : ""}`}
               onClick={() => {
                 if (editMode && permissoes.podeEditar) {
                   setEditingNome(true);
@@ -403,7 +429,7 @@ function ElevatoriaFichaPage() {
                         setEditingNome(false);
                       }
                     }}
-                    className="rounded border border-white/40 bg-white/20 px-1.5 py-0.5 text-lg font-semibold text-white outline-none placeholder:text-white/50"
+                    className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-lg font-bold text-[#0b3a73] outline-none placeholder:text-slate-400"
                     placeholder="Nome..."
                   />
                   <button
@@ -428,71 +454,71 @@ function ElevatoriaFichaPage() {
               )}
             </h1>
             {elevatoria.planta && (
-              <Badge variant="outline" className="border-white/20 bg-white/10 text-white text-[10px] shrink-0">
+              <Badge variant="outline" className="border-slate-300 bg-white text-[10px] text-slate-500 dark:border-slate-600 dark:bg-slate-800">
                 {elevatoria.planta}
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {salvando && (
-              <span className="flex items-center gap-1 text-[11px] text-cyan-200">
-                <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
-              </span>
-            )}
-            {permissoes.podeEditar && (
-              <button
-                onClick={() => setEditMode(prev => !prev)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                  editMode
-                    ? "border-amber-400 bg-amber-500 text-white shadow-md"
-                    : "border-white/20 bg-white/15 text-white hover:bg-white/25"
-                }`}
-                title={editMode ? "Sair do modo edição" : "Ativar modo edição"}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                {editMode ? "Editando" : "Editar"}
-              </button>
-            )}
-            {permissoes.podeExportar && (
-              <button
-                onClick={() => {
-                  try {
-                    const wb = XLSX.utils.book_new();
-                    const data: Record<string, string | number | null>[] = [];
-                    const addFields = (prefix: string, fields: Record<string, unknown>) => {
-                      for (const [k, v] of Object.entries(fields)) {
-                        if (k !== "id" && k !== "elevatoria_id" && k !== "criado_em" && k !== "atualizado_em") {
-                          const row: Record<string, string | number | null> = {};
-                          row["Campo"] = prefix + " · " + k;
-                          row["Valor"] = v as string | number | null;
-                          data.push(row);
-                        }
-                      }
-                    };
-                    addFields("Básico", elevatoria || {});
-                    for (const eq of equipamentos) addFields(`Equipamento G${eq.grupo}`, eq);
-                    for (const el of eletricas) addFields(`Elétrica G${el.grupo}`, el);
-                    if (hidraulica) addFields("Hidráulica", hidraulica);
-                    if (areaInfluencia) addFields("Área Influência", areaInfluencia);
-                    if (implantacao) addFields("Implantação", implantacao);
-                    const ws = XLSX.utils.json_to_sheet(data);
-                    XLSX.utils.book_append_sheet(wb, ws, elevatoria?.nome || "Ficha");
-                    XLSX.writeFile(wb, `ficha_${elevatoria?.nome || "elevatoria"}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                    toast.success("Exportação concluída!");
-                  } catch (err) {
-                    toast.error("Erro ao exportar: " + (err instanceof Error ? err.message : "desconhecido"));
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-medium transition hover:bg-white/25"
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" /> Exportar
-              </button>
-            )}
-          </div>
         </div>
-      </header>
+        <div className="flex flex-wrap items-center gap-2">
+          {salvando && (
+            <span className="flex items-center gap-1 text-[11px] text-slate-400">
+              <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
+            </span>
+          )}
+          {permissoes.podeEditar && (
+            <button
+              onClick={() => setEditMode(prev => !prev)}
+              className={`inline-flex min-h-11 items-center gap-1 rounded-md border px-3 py-2 text-[13px] font-semibold shadow-sm transition ${
+                editMode
+                  ? "border-amber-400 bg-amber-500 text-white hover:bg-amber-600"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              }`}
+              title={editMode ? "Sair do modo edição" : "Ativar modo edição"}
+            >
+              <Pencil className="h-4 w-4" />
+              {editMode ? "Editando" : "Editar"}
+            </button>
+          )}
+          {permissoes.podeExportar && (
+            <button
+              onClick={() => {
+                try {
+                  const wb = XLSX.utils.book_new();
+                  const data: Record<string, string | number | null>[] = [];
+                  const addFields = (prefix: string, fields: Record<string, unknown>) => {
+                    for (const [k, v] of Object.entries(fields)) {
+                      if (k !== "id" && k !== "elevatoria_id" && k !== "criado_em" && k !== "atualizado_em") {
+                        const row: Record<string, string | number | null> = {};
+                        row["Campo"] = prefix + " · " + k;
+                        row["Valor"] = v as string | number | null;
+                        data.push(row);
+                      }
+                    }
+                  };
+                  addFields("Básico", elevatoria || {});
+                  for (const eq of equipamentos) addFields(`Equipamento G${eq.grupo}`, eq);
+                  for (const el of eletricas) addFields(`Elétrica G${el.grupo}`, el);
+                  if (hidraulica) addFields("Hidráulica", hidraulica);
+                  if (areaInfluencia) addFields("Área Influência", areaInfluencia);
+                  if (implantacao) addFields("Implantação", implantacao);
+                  const ws = XLSX.utils.json_to_sheet(data);
+                  XLSX.utils.book_append_sheet(wb, ws, elevatoria?.nome || "Ficha");
+                  XLSX.writeFile(wb, `ficha_${elevatoria?.nome || "elevatoria"}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                  toast.success("Exportação concluída!");
+                } catch (err) {
+                  toast.error("Erro ao exportar: " + (err instanceof Error ? err.message : "desconhecido"));
+                }
+              }}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Exportar
+            </button>
+          )}
+        </div>
+      </div>
 
-      <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1400px]">
         {/* Basic Info Card */}
         <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
