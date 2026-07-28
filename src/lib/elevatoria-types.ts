@@ -47,6 +47,8 @@ export type ElevatoriaEquipamento = {
   capacidade_tratamento: string | null;
   procedencia_mca: string | null;
   cod_sap: string | null;
+  cod_sap_motor: string | null;
+  cod_sap_bomba: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
 };
@@ -63,6 +65,8 @@ export type ElevatoriaEletrica = {
   medidor_apurado_data: string | null;
   unidade_consumo: string | null;
   endereco_concessionaria: string | null;
+  custo_medio_kwh: string | null;
+  meses_media_kwh: string | null;
   fusivel_pc: string | null;
   disjuntor_pc: string | null;
   regulagem_rele_termico_bimetálico: string | null;
@@ -120,6 +124,7 @@ export type ElevatoriaAreaInfluencia = {
 export type ElevatoriaRolamentoSelo = {
   id: number;
   elevatoria_id: number;
+  nome: string | null;
   tipo: string | null;
   cadeados_padrao: string | null;
   quantidade_cadeados: string | null;
