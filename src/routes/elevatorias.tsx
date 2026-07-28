@@ -65,6 +65,7 @@ function ElevatoriasPage() {
   const [search, setSearch] = useState("");
   const [filtroMunicipio, setFiltroMunicipio] = useState("TODAS");
   const [filtroCompletude, setFiltroCompletude] = useState("TODAS");
+  const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
@@ -201,6 +202,11 @@ function ElevatoriasPage() {
     return Array.from(s).sort();
   }, [elevatorias]);
 
+  const tipos = useMemo(() => {
+    const s = new Set(elevatorias.map(e => e.tipo).filter(Boolean));
+    return Array.from(s).sort();
+  }, [elevatorias]);
+
   const kpis = useMemo(() => {
     const total = elevatorias.length;
     let completudeMedia = 0;
@@ -230,6 +236,7 @@ function ElevatoriasPage() {
       );
     }
     if (filtroMunicipio !== "TODAS") list = list.filter(e => e.municipio === filtroMunicipio);
+    if (filtroTipo !== "TODAS") list = list.filter(e => e.tipo === filtroTipo);
     if (filtroCompletude !== "TODAS") list = list.filter(e => completudes.get(e.id)?.nivel === filtroCompletude);
     if (filtroImplantacao !== "TODAS") {
       if (filtroImplantacao === "operacional") {
@@ -246,7 +253,7 @@ function ElevatoriasPage() {
       list = list.filter(e => idsImplantacao.has(e.id));
     }
     return list;
-  }, [elevatorias, search, filtroMunicipio, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes]);
+  }, [elevatorias, search, filtroMunicipio, filtroTipo, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes]);
 
   const criarElevatoria = async () => {
     if (!permissoes.podeEditar) return;
@@ -730,6 +737,15 @@ function ElevatoriasPage() {
                 {municipios.map(m => <option key={m} value={m!}>{m}</option>)}
               </select>
 
+              <select
+                value={filtroTipo}
+                onChange={e => setFiltroTipo(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="TODAS">Todos os tipos</option>
+                {tipos.map(t => <option key={t} value={t!}>{t}</option>)}
+              </select>
+
               {permissoes.podeVerMestres && (
                 <select
                   value={filtroCompletude}
@@ -788,7 +804,28 @@ function ElevatoriasPage() {
                             {elev.planta || "—"}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            <Badge variant="outline" className="text-[11px]">{elev.tipo || "—"}</Badge>
+                            {permissoes.podeEditar ? (
+                              <select
+                                value={elev.tipo || ""}
+                                onChange={async e => {
+                                  const newTipo = e.target.value || null;
+                                  setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, tipo: newTipo } : el));
+                                  const { error } = await supabase.from("elevatorias").update({ tipo: newTipo }).eq("id", elev.id);
+                                  if (error) {
+                                    toast.error("Erro ao salvar tipo");
+                                    setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, tipo: elev.tipo } : el));
+                                  }
+                                }}
+                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                              >
+                                <option value="">—</option>
+                                <option value="EAT">EAT</option>
+                                <option value="Booster">Booster</option>
+                                <option value="Container">Container</option>
+                              </select>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px]">{elev.tipo || "—"}</Badge>
+                            )}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
                             {elev.municipio || "—"}
@@ -799,12 +836,46 @@ function ElevatoriasPage() {
                             </td>
                           )}
                           <td className="whitespace-nowrap px-3 py-2">
-                            {imp ? (
-                              <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${IMPLANTACAO_STATUS_CORES[imp.status] || ""}`}>
-                                {IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status}
-                              </span>
+                            {permissoes.podeEditarMestres ? (
+                              <select
+                                value={imp?.status || ""}
+                                onChange={async e => {
+                                  const newStatus = e.target.value as StatusImplantacao;
+                                  if (!newStatus) return;
+                                  setImplantacoes(prev => {
+                                    const idx = prev.findIndex(i => i.elevatoria_id === elev.id);
+                                    if (idx >= 0) {
+                                      const updated = [...prev];
+                                      updated[idx] = { ...updated[idx], status: newStatus };
+                                      return updated;
+                                    }
+                                    return [...prev, { elevatoria_id: elev.id, status: newStatus, tipo: null, segmento: null, fase_atual: null, observacoes_inconformidades: null } as ElevatoriaImplantacao];
+                                  });
+                                  const { error } = await supabase.from("elevatoria_implantacao").upsert(
+                                    { elevatoria_id: elev.id, status: newStatus },
+                                    { onConflict: "elevatoria_id", ignoreDuplicates: false }
+                                  );
+                                  if (error) {
+                                    toast.error("Erro ao salvar implantação");
+                                    const { data } = await supabase.from("elevatoria_implantacao").select("*");
+                                    if (data) setImplantacoes(data);
+                                  }
+                                }}
+                                className={`w-full rounded border px-2 py-1 text-[11px] font-semibold focus:outline-none ${IMPLANTACAO_STATUS_CORES[imp?.status || ""] || "bg-white text-slate-600 border-slate-300"}`}
+                              >
+                                <option value="">—</option>
+                                {IMPLANTACAO_STATUS_OPCOES.map(o => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">—</span>
+                              imp ? (
+                                <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${IMPLANTACAO_STATUS_CORES[imp.status] || ""}`}>
+                                  {IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">—</span>
+                              )
                             )}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
