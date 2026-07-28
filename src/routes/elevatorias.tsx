@@ -13,6 +13,9 @@ import {
   TrendingUp,
   HardHat,
   Plus,
+  Trash2,
+  History,
+  ArrowUpDown,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
@@ -29,6 +32,7 @@ import type {
   CompletudeNivel,
   StatusImplantacao,
   ElevatoriaImplantacao,
+  ElevatoriaRegistro,
 } from "@/lib/elevatoria-types";
 import { IMPLANTACAO_STATUS_CORES, IMPLANTACAO_STATUS_OPCOES } from "@/lib/elevatoria-types";
 
@@ -55,18 +59,37 @@ const COMPLETUDE_OPCOES = [
   { value: "bom", label: "Bom (≥ 80%)" },
 ];
 
+const SECOES_COMPLETUDE = [
+  { value: "geral", label: "Geral" },
+  { value: "elevatoria", label: "Elevatória" },
+  { value: "equipamento", label: "Equipamento" },
+  { value: "eletrica", label: "Elétrica" },
+  { value: "eletrica_geral", label: "Elétrica Geral" },
+  { value: "hidraulica", label: "Hidráulica" },
+  { value: "rolamentos", label: "Rolamentos & Selos" },
+  { value: "area_influencia", label: "Área de Influência" },
+  { value: "implantacao", label: "Implantação" },
+];
+
 function ElevatoriasPage() {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
   const [elevatorias, setElevatorias] = useState<Elevatoria[]>([]);
   const [implantacoes, setImplantacoes] = useState<ElevatoriaImplantacao[]>([]);
-  const [completudes, setCompletudes] = useState<Map<number, ElevatoriaCompletude>>(new Map());
+  const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
+  const [filtroSecaoCompletude, setFiltroSecaoCompletude] = useState("geral");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filtroMunicipio, setFiltroMunicipio] = useState("TODAS");
   const [filtroCompletude, setFiltroCompletude] = useState("TODAS");
+  const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
+  const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc");
+  const [registros, setRegistros] = useState<ElevatoriaRegistro[]>([]);
+  const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
+  const [novoRegistro, setNovoRegistro] = useState("");
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false,
     podeEditar: false,
@@ -127,11 +150,19 @@ function ElevatoriasPage() {
   };
 
   const calcularCompletudes = async (elevs: Elevatoria[]) => {
-    const tabs = ["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_eletrica_geral", "elevatoria_hidraulica",
-      "elevatoria_rolamentos_selos", "elevatoria_area_influencia", "elevatoria_implantacao"];
-    const multiGrupoTabs = new Set(["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_rolamentos_selos"]);
+    const tabs: { key: string; table: string | null; multi: boolean }[] = [
+      { key: "elevatoria", table: null, multi: false },
+      { key: "equipamento", table: "elevatoria_equipamento", multi: true },
+      { key: "eletrica", table: "elevatoria_eletrica", multi: true },
+      { key: "eletrica_geral", table: "elevatoria_eletrica_geral", multi: false },
+      { key: "hidraulica", table: "elevatoria_hidraulica", multi: false },
+      { key: "rolamentos", table: "elevatoria_rolamentos_selos", multi: true },
+      { key: "area_influencia", table: "elevatoria_area_influencia", multi: false },
+      { key: "implantacao", table: "elevatoria_implantacao", multi: false },
+    ];
 
-    const promises = tabs.map(t => supabase.from(t).select("*"));
+    const dbTabs = tabs.filter(t => t.table !== null).map(t => t.table!);
+    const promises = dbTabs.map(t => supabase.from(t).select("*"));
     const results = await Promise.all(promises);
 
     const naRes = await supabase.from("elevatoria_campo_na").select("*");
@@ -145,53 +176,66 @@ function ElevatoriasPage() {
     }
 
     const metaFields = ["id", "elevatoria_id", "criado_em", "atualizado_em", "grupo"];
+    const elevFields = ["nome", "planta", "tipo", "superintendencia", "endereco", "bairro", "municipio", "cep",
+      "latitude", "longitude", "inicio_operacao", "caracteristicas_area", "grupo", "funcao"];
 
-    const map = new Map<number, ElevatoriaCompletude>();
+    const calc = (total: number, preenchidos: number, naAplicaveis: number): ElevatoriaCompletude => {
+      const aplicaveis = total - naAplicaveis;
+      const pct = aplicaveis > 0 ? (preenchidos / aplicaveis) * 100 : 100;
+      const nivel: CompletudeNivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
+      return { elevatoria_id: 0, total_campos: total, preenchidos, na_aplicaveis: naAplicaveis, percentual: Math.round(pct), nivel };
+    };
+
+    const map = new Map<string, ElevatoriaCompletude>();
     for (const elev of elevs) {
-      let total = 0;
-      let preenchidos = 0;
-      let naAplicaveis = 0;
+      const secos: { key: string; total: number; preenchidos: number; na: number }[] = [];
+
+      let elevTotal = 0, elevPreenchidos = 0;
+      for (const field of elevFields) {
+        elevTotal++;
+        if (elev[field as keyof Elevatoria] !== null && elev[field as keyof Elevatoria] !== "" && elev[field as keyof Elevatoria] !== undefined) {
+          elevPreenchidos++;
+        }
+      }
+      secos.push({ key: "elevatoria", total: elevTotal, preenchidos: elevPreenchidos, na: 0 });
 
       for (let i = 0; i < tabs.length; i++) {
-        const tabData = results[i].data?.filter(r => r.elevatoria_id === elev.id) ?? [];
-        if (tabData.length === 0) continue;
+        if (!tabs[i].table) continue;
+        const tabData = results[i].data?.filter((r: Record<string, unknown>) => r.elevatoria_id === elev.id) ?? [];
+        if (tabData.length === 0) { secos.push({ key: tabs[i].key, total: 0, preenchidos: 0, na: 0 }); continue; }
 
-        const isMulti = multiGrupoTabs.has(tabs[i]);
-        const naFields = naMap.get(`${elev.id}:${tabs[i]}`) ?? new Set();
+        const naFields = naMap.get(`${elev.id}:${tabs[i].table}`) ?? new Set();
+        let total = 0, preenchidos = 0, naAplicaveis = 0;
 
-        if (isMulti) {
+        if (tabs[i].multi) {
           for (const row of tabData) {
-            const fields = Object.keys(row).filter(k => !metaFields.includes(k));
+            const fields = Object.keys(row as Record<string, unknown>).filter(k => !metaFields.includes(k));
             for (const field of fields) {
               total++;
-              if (naFields.has(field)) {
-                naAplicaveis++;
-                preenchidos++;
-              } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
-                preenchidos++;
-              }
+              if (naFields.has(field)) { naAplicaveis++; preenchidos++; }
+              else if ((row as Record<string, unknown>)[field] !== null && (row as Record<string, unknown>)[field] !== "" && (row as Record<string, unknown>)[field] !== undefined) { preenchidos++; }
             }
           }
         } else {
           const row = tabData[0];
-          const fields = Object.keys(row).filter(k => !metaFields.includes(k));
+          const fields = Object.keys(row as Record<string, unknown>).filter(k => !metaFields.includes(k));
           for (const field of fields) {
             total++;
-            if (naFields.has(field)) {
-              naAplicaveis++;
-              preenchidos++;
-            } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
-              preenchidos++;
-            }
+            if (naFields.has(field)) { naAplicaveis++; preenchidos++; }
+            else if ((row as Record<string, unknown>)[field] !== null && (row as Record<string, unknown>)[field] !== "" && (row as Record<string, unknown>)[field] !== undefined) { preenchidos++; }
           }
         }
+        secos.push({ key: tabs[i].key, total, preenchidos, na: naAplicaveis });
       }
 
-      const aplicaveis = total - naAplicaveis;
-      const pct = aplicaveis > 0 ? (preenchidos / aplicaveis) * 100 : 100;
-      const nivel: CompletudeNivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
-
-      map.set(elev.id, { elevatoria_id: elev.id, total_campos: total, preenchidos, na_aplicaveis: naAplicaveis, percentual: Math.round(pct), nivel });
+      let geralTotal = 0, geralPreenchidos = 0, geralNa = 0;
+      for (const s of secos) {
+        map.set(`${elev.id}:${s.key}`, calc(s.total, s.preenchidos, s.na));
+        geralTotal += s.total;
+        geralPreenchidos += s.preenchidos;
+        geralNa += s.na;
+      }
+      map.set(`${elev.id}:geral`, calc(geralTotal, geralPreenchidos, geralNa));
     }
     setCompletudes(map);
   };
@@ -201,13 +245,18 @@ function ElevatoriasPage() {
     return Array.from(s).sort();
   }, [elevatorias]);
 
+  const tipos = useMemo(() => {
+    const s = new Set(elevatorias.map(e => e.tipo).filter(Boolean));
+    return Array.from(s).sort();
+  }, [elevatorias]);
+
   const kpis = useMemo(() => {
     const total = elevatorias.length;
     let completudeMedia = 0;
     let criticas = 0;
     let emImplantacao = 0;
     for (const e of elevatorias) {
-      const c = completudes.get(e.id);
+      const c = completudes.get(`${e.id}:geral`);
       if (c) {
         completudeMedia += c.percentual;
         if (c.nivel === "critico") criticas++;
@@ -230,7 +279,8 @@ function ElevatoriasPage() {
       );
     }
     if (filtroMunicipio !== "TODAS") list = list.filter(e => e.municipio === filtroMunicipio);
-    if (filtroCompletude !== "TODAS") list = list.filter(e => completudes.get(e.id)?.nivel === filtroCompletude);
+    if (filtroTipo !== "TODAS") list = list.filter(e => e.tipo === filtroTipo);
+    if (filtroCompletude !== "TODAS") list = list.filter(e => completudes.get(`${e.id}:${filtroSecaoCompletude}`)?.nivel === filtroCompletude);
     if (filtroImplantacao !== "TODAS") {
       if (filtroImplantacao === "operacional") {
         const idsComImplantacao = new Set(implantacoes.filter(i => i.status === "operacional").map(i => i.elevatoria_id));
@@ -240,13 +290,74 @@ function ElevatoriasPage() {
         list = list.filter(e => idsFiltro.has(e.id));
       }
     }
-    if (filtroKpi === "criticas") list = list.filter(e => completudes.get(e.id)?.nivel === "critico");
+    if (filtroKpi === "criticas") list = list.filter(e => completudes.get(`${e.id}:geral`)?.nivel === "critico");
     if (filtroKpi === "implantacao") {
       const idsImplantacao = new Set(implantacoes.filter(i => i.status !== "operacional").map(i => i.elevatoria_id));
       list = list.filter(e => idsImplantacao.has(e.id));
     }
+    list = [...list].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "completude") {
+        const aVal = completudes.get(`${a.id}:${filtroSecaoCompletude}`)?.percentual ?? -1;
+        const bVal = completudes.get(`${b.id}:${filtroSecaoCompletude}`)?.percentual ?? -1;
+        cmp = aVal - bVal;
+      } else if (sortField === "implantacao") {
+        const aImp = implantacoes.find(i => i.elevatoria_id === a.id);
+        const bImp = implantacoes.find(i => i.elevatoria_id === b.id);
+        const aVal = aImp ? IMPLANTACAO_STATUS_OPCOES.findIndex(o => o.value === aImp.status) : -1;
+        const bVal = bImp ? IMPLANTACAO_STATUS_OPCOES.findIndex(o => o.value === bImp.status) : -1;
+        cmp = aVal - bVal;
+      } else {
+        const aVal = a[sortField as keyof Elevatoria];
+        const bVal = b[sortField as keyof Elevatoria];
+        if (aVal === null || aVal === undefined) cmp = 1;
+        else if (bVal === null || bVal === undefined) cmp = -1;
+        else cmp = String(aVal).localeCompare(String(bVal), "pt-BR", { numeric: true });
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
     return list;
-  }, [elevatorias, search, filtroMunicipio, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes]);
+  }, [elevatorias, search, filtroMunicipio, filtroTipo, filtroCompletude, filtroSecaoCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes, sortField, sortDir]);
+
+  const handleSort = (field: string) => {
+    const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
+    setSortField(field);
+    setSortDir(newDir);
+    localStorage.setItem("elev_sort", field);
+    localStorage.setItem("elev_sort_dir", newDir);
+  };
+
+  const excluirElevatoria = async (elev: Elevatoria) => {
+    if (!confirm(`Tem certeza que deseja excluir "${elev.nome}"? Esta ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from("elevatorias").delete().eq("id", elev.id);
+    if (error) { toast.error("Erro ao excluir: " + error.message); return; }
+    setElevatorias(prev => prev.filter(e => e.id !== elev.id));
+    toast.success("Elevatória excluída");
+  };
+
+  const abrirRegistros = async (elevId: number) => {
+    const { data } = await supabase.from("elevatoria_registros").select("*").eq("elevatoria_id", elevId).order("criado_em", { ascending: false });
+    if (data) setRegistros(data);
+    setRegistrosDialog(elevId);
+  };
+
+  const adicionarRegistro = async () => {
+    if (!novoRegistro.trim() || registrosDialog === null) return;
+    const { data, error } = await supabase.from("elevatoria_registros").insert({
+      elevatoria_id: registrosDialog,
+      texto: novoRegistro.trim(),
+      criado_por: user?.id,
+    }).select().single();
+    if (error) { toast.error("Erro ao adicionar registro"); return; }
+    setRegistros(prev => [data, ...prev]);
+    setNovoRegistro("");
+  };
+
+  const salvarObs = async (elev: Elevatoria, obs: string | null) => {
+    setElevatorias(prev => prev.map(e => e.id === elev.id ? { ...e, obs } : e));
+    const { error } = await supabase.from("elevatorias").update({ obs }).eq("id", elev.id);
+    if (error) { toast.error("Erro ao salvar OBS"); setElevatorias(prev => prev.map(e => e.id === elev.id ? { ...e, obs: elev.obs } : e)); }
+  };
 
   const criarElevatoria = async () => {
     if (!permissoes.podeEditar) return;
@@ -534,7 +645,7 @@ function ElevatoriasPage() {
           "Grupo": e.grupo || "",
           "Função": e.funcao || "",
           "Implantação": imp ? (IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status) : "",
-          "Completude %": completudes.get(e.id)?.percentual ?? "",
+          "Completude %": completudes.get(`${e.id}:geral`)?.percentual ?? "",
         };
       });
       const ws1 = XLSX.utils.json_to_sheet(basicData);
@@ -730,6 +841,24 @@ function ElevatoriasPage() {
                 {municipios.map(m => <option key={m} value={m!}>{m}</option>)}
               </select>
 
+              <select
+                value={filtroTipo}
+                onChange={e => setFiltroTipo(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="TODAS">Todos os tipos</option>
+                {tipos.map(t => <option key={t} value={t!}>{t}</option>)}
+              </select>
+
+              {permissoes.podeVerMestres && (
+                <select
+                  value={filtroSecaoCompletude}
+                  onChange={e => setFiltroSecaoCompletude(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  {SECOES_COMPLETUDE.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              )}
               {permissoes.podeVerMestres && (
                 <select
                   value={filtroCompletude}
@@ -759,20 +888,33 @@ function ElevatoriasPage() {
                 <table className="min-w-[800px] w-full text-left text-[13px]">
                   <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                     <tr>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Nome</th>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Planta</th>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Tipo</th>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Município</th>
+                      {(["nome", "planta", "tipo", "municipio"] as const).map(f => (
+                        <th key={f} className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]" onClick={() => handleSort(f)}>
+                          <span className="inline-flex items-center gap-1">
+                            {f === "nome" ? "Nome" : f === "planta" ? "Planta" : f === "tipo" ? "Tipo" : "Município"}
+                            {sortField === f && <ArrowUpDown className="h-3 w-3" />}
+                          </span>
+                        </th>
+                      ))}
                       {permissoes.podeVerMestres && (
-                        <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Completude</th>
+                        <th className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]" onClick={() => handleSort("completude")}>
+                          <span className="inline-flex items-center gap-1">
+                            Completude {sortField === "completude" && <ArrowUpDown className="h-3 w-3" />}
+                          </span>
+                        </th>
                       )}
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Implantação</th>
+                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]" onClick={() => handleSort("implantacao")}>
+                        <span className="inline-flex items-center gap-1">
+                          Implantação {sortField === "implantacao" && <ArrowUpDown className="h-3 w-3" />}
+                        </span>
+                      </th>
+                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">OBS</th>
                       <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((elev, idx) => {
-                      const comp = completudes.get(elev.id);
+                      const comp = completudes.get(`${elev.id}:${filtroSecaoCompletude}`);
                       const imp = implantacoes.find(i => i.elevatoria_id === elev.id);
                       return (
                         <tr
@@ -788,7 +930,28 @@ function ElevatoriasPage() {
                             {elev.planta || "—"}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            <Badge variant="outline" className="text-[11px]">{elev.tipo || "—"}</Badge>
+                            {permissoes.podeEditar ? (
+                              <select
+                                value={elev.tipo || ""}
+                                onChange={async e => {
+                                  const newTipo = e.target.value || null;
+                                  setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, tipo: newTipo } : el));
+                                  const { error } = await supabase.from("elevatorias").update({ tipo: newTipo }).eq("id", elev.id);
+                                  if (error) {
+                                    toast.error("Erro ao salvar tipo");
+                                    setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, tipo: elev.tipo } : el));
+                                  }
+                                }}
+                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                              >
+                                <option value="">—</option>
+                                <option value="EAT">EAT</option>
+                                <option value="Booster">Booster</option>
+                                <option value="Container">Container</option>
+                              </select>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px]">{elev.tipo || "—"}</Badge>
+                            )}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
                             {elev.municipio || "—"}
@@ -799,28 +962,96 @@ function ElevatoriasPage() {
                             </td>
                           )}
                           <td className="whitespace-nowrap px-3 py-2">
-                            {imp ? (
-                              <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${IMPLANTACAO_STATUS_CORES[imp.status] || ""}`}>
-                                {IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status}
-                              </span>
+                            {permissoes.podeEditarMestres ? (
+                              <select
+                                value={imp?.status || ""}
+                                onChange={async e => {
+                                  const newStatus = e.target.value as StatusImplantacao;
+                                  if (!newStatus) return;
+                                  setImplantacoes(prev => {
+                                    const idx = prev.findIndex(i => i.elevatoria_id === elev.id);
+                                    if (idx >= 0) {
+                                      const updated = [...prev];
+                                      updated[idx] = { ...updated[idx], status: newStatus };
+                                      return updated;
+                                    }
+                                    return [...prev, { elevatoria_id: elev.id, status: newStatus, tipo: null, segmento: null, fase_atual: null, observacoes_inconformidades: null } as ElevatoriaImplantacao];
+                                  });
+                                  const { error } = await supabase.from("elevatoria_implantacao").upsert(
+                                    { elevatoria_id: elev.id, status: newStatus },
+                                    { onConflict: "elevatoria_id", ignoreDuplicates: false }
+                                  );
+                                  if (error) {
+                                    toast.error("Erro ao salvar implantação");
+                                    const { data } = await supabase.from("elevatoria_implantacao").select("*");
+                                    if (data) setImplantacoes(data);
+                                  }
+                                }}
+                                className={`w-full rounded border px-2 py-1 text-[11px] font-semibold focus:outline-none ${IMPLANTACAO_STATUS_CORES[imp?.status || ""] || "bg-white text-slate-600 border-slate-300"}`}
+                              >
+                                <option value="">—</option>
+                                {IMPLANTACAO_STATUS_OPCOES.map(o => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">—</span>
+                              imp ? (
+                                <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${IMPLANTACAO_STATUS_CORES[imp.status] || ""}`}>
+                                  {IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">—</span>
+                              )
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 max-w-[150px]">
+                            {permissoes.podeEditar ? (
+                              <input
+                                value={elev.obs || ""}
+                                onChange={e => {
+                                  const newObs = e.target.value;
+                                  setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, obs: newObs || null } : el));
+                                }}
+                                onBlur={e => salvarObs(elev, e.target.value || null)}
+                                placeholder="Clique para editar..."
+                                className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-slate-600 placeholder-slate-300 hover:border-slate-200 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-300 dark:placeholder-slate-500"
+                              />
+                            ) : (
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">{elev.obs || "—"}</span>
                             )}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            <Link
-                              to={`/elevatorias/${elev.id}`}
-                              className="rounded-md bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
-                            >
-                              Abrir ficha
-                            </Link>
+                            <div className="flex items-center gap-1.5">
+                              <Link
+                                to={`/elevatorias/${elev.id}`}
+                                className="rounded-md bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
+                              >
+                                Abrir ficha
+                              </Link>
+                              <button
+                                onClick={() => abrirRegistros(elev.id)}
+                                className="rounded-md bg-[#eaf3fb] px-2 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
+                                title="Registros"
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </button>
+                              {permissoes.podeEditar && (
+                                <button
+                                  onClick={() => excluirElevatoria(elev)}
+                                  className="rounded-md px-2 py-1 text-[11px] font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-900/30"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
                     })}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={permissoes.podeVerMestres ? 7 : 6} className="px-3 py-8 text-center text-sm text-slate-400">
+                        <td colSpan={permissoes.podeVerMestres ? 9 : 8} className="px-3 py-8 text-center text-sm text-slate-400">
                           Nenhuma elevatória encontrada com os filtros atuais.
                         </td>
                       </tr>
@@ -831,6 +1062,49 @@ function ElevatoriasPage() {
             </div>
           </>
         )}
+
+      {/* Registros Dialog */}
+      <Dialog open={registrosDialog !== null} onOpenChange={o => { if (!o) setRegistrosDialog(null); }}>
+        <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] dark:text-white flex items-center gap-2">
+              <History className="h-4 w-4" /> Registros da Elevatória
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-2 py-4">
+            {registros.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">Nenhum registro ainda.</p>
+            ) : (
+              registros.map(r => (
+                <div key={r.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                  <p>{r.texto}</p>
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    {r.criado_em ? new Date(r.criado_em).toLocaleString("pt-BR") : ""}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+          {permissoes.podeEditar && (
+            <div className="flex gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
+              <input
+                value={novoRegistro}
+                onChange={e => setNovoRegistro(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") adicionarRegistro(); }}
+                placeholder="Digite um novo registro..."
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              />
+              <button
+                onClick={adicionarRegistro}
+                disabled={!novoRegistro.trim()}
+                className="rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+              >
+                Adicionar
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Import Dialog */}
       <Dialog open={dialogImportar} onOpenChange={setDialogImportar}>

@@ -170,7 +170,15 @@ function ElevatoriaFichaPage() {
       if (eletGeralRes.data) setEletricaGeral(eletGeralRes.data);
       if (hidrRes.data) setHidraulica(hidrRes.data);
       if (areaRes.data) setAreaInfluencia(areaRes.data);
-      if (rolaRes.data) setRolamentos(rolaRes.data);
+      if (rolaRes.data && rolaRes.data.length > 0) {
+        setRolamentos(rolaRes.data);
+      } else if (rolaRes.data && rolaRes.data.length === 0 && elevRes.data) {
+        const { data: newRol, error: rolErr } = await supabase.from("elevatoria_rolamentos_selos").insert({ elevatoria_id: elevId }).select().single();
+        if (rolErr) console.error("Erro ao criar Grupo 1 rolamentos:", rolErr);
+        if (newRol) setRolamentos([newRol]);
+      } else {
+        setRolamentos([]);
+      }
       if (impRes.data) setImplantacao(impRes.data);
       if (etapasRes.data) setEtapas(etapasRes.data);
 
@@ -268,6 +276,8 @@ function ElevatoriaFichaPage() {
         setHidraulica(prev => prev ? { ...prev, [campo]: newVal } : prev);
       } else if (tabela === "elevatoria_area_influencia") {
         setAreaInfluencia(prev => prev ? { ...prev, [campo]: newVal } : prev);
+      } else if (tabela === "elevatoria_implantacao") {
+        setImplantacao(prev => prev ? { ...prev, [campo]: newVal } : prev);
       }
     } else {
       if (tabela === "elevatoria" && campo === "nome" && error.message?.includes("violates not-null constraint")) {
@@ -278,7 +288,7 @@ function ElevatoriaFichaPage() {
       }
     }
     setSalvando(false);
-  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setEletricaGeral, setHidraulica, setAreaInfluencia, setRolamentos]);
+  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setEletricaGeral, setHidraulica, setAreaInfluencia, setRolamentos, setImplantacao]);
 
   const handleFieldChange = (tabela: string, campo: string, valor: string, grupo?: number, rowId?: number) => {
     const cacheKey = `${tabela}:${campo}:${grupo ?? ""}:${rowId ?? ""}`;
@@ -314,8 +324,9 @@ function ElevatoriaFichaPage() {
     tabela: string; campo: string; label: string; tipo?: string; opcoes?: string[];
     valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean; grupo?: number; rowId?: number;
   }) => {
-    const [localValor, setLocalValor] = useState(valor || "");
+    const [localValor, setLocalValor] = useState(valor ?? "");
     const na = isNA(tabela, campo);
+    useEffect(() => { setLocalValor(valor ?? ""); }, [valor]);
     const podeEditarBase = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
     const podeEditar = editOnly ? (podeEditarBase && editMode) : podeEditarBase;
     const podeVer = tabela === "elevatoria" ? permissoes.podeVer : permissoes.podeVerMestres;
@@ -804,19 +815,18 @@ function ElevatoriaFichaPage() {
                     )}
                   </div>
                 ) : (
-                    rolamentos.map(rol => (
+                    rolamentos.map((rol, idx) => (
                     <div key={rol.id}>
-                      <SectionCard title={rol.nome || `Conjunto #${rol.id}`}>
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="nome" label="Nome do Conjunto" valor={rol.nome} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="tipo" label="Tipo" valor={rol.tipo} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="cadeados_padrao" label="Cadeados Padrão" valor={rol.cadeados_padrao} opcoes={["Sim", "Não"]} tipo="select" rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="quantidade_cadeados" label="Quantidade de Cadeados" valor={rol.quantidade_cadeados} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_motor" label="Rolamento Motor" valor={rol.rolamento_motor} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_bomba" label="Rolamento Bomba" valor={rol.rolamento_bomba} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="b_acoplamento" label="B. Acoplamento" valor={rol.b_acoplamento} rowId={rol.id} />
+                      <SectionCard title={`Grupo ${idx + 1}`}>
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="tem_cadeado" label="Tem Cadeado?" valor={rol.tem_cadeado} opcoes={["Sim", "Não"]} tipo="select" rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="cadeado_padrao" label="Cadeado Padrão?" valor={rol.cadeado_padrao} opcoes={["Sim", "Não"]} tipo="select" rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_la_motor" label="Rolamento LA Motor" valor={rol.rolamento_la_motor} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_loa_motor" label="Rolamento LOA Motor" valor={rol.rolamento_loa_motor} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_la_bomba" label="Rolamento LA Bomba" valor={rol.rolamento_la_bomba} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_loa_bomba" label="Rolamento LOA Bomba" valor={rol.rolamento_loa_bomba} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="mm_bomba" label="MM Bomba" valor={rol.mm_bomba} rowId={rol.id} />
                         <InputField tabela="elevatoria_rolamentos_selos" campo="gaxeta" label="Gaxeta" valor={rol.gaxeta} rowId={rol.id} />
                         <InputField tabela="elevatoria_rolamentos_selos" campo="selo_mecanico" label="Selo Mecânico" valor={rol.selo_mecanico} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="data_troca" label="Data da Troca" tipo="date" valor={rol.data_troca} rowId={rol.id} />
                         {permissoes.podeEditarMestres && editMode && (
                           <div className="flex items-end justify-end">
                             <button
