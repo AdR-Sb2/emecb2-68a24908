@@ -146,6 +146,13 @@ export type ElevatoriaRolamentoSelo = {
   gaxeta: string | null;
   selo_mecanico: string | null;
   data_troca: string | null;
+  tem_cadeado: string | null;
+  cadeado_padrao: string | null;
+  rolamento_la_motor: string | null;
+  rolamento_loa_motor: string | null;
+  rolamento_la_bomba: string | null;
+  rolamento_loa_bomba: string | null;
+  mm_bomba: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
 };
