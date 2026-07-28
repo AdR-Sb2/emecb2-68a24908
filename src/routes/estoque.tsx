@@ -144,6 +144,9 @@ function EstoquePage() {
   const [filaStatusConfirmId, setFilaStatusConfirmId] = useState<number | null>(null);
   const [filaRcNumero, setFilaRcNumero] = useState("");
   const [filaRcItem, setFilaRcItem] = useState("");
+  const [filaSortKey, setFilaSortKey] = useState<"descricao" | "data" | "status">("data");
+  const [filaSortDir, setFilaSortDir] = useState<"asc" | "desc">("desc");
+  const [filaEditQtd, setFilaEditQtd] = useState<number | null>(null);
   const [dialogSaldoNegativo, setDialogSaldoNegativo] = useState(false);
   const [dialogSolicitarRc, setDialogSolicitarRc] = useState(false);
   const [solicitarRcMaterial, setSolicitarRcMaterial] = useState<Material | null>(null);
@@ -762,6 +765,32 @@ function EstoquePage() {
     setDialogRcEmFila(false);
   };
 
+  const handleCancelarFila = async (id: number) => {
+    if (!confirm("Tem certeza que deseja cancelar esta RC da fila?")) return;
+    const { error } = await supabase.from("compras").update({ rc_em_fila: false, status_fila: "Cancelado" }).eq("id", id);
+    if (error) {
+      toast.error("Erro ao cancelar RC: " + error.message);
+      return;
+    }
+    await carregarDados();
+    toast.success("RC cancelada da fila.");
+  };
+
+  const handleAlterarQtdeFila = async (id: number, novaQtde: number) => {
+    if (novaQtde <= 0) {
+      toast.error("Quantidade deve ser maior que zero.");
+      return;
+    }
+    const { error } = await supabase.from("compras").update({ qtde_rc: novaQtde }).eq("id", id);
+    if (error) {
+      toast.error("Erro ao alterar quantidade: " + error.message);
+      return;
+    }
+    await carregarDados();
+    setFilaEditQtd(null);
+    toast.success("Quantidade atualizada!");
+  };
+
   const handleCompraStatus = async (id: number, status_geral: StatusCompra) => {
     const update: Partial<Compra> = { status_geral };
     const { error } = await supabase.from("compras").update(update).eq("id", id);
@@ -1156,6 +1185,18 @@ function EstoquePage() {
       }
     }, [materialSelecionado, dialogMov]);
 
+    const sugestoesResponsavelEntrada = useMemo(
+      () =>
+        [
+          ...new Set(
+            movimentacoes
+              .filter((m) => m.tipo === "ENTRADA" && m.responsavel)
+              .map((m) => m.responsavel),
+          ),
+        ].sort(),
+      [movimentacoes],
+    );
+
     const valido = selected !== null && qtd > 0 && resp.trim().length > 0;
 
     const handleSalvar = async () => {
@@ -1231,8 +1272,14 @@ function EstoquePage() {
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}
+            list="sugestoes-responsavel-entrada"
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
+          <datalist id="sugestoes-responsavel-entrada">
+            {sugestoesResponsavelEntrada.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -1295,6 +1342,18 @@ function EstoquePage() {
             movimentacoes
               .filter((m) => m.tipo === "SAIDA" && m.solicitante)
               .map((m) => m.solicitante),
+          ),
+        ].sort(),
+      [movimentacoes],
+    );
+
+    const sugestoesResponsavelSaida = useMemo(
+      () =>
+        [
+          ...new Set(
+            movimentacoes
+              .filter((m) => m.tipo === "SAIDA" && m.responsavel)
+              .map((m) => m.responsavel),
           ),
         ].sort(),
       [movimentacoes],
@@ -1424,8 +1483,14 @@ function EstoquePage() {
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}
+            list="sugestoes-responsavel-saida"
             className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
+          <datalist id="sugestoes-responsavel-saida">
+            {sugestoesResponsavelSaida.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -4435,6 +4500,38 @@ function EstoquePage() {
             </div>
           )}
 
+          {/* Sort controls */}
+          {compras.filter((c) => c.rc_em_fila).length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-slate-500 dark:text-slate-400">Ordenar:</span>
+              {[
+                { key: "descricao", label: "Alfabética" },
+                { key: "data", label: "Data" },
+                { key: "status", label: "Status" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => {
+                    if (filaSortKey === opt.key) {
+                      setFilaSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                    } else {
+                      setFilaSortKey(opt.key as typeof filaSortKey);
+                      setFilaSortDir("asc");
+                    }
+                  }}
+                  className={`rounded-md border px-2 py-1 font-medium transition-colors cursor-pointer ${
+                    filaSortKey === opt.key
+                      ? "border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
+                      : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {opt.label}{" "}
+                  {filaSortKey === opt.key && (filaSortDir === "asc" ? "↑" : "↓")}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Lista da fila */}
           <div className="grid gap-2 text-sm">
             {compras.filter((c) => c.rc_em_fila).length === 0 ? (
@@ -4442,7 +4539,20 @@ function EstoquePage() {
             ) : (
               compras
                 .filter((c) => c.rc_em_fila)
-                .sort((a, b) => ((b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1))
+                .sort((a, b) => {
+                  const dir = filaSortDir === "asc" ? 1 : -1;
+                  if (filaSortKey === "descricao") {
+                    const av = (a.descricao_material || "").toLowerCase();
+                    const bv = (b.descricao_material || "").toLowerCase();
+                    return av.localeCompare(bv) * dir;
+                  }
+                  if (filaSortKey === "status") {
+                    const av = a.status_fila || "Pendente";
+                    const bv = b.status_fila || "Pendente";
+                    return av.localeCompare(bv) * dir;
+                  }
+                  return ((b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1) * (dir === 1 ? 1 : -1);
+                })
                 .map((c) => {
                   const STATUS_FILA_STAGES = ["Pendente", "Em Andamento", "RC Criada"] as const;
                   type StatusFila = (typeof STATUS_FILA_STAGES)[number];
@@ -4468,7 +4578,7 @@ function EstoquePage() {
                   };
                   return (
                     <div key={c.id}>
-                      <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-800">
+                      <div className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-800">
                         <span className="font-mono text-sm font-bold text-blue-600">
                           {c.requisicao || "—"}
                         </span>
@@ -4478,7 +4588,42 @@ function EstoquePage() {
                         <span className="flex-1 truncate text-slate-600 dark:text-slate-300">
                           {c.descricao_material || "—"}
                         </span>
-                        <span className="font-bold">{c.qtde_rc ?? "—"}</span>
+                        {filaEditQtd === c.id ? (
+                          <span className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={1}
+                              defaultValue={c.qtde_rc ?? 1}
+                              autoFocus
+                              className="w-20 rounded-md border border-blue-300 px-2 py-1 text-[13px] shadow-sm dark:border-blue-600 dark:bg-slate-700 dark:text-slate-200"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleAlterarQtdeFila(c.id, Number((e.target as HTMLInputElement).value));
+                                }
+                                if (e.key === "Escape") setFilaEditQtd(null);
+                              }}
+                              onBlur={(e) => {
+                                const val = Number(e.target.value);
+                                if (val > 0 && val !== c.qtde_rc) {
+                                  handleAlterarQtdeFila(c.id, val);
+                                } else {
+                                  setFilaEditQtd(null);
+                                }
+                              }}
+                            />
+                          </span>
+                        ) : (
+                          <span className="font-bold">{c.qtde_rc ?? "—"}</span>
+                        )}
+                        {permissoes.solicitarCompra && filaEditQtd !== c.id && (
+                          <button
+                            onClick={() => setFilaEditQtd(c.id)}
+                            className="rounded p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                            title="Alterar quantidade"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <span className="text-xs text-slate-400 dark:text-slate-500">
                           {c.dt_criacao_rc || "—"}
                         </span>
@@ -4497,6 +4642,15 @@ function EstoquePage() {
                           >
                             {currentStatus}
                           </span>
+                        )}
+                        {permissoes.solicitarCompra && (
+                          <button
+                            onClick={() => handleCancelarFila(c.id)}
+                            className="rounded p-0.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                            title="Cancelar RC"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
                         )}
                       </div>
                       {/* Confirmação de RC Criada */}
