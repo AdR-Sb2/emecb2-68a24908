@@ -21,6 +21,7 @@ WHERE a.nome = b.nome
   AND a.id > b.id;
 
 -- 3. UNIQUE constraint na tabela elevatorias (necessário para upsert na importação)
+ALTER TABLE elevatorias DROP CONSTRAINT IF EXISTS elevatorias_nome_unique;
 ALTER TABLE elevatorias ADD CONSTRAINT elevatorias_nome_unique UNIQUE (nome);
 
 -- 4. Adicionar coluna grupo se não existir
@@ -34,6 +35,8 @@ ALTER TABLE elevatoria_eletrica DROP CONSTRAINT IF EXISTS elevatoria_elevatoria_
 -- 6. Novo UNIQUE composto (elevatoria_id, grupo)
 DROP INDEX IF EXISTS idx_elev_equipamento_elevatoria_id_grupo;
 DROP INDEX IF EXISTS idx_elev_eletrica_elevatoria_id_grupo;
+ALTER TABLE elevatoria_equipamento DROP CONSTRAINT IF EXISTS elevatoria_equipamento_elev_grupo_unique;
+ALTER TABLE elevatoria_eletrica DROP CONSTRAINT IF EXISTS elevatoria_eletrica_elev_grupo_unique;
 ALTER TABLE elevatoria_equipamento ADD CONSTRAINT elevatoria_equipamento_elev_grupo_unique UNIQUE (elevatoria_id, grupo);
 ALTER TABLE elevatoria_eletrica ADD CONSTRAINT elevatoria_eletrica_elev_grupo_unique UNIQUE (elevatoria_id, grupo);
 CREATE INDEX IF NOT EXISTS idx_elev_equipamento_grupo ON elevatoria_equipamento(elevatoria_id, grupo);
