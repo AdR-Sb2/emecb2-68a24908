@@ -492,7 +492,8 @@ function EstoquePage() {
 
   const comprasFiltradas = useMemo(() => {
     return compras.filter((c) => {
-      if (filtroStatusCompra !== "TODOS" && c.status_geral !== filtroStatusCompra) return false;
+      const statusDisplay = c.status_geral || "Sem status";
+      if (filtroStatusCompra !== "TODOS" && statusDisplay !== filtroStatusCompra) return false;
       if (filtroCompradorCompra !== "TODOS" && c.comprador_cotacao !== filtroCompradorCompra)
         return false;
       if (filtroChegou === "sim" && !c.chegou) return false;
@@ -767,13 +768,24 @@ function EstoquePage() {
 
   const handleCancelarFila = async (id: number) => {
     if (!confirm("Tem certeza que deseja cancelar esta RC da fila?")) return;
-    const { error } = await supabase.from("compras").update({ rc_em_fila: false, status_fila: "Cancelado" }).eq("id", id);
+    const { error } = await supabase.from("compras").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao cancelar RC: " + error.message);
       return;
     }
     await carregarDados();
-    toast.success("RC cancelada da fila.");
+    toast.success("RC removida da fila e da lista de requisições.");
+  };
+
+  const handleExcluirCompra = async (id: number) => {
+    if (!confirm("Tem certeza que deseja excluir esta RC permanentemente?")) return;
+    const { error } = await supabase.from("compras").delete().eq("id", id);
+    if (error) {
+      toast.error("Erro ao excluir RC: " + error.message);
+      return;
+    }
+    await carregarDados();
+    toast.success("RC excluída permanentemente.");
   };
 
   const handleAlterarQtdeFila = async (id: number, novaQtde: number) => {
@@ -3807,6 +3819,7 @@ function EstoquePage() {
                   <th className="px-2 py-2 text-center">Data prevista</th>
                   <th className="px-2 py-2 text-right">Dias aberto</th>
                   <th className="px-2 py-2 text-right">Dias p/ retirar</th>
+                  <th className="px-2 py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody>
@@ -4009,6 +4022,15 @@ function EstoquePage() {
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <button
+                          onClick={() => handleExcluirCompra(c.id)}
+                          className="rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-600 cursor-pointer"
+                          title="Excluir RC"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </td>
                     </tr>
                   );
