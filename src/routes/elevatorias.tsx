@@ -59,12 +59,25 @@ const COMPLETUDE_OPCOES = [
   { value: "bom", label: "Bom (≥ 80%)" },
 ];
 
+const SECOES_COMPLETUDE = [
+  { value: "geral", label: "Geral" },
+  { value: "elevatoria", label: "Elevatória" },
+  { value: "equipamento", label: "Equipamento" },
+  { value: "eletrica", label: "Elétrica" },
+  { value: "eletrica_geral", label: "Elétrica Geral" },
+  { value: "hidraulica", label: "Hidráulica" },
+  { value: "rolamentos", label: "Rolamentos & Selos" },
+  { value: "area_influencia", label: "Área de Influência" },
+  { value: "implantacao", label: "Implantação" },
+];
+
 function ElevatoriasPage() {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
   const [elevatorias, setElevatorias] = useState<Elevatoria[]>([]);
   const [implantacoes, setImplantacoes] = useState<ElevatoriaImplantacao[]>([]);
-  const [completudes, setCompletudes] = useState<Map<number, ElevatoriaCompletude>>(new Map());
+  const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
+  const [filtroSecaoCompletude, setFiltroSecaoCompletude] = useState("geral");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filtroMunicipio, setFiltroMunicipio] = useState("TODAS");
@@ -137,11 +150,19 @@ function ElevatoriasPage() {
   };
 
   const calcularCompletudes = async (elevs: Elevatoria[]) => {
-    const tabs = ["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_eletrica_geral", "elevatoria_hidraulica",
-      "elevatoria_rolamentos_selos", "elevatoria_area_influencia", "elevatoria_implantacao"];
-    const multiGrupoTabs = new Set(["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_rolamentos_selos"]);
+    const tabs: { key: string; table: string | null; multi: boolean }[] = [
+      { key: "elevatoria", table: null, multi: false },
+      { key: "equipamento", table: "elevatoria_equipamento", multi: true },
+      { key: "eletrica", table: "elevatoria_eletrica", multi: true },
+      { key: "eletrica_geral", table: "elevatoria_eletrica_geral", multi: false },
+      { key: "hidraulica", table: "elevatoria_hidraulica", multi: false },
+      { key: "rolamentos", table: "elevatoria_rolamentos_selos", multi: true },
+      { key: "area_influencia", table: "elevatoria_area_influencia", multi: false },
+      { key: "implantacao", table: "elevatoria_implantacao", multi: false },
+    ];
 
-    const promises = tabs.map(t => supabase.from(t).select("*"));
+    const dbTabs = tabs.filter(t => t.table !== null).map(t => t.table!);
+    const promises = dbTabs.map(t => supabase.from(t).select("*"));
     const results = await Promise.all(promises);
 
     const naRes = await supabase.from("elevatoria_campo_na").select("*");
@@ -158,59 +179,63 @@ function ElevatoriasPage() {
     const elevFields = ["nome", "planta", "tipo", "superintendencia", "endereco", "bairro", "municipio", "cep",
       "latitude", "longitude", "inicio_operacao", "caracteristicas_area", "grupo", "funcao"];
 
-    const map = new Map<number, ElevatoriaCompletude>();
-    for (const elev of elevs) {
-      let total = 0;
-      let preenchidos = 0;
-      let naAplicaveis = 0;
+    const calc = (total: number, preenchidos: number, naAplicaveis: number): ElevatoriaCompletude => {
+      const aplicaveis = total - naAplicaveis;
+      const pct = aplicaveis > 0 ? (preenchidos / aplicaveis) * 100 : 100;
+      const nivel: CompletudeNivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
+      return { elevatoria_id: 0, total_campos: total, preenchidos, na_aplicaveis: naAplicaveis, percentual: Math.round(pct), nivel };
+    };
 
+    const map = new Map<string, ElevatoriaCompletude>();
+    for (const elev of elevs) {
+      const secos: { key: string; total: number; preenchidos: number; na: number }[] = [];
+
+      let elevTotal = 0, elevPreenchidos = 0;
       for (const field of elevFields) {
-        total++;
+        elevTotal++;
         if (elev[field as keyof Elevatoria] !== null && elev[field as keyof Elevatoria] !== "" && elev[field as keyof Elevatoria] !== undefined) {
-          preenchidos++;
+          elevPreenchidos++;
         }
       }
+      secos.push({ key: "elevatoria", total: elevTotal, preenchidos: elevPreenchidos, na: 0 });
 
       for (let i = 0; i < tabs.length; i++) {
-        const tabData = results[i].data?.filter(r => r.elevatoria_id === elev.id) ?? [];
-        if (tabData.length === 0) continue;
+        if (!tabs[i].table) continue;
+        const tabData = results[i].data?.filter((r: Record<string, unknown>) => r.elevatoria_id === elev.id) ?? [];
+        if (tabData.length === 0) { secos.push({ key: tabs[i].key, total: 0, preenchidos: 0, na: 0 }); continue; }
 
-        const isMulti = multiGrupoTabs.has(tabs[i]);
-        const naFields = naMap.get(`${elev.id}:${tabs[i]}`) ?? new Set();
+        const naFields = naMap.get(`${elev.id}:${tabs[i].table}`) ?? new Set();
+        let total = 0, preenchidos = 0, naAplicaveis = 0;
 
-        if (isMulti) {
+        if (tabs[i].multi) {
           for (const row of tabData) {
-            const fields = Object.keys(row).filter(k => !metaFields.includes(k));
+            const fields = Object.keys(row as Record<string, unknown>).filter(k => !metaFields.includes(k));
             for (const field of fields) {
               total++;
-              if (naFields.has(field)) {
-                naAplicaveis++;
-                preenchidos++;
-              } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
-                preenchidos++;
-              }
+              if (naFields.has(field)) { naAplicaveis++; preenchidos++; }
+              else if ((row as Record<string, unknown>)[field] !== null && (row as Record<string, unknown>)[field] !== "" && (row as Record<string, unknown>)[field] !== undefined) { preenchidos++; }
             }
           }
         } else {
           const row = tabData[0];
-          const fields = Object.keys(row).filter(k => !metaFields.includes(k));
+          const fields = Object.keys(row as Record<string, unknown>).filter(k => !metaFields.includes(k));
           for (const field of fields) {
             total++;
-            if (naFields.has(field)) {
-              naAplicaveis++;
-              preenchidos++;
-            } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
-              preenchidos++;
-            }
+            if (naFields.has(field)) { naAplicaveis++; preenchidos++; }
+            else if ((row as Record<string, unknown>)[field] !== null && (row as Record<string, unknown>)[field] !== "" && (row as Record<string, unknown>)[field] !== undefined) { preenchidos++; }
           }
         }
+        secos.push({ key: tabs[i].key, total, preenchidos, na: naAplicaveis });
       }
 
-      const aplicaveis = total - naAplicaveis;
-      const pct = aplicaveis > 0 ? (preenchidos / aplicaveis) * 100 : 100;
-      const nivel: CompletudeNivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
-
-      map.set(elev.id, { elevatoria_id: elev.id, total_campos: total, preenchidos, na_aplicaveis: naAplicaveis, percentual: Math.round(pct), nivel });
+      let geralTotal = 0, geralPreenchidos = 0, geralNa = 0;
+      for (const s of secos) {
+        map.set(`${elev.id}:${s.key}`, calc(s.total, s.preenchidos, s.na));
+        geralTotal += s.total;
+        geralPreenchidos += s.preenchidos;
+        geralNa += s.na;
+      }
+      map.set(`${elev.id}:geral`, calc(geralTotal, geralPreenchidos, geralNa));
     }
     setCompletudes(map);
   };
@@ -231,7 +256,7 @@ function ElevatoriasPage() {
     let criticas = 0;
     let emImplantacao = 0;
     for (const e of elevatorias) {
-      const c = completudes.get(e.id);
+      const c = completudes.get(`${e.id}:geral`);
       if (c) {
         completudeMedia += c.percentual;
         if (c.nivel === "critico") criticas++;
@@ -255,7 +280,7 @@ function ElevatoriasPage() {
     }
     if (filtroMunicipio !== "TODAS") list = list.filter(e => e.municipio === filtroMunicipio);
     if (filtroTipo !== "TODAS") list = list.filter(e => e.tipo === filtroTipo);
-    if (filtroCompletude !== "TODAS") list = list.filter(e => completudes.get(e.id)?.nivel === filtroCompletude);
+    if (filtroCompletude !== "TODAS") list = list.filter(e => completudes.get(`${e.id}:${filtroSecaoCompletude}`)?.nivel === filtroCompletude);
     if (filtroImplantacao !== "TODAS") {
       if (filtroImplantacao === "operacional") {
         const idsComImplantacao = new Set(implantacoes.filter(i => i.status === "operacional").map(i => i.elevatoria_id));
@@ -265,7 +290,7 @@ function ElevatoriasPage() {
         list = list.filter(e => idsFiltro.has(e.id));
       }
     }
-    if (filtroKpi === "criticas") list = list.filter(e => completudes.get(e.id)?.nivel === "critico");
+    if (filtroKpi === "criticas") list = list.filter(e => completudes.get(`${e.id}:geral`)?.nivel === "critico");
     if (filtroKpi === "implantacao") {
       const idsImplantacao = new Set(implantacoes.filter(i => i.status !== "operacional").map(i => i.elevatoria_id));
       list = list.filter(e => idsImplantacao.has(e.id));
@@ -273,8 +298,8 @@ function ElevatoriasPage() {
     list = [...list].sort((a, b) => {
       let cmp = 0;
       if (sortField === "completude") {
-        const aVal = completudes.get(a.id)?.percentual ?? -1;
-        const bVal = completudes.get(b.id)?.percentual ?? -1;
+        const aVal = completudes.get(`${a.id}:${filtroSecaoCompletude}`)?.percentual ?? -1;
+        const bVal = completudes.get(`${b.id}:${filtroSecaoCompletude}`)?.percentual ?? -1;
         cmp = aVal - bVal;
       } else if (sortField === "implantacao") {
         const aImp = implantacoes.find(i => i.elevatoria_id === a.id);
@@ -292,7 +317,7 @@ function ElevatoriasPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [elevatorias, search, filtroMunicipio, filtroTipo, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes, sortField, sortDir]);
+  }, [elevatorias, search, filtroMunicipio, filtroTipo, filtroCompletude, filtroSecaoCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes, sortField, sortDir]);
 
   const handleSort = (field: string) => {
     const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
@@ -620,7 +645,7 @@ function ElevatoriasPage() {
           "Grupo": e.grupo || "",
           "Função": e.funcao || "",
           "Implantação": imp ? (IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status) : "",
-          "Completude %": completudes.get(e.id)?.percentual ?? "",
+          "Completude %": completudes.get(`${e.id}:geral`)?.percentual ?? "",
         };
       });
       const ws1 = XLSX.utils.json_to_sheet(basicData);
@@ -827,6 +852,15 @@ function ElevatoriasPage() {
 
               {permissoes.podeVerMestres && (
                 <select
+                  value={filtroSecaoCompletude}
+                  onChange={e => setFiltroSecaoCompletude(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  {SECOES_COMPLETUDE.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              )}
+              {permissoes.podeVerMestres && (
+                <select
                   value={filtroCompletude}
                   onChange={e => setFiltroCompletude(e.target.value)}
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
@@ -880,7 +914,7 @@ function ElevatoriasPage() {
                   </thead>
                   <tbody>
                     {filtered.map((elev, idx) => {
-                      const comp = completudes.get(elev.id);
+                      const comp = completudes.get(`${elev.id}:${filtroSecaoCompletude}`);
                       const imp = implantacoes.find(i => i.elevatoria_id === elev.id);
                       return (
                         <tr
