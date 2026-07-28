@@ -196,7 +196,8 @@ function ElevatoriaFichaPage() {
       await supabase.from("elevatoria_campo_na").delete().eq("elevatoria_id", elevId).eq("tabela", tabela).eq("campo", campo);
       setCamposNA(prev => prev.filter(c => !(c.tabela === tabela && c.campo === campo)));
     } else {
-      const { data } = await supabase.from("elevatoria_campo_na").insert({ elevatoria_id: elevId, tabela, campo, motivo: motivo || "" }).select().single();
+      const { data, error } = await supabase.from("elevatoria_campo_na").insert({ elevatoria_id: elevId, tabela, campo, motivo: motivo || "" }).select().single();
+      if (error) { toast.error("Erro ao marcar N/A: " + error.message); return; }
       if (data) setCamposNA(prev => [...prev, data]);
     }
   };
@@ -596,7 +597,8 @@ function ElevatoriaFichaPage() {
                   <button
                     onClick={async () => {
                       const nextGrupo = equipamentos.length > 0 ? Math.max(...equipamentos.map(e => e.grupo)) + 1 : 1;
-                      const { data } = await supabase.from("elevatoria_equipamento").insert({ elevatoria_id: elevId, grupo: nextGrupo }).select().single();
+                      const { data, error } = await supabase.from("elevatoria_equipamento").insert({ elevatoria_id: elevId, grupo: nextGrupo }).select().single();
+                      if (error) { toast.error("Erro ao adicionar grupo: " + error.message); return; }
                       if (data) {
                         setEquipamentos(prev => [...prev, data]);
                         toast.success("Grupo de equipamento adicionado");
@@ -669,7 +671,8 @@ function ElevatoriaFichaPage() {
                   <button
                     onClick={async () => {
                       const nextGrupo = eletricas.length > 0 ? Math.max(...eletricas.map(e => e.grupo)) + 1 : 1;
-                      const { data } = await supabase.from("elevatoria_eletrica").insert({ elevatoria_id: elevId, grupo: nextGrupo }).select().single();
+                      const { data, error } = await supabase.from("elevatoria_eletrica").insert({ elevatoria_id: elevId, grupo: nextGrupo }).select().single();
+                      if (error) { toast.error("Erro ao adicionar grupo: " + error.message); return; }
                       if (data) {
                         setEletricas(prev => [...prev, data]);
                         toast.success("Grupo elétrico adicionado");
@@ -728,7 +731,8 @@ function ElevatoriaFichaPage() {
                 {permissoes.podeEditarMestres && editMode && (
                   <button
                     onClick={async () => {
-                      const { data } = await supabase.from("elevatoria_rolamentos_selos").insert({ elevatoria_id: elevId }).select().single();
+                      const { data, error } = await supabase.from("elevatoria_rolamentos_selos").insert({ elevatoria_id: elevId }).select().single();
+                      if (error) { toast.error("Erro ao adicionar conjunto: " + error.message); return; }
                       if (data) {
                         setRolamentos(prev => [...prev, data]);
                         toast.success("Conjunto adicionado");
@@ -812,11 +816,12 @@ function ElevatoriaFichaPage() {
                         onClick={async () => {
                           const desc = prompt("Descrição da etapa:");
                           if (!desc || !implantacao) return;
-                          const { data } = await supabase.from("elevatoria_implantacao_etapas").insert({
+                          const { data, error } = await supabase.from("elevatoria_implantacao_etapas").insert({
                             implantacao_id: implantacao.id,
                             descricao: desc,
                             ordem: etapas.length + 1,
                           }).select().single();
+                          if (error) { toast.error("Erro ao adicionar etapa: " + error.message); return; }
                           if (data) {
                             setEtapas(prev => [...prev, data]);
                             toast.success("Etapa adicionada");
