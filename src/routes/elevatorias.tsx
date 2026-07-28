@@ -127,7 +127,7 @@ function ElevatoriasPage() {
   };
 
   const calcularCompletudes = async (elevs: Elevatoria[]) => {
-    const tabs = ["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_hidraulica",
+    const tabs = ["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_eletrica_geral", "elevatoria_hidraulica",
       "elevatoria_rolamentos_selos", "elevatoria_area_influencia", "elevatoria_implantacao"];
     const multiGrupoTabs = new Set(["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_rolamentos_selos"]);
 
@@ -302,6 +302,7 @@ function ElevatoriasPage() {
       const elevRecords: Array<Record<string, unknown>> = [];
       const equipRecords: Array<Record<string, unknown>> = [];
       const eletRecords: Array<Record<string, unknown>> = [];
+      const eletGeralRecords: Array<Record<string, unknown>> = [];
       const hidrRecords: Array<Record<string, unknown>> = [];
       const areaRecords: Array<Record<string, unknown>> = [];
 
@@ -383,19 +384,11 @@ function ElevatoriasPage() {
             amt_aproximada: toStr(r.raw[35]),
             capacidade_tratamento: toStr(r.raw[36]),
             procedencia_mca: toStr(r.raw[37]),
-            cod_sap: toStr(r.raw[38]),
           });
 
           eletRecords.push({
             nome,
             grupo: g,
-            bt_mt: toStr(r.raw[39]),
-            trafo_kva: toStr(r.raw[40]),
-            num_cliente: toStr(r.raw[41]),
-            medidor: toStr(r.raw[42]),
-            medidor_apurado: toStr(r.raw[43]),
-            unidade_consumo: toStr(r.raw[44]),
-            endereco_concessionaria: toStr(r.raw[45]),
             fusivel_pc: toStr(r.raw[52]),
             disjuntor_pc: toStr(r.raw[53]),
             regulagem_rele_termico_bimetálico: toStr(r.raw[54]),
@@ -411,8 +404,6 @@ function ElevatoriasPage() {
             modelo_acionamento: toStr(r.raw[64]),
             corrente_a_acionamento: toStr(r.raw[65]),
             tag_acionamento: toStr(r.raw[66]),
-            clp: toStr(r.raw[67]),
-            pcp: toStr(r.raw[68]),
             retaguarda_liga: toStr(r.raw[69]),
             retaguarda_desliga: toStr(r.raw[70]),
             recalque_setpoint: toStr(r.raw[71]),
@@ -431,6 +422,19 @@ function ElevatoriasPage() {
           nome,
           populacao_beneficiada_habitantes: pickFirstNonEmpty(rows, 50),
           domicilios: pickFirstNonEmpty(rows, 51),
+        });
+
+        eletGeralRecords.push({
+          nome,
+          bt_mt: pickFirstNonEmpty(rows, 39),
+          trafo_kva: pickFirstNonEmpty(rows, 40),
+          num_cliente: pickFirstNonEmpty(rows, 41),
+          medidor: pickFirstNonEmpty(rows, 42),
+          medidor_apurado: pickFirstNonEmpty(rows, 43),
+          unidade_consumo: pickFirstNonEmpty(rows, 44),
+          endereco_concessionaria: pickFirstNonEmpty(rows, 45),
+          clp: pickFirstNonEmpty(rows, 67),
+          pcp: pickFirstNonEmpty(rows, 68),
         });
       }
 
@@ -459,20 +463,24 @@ function ElevatoriasPage() {
         "mancais_la","mancais_loa","modelo_bomba","tag_bomba","marca_bomba","diametro_rotor_pol",
         "diametro_rotor_mm","tipo_construtivo_elevatoria","bomba_dreno","ponta_eixo_motor",
         "sentido_montagem_motor","flange","forma_construtiva_bomba","vazao_aproximada_m3h",
-        "amt_aproximada","capacidade_tratamento","procedencia_mca","cod_sap",
+        "amt_aproximada","capacidade_tratamento","procedencia_mca",
       ];
       const eletFields = [
-        "grupo","bt_mt","trafo_kva","num_cliente","medidor","medidor_apurado","unidade_consumo",
-        "endereco_concessionaria","fusivel_pc","disjuntor_pc","regulagem_rele_termico_bimetálico",
+        "grupo","fusivel_pc","disjuntor_pc","regulagem_rele_termico_bimetálico",
         "rele_tempo_delta_y","rele_eletrodo_nivel","monitor_corrente","tamanho_fusivel_nh",
         "corrente_fusivel_nh","corrente_fusivel_dz","tag_painel","tipo_acionamento",
         "fabricante_acionamento","modelo_acionamento","corrente_a_acionamento","tag_acionamento",
-        "clp","pcp","retaguarda_liga","retaguarda_desliga","recalque_setpoint",
+        "retaguarda_liga","retaguarda_desliga","recalque_setpoint",
+      ];
+      const eletGeralFields = [
+        "bt_mt","trafo_kva","num_cliente","medidor","medidor_apurado","unidade_consumo",
+        "endereco_concessionaria","clp","pcp",
       ];
 
       await Promise.all([
         upsertChild("elevatoria_equipamento", equipRecords, equipFields, "elevatoria_id,grupo"),
         upsertChild("elevatoria_eletrica", eletRecords, eletFields, "elevatoria_id,grupo"),
+        upsertChild("elevatoria_eletrica_geral", eletGeralRecords, eletGeralFields, "elevatoria_id"),
         upsertChild("elevatoria_hidraulica", hidrRecords, [
           "succao","recalque","tronco","distancia_ate_elev",
         ], "elevatoria_id"),

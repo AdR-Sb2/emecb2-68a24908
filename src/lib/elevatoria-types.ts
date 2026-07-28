@@ -46,17 +46,15 @@ export type ElevatoriaEquipamento = {
   amt_aproximada: string | null;
   capacidade_tratamento: string | null;
   procedencia_mca: string | null;
-  cod_sap: string | null;
   cod_sap_motor: string | null;
   cod_sap_bomba: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
 };
 
-export type ElevatoriaEletrica = {
+export type ElevatoriaEletricaGeral = {
   id: number;
   elevatoria_id: number;
-  grupo: number;
   bt_mt: string | null;
   trafo_kva: string | null;
   num_cliente: string | null;
@@ -67,6 +65,21 @@ export type ElevatoriaEletrica = {
   endereco_concessionaria: string | null;
   custo_medio_kwh: string | null;
   meses_media_kwh: string | null;
+  tag_painel_aut: string | null;
+  pcp: string | null;
+  clp: string | null;
+  modelo_clp: string | null;
+  versao_tea_portal: string | null;
+  serial_chip: string | null;
+  operadora: string | null;
+  criado_em: string | null;
+  atualizado_em: string | null;
+};
+
+export type ElevatoriaEletrica = {
+  id: number;
+  elevatoria_id: number;
+  grupo: number;
   fusivel_pc: string | null;
   disjuntor_pc: string | null;
   regulagem_rele_termico_bimetálico: string | null;
@@ -82,8 +95,6 @@ export type ElevatoriaEletrica = {
   modelo_acionamento: string | null;
   corrente_a_acionamento: string | null;
   tag_acionamento: string | null;
-  clp: string | null;
-  pcp: string | null;
   retaguarda_liga: string | null;
   retaguarda_desliga: string | null;
   recalque_setpoint: string | null;
@@ -227,6 +238,7 @@ export function getCompletudeCor(nivel: CompletudeNivel): string {
 export const TABELAS_DADOS_MESTRES = [
   { key: 'equipamento', label: 'Equipamento Instalado', table: 'elevatoria_equipamento' },
   { key: 'eletrica', label: 'Elétrica & Automação', table: 'elevatoria_eletrica' },
+  { key: 'eletrica_geral', label: 'Elétrica Geral', table: 'elevatoria_eletrica_geral' },
   { key: 'hidraulica', label: 'Hidráulica', table: 'elevatoria_hidraulica' },
   { key: 'rolamentos', label: 'Rolamentos & Selos', table: 'elevatoria_rolamentos_selos' },
   { key: 'area_influencia', label: 'Área de Influência', table: 'elevatoria_area_influencia' },
