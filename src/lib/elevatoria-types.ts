@@ -21,6 +21,7 @@ export type Elevatoria = {
 export type ElevatoriaEquipamento = {
   id: number;
   elevatoria_id: number;
+  grupo: number;
   potencia_motor_cv: string | null;
   rpm: string | null;
   marca_motor: string | null;
@@ -53,6 +54,7 @@ export type ElevatoriaEquipamento = {
 export type ElevatoriaEletrica = {
   id: number;
   elevatoria_id: number;
+  grupo: number;
   bt_mt: string | null;
   trafo_kva: string | null;
   num_cliente: string | null;
