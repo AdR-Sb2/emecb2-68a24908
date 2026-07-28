@@ -268,6 +268,8 @@ function ElevatoriaFichaPage() {
         setHidraulica(prev => prev ? { ...prev, [campo]: newVal } : prev);
       } else if (tabela === "elevatoria_area_influencia") {
         setAreaInfluencia(prev => prev ? { ...prev, [campo]: newVal } : prev);
+      } else if (tabela === "elevatoria_implantacao") {
+        setImplantacao(prev => prev ? { ...prev, [campo]: newVal } : prev);
       }
     } else {
       if (tabela === "elevatoria" && campo === "nome" && error.message?.includes("violates not-null constraint")) {
@@ -278,7 +280,7 @@ function ElevatoriaFichaPage() {
       }
     }
     setSalvando(false);
-  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setEletricaGeral, setHidraulica, setAreaInfluencia, setRolamentos]);
+  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setEletricaGeral, setHidraulica, setAreaInfluencia, setRolamentos, setImplantacao]);
 
   const handleFieldChange = (tabela: string, campo: string, valor: string, grupo?: number, rowId?: number) => {
     const cacheKey = `${tabela}:${campo}:${grupo ?? ""}:${rowId ?? ""}`;
@@ -314,8 +316,9 @@ function ElevatoriaFichaPage() {
     tabela: string; campo: string; label: string; tipo?: string; opcoes?: string[];
     valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean; grupo?: number; rowId?: number;
   }) => {
-    const [localValor, setLocalValor] = useState(valor || "");
+    const [localValor, setLocalValor] = useState(valor ?? "");
     const na = isNA(tabela, campo);
+    useEffect(() => { setLocalValor(valor ?? ""); }, [valor]);
     const podeEditarBase = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
     const podeEditar = editOnly ? (podeEditarBase && editMode) : podeEditarBase;
     const podeVer = tabela === "elevatoria" ? permissoes.podeVer : permissoes.podeVerMestres;

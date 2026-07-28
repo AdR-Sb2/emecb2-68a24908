@@ -13,6 +13,9 @@ import {
   TrendingUp,
   HardHat,
   Plus,
+  Trash2,
+  History,
+  ArrowUpDown,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
@@ -29,6 +32,7 @@ import type {
   CompletudeNivel,
   StatusImplantacao,
   ElevatoriaImplantacao,
+  ElevatoriaRegistro,
 } from "@/lib/elevatoria-types";
 import { IMPLANTACAO_STATUS_CORES, IMPLANTACAO_STATUS_OPCOES } from "@/lib/elevatoria-types";
 
@@ -68,6 +72,11 @@ function ElevatoriasPage() {
   const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
+  const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc");
+  const [registros, setRegistros] = useState<ElevatoriaRegistro[]>([]);
+  const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
+  const [novoRegistro, setNovoRegistro] = useState("");
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false,
     podeEditar: false,
@@ -146,12 +155,21 @@ function ElevatoriasPage() {
     }
 
     const metaFields = ["id", "elevatoria_id", "criado_em", "atualizado_em", "grupo"];
+    const elevFields = ["nome", "planta", "tipo", "superintendencia", "endereco", "bairro", "municipio", "cep",
+      "latitude", "longitude", "inicio_operacao", "caracteristicas_area", "grupo", "funcao"];
 
     const map = new Map<number, ElevatoriaCompletude>();
     for (const elev of elevs) {
       let total = 0;
       let preenchidos = 0;
       let naAplicaveis = 0;
+
+      for (const field of elevFields) {
+        total++;
+        if (elev[field as keyof Elevatoria] !== null && elev[field as keyof Elevatoria] !== "" && elev[field as keyof Elevatoria] !== undefined) {
+          preenchidos++;
+        }
+      }
 
       for (let i = 0; i < tabs.length; i++) {
         const tabData = results[i].data?.filter(r => r.elevatoria_id === elev.id) ?? [];
@@ -252,8 +270,69 @@ function ElevatoriasPage() {
       const idsImplantacao = new Set(implantacoes.filter(i => i.status !== "operacional").map(i => i.elevatoria_id));
       list = list.filter(e => idsImplantacao.has(e.id));
     }
+    list = [...list].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "completude") {
+        const aVal = completudes.get(a.id)?.percentual ?? -1;
+        const bVal = completudes.get(b.id)?.percentual ?? -1;
+        cmp = aVal - bVal;
+      } else if (sortField === "implantacao") {
+        const aImp = implantacoes.find(i => i.elevatoria_id === a.id);
+        const bImp = implantacoes.find(i => i.elevatoria_id === b.id);
+        const aVal = aImp ? IMPLANTACAO_STATUS_OPCOES.findIndex(o => o.value === aImp.status) : -1;
+        const bVal = bImp ? IMPLANTACAO_STATUS_OPCOES.findIndex(o => o.value === bImp.status) : -1;
+        cmp = aVal - bVal;
+      } else {
+        const aVal = a[sortField as keyof Elevatoria];
+        const bVal = b[sortField as keyof Elevatoria];
+        if (aVal === null || aVal === undefined) cmp = 1;
+        else if (bVal === null || bVal === undefined) cmp = -1;
+        else cmp = String(aVal).localeCompare(String(bVal), "pt-BR", { numeric: true });
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
     return list;
-  }, [elevatorias, search, filtroMunicipio, filtroTipo, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes]);
+  }, [elevatorias, search, filtroMunicipio, filtroTipo, filtroCompletude, filtroImplantacao, filtroKpi, completudes, implantacoes, sortField, sortDir]);
+
+  const handleSort = (field: string) => {
+    const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
+    setSortField(field);
+    setSortDir(newDir);
+    localStorage.setItem("elev_sort", field);
+    localStorage.setItem("elev_sort_dir", newDir);
+  };
+
+  const excluirElevatoria = async (elev: Elevatoria) => {
+    if (!confirm(`Tem certeza que deseja excluir "${elev.nome}"? Esta ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from("elevatorias").delete().eq("id", elev.id);
+    if (error) { toast.error("Erro ao excluir: " + error.message); return; }
+    setElevatorias(prev => prev.filter(e => e.id !== elev.id));
+    toast.success("Elevatória excluída");
+  };
+
+  const abrirRegistros = async (elevId: number) => {
+    const { data } = await supabase.from("elevatoria_registros").select("*").eq("elevatoria_id", elevId).order("criado_em", { ascending: false });
+    if (data) setRegistros(data);
+    setRegistrosDialog(elevId);
+  };
+
+  const adicionarRegistro = async () => {
+    if (!novoRegistro.trim() || registrosDialog === null) return;
+    const { data, error } = await supabase.from("elevatoria_registros").insert({
+      elevatoria_id: registrosDialog,
+      texto: novoRegistro.trim(),
+      criado_por: user?.id,
+    }).select().single();
+    if (error) { toast.error("Erro ao adicionar registro"); return; }
+    setRegistros(prev => [data, ...prev]);
+    setNovoRegistro("");
+  };
+
+  const salvarObs = async (elev: Elevatoria, obs: string | null) => {
+    setElevatorias(prev => prev.map(e => e.id === elev.id ? { ...e, obs } : e));
+    const { error } = await supabase.from("elevatorias").update({ obs }).eq("id", elev.id);
+    if (error) { toast.error("Erro ao salvar OBS"); setElevatorias(prev => prev.map(e => e.id === elev.id ? { ...e, obs: elev.obs } : e)); }
+  };
 
   const criarElevatoria = async () => {
     if (!permissoes.podeEditar) return;
@@ -775,14 +854,27 @@ function ElevatoriasPage() {
                 <table className="min-w-[800px] w-full text-left text-[13px]">
                   <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                     <tr>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Nome</th>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Planta</th>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Tipo</th>
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Município</th>
+                      {(["nome", "planta", "tipo", "municipio"] as const).map(f => (
+                        <th key={f} className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]" onClick={() => handleSort(f)}>
+                          <span className="inline-flex items-center gap-1">
+                            {f === "nome" ? "Nome" : f === "planta" ? "Planta" : f === "tipo" ? "Tipo" : "Município"}
+                            {sortField === f && <ArrowUpDown className="h-3 w-3" />}
+                          </span>
+                        </th>
+                      ))}
                       {permissoes.podeVerMestres && (
-                        <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Completude</th>
+                        <th className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]" onClick={() => handleSort("completude")}>
+                          <span className="inline-flex items-center gap-1">
+                            Completude {sortField === "completude" && <ArrowUpDown className="h-3 w-3" />}
+                          </span>
+                        </th>
                       )}
-                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Implantação</th>
+                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]" onClick={() => handleSort("implantacao")}>
+                        <span className="inline-flex items-center gap-1">
+                          Implantação {sortField === "implantacao" && <ArrowUpDown className="h-3 w-3" />}
+                        </span>
+                      </th>
+                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">OBS</th>
                       <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Ações</th>
                     </tr>
                   </thead>
@@ -878,20 +970,54 @@ function ElevatoriasPage() {
                               )
                             )}
                           </td>
+                          <td className="whitespace-nowrap px-3 py-2 max-w-[150px]">
+                            {permissoes.podeEditar ? (
+                              <input
+                                value={elev.obs || ""}
+                                onChange={e => {
+                                  const newObs = e.target.value;
+                                  setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, obs: newObs || null } : el));
+                                }}
+                                onBlur={e => salvarObs(elev, e.target.value || null)}
+                                placeholder="Clique para editar..."
+                                className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-slate-600 placeholder-slate-300 hover:border-slate-200 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-300 dark:placeholder-slate-500"
+                              />
+                            ) : (
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">{elev.obs || "—"}</span>
+                            )}
+                          </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            <Link
-                              to={`/elevatorias/${elev.id}`}
-                              className="rounded-md bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
-                            >
-                              Abrir ficha
-                            </Link>
+                            <div className="flex items-center gap-1.5">
+                              <Link
+                                to={`/elevatorias/${elev.id}`}
+                                className="rounded-md bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
+                              >
+                                Abrir ficha
+                              </Link>
+                              <button
+                                onClick={() => abrirRegistros(elev.id)}
+                                className="rounded-md bg-[#eaf3fb] px-2 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
+                                title="Registros"
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </button>
+                              {permissoes.podeEditar && (
+                                <button
+                                  onClick={() => excluirElevatoria(elev)}
+                                  className="rounded-md px-2 py-1 text-[11px] font-semibold text-red-500 transition hover:bg-red-50 dark:hover:bg-red-900/30"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
                     })}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={permissoes.podeVerMestres ? 7 : 6} className="px-3 py-8 text-center text-sm text-slate-400">
+                        <td colSpan={permissoes.podeVerMestres ? 9 : 8} className="px-3 py-8 text-center text-sm text-slate-400">
                           Nenhuma elevatória encontrada com os filtros atuais.
                         </td>
                       </tr>
@@ -902,6 +1028,49 @@ function ElevatoriasPage() {
             </div>
           </>
         )}
+
+      {/* Registros Dialog */}
+      <Dialog open={registrosDialog !== null} onOpenChange={o => { if (!o) setRegistrosDialog(null); }}>
+        <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] dark:text-white flex items-center gap-2">
+              <History className="h-4 w-4" /> Registros da Elevatória
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-2 py-4">
+            {registros.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">Nenhum registro ainda.</p>
+            ) : (
+              registros.map(r => (
+                <div key={r.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                  <p>{r.texto}</p>
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    {r.criado_em ? new Date(r.criado_em).toLocaleString("pt-BR") : ""}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+          {permissoes.podeEditar && (
+            <div className="flex gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
+              <input
+                value={novoRegistro}
+                onChange={e => setNovoRegistro(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") adicionarRegistro(); }}
+                placeholder="Digite um novo registro..."
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              />
+              <button
+                onClick={adicionarRegistro}
+                disabled={!novoRegistro.trim()}
+                className="rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+              >
+                Adicionar
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Import Dialog */}
       <Dialog open={dialogImportar} onOpenChange={setDialogImportar}>
