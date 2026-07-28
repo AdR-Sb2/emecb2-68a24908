@@ -227,10 +227,7 @@ function ElevatoriaFichaPage() {
     let filtro: Record<string, unknown>;
     let onConflict: string;
 
-    if (tabela === "elevatoria") {
-      filtro = { id: elevId };
-      onConflict = "id";
-    } else if (isMultiGrupo && grupo !== undefined) {
+    if (isMultiGrupo && grupo !== undefined) {
       filtro = { elevatoria_id: elevId, grupo };
       onConflict = "elevatoria_id,grupo";
     } else if (isGeral) {
@@ -244,10 +241,15 @@ function ElevatoriaFichaPage() {
       onConflict = "elevatoria_id";
     }
 
-    const { error } = await supabase.from(tabelaReal).upsert({ ...filtro, [campo]: valor || null } as Record<string, unknown>, {
-      onConflict,
-      ignoreDuplicates: false,
-    });
+    let error;
+    if (tabela === "elevatoria") {
+      ({ error } = await supabase.from(tabelaReal).update({ [campo]: valor || null }).eq("id", elevId));
+    } else {
+      ({ error } = await supabase.from(tabelaReal).upsert({ ...filtro, [campo]: valor || null } as Record<string, unknown>, {
+        onConflict,
+        ignoreDuplicates: false,
+      }));
+    }
 
     if (!error) {
       const newVal = valor || null;
