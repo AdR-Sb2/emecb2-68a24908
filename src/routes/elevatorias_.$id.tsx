@@ -210,19 +210,12 @@ function ElevatoriaFichaPage() {
     }
   };
 
-  const NOT_NULL_COLS: Record<string, string[]> = {
-    elevatorias: ["nome"],
-  };
-
   const salvarField = useCallback(async (tabela: string, campo: string, valor: string | null, grupo?: number, rowId?: number) => {
     if (!permissoes.podeEditarMestres) return;
     const tabelaReal = tabela === "elevatoria" ? "elevatorias" : tabela;
 
-    const notNullCols = NOT_NULL_COLS[tabelaReal];
-    if (notNullCols?.includes(campo) && (valor === null || valor === "")) {
-      if (tabelaReal === "elevatorias" && campo === "nome") {
-        setElevatoria(prev => prev ? { ...prev, nome: lastSavedNome.current } : prev);
-      }
+    if (tabela === "elevatoria" && campo === "nome" && (valor === null || valor === "")) {
+      setElevatoria(prev => prev ? { ...prev, nome: lastSavedNome.current } : prev);
       toast.error("Este campo não pode ficar vazio");
       return;
     }
@@ -275,11 +268,9 @@ function ElevatoriaFichaPage() {
         setAreaInfluencia(prev => prev ? { ...prev, [campo]: newVal } : prev);
       }
     } else {
-      if (error.message?.includes("violates not-null constraint")) {
+      if (tabela === "elevatoria" && campo === "nome" && error.message?.includes("violates not-null constraint")) {
+        setElevatoria(prev => prev ? { ...prev, nome: lastSavedNome.current } : prev);
         toast.error("Este campo não pode ficar vazio");
-        if (tabelaReal === "elevatorias" && campo === "nome") {
-          setElevatoria(prev => prev ? { ...prev, nome: lastSavedNome.current } : prev);
-        }
       } else {
         toast.error("Erro ao salvar: " + error.message);
       }
@@ -288,12 +279,6 @@ function ElevatoriaFichaPage() {
   }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setEletricaGeral, setHidraulica, setAreaInfluencia, setRolamentos]);
 
   const handleFieldChange = (tabela: string, campo: string, valor: string, grupo?: number, rowId?: number) => {
-    const tabelaReal = tabela === "elevatoria" ? "elevatorias" : tabela;
-    const notNullCols = NOT_NULL_COLS[tabelaReal];
-    if (notNullCols?.includes(campo) && !valor.trim()) {
-      toast.error("Este campo não pode ficar vazio");
-      return;
-    }
     const cacheKey = `${tabela}:${campo}:${grupo ?? ""}:${rowId ?? ""}`;
     if (saveTimers.current.has(cacheKey)) {
       clearTimeout(saveTimers.current.get(cacheKey));
