@@ -129,6 +129,7 @@ function ElevatoriasPage() {
   const calcularCompletudes = async (elevs: Elevatoria[]) => {
     const tabs = ["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_hidraulica",
       "elevatoria_rolamentos_selos", "elevatoria_area_influencia", "elevatoria_implantacao"];
+    const multiGrupoTabs = new Set(["elevatoria_equipamento", "elevatoria_eletrica", "elevatoria_rolamentos_selos"]);
 
     const promises = tabs.map(t => supabase.from(t).select("*"));
     const results = await Promise.all(promises);
@@ -143,6 +144,8 @@ function ElevatoriasPage() {
       }
     }
 
+    const metaFields = ["id", "elevatoria_id", "criado_em", "atualizado_em", "grupo"];
+
     const map = new Map<number, ElevatoriaCompletude>();
     for (const elev of elevs) {
       let total = 0;
@@ -153,19 +156,33 @@ function ElevatoriasPage() {
         const tabData = results[i].data?.filter(r => r.elevatoria_id === elev.id) ?? [];
         if (tabData.length === 0) continue;
 
-        const row = tabData[0];
+        const isMulti = multiGrupoTabs.has(tabs[i]);
         const naFields = naMap.get(`${elev.id}:${tabs[i]}`) ?? new Set();
-        const fields = Object.keys(row).filter(k =>
-          !["id", "elevatoria_id", "criado_em", "atualizado_em"].includes(k)
-        );
 
-        for (const field of fields) {
-          total++;
-          if (naFields.has(field)) {
-            naAplicaveis++;
-            preenchidos++;
-          } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
-            preenchidos++;
+        if (isMulti) {
+          for (const row of tabData) {
+            const fields = Object.keys(row).filter(k => !metaFields.includes(k));
+            for (const field of fields) {
+              total++;
+              if (naFields.has(field)) {
+                naAplicaveis++;
+                preenchidos++;
+              } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
+                preenchidos++;
+              }
+            }
+          }
+        } else {
+          const row = tabData[0];
+          const fields = Object.keys(row).filter(k => !metaFields.includes(k));
+          for (const field of fields) {
+            total++;
+            if (naFields.has(field)) {
+              naAplicaveis++;
+              preenchidos++;
+            } else if (row[field] !== null && row[field] !== "" && row[field] !== undefined) {
+              preenchidos++;
+            }
           }
         }
       }
@@ -253,114 +270,169 @@ function ElevatoriasPage() {
       if (rows.length < 3) { toast.error("Planilha vazia ou formato inválido"); setLoading(false); return; }
 
       const dataRows = rows.slice(2);
-      const elevRecords: Array<Record<string, unknown>> = [];
-      const equipRecords: Array<Record<string, unknown>> = [];
-      const eletRecords: Array<Record<string, unknown>> = [];
-      const hidrRecords: Array<Record<string, unknown>> = [];
-      const areaRecords: Array<Record<string, unknown>> = [];
 
       const toStr = (v: unknown): string | null => {
         if (v === null || v === undefined || v === "") return null;
         return String(v).trim() || null;
       };
 
+      const isZeroPlaceholder = (v: unknown): boolean => {
+        const s = String(v ?? "").trim();
+        return s === "0" || s === "0.0" || s === "0,0";
+      };
+
+      type RowData = { raw: unknown[]; nome: string; grupo: number };
+      const allRows: RowData[] = [];
+
       for (const row of dataRows) {
         const nome = toStr(row[0]);
         if (!nome || nome.toUpperCase().includes("TOTAL") || nome.toUpperCase().includes("SUBTOTAL")) continue;
+        const grupoNum = parseInt(String(row[12] || "1"), 10) || 1;
+        allRows.push({ raw: row, nome, grupo: grupoNum });
+      }
+
+      if (allRows.length === 0) { toast.error("Nenhuma elevatória válida encontrada na planilha"); setLoading(false); return; }
+
+      const rowsByNome = new Map<string, RowData[]>();
+      for (const r of allRows) {
+        if (!rowsByNome.has(r.nome)) rowsByNome.set(r.nome, []);
+        rowsByNome.get(r.nome)!.push(r);
+      }
+
+      const elevRecords: Array<Record<string, unknown>> = [];
+      const equipRecords: Array<Record<string, unknown>> = [];
+      const eletRecords: Array<Record<string, unknown>> = [];
+      const hidrRecords: Array<Record<string, unknown>> = [];
+      const areaRecords: Array<Record<string, unknown>> = [];
+
+      const pickFirstNonEmpty = (rows: RowData[], idx: number, treatZeroAsEmpty = false): string | null => {
+        for (const r of rows) {
+          const v = toStr(r.raw[idx]);
+          if (!v) continue;
+          if (treatZeroAsEmpty && isZeroPlaceholder(r.raw[idx])) continue;
+          return v;
+        }
+        return null;
+      };
+
+      const pickFirstNonEmptyNum = (rows: RowData[], idx: number): number | null => {
+        for (const r of rows) {
+          const v = parseFloat(String(r.raw[idx] || ""));
+          if (!isNaN(v)) return v;
+        }
+        return null;
+      };
+
+      const pickFirstNonEmptyDate = (rows: RowData[], idx: number): string | null => {
+        for (const r of rows) {
+          const v = toStr(r.raw[idx]);
+          if (!v || v.includes("/")) continue;
+          const d = new Date(v);
+          if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        }
+        return null;
+      };
+
+      for (const [nome, rows] of rowsByNome) {
+        const first = rows[0];
 
         elevRecords.push({
           nome,
-          planta: toStr(row[1]),
-          tipo: toStr(row[2]),
-          superintendencia: toStr(row[3]),
-          endereco: toStr(row[4]),
-          bairro: toStr(row[5]),
-          municipio: toStr(row[6]),
-          cep: toStr(row[7]),
-          latitude: (() => { const n = parseFloat(String(row[8] || "")); return isNaN(n) ? null : n; })(),
-          longitude: (() => { const n = parseFloat(String(row[9] || "")); return isNaN(n) ? null : n; })(),
-          inicio_operacao: (() => { const v = toStr(row[10]); if (!v || v.includes("/")) return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); })(),
-          caracteristicas_area: toStr(row[11]),
-          grupo: toStr(row[12]),
-          funcao: toStr(row[13]),
+          planta: pickFirstNonEmpty(rows, 1),
+          tipo: pickFirstNonEmpty(rows, 2),
+          superintendencia: pickFirstNonEmpty(rows, 3),
+          endereco: pickFirstNonEmpty(rows, 4, true),
+          bairro: pickFirstNonEmpty(rows, 5, true),
+          municipio: pickFirstNonEmpty(rows, 6),
+          cep: pickFirstNonEmpty(rows, 7),
+          latitude: pickFirstNonEmptyNum(rows, 8),
+          longitude: pickFirstNonEmptyNum(rows, 9),
+          inicio_operacao: pickFirstNonEmptyDate(rows, 10),
+          caracteristicas_area: pickFirstNonEmpty(rows, 11),
+          grupo: toStr(first.raw[12]),
+          funcao: pickFirstNonEmpty(rows, 13),
         });
 
-        equipRecords.push({
-          nome,
-          potencia_motor_cv: toStr(row[14]),
-          rpm: toStr(row[15]),
-          marca_motor: toStr(row[16]),
-          carcaca_motor: toStr(row[17]),
-          tag_motor: toStr(row[18]),
-          tensao_v: toStr(row[19]),
-          corrente_a: toStr(row[20]),
-          mancais_la: toStr(row[21]),
-          mancais_loa: toStr(row[22]),
-          modelo_bomba: toStr(row[23]),
-          tag_bomba: toStr(row[24]),
-          marca_bomba: toStr(row[25]),
-          diametro_rotor_pol: toStr(row[26]),
-          diametro_rotor_mm: toStr(row[27]),
-          tipo_construtivo_elevatoria: toStr(row[28]),
-          bomba_dreno: toStr(row[29]),
-          ponta_eixo_motor: toStr(row[30]),
-          sentido_montagem_motor: toStr(row[31]),
-          flange: toStr(row[32]),
-          forma_construtiva_bomba: toStr(row[33]),
-          vazao_aproximada_m3h: toStr(row[34]),
-          amt_aproximada: toStr(row[35]),
-          capacidade_tratamento: toStr(row[36]),
-          procedencia_mca: toStr(row[37]),
-          cod_sap: toStr(row[38]),
-        });
+        for (const r of rows) {
+          const g = r.grupo;
 
-        eletRecords.push({
-          nome,
-          bt_mt: toStr(row[39]),
-          trafo_kva: toStr(row[40]),
-          num_cliente: toStr(row[41]),
-          medidor: toStr(row[42]),
-          medidor_apurado: toStr(row[43]),
-          unidade_consumo: toStr(row[44]),
-          endereco_concessionaria: toStr(row[45]),
-          fusivel_pc: toStr(row[52]),
-          disjuntor_pc: toStr(row[53]),
-          regulagem_rele_termico_bimetálico: toStr(row[54]),
-          rele_tempo_delta_y: toStr(row[55]),
-          rele_eletrodo_nivel: toStr(row[56]),
-          monitor_corrente: toStr(row[57]),
-          tamanho_fusivel_nh: toStr(row[58]),
-          corrente_fusivel_nh: toStr(row[59]),
-          corrente_fusivel_dz: toStr(row[60]),
-          tag_painel: toStr(row[61]),
-          tipo_acionamento: toStr(row[62]),
-          fabricante_acionamento: toStr(row[63]),
-          modelo_acionamento: toStr(row[64]),
-          corrente_a_acionamento: toStr(row[65]),
-          tag_acionamento: toStr(row[66]),
-          clp: toStr(row[67]),
-          pcp: toStr(row[68]),
-          retaguarda_liga: toStr(row[69]),
-          retaguarda_desliga: toStr(row[70]),
-          recalque_setpoint: toStr(row[71]),
-        });
+          equipRecords.push({
+            nome,
+            grupo: g,
+            potencia_motor_cv: toStr(r.raw[14]),
+            rpm: toStr(r.raw[15]),
+            marca_motor: toStr(r.raw[16]),
+            carcaca_motor: toStr(r.raw[17]),
+            tag_motor: toStr(r.raw[18]),
+            tensao_v: toStr(r.raw[19]),
+            corrente_a: toStr(r.raw[20]),
+            mancais_la: toStr(r.raw[21]),
+            mancais_loa: toStr(r.raw[22]),
+            modelo_bomba: toStr(r.raw[23]),
+            tag_bomba: toStr(r.raw[24]),
+            marca_bomba: toStr(r.raw[25]),
+            diametro_rotor_pol: toStr(r.raw[26]),
+            diametro_rotor_mm: toStr(r.raw[27]),
+            tipo_construtivo_elevatoria: toStr(r.raw[28]),
+            bomba_dreno: toStr(r.raw[29]),
+            ponta_eixo_motor: toStr(r.raw[30]),
+            sentido_montagem_motor: toStr(r.raw[31]),
+            flange: toStr(r.raw[32]),
+            forma_construtiva_bomba: toStr(r.raw[33]),
+            vazao_aproximada_m3h: toStr(r.raw[34]),
+            amt_aproximada: toStr(r.raw[35]),
+            capacidade_tratamento: toStr(r.raw[36]),
+            procedencia_mca: toStr(r.raw[37]),
+            cod_sap: toStr(r.raw[38]),
+          });
+
+          eletRecords.push({
+            nome,
+            grupo: g,
+            bt_mt: toStr(r.raw[39]),
+            trafo_kva: toStr(r.raw[40]),
+            num_cliente: toStr(r.raw[41]),
+            medidor: toStr(r.raw[42]),
+            medidor_apurado: toStr(r.raw[43]),
+            unidade_consumo: toStr(r.raw[44]),
+            endereco_concessionaria: toStr(r.raw[45]),
+            fusivel_pc: toStr(r.raw[52]),
+            disjuntor_pc: toStr(r.raw[53]),
+            regulagem_rele_termico_bimetálico: toStr(r.raw[54]),
+            rele_tempo_delta_y: toStr(r.raw[55]),
+            rele_eletrodo_nivel: toStr(r.raw[56]),
+            monitor_corrente: toStr(r.raw[57]),
+            tamanho_fusivel_nh: toStr(r.raw[58]),
+            corrente_fusivel_nh: toStr(r.raw[59]),
+            corrente_fusivel_dz: toStr(r.raw[60]),
+            tag_painel: toStr(r.raw[61]),
+            tipo_acionamento: toStr(r.raw[62]),
+            fabricante_acionamento: toStr(r.raw[63]),
+            modelo_acionamento: toStr(r.raw[64]),
+            corrente_a_acionamento: toStr(r.raw[65]),
+            tag_acionamento: toStr(r.raw[66]),
+            clp: toStr(r.raw[67]),
+            pcp: toStr(r.raw[68]),
+            retaguarda_liga: toStr(r.raw[69]),
+            retaguarda_desliga: toStr(r.raw[70]),
+            recalque_setpoint: toStr(r.raw[71]),
+          });
+        }
 
         hidrRecords.push({
           nome,
-          succao: toStr(row[46]),
-          recalque: toStr(row[47]),
-          tronco: toStr(row[48]),
-          distancia_ate_elev: toStr(row[49]),
+          succao: pickFirstNonEmpty(rows, 46),
+          recalque: pickFirstNonEmpty(rows, 47),
+          tronco: pickFirstNonEmpty(rows, 48),
+          distancia_ate_elev: pickFirstNonEmpty(rows, 49),
         });
 
         areaRecords.push({
           nome,
-          populacao_beneficiada_habitantes: toStr(row[50]),
-          domicilios: toStr(row[51]),
+          populacao_beneficiada_habitantes: pickFirstNonEmpty(rows, 50),
+          domicilios: pickFirstNonEmpty(rows, 51),
         });
       }
-
-      if (elevRecords.length === 0) { toast.error("Nenhuma elevatória válida encontrada na planilha"); setLoading(false); return; }
 
       const { data: insertedElevs, error: elevErr } = await supabase.from("elevatorias").upsert(elevRecords, { onConflict: "nome", ignoreDuplicates: false }).select("id, nome");
       if (elevErr) { toast.error("Erro ao inserir elevatorias: " + elevErr.message); setLoading(false); return; }
@@ -368,7 +440,7 @@ function ElevatoriasPage() {
       const nameToId = new Map<string, number>();
       if (insertedElevs) insertedElevs.forEach(e => nameToId.set(e.nome, e.id));
 
-      const upsertChild = async (table: string, records: Array<Record<string, unknown>>, dbFields: string[]) => {
+      const upsertChild = async (table: string, records: Array<Record<string, unknown>>, dbFields: string[], conflictCols: string) => {
         const payload = records.filter(r => nameToId.has(r.nome as string)).map(r => {
           const elevId = nameToId.get(r.nome as string)!;
           const rec: Record<string, unknown> = { elevatoria_id: elevId };
@@ -378,34 +450,52 @@ function ElevatoriasPage() {
           return rec;
         });
         if (payload.length === 0) return;
-        await supabase.from(table).upsert(payload, { onConflict: "elevatoria_id", ignoreDuplicates: false });
+        const { error } = await supabase.from(table).upsert(payload, { onConflict: conflictCols, ignoreDuplicates: false });
+        if (error) console.error(`Erro upsert ${table}:`, error);
       };
 
+      const equipFields = [
+        "grupo","potencia_motor_cv","rpm","marca_motor","carcaca_motor","tag_motor","tensao_v","corrente_a",
+        "mancais_la","mancais_loa","modelo_bomba","tag_bomba","marca_bomba","diametro_rotor_pol",
+        "diametro_rotor_mm","tipo_construtivo_elevatoria","bomba_dreno","ponta_eixo_motor",
+        "sentido_montagem_motor","flange","forma_construtiva_bomba","vazao_aproximada_m3h",
+        "amt_aproximada","capacidade_tratamento","procedencia_mca","cod_sap",
+      ];
+      const eletFields = [
+        "grupo","bt_mt","trafo_kva","num_cliente","medidor","medidor_apurado","unidade_consumo",
+        "endereco_concessionaria","fusivel_pc","disjuntor_pc","regulagem_rele_termico_bimetálico",
+        "rele_tempo_delta_y","rele_eletrodo_nivel","monitor_corrente","tamanho_fusivel_nh",
+        "corrente_fusivel_nh","corrente_fusivel_dz","tag_painel","tipo_acionamento",
+        "fabricante_acionamento","modelo_acionamento","corrente_a_acionamento","tag_acionamento",
+        "clp","pcp","retaguarda_liga","retaguarda_desliga","recalque_setpoint",
+      ];
+
       await Promise.all([
-        upsertChild("elevatoria_equipamento", equipRecords, [
-          "potencia_motor_cv","rpm","marca_motor","carcaca_motor","tag_motor","tensao_v","corrente_a",
-          "mancais_la","mancais_loa","modelo_bomba","tag_bomba","marca_bomba","diametro_rotor_pol",
-          "diametro_rotor_mm","tipo_construtivo_elevatoria","bomba_dreno","ponta_eixo_motor",
-          "sentido_montagem_motor","flange","forma_construtiva_bomba","vazao_aproximada_m3h",
-          "amt_aproximada","capacidade_tratamento","procedencia_mca","cod_sap",
-        ]),
-        upsertChild("elevatoria_eletrica", eletRecords, [
-          "bt_mt","trafo_kva","num_cliente","medidor","medidor_apurado","unidade_consumo",
-          "endereco_concessionaria","fusivel_pc","disjuntor_pc","regulagem_rele_termico_bimetálico",
-          "rele_tempo_delta_y","rele_eletrodo_nivel","monitor_corrente","tamanho_fusivel_nh",
-          "corrente_fusivel_nh","corrente_fusivel_dz","tag_painel","tipo_acionamento",
-          "fabricante_acionamento","modelo_acionamento","corrente_a_acionamento","tag_acionamento",
-          "clp","pcp","retaguarda_liga","retaguarda_desliga","recalque_setpoint",
-        ]),
+        upsertChild("elevatoria_equipamento", equipRecords, equipFields, "elevatoria_id,grupo"),
+        upsertChild("elevatoria_eletrica", eletRecords, eletFields, "elevatoria_id,grupo"),
         upsertChild("elevatoria_hidraulica", hidrRecords, [
           "succao","recalque","tronco","distancia_ate_elev",
-        ]),
+        ], "elevatoria_id"),
         upsertChild("elevatoria_area_influencia", areaRecords, [
           "populacao_beneficiada_habitantes","domicilios",
-        ]),
+        ], "elevatoria_id"),
       ]);
 
-      toast.success(`${elevRecords.length} elevatória(s) importada(s) com sucesso!`);
+      const pendencias: string[] = [];
+      const nomesPendencia = ["CHATUBA", "DA SERRA", "SÃO JORGE", "ETE LAGOINHA"];
+      for (const [nome, rows] of rowsByNome) {
+        if (rows.length > 1 && nomesPendencia.some(p => nome.toUpperCase().includes(p))) {
+          pendencias.push(nome);
+        }
+      }
+
+      const totalGrupos = equipRecords.length;
+      const totalElevs = rowsByNome.size;
+      let msg = `${totalElevs} elevatória(s) importada(s) com ${totalGrupos} grupo(s) de equipamento/eletrica.`;
+      if (pendencias.length > 0) {
+        msg += `\n\n⚠️ Pendências para conciliação manual: ${pendencias.join(", ")} — dados básicos divergentes entre linhas (endereço/bairro/coordenadas).`;
+      }
+      toast.success(msg, { duration: 8000 });
       await carregarDados();
     } catch (err) {
       toast.error("Erro ao processar planilha: " + (err instanceof Error ? err.message : "desconhecido"));
