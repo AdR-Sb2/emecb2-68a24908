@@ -85,6 +85,8 @@ function ElevatoriasPage() {
   const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
+  const [editandoTipo, setEditandoTipo] = useState<number | null>(null);
+  const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
   const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc");
   const [registros, setRegistros] = useState<ElevatoriaRegistro[]>([]);
@@ -930,25 +932,35 @@ function ElevatoriasPage() {
                             {elev.planta || "—"}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            {permissoes.podeEditar ? (
+                            {permissoes.podeEditar && editandoTipo === elev.id ? (
                               <select
                                 value={elev.tipo || ""}
                                 onChange={async e => {
                                   const newTipo = e.target.value || null;
                                   setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, tipo: newTipo } : el));
+                                  setEditandoTipo(null);
                                   const { error } = await supabase.from("elevatorias").update({ tipo: newTipo }).eq("id", elev.id);
                                   if (error) {
                                     toast.error("Erro ao salvar tipo");
                                     setElevatorias(prev => prev.map(el => el.id === elev.id ? { ...el, tipo: elev.tipo } : el));
                                   }
                                 }}
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                                onBlur={() => setEditandoTipo(null)}
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                                autoFocus
                               >
                                 <option value="">—</option>
                                 <option value="EAT">EAT</option>
                                 <option value="Booster">Booster</option>
                                 <option value="Container">Container</option>
                               </select>
+                            ) : permissoes.podeEditar ? (
+                              <span
+                                onClick={() => setEditandoTipo(elev.id)}
+                                className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700"
+                              >
+                                <Badge variant="outline" className="text-[11px]">{elev.tipo || "—"}</Badge>
+                              </span>
                             ) : (
                               <Badge variant="outline" className="text-[11px]">{elev.tipo || "—"}</Badge>
                             )}
@@ -962,12 +974,13 @@ function ElevatoriasPage() {
                             </td>
                           )}
                           <td className="whitespace-nowrap px-3 py-2">
-                            {permissoes.podeEditarMestres ? (
+                            {permissoes.podeEditarMestres && editandoImplantacao === elev.id ? (
                               <select
                                 value={imp?.status || ""}
                                 onChange={async e => {
                                   const newStatus = e.target.value as StatusImplantacao;
                                   if (!newStatus) return;
+                                  setEditandoImplantacao(null);
                                   setImplantacoes(prev => {
                                     const idx = prev.findIndex(i => i.elevatoria_id === elev.id);
                                     if (idx >= 0) {
@@ -987,20 +1000,35 @@ function ElevatoriasPage() {
                                     if (data) setImplantacoes(data);
                                   }
                                 }}
-                                className={`w-full rounded border px-2 py-1 text-[11px] font-semibold focus:outline-none ${IMPLANTACAO_STATUS_CORES[imp?.status || ""] || "bg-white text-slate-600 border-slate-300"}`}
+                                onBlur={() => setEditandoImplantacao(null)}
+                                className="rounded border px-2 py-1 text-[11px] font-semibold focus:outline-none"
+                                autoFocus
                               >
                                 <option value="">—</option>
                                 {IMPLANTACAO_STATUS_OPCOES.map(o => (
                                   <option key={o.value} value={o.value}>{o.label}</option>
                                 ))}
                               </select>
+                            ) : permissoes.podeEditarMestres ? (
+                              <span
+                                onClick={() => setEditandoImplantacao(elev.id)}
+                                className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700"
+                              >
+                                {imp ? (
+                                  <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${IMPLANTACAO_STATUS_CORES[imp.status] || ""}`}>
+                                    {IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
+                              </span>
                             ) : (
                               imp ? (
                                 <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${IMPLANTACAO_STATUS_CORES[imp.status] || ""}`}>
                                   {IMPLANTACAO_STATUS_OPCOES.find(o => o.value === imp.status)?.label || imp.status}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 text-[11px]">—</span>
+                                "—"
                               )
                             )}
                           </td>
