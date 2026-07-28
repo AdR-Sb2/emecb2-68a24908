@@ -202,7 +202,7 @@ function ElevatoriaFichaPage() {
     }
   };
 
-  const salvarField = useCallback(async (tabela: string, campo: string, valor: string | null, grupo?: number) => {
+  const salvarField = useCallback(async (tabela: string, campo: string, valor: string | null, grupo?: number, rowId?: number) => {
     if (!permissoes.podeEditarMestres) return;
     setSalvando(true);
     const tabelaReal = tabela === "elevatoria" ? "elevatorias" : tabela;
@@ -217,6 +217,9 @@ function ElevatoriaFichaPage() {
     } else if (isMultiGrupo && grupo !== undefined) {
       filtro = { elevatoria_id: elevId, grupo };
       onConflict = "elevatoria_id,grupo";
+    } else if (rowId !== undefined) {
+      filtro = { id: rowId };
+      onConflict = "id";
     } else {
       filtro = { elevatoria_id: elevId };
       onConflict = "elevatoria_id";
@@ -227,19 +230,34 @@ function ElevatoriaFichaPage() {
       ignoreDuplicates: false,
     });
 
-    if (error) {
+    if (!error) {
+      const newVal = valor || null;
+      if (tabela === "elevatoria") {
+        setElevatoria(prev => prev ? { ...prev, [campo]: newVal } : prev);
+      } else if (tabela === "elevatoria_equipamento" && grupo !== undefined) {
+        setEquipamentos(prev => prev.map(e => e.grupo === grupo ? { ...e, [campo]: newVal } : e));
+      } else if (tabela === "elevatoria_eletrica" && grupo !== undefined) {
+        setEletricas(prev => prev.map(e => e.grupo === grupo ? { ...e, [campo]: newVal } : e));
+      } else if (tabela === "elevatoria_rolamentos_selos" && rowId !== undefined) {
+        setRolamentos(prev => prev.map(r => r.id === rowId ? { ...r, [campo]: newVal } : r));
+      } else if (tabela === "elevatoria_hidraulica") {
+        setHidraulica(prev => prev ? { ...prev, [campo]: newVal } : prev);
+      } else if (tabela === "elevatoria_area_influencia") {
+        setAreaInfluencia(prev => prev ? { ...prev, [campo]: newVal } : prev);
+      }
+    } else {
       toast.error("Erro ao salvar: " + error.message);
     }
     setSalvando(false);
-  }, [elevId, permissoes.podeEditarMestres]);
+  }, [elevId, permissoes.podeEditarMestres, setElevatoria, setEquipamentos, setEletricas, setHidraulica, setAreaInfluencia, setRolamentos]);
 
-  const handleFieldChange = (tabela: string, campo: string, valor: string, grupo?: number) => {
-    const cacheKey = `${tabela}:${campo}:${grupo ?? ""}`;
+  const handleFieldChange = (tabela: string, campo: string, valor: string, grupo?: number, rowId?: number) => {
+    const cacheKey = `${tabela}:${campo}:${grupo ?? ""}:${rowId ?? ""}`;
     if (saveTimers.current.has(cacheKey)) {
       clearTimeout(saveTimers.current.get(cacheKey));
     }
     saveTimers.current.set(cacheKey, setTimeout(() => {
-      salvarField(tabela, campo, valor, grupo);
+      salvarField(tabela, campo, valor, grupo, rowId);
       saveTimers.current.delete(cacheKey);
     }, 600));
   };
@@ -263,10 +281,11 @@ function ElevatoriaFichaPage() {
     setEtapas(prev => prev.map(e => e.id === etapaId ? { ...e, concluida } : e));
   };
 
-  const InputField = ({ tabela, campo, label, tipo = "text", opcoes, valor, onChange, editOnly, grupo }: {
+  const InputField = ({ tabela, campo, label, tipo = "text", opcoes, valor, onChange, editOnly, grupo, rowId }: {
     tabela: string; campo: string; label: string; tipo?: string; opcoes?: string[];
-    valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean; grupo?: number;
+    valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean; grupo?: number; rowId?: number;
   }) => {
+    const [localValor, setLocalValor] = useState(valor || "");
     const na = isNA(tabela, campo);
     const podeEditarBase = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
     const podeEditar = editOnly ? (podeEditarBase && editMode) : podeEditarBase;
@@ -297,10 +316,12 @@ function ElevatoriaFichaPage() {
           </div>
         ) : tipo === "select" && opcoes ? (
           <select
-            value={valor || ""}
+            value={localValor}
             onChange={e => {
-              if (onChange) onChange(e.target.value);
-              else handleFieldChange(tabela, campo, e.target.value, grupo);
+              const newVal = e.target.value;
+              setLocalValor(newVal);
+              if (onChange) onChange(newVal);
+              else handleFieldChange(tabela, campo, newVal, grupo, rowId);
             }}
             disabled={!podeEditar}
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
@@ -311,10 +332,12 @@ function ElevatoriaFichaPage() {
         ) : (
           <input
             type={tipo}
-            value={valor || ""}
+            value={localValor}
             onChange={e => {
-              if (onChange) onChange(e.target.value);
-              else handleFieldChange(tabela, campo, e.target.value, grupo);
+              const newVal = e.target.value;
+              setLocalValor(newVal);
+              if (onChange) onChange(newVal);
+              else handleFieldChange(tabela, campo, newVal, grupo, rowId);
             }}
             disabled={!podeEditar}
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
@@ -571,6 +594,7 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_equipamento" campo="mancais_loa" label="Mancais (LOA)" valor={eq.mancais_loa} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="ponta_eixo_motor" label="Ponta do Eixo do Motor" valor={eq.ponta_eixo_motor} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="sentido_montagem_motor" label="Sentido de Montagem do Motor" valor={eq.sentido_montagem_motor} grupo={eq.grupo} />
+                        <InputField tabela="elevatoria_equipamento" campo="cod_sap_motor" label="Cód. SAP Motor" valor={eq.cod_sap_motor} grupo={eq.grupo} />
                       </SectionCard>
                       <SectionCard title="Bomba">
                         <InputField tabela="elevatoria_equipamento" campo="modelo_bomba" label="Modelo da Bomba" valor={eq.modelo_bomba} grupo={eq.grupo} />
@@ -582,6 +606,7 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_equipamento" campo="bomba_dreno" label="Bomba Dreno" valor={eq.bomba_dreno} opcoes={["Sim", "Não"]} tipo="select" grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="flange" label="Flange" valor={eq.flange} grupo={eq.grupo} />
                         <InputField tabela="elevatoria_equipamento" campo="forma_construtiva_bomba" label="Forma Construtiva da Bomba" valor={eq.forma_construtiva_bomba} grupo={eq.grupo} />
+                        <InputField tabela="elevatoria_equipamento" campo="cod_sap_bomba" label="Cód. SAP Bomba" valor={eq.cod_sap_bomba} grupo={eq.grupo} />
                       </SectionCard>
                       <SectionCard title="Desempenho">
                         <InputField tabela="elevatoria_equipamento" campo="vazao_aproximada_m3h" label="Vazão Aproximada (m³/h)" valor={eq.vazao_aproximada_m3h} grupo={eq.grupo} />
@@ -637,6 +662,8 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_eletrica" campo="medidor_apurado_data" label="Data Medição" tipo="date" valor={el.medidor_apurado_data} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="unidade_consumo" label="Unidade de Consumo" valor={el.unidade_consumo} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="endereco_concessionaria" label="Endereço (Concessionária)" valor={el.endereco_concessionaria} grupo={el.grupo} />
+                        <InputField tabela="elevatoria_eletrica" campo="custo_medio_kwh" label="Custo Médio (R$/kWh)" valor={el.custo_medio_kwh} grupo={el.grupo} />
+                        <InputField tabela="elevatoria_eletrica" campo="meses_media_kwh" label="Meses da Média (ex: Jan-Jun)" valor={el.meses_media_kwh} grupo={el.grupo} />
                       </SectionCard>
                       <SectionCard title="Painéis">
                         <InputField tabela="elevatoria_eletrica" campo="fusivel_pc" label="Fusível (PC)" valor={el.fusivel_pc} grupo={el.grupo} />
@@ -657,7 +684,7 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_eletrica" campo="corrente_a_acionamento" label="Corrente (A) do Acionamento" valor={el.corrente_a_acionamento} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="tag_acionamento" label="TAG do Acionamento" valor={el.tag_acionamento} grupo={el.grupo} />
                         <InputField tabela="elevatoria_eletrica" campo="clp" label="CLP" valor={el.clp} opcoes={["Sim", "Não"]} tipo="select" grupo={el.grupo} />
-                        <InputField tabela="elevatoria_eletrica" campo="pcp" label="PCP" valor={el.pcp} grupo={el.grupo} />
+                        <InputField tabela="elevatoria_eletrica" campo="pcp" label="PCP" valor={el.pcp} opcoes={["Sim", "Não"]} tipo="select" grupo={el.grupo} />
                       </SectionCard>
                       <SectionCard title="Setpoint">
                         <InputField tabela="elevatoria_eletrica" campo="retaguarda_liga" label="Retaguarda Liga" valor={el.retaguarda_liga} grupo={el.grupo} />
@@ -714,18 +741,37 @@ function ElevatoriaFichaPage() {
                     )}
                   </div>
                 ) : (
-                  rolamentos.map(rol => (
-                    <SectionCard key={rol.id} title={`Conjunto #${rol.id}`}>
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="tipo" label="Tipo" valor={rol.tipo} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="cadeados_padrao" label="Cadeados Padrão" valor={rol.cadeados_padrao} opcoes={["Sim", "Não"]} tipo="select" />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="quantidade_cadeados" label="Quantidade de Cadeados" valor={rol.quantidade_cadeados} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_motor" label="Rolamento Motor" valor={rol.rolamento_motor} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_bomba" label="Rolamento Bomba" valor={rol.rolamento_bomba} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="b_acoplamento" label="B. Acoplamento" valor={rol.b_acoplamento} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="gaxeta" label="Gaxeta" valor={rol.gaxeta} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="selo_mecanico" label="Selo Mecânico" valor={rol.selo_mecanico} />
-                      <InputField tabela="elevatoria_rolamentos_selos" campo="data_troca" label="Data da Troca" tipo="date" valor={rol.data_troca} />
-                    </SectionCard>
+                    rolamentos.map(rol => (
+                    <div key={rol.id}>
+                      <SectionCard title={rol.nome || `Conjunto #${rol.id}`}>
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="nome" label="Nome do Conjunto" valor={rol.nome} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="tipo" label="Tipo" valor={rol.tipo} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="cadeados_padrao" label="Cadeados Padrão" valor={rol.cadeados_padrao} opcoes={["Sim", "Não"]} tipo="select" rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="quantidade_cadeados" label="Quantidade de Cadeados" valor={rol.quantidade_cadeados} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_motor" label="Rolamento Motor" valor={rol.rolamento_motor} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_bomba" label="Rolamento Bomba" valor={rol.rolamento_bomba} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="b_acoplamento" label="B. Acoplamento" valor={rol.b_acoplamento} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="gaxeta" label="Gaxeta" valor={rol.gaxeta} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="selo_mecanico" label="Selo Mecânico" valor={rol.selo_mecanico} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="data_troca" label="Data da Troca" tipo="date" valor={rol.data_troca} rowId={rol.id} />
+                        {permissoes.podeEditarMestres && editMode && (
+                          <div className="flex items-end justify-end">
+                            <button
+                              onClick={async () => {
+                                if (!confirm("Excluir este conjunto permanentemente?")) return;
+                                const { error } = await supabase.from("elevatoria_rolamentos_selos").delete().eq("id", rol.id);
+                                if (error) { toast.error("Erro ao excluir: " + error.message); return; }
+                                setRolamentos(prev => prev.filter(r => r.id !== rol.id));
+                                toast.success("Conjunto excluído");
+                              }}
+                              className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 cursor-pointer"
+                            >
+                              <X className="mr-1 inline h-3 w-3" /> Excluir
+                            </button>
+                          </div>
+                        )}
+                      </SectionCard>
+                    </div>
                   ))
                 )}
                 {permissoes.podeEditarMestres && editMode && (

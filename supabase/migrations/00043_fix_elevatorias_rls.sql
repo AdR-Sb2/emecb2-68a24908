@@ -46,3 +46,14 @@ CREATE INDEX IF NOT EXISTS idx_elev_eletrica_grupo ON elevatoria_eletrica(elevat
 ALTER TABLE elevatoria_hidraulica DROP CONSTRAINT IF EXISTS elevatoria_elevatoria_hidraulica_elevatoria_id_key;
 ALTER TABLE elevatoria_area_influencia DROP CONSTRAINT IF EXISTS elevatoria_elevatoria_area_influencia_elevatoria_id_key;
 ALTER TABLE elevatoria_implantacao DROP CONSTRAINT IF EXISTS elevatoria_elevatoria_implantacao_elevatoria_id_key;
+
+-- 8. Adicionar colunas novas em equipamento (cod_sap_motor/bomba)
+ALTER TABLE elevatoria_equipamento ADD COLUMN IF NOT EXISTS cod_sap_motor TEXT;
+ALTER TABLE elevatoria_equipamento ADD COLUMN IF NOT EXISTS cod_sap_bomba TEXT;
+
+-- 9. Adicionar colunas novas em elétrica (custo_medio_kwh, meses_media_kwh)
+ALTER TABLE elevatoria_eletrica ADD COLUMN IF NOT EXISTS custo_medio_kwh TEXT;
+ALTER TABLE elevatoria_eletrica ADD COLUMN IF NOT EXISTS meses_media_kwh TEXT;
+
+-- 10. Adicionar coluna nome em rolamentos_selos
+ALTER TABLE elevatoria_rolamentos_selos ADD COLUMN IF NOT EXISTS nome TEXT;
