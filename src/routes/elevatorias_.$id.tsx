@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useContext, createContext } from "react";
 import {
   Home,
   ArrowLeft,
@@ -65,6 +65,96 @@ interface CampoEditavel {
   label: string;
   tipo?: "text" | "select" | "date" | "number";
   opcoes?: string[];
+}
+
+type FichaContextValue = {
+  isNA: (tabela: string, campo: string) => boolean;
+  toggleNA: (tabela: string, campo: string, motivo?: string) => Promise<void>;
+  handleFieldChange: (tabela: string, campo: string, valor: string, grupo?: number, rowId?: number) => void;
+  editMode: boolean;
+  permissoes: PermissoesElev;
+};
+
+const FichaContext = createContext<FichaContextValue | null>(null);
+
+function InputField({ tabela, campo, label, tipo = "text", opcoes, valor, onChange, editOnly, grupo, rowId }: {
+  tabela: string; campo: string; label: string; tipo?: string; opcoes?: string[];
+  valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean; grupo?: number; rowId?: number;
+}) {
+  const ctx = useContext(FichaContext);
+  const { isNA, toggleNA, handleFieldChange, editMode, permissoes } = ctx!;
+  const [localValor, setLocalValor] = useState(valor ?? "");
+  const na = isNA(tabela, campo);
+  useEffect(() => { setLocalValor(valor ?? ""); }, [valor]);
+  const podeEditarBase = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
+  const podeEditar = editOnly ? (podeEditarBase && editMode) : podeEditarBase;
+  const podeVer = tabela === "elevatoria" ? permissoes.podeVer : permissoes.podeVerMestres;
+
+  if (!podeVer) return null;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</label>
+        {podeEditar && (
+          <button
+            type="button"
+            onClick={() => toggleNA(tabela, campo)}
+            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold transition ${
+              na ? "bg-slate-200 text-slate-500 dark:bg-slate-600 dark:text-slate-300" : "text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
+            }`}
+            title={na ? "Remover N/A" : "Marcar como não aplicável"}
+          >
+            N/A
+          </button>
+        )}
+      </div>
+      {na ? (
+        <div className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm italic text-slate-400 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-500">
+          Não aplicável
+        </div>
+      ) : tipo === "select" && opcoes ? (
+        <select
+          value={localValor}
+          onChange={e => {
+            const newVal = e.target.value;
+            setLocalValor(newVal);
+            if (onChange) onChange(newVal);
+            else handleFieldChange(tabela, campo, newVal, grupo, rowId);
+          }}
+          disabled={!podeEditar}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
+        >
+          <option value="">—</option>
+          {opcoes.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input
+          type={tipo}
+          value={localValor}
+          onChange={e => {
+            const newVal = e.target.value;
+            setLocalValor(newVal);
+            if (onChange) onChange(newVal);
+            else handleFieldChange(tabela, campo, newVal, grupo, rowId);
+          }}
+          disabled={!podeEditar}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
+        />
+      )}
+    </div>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <h3 className="mb-4 text-sm font-bold text-[#0b3a73] dark:text-white">{title}</h3>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function ElevatoriaFichaPage() {
@@ -322,82 +412,6 @@ function ElevatoriaFichaPage() {
     setEtapas(prev => prev.map(e => e.id === etapaId ? { ...e, concluida } : e));
   };
 
-  const InputField = ({ tabela, campo, label, tipo = "text", opcoes, valor, onChange, editOnly, grupo, rowId }: {
-    tabela: string; campo: string; label: string; tipo?: string; opcoes?: string[];
-    valor: string | null | undefined; onChange?: (v: string) => void; editOnly?: boolean; grupo?: number; rowId?: number;
-  }) => {
-    const [localValor, setLocalValor] = useState(valor ?? "");
-    const na = isNA(tabela, campo);
-    useEffect(() => { setLocalValor(valor ?? ""); }, [valor]);
-    const podeEditarBase = tabela === "elevatoria" ? permissoes.podeEditar : permissoes.podeEditarMestres;
-    const podeEditar = editOnly ? (podeEditarBase && editMode) : podeEditarBase;
-    const podeVer = tabela === "elevatoria" ? permissoes.podeVer : permissoes.podeVerMestres;
-
-    if (!podeVer) return null;
-
-    return (
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</label>
-          {podeEditar && (
-            <button
-              type="button"
-              onClick={() => toggleNA(tabela, campo)}
-              className={`text-[10px] px-1.5 py-0.5 rounded font-semibold transition ${
-                na ? "bg-slate-200 text-slate-500 dark:bg-slate-600 dark:text-slate-300" : "text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
-              }`}
-              title={na ? "Remover N/A" : "Marcar como não aplicável"}
-            >
-              N/A
-            </button>
-          )}
-        </div>
-        {na ? (
-          <div className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm italic text-slate-400 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-500">
-            Não aplicável
-          </div>
-        ) : tipo === "select" && opcoes ? (
-          <select
-            value={localValor}
-            onChange={e => {
-              const newVal = e.target.value;
-              setLocalValor(newVal);
-              if (onChange) onChange(newVal);
-              else handleFieldChange(tabela, campo, newVal, grupo, rowId);
-            }}
-            disabled={!podeEditar}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
-          >
-            <option value="">—</option>
-            {opcoes.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        ) : (
-          <input
-            type={tipo}
-            value={localValor}
-            onChange={e => {
-              const newVal = e.target.value;
-              setLocalValor(newVal);
-              if (onChange) onChange(newVal);
-              else handleFieldChange(tabela, campo, newVal, grupo, rowId);
-            }}
-            disabled={!podeEditar}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
-          />
-        )}
-      </div>
-    );
-  };
-
-  const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <h3 className="mb-4 text-sm font-bold text-[#0b3a73] dark:text-white">{title}</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {children}
-      </div>
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f0f4f8] dark:bg-slate-900">
@@ -409,6 +423,7 @@ function ElevatoriaFichaPage() {
   if (!elevatoria) return null;
 
   return (
+    <FichaContext.Provider value={{ isNA, toggleNA, handleFieldChange, editMode, permissoes }}>
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
       {/* Header */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
@@ -585,6 +600,16 @@ function ElevatoriaFichaPage() {
               <div className="mt-4 grid grid-cols-2 gap-4 sm:w-1/2 lg:w-1/3">
                 <InputField tabela="elevatoria" campo="latitude" label="Latitude" tipo="number" valor={elevatoria.latitude?.toString()} />
                 <InputField tabela="elevatoria" campo="longitude" label="Longitude" tipo="number" valor={elevatoria.longitude?.toString()} />
+                {elevatoria.latitude != null && elevatoria.longitude != null ? (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${elevatoria.latitude},${elevatoria.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="col-span-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f7ad6] bg-[#1f7ad6]/10 px-3 py-2 text-[13px] font-semibold text-[#1f7ad6] transition hover:bg-[#1f7ad6] hover:text-white dark:border-[#38bdf8] dark:bg-[#38bdf8]/10 dark:text-[#38bdf8] dark:hover:bg-[#38bdf8]"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Abrir mapa
+                  </a>
+                ) : null}
               </div>
             </div>
             <div className="xl:col-span-1">
@@ -994,6 +1019,7 @@ function ElevatoriaFichaPage() {
         )}
       </div>
     </div>
+    </FichaContext.Provider>
   );
 }
 
