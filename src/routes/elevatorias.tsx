@@ -166,6 +166,8 @@ function ElevatoriasPage() {
     const dbTabs = tabs.filter(t => t.table !== null).map(t => t.table!);
     const promises = dbTabs.map(t => supabase.from(t).select("*"));
     const results = await Promise.all(promises);
+    const resultsByTable = new Map<string, typeof results[number]>();
+    dbTabs.forEach((t, i) => resultsByTable.set(t, results[i]));
 
     const naRes = await supabase.from("elevatoria_campo_na").select("*");
     const naMap = new Map<string, Set<string>>();
@@ -203,7 +205,7 @@ function ElevatoriasPage() {
 
       for (let i = 0; i < tabs.length; i++) {
         if (!tabs[i].table) continue;
-        const tabData = results[i].data?.filter((r: Record<string, unknown>) => r.elevatoria_id === elev.id) ?? [];
+        const tabData = resultsByTable.get(tabs[i].table!)?.data?.filter((r: Record<string, unknown>) => r.elevatoria_id === elev.id) ?? [];
         if (tabData.length === 0) { secos.push({ key: tabs[i].key, total: 0, preenchidos: 0, na: 0 }); continue; }
 
         const naFields = naMap.get(`${elev.id}:${tabs[i].table}`) ?? new Set();
