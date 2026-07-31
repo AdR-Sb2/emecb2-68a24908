@@ -25,6 +25,8 @@ import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ListaRegistros } from "@/components/registros/ListaRegistros";
+import type { PermissoesRegistros } from "@/lib/registros-permissoes";
 import { getPermissoesCargo, temPermissao, temPainel } from "@/lib/permissoes";
 import type {
   Elevatoria,
@@ -32,7 +34,6 @@ import type {
   CompletudeNivel,
   StatusImplantacao,
   ElevatoriaImplantacao,
-  ElevatoriaRegistro,
 } from "@/lib/elevatoria-types";
 import { IMPLANTACAO_STATUS_CORES, IMPLANTACAO_STATUS_OPCOES } from "@/lib/elevatoria-types";
 
@@ -50,6 +51,8 @@ type PermissoesElev = {
   podeEditarMestres: boolean;
   podeExportar: boolean;
   podeImportar: boolean;
+  podeVerRegistros: boolean;
+  permissoesRegistros: PermissoesRegistros;
 };
 
 const COMPLETUDE_OPCOES = [
@@ -89,9 +92,7 @@ function ElevatoriasPage() {
   const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
   const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc");
-  const [registros, setRegistros] = useState<ElevatoriaRegistro[]>([]);
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
-  const [novoRegistro, setNovoRegistro] = useState("");
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false,
     podeEditar: false,
@@ -99,6 +100,8 @@ function ElevatoriasPage() {
     podeEditarMestres: false,
     podeExportar: false,
     podeImportar: false,
+    podeVerRegistros: false,
+    permissoesRegistros: { visualizar: false, criar: false, importar: false, anexarPdf: false },
   });
   const [dialogImportar, setDialogImportar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,6 +132,13 @@ function ElevatoriasPage() {
         podeEditarMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.editar"),
         podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
         podeImportar: temPermissao(perms, "ficha_elevatoria", "importar"),
+        podeVerRegistros: temPermissao(perms, "registros", "visualizar"),
+        permissoesRegistros: {
+          visualizar: temPermissao(perms, "registros", "visualizar"),
+          criar: temPermissao(perms, "registros", "criar"),
+          importar: temPermissao(perms, "registros", "importar"),
+          anexarPdf: temPermissao(perms, "registros", "anexar_pdf"),
+        },
       });
 
       await carregarDados();
@@ -145,7 +155,7 @@ function ElevatoriasPage() {
     if (elevRes.data) setElevatorias(elevRes.data);
     if (impRes.data) setImplantacoes(impRes.data);
 
-    if (elevRes.data && permissoes.podeVerMestres) {
+    if (elevRes.data) {
       await calcularCompletudes(elevRes.data);
     }
     setLoading(false);
@@ -339,22 +349,8 @@ function ElevatoriasPage() {
     toast.success("Elevatória excluída");
   };
 
-  const abrirRegistros = async (elevId: number) => {
-    const { data } = await supabase.from("elevatoria_registros").select("*").eq("elevatoria_id", elevId).order("criado_em", { ascending: false });
-    if (data) setRegistros(data);
+  const abrirRegistros = (elevId: number) => {
     setRegistrosDialog(elevId);
-  };
-
-  const adicionarRegistro = async () => {
-    if (!novoRegistro.trim() || registrosDialog === null) return;
-    const { data, error } = await supabase.from("elevatoria_registros").insert({
-      elevatoria_id: registrosDialog,
-      texto: novoRegistro.trim(),
-      criado_por: user?.id,
-    }).select().single();
-    if (error) { toast.error("Erro ao adicionar registro"); return; }
-    setRegistros(prev => [data, ...prev]);
-    setNovoRegistro("");
   };
 
   const salvarObs = async (elev: Elevatoria, obs: string | null) => {
@@ -774,10 +770,10 @@ function ElevatoriasPage() {
                 }`}
               >
                 <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
-                  <Building2 className="h-3 w-3" /> Total
+                  <Building2 className="h-3 w-3" /> Total (filtradas)
                 </div>
-                <div className="mt-1 text-3xl font-bold text-blue-700">{kpis.total}</div>
-                <div className="text-[11px] text-blue-500">elevatórias cadastradas</div>
+                <div className="mt-1 text-3xl font-bold text-blue-700">{filtered.length}</div>
+                <div className="text-[11px] text-blue-500">de {kpis.total} elevatórias cadastradas</div>
               </div>
 
               {permissoes.podeVerMestres && (
@@ -1095,44 +1091,17 @@ function ElevatoriasPage() {
 
       {/* Registros Dialog */}
       <Dialog open={registrosDialog !== null} onOpenChange={o => { if (!o) setRegistrosDialog(null); }}>
-        <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-[#0b3a73] dark:text-white flex items-center gap-2">
               <History className="h-4 w-4" /> Registros da Elevatória
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-2 py-4">
-            {registros.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-8">Nenhum registro ainda.</p>
-            ) : (
-              registros.map(r => (
-                <div key={r.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                  <p>{r.texto}</p>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    {r.criado_em ? new Date(r.criado_em).toLocaleString("pt-BR") : ""}
-                  </p>
-                </div>
-              ))
+          <div className="flex-1 overflow-y-auto">
+            {registrosDialog !== null && (
+              <ListaRegistros elevatoriaId={registrosDialog} permissoes={permissoes.permissoesRegistros} />
             )}
           </div>
-          {permissoes.podeEditar && (
-            <div className="flex gap-2 border-t border-slate-200 pt-3 dark:border-slate-600">
-              <input
-                value={novoRegistro}
-                onChange={e => setNovoRegistro(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") adicionarRegistro(); }}
-                placeholder="Digite um novo registro..."
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-              />
-              <button
-                onClick={adicionarRegistro}
-                disabled={!novoRegistro.trim()}
-                className="rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
-              >
-                Adicionar
-              </button>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
 
