@@ -25,6 +25,8 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui/badge";
+import { ListaRegistros } from "@/components/registros/ListaRegistros";
+import type { PermissoesRegistros } from "@/lib/registros-permissoes";
 import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import type {
   Elevatoria,
@@ -55,6 +57,8 @@ type PermissoesElev = {
   podeVerMestres: boolean;
   podeEditarMestres: boolean;
   podeExportar: boolean;
+  podeVerRegistros: boolean;
+  permissoesRegistros: PermissoesRegistros;
 };
 
 type AbaDadosMestres = "equipamento" | "eletrica" | "hidraulica" | "rolamentos" | "area_influencia" | "implantacao" | "historico";
@@ -166,6 +170,7 @@ function ElevatoriaFichaPage() {
   const [loading, setLoading] = useState(true);
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false, podeEditar: false, podeVerMestres: false, podeEditarMestres: false, podeExportar: false,
+    podeVerRegistros: false, permissoesRegistros: { visualizar: false, criar: false, importar: false, anexarPdf: false },
   });
 
   const [aba, setAba] = useState<AbaDadosMestres>("equipamento");
@@ -216,6 +221,13 @@ function ElevatoriaFichaPage() {
           podeVerMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.ver"),
           podeEditarMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.editar"),
           podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
+          podeVerRegistros: temPermissao(perms, "registros", "visualizar"),
+          permissoesRegistros: {
+            visualizar: temPermissao(perms, "registros", "visualizar"),
+            criar: temPermissao(perms, "registros", "criar"),
+            importar: temPermissao(perms, "registros", "importar"),
+            anexarPdf: temPermissao(perms, "registros", "anexar_pdf"),
+          },
         });
 
         await carregarTudo();
@@ -634,6 +646,13 @@ function ElevatoriaFichaPage() {
           </div>
         </div>
 
+        {/* Registros (Informação + Atendimentos) */}
+        {permissoes.podeVerRegistros && (
+          <div className="mb-6">
+            <ListaRegistros elevatoriaId={elevId} permissoes={permissoes.permissoesRegistros} />
+          </div>
+        )}
+
         {/* Dados Mestres Sections (only if user has permission) */}
         {permissoes.podeVerMestres && (
           <>
@@ -851,7 +870,7 @@ function ElevatoriaFichaPage() {
                         <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_loa_motor" label="Rolamento LOA Motor" valor={rol.rolamento_loa_motor} rowId={rol.id} />
                         <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_la_bomba" label="Rolamento LA Bomba" valor={rol.rolamento_la_bomba} rowId={rol.id} />
                         <InputField tabela="elevatoria_rolamentos_selos" campo="rolamento_loa_bomba" label="Rolamento LOA Bomba" valor={rol.rolamento_loa_bomba} rowId={rol.id} />
-                        <InputField tabela="elevatoria_rolamentos_selos" campo="mm_bomba" label="MM Bomba" valor={rol.mm_bomba} rowId={rol.id} />
+                        <InputField tabela="elevatoria_rolamentos_selos" campo="mm_bomba" label="MM Rotor" valor={rol.mm_bomba} rowId={rol.id} />
                         <InputField tabela="elevatoria_rolamentos_selos" campo="gaxeta" label="Gaxeta" valor={rol.gaxeta} rowId={rol.id} />
                         <InputField tabela="elevatoria_rolamentos_selos" campo="selo_mecanico" label="Selo Mecânico" valor={rol.selo_mecanico} rowId={rol.id} />
                         {permissoes.podeEditarMestres && editMode && (
