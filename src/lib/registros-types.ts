@@ -33,14 +33,31 @@ export type RegistroAtendimento = {
   atualizado_em: string;
 };
 
-const TIPOS_CORRETIVA = ["ZNTE", "ZNTP", "ZTRE"];
-const TIPOS_PREVENTIVA = ["ZTPC", "ZTPD", "ZTPF"];
+export const TIPOS_ORDEM = [
+  "EMERGENCIAL",
+  "PROGRAMADA",
+  "SERVIÇOS",
+  "CONTROLE OPERACIONAL",
+  "MELHORIA",
+  "PREV. CONDIÇÂO",
+  "PREV. FREQUENCIA",
+] as const;
+
+const MAPA_TIPO_ORDEM: Record<string, string> = {
+  ZNTE: "EMERGENCIAL",
+  ZNTP: "PROGRAMADA",
+  ZNTS: "SERVIÇOS",
+  ZTCO: "CONTROLE OPERACIONAL",
+  ZTEN: "MELHORIA",
+  ZTPC: "PREV. CONDIÇÂO",
+  ZTPD: "PREV. FREQUENCIA",
+  ZTPF: "PREV. FREQUENCIA",
+  ZTRE: "PREV. FREQUENCIA",
+};
 
 export function derivarNatureza(tipoOrdem: string | null | undefined): string {
   const t = (tipoOrdem ?? "").toUpperCase().trim();
-  if (TIPOS_CORRETIVA.includes(t)) return "corretiva";
-  if (TIPOS_PREVENTIVA.includes(t)) return "preventiva";
-  return "outras";
+  return MAPA_TIPO_ORDEM[t] ?? "outras";
 }
 
 export function derivarStatusSimplificado(status: string | null | undefined): string | null {

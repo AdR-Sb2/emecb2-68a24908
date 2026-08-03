@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/command";
 import { getPermissoesRegistros, type PermissoesRegistros } from "@/lib/registros-permissoes";
 import type { RegistroAtendimento, RegistroInformacao } from "@/lib/registros-types";
+import { TIPOS_ORDEM } from "@/lib/registros-types";
 import { importarRegistrosSAP } from "@/lib/registros-import";
 
 type Props = {
@@ -43,9 +44,19 @@ type Props = {
 };
 
 const NATUREZA_CORES: Record<string, string> = {
-  corretiva:
+  EMERGENCIAL:
     "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800",
-  preventiva:
+  PROGRAMADA:
+    "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800",
+  SERVIÇOS:
+    "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800",
+  "CONTROLE OPERACIONAL":
+    "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800",
+  MELHORIA:
+    "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800",
+  "PREV. CONDIÇÂO":
+    "bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800",
+  "PREV. FREQUENCIA":
     "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800",
   outras:
     "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
@@ -618,10 +629,12 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
               onChange={(e) => setFiltroNatureza(e.target.value)}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             >
-              <option value="TODAS">Natureza: todas</option>
-              <option value="corretiva">Corretiva</option>
-              <option value="preventiva">Preventiva</option>
-              <option value="outras">Outras</option>
+              <option value="TODAS">Tipo de ordem: todos</option>
+              {[...TIPOS_ORDEM, "outras"].map((t) => (
+                <option key={t} value={t}>
+                  {t === "outras" ? "Outras" : t}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -663,11 +676,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                           <Badge
                             className={`border ${NATUREZA_CORES[natureza] ?? NATUREZA_CORES.outras}`}
                           >
-                            {natureza === "corretiva"
-                              ? "Corretiva"
-                              : natureza === "preventiva"
-                                ? "Preventiva"
-                                : "Outras"}
+                            {natureza === "outras" ? "Outras" : natureza}
                           </Badge>
                           {a.status_simplificado ? (
                             <Badge
