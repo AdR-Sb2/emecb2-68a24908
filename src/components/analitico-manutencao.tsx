@@ -1,24 +1,48 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Printer, FileSpreadsheet, ShieldAlert, Info } from "lucide-react";
+import {
+  Loader2,
+  Printer,
+  FileSpreadsheet,
+  ShieldAlert,
+  Info,
+  Search,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+} from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import {
   ResponsiveContainer,
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip as UiTooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 type LinhaAnalitico = {
   elevatoria_id: number;
@@ -40,7 +64,72 @@ type PontoTendencia = {
   corretiva: number;
 };
 
+type PontoTendenciaComRazao = PontoTendencia & {
+  razao: number | null;
+};
+
+type Ordenacao = { coluna: string | null; direcao: "asc" | "desc" };
+
 const JANELAS = [3, 6, 12, 24];
+
+const META_RAZAO = 10;
+
+const MESES_PT = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+const MESES_PT_CURTO = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
+
+function formatMesLabel(mes: string): string {
+  const [ano, mm] = mes.split("-");
+  const i = Number(mm) - 1;
+  return MESES_PT[i] ? `${MESES_PT[i]}/${ano}` : mes;
+}
+
+function formatMesTick(mes: string): string {
+  const [ano, mm] = mes.split("-");
+  const i = Number(mm) - 1;
+  return MESES_PT_CURTO[i] ? `${MESES_PT_CURTO[i]}/${ano.slice(2)}` : mes;
+}
+
+function fmtRazao(r: number | null): string {
+  if (r === null) return "∞";
+  return r.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+}
+
+function somaPrevCorr(
+  pontos: PontoTendenciaComRazao[],
+  n: number,
+): { prev: number; corr: number; razao: number | null } {
+  const slice = pontos.slice(-n);
+  const prev = slice.reduce((s, p) => s + p.preventiva, 0);
+  const corr = slice.reduce((s, p) => s + p.corretiva, 0);
+  return { prev, corr, razao: corr > 0 ? prev / corr : null };
+}
 
 const STATUS_INFO: Record<
   string,
@@ -140,11 +229,36 @@ const COLUNA_TOOLTIP: Record<string, string> = {
     "Classificação: Normal (<45 dias sem preventiva), Atrasado (45–89 dias), Parado (90+ dias), Crítico (zero preventiva válida com corretiva ocorrendo), Sem dados (nenhuma O.S. registrada no período)",
 };
 
-function CabecalhoCol({ col }: { col: string }) {
+function CabecalhoCol({
+  col,
+  ordenacao,
+  onOrdenar,
+}: {
+  col: string;
+  ordenacao: Ordenacao;
+  onOrdenar: (c: string) => void;
+}) {
+  const ativa = ordenacao.coluna === col;
   return (
     <th className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
       <span className="inline-flex items-center gap-1">
-        {col}
+        <button
+          type="button"
+          onClick={() => onOrdenar(col)}
+          className="inline-flex items-center gap-0.5 hover:text-[#1f7ad6]"
+          title={`Ordenar por ${col}`}
+        >
+          {col}
+          {ativa ? (
+            ordenacao.direcao === "asc" ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )
+          ) : (
+            <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />
+          )}
+        </button>
         {COLUNA_TOOLTIP[col] && (
           <UiTooltip>
             <TooltipTrigger asChild>
@@ -191,6 +305,204 @@ function valorCelula(linha: LinhaAnalitico, coluna: string): string {
   }
 }
 
+function valorOrdenacao(linha: LinhaAnalitico, coluna: string): string | number | null {
+  switch (coluna) {
+    case "Elevatória":
+      return (linha.nome || linha.planta || `#${linha.elevatoria_id}`).toLowerCase();
+    case "Município":
+      return linha.municipio ? linha.municipio.toLowerCase() : null;
+    case "Última preventiva válida":
+      return linha.ultima_preventiva_valida;
+    case "Dias sem preventiva":
+      return linha.dias_sem_preventiva_valida;
+    case "Preventiva (janela)":
+      return linha.qtd_preventiva_valida_janela;
+    case "Corretiva (janela)":
+      return linha.qtd_corretiva_janela;
+    case "ZTPC (janela)":
+      return linha.qtd_ztpc_janela;
+    case "Razão Corr/Prev":
+      return linha.razao_corretiva_preventiva;
+    case "Status":
+      return linha.status_plano;
+    default:
+      return null;
+  }
+}
+
+function compararLinhas(
+  a: LinhaAnalitico,
+  b: LinhaAnalitico,
+  coluna: string,
+  direcao: "asc" | "desc",
+): number {
+  const va = valorOrdenacao(a, coluna);
+  const vb = valorOrdenacao(b, coluna);
+  if (va === null && vb === null) return 0;
+  if (va === null) return direcao === "asc" ? -1 : 1;
+  if (vb === null) return direcao === "asc" ? 1 : -1;
+  let cmp: number;
+  if (typeof va === "number" && typeof vb === "number") {
+    cmp = va - vb;
+  } else if (typeof va === "string" && typeof vb === "string") {
+    if (coluna === "Status") {
+      cmp = (ORDEM_STATUS[va] ?? 99) - (ORDEM_STATUS[vb] ?? 99);
+    } else {
+      cmp = va.localeCompare(vb, "pt-BR");
+    }
+  } else {
+    cmp = 0;
+  }
+  return direcao === "asc" ? cmp : -cmp;
+}
+
+function MultiSelectMunicipio({
+  opcoes,
+  valor,
+  onChange,
+}: {
+  opcoes: { nome: string; contagem: number }[];
+  valor: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (o: string) => {
+    if (valor.includes(o)) onChange(valor.filter((v) => v !== o));
+    else onChange([...valor, o]);
+  };
+  const label =
+    valor.length === 0
+      ? "Todos os municípios"
+      : valor.length === 1
+        ? valor[0]
+        : `${valor.length} municípios`;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex min-h-10 max-w-[220px] items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:border-[#1f7ad6] dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[280px] p-0">
+        <Command>
+          <CommandInput placeholder="Buscar município..." />
+          <CommandList>
+            <CommandEmpty>Nenhum município encontrado</CommandEmpty>
+            {opcoes.map((op) => {
+              const marcado = valor.includes(op.nome);
+              return (
+                <CommandItem
+                  key={op.nome}
+                  onSelect={() => toggle(op.nome)}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        marcado
+                          ? "border-[#1f7ad6] bg-[#1f7ad6] text-white"
+                          : "border-slate-300 dark:border-slate-500"
+                      }`}
+                    >
+                      {marcado && <Check className="h-3 w-3" />}
+                    </span>
+                    <span className="truncate">{op.nome}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">{op.contagem}</span>
+                </CommandItem>
+              );
+            })}
+          </CommandList>
+          <div className="border-t p-1.5">
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="w-full rounded px-2 py-1 text-left text-xs font-semibold text-[#1f7ad6] hover:bg-slate-100 dark:hover:bg-slate-700"
+            >
+              Limpar seleção (todos)
+            </button>
+          </div>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function CardRazao({
+  titulo,
+  sub,
+  d,
+}: {
+  titulo: string;
+  sub: string;
+  d: { prev: number; corr: number; razao: number | null };
+}) {
+  const dentro = d.razao === null || d.razao >= META_RAZAO;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {titulo}
+      </div>
+      <div
+        className={`mt-1 text-3xl font-bold ${
+          dentro ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+        }`}
+      >
+        {d.razao === null ? "∞" : `${fmtRazao(d.razao)} : 1`}
+      </div>
+      <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+        {d.prev} preventiva{d.prev === 1 ? "" : "s"} · {d.corr} corretiva{d.corr === 1 ? "" : "s"}
+      </div>
+      <div
+        className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+          dentro
+            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+            : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+        }`}
+      >
+        {dentro ? "dentro da meta" : `abaixo da meta (${META_RAZAO}:1)`}
+      </div>
+      <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{sub}</div>
+    </div>
+  );
+}
+
+function TooltipTendencia({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: PontoTendenciaComRazao }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const ponto = payload[0].payload;
+  const razao = ponto.razao;
+  const dentro = razao === null || razao >= META_RAZAO;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-800">
+      <p className="mb-1 font-bold text-slate-700 dark:text-slate-200">
+        {formatMesLabel(ponto.mes)}
+      </p>
+      <p className="text-emerald-600 dark:text-emerald-400">
+        Preventiva válida: {ponto.preventiva}
+      </p>
+      <p className="text-red-600 dark:text-red-400">Corretiva: {ponto.corretiva}</p>
+      <p
+        className={`mt-1 font-semibold ${
+          dentro ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+        }`}
+      >
+        Razão Prev/Corr: {razao === null ? "sem corretiva (∞)" : `${fmtRazao(razao)} : 1`} ·{" "}
+        {dentro ? "dentro da meta" : "abaixo da meta (10:1)"}
+      </p>
+    </div>
+  );
+}
+
 export function AnaliticoManutencao() {
   const [janelaMeses, setJanelaMeses] = useState<number>(12);
   const [dados, setDados] = useState<LinhaAnalitico[]>([]);
@@ -198,6 +510,13 @@ export function AnaliticoManutencao() {
   const [emergenciais30dias, setEmergenciais30dias] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusSelecionados, setStatusSelecionados] = useState<string[]>([]);
+  const [ocultarSemDados, setOcultarSemDados] = useState(true);
+  const [municipiosSelecionados, setMunicipiosSelecionados] = useState<string[]>([]);
+  const [buscaNome, setBuscaNome] = useState("");
+  const [razaoMin, setRazaoMin] = useState("");
+  const [razaoMax, setRazaoMax] = useState("");
+  const [abaixoMeta, setAbaixoMeta] = useState(false);
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>({ coluna: null, direcao: "asc" });
   const [exportando, setExportando] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -205,7 +524,10 @@ export function AnaliticoManutencao() {
     try {
       const [res, tend, emerg] = await Promise.all([
         supabase.rpc("analitico_manutencao", { janela_meses: janelaMeses }),
-        supabase.rpc("analitico_tendencia_mensal", { ultimos_meses: 24 }),
+        supabase.rpc("analitico_tendencia_mensal", {
+          ultimos_meses: 24,
+          municipios: municipiosSelecionados.length ? municipiosSelecionados : null,
+        }),
         supabase
           .from("registros_atendimento")
           .select("*", { count: "exact", head: true })
@@ -225,11 +547,23 @@ export function AnaliticoManutencao() {
     } finally {
       setLoading(false);
     }
-  }, [janelaMeses]);
+  }, [janelaMeses, municipiosSelecionados]);
 
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  const municipiosDisponiveis = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of dados) {
+      const m = d.municipio;
+      if (!m) continue;
+      map.set(m, (map.get(m) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .map(([nome, contagem]) => ({ nome, contagem }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [dados]);
 
   const contagemStatus = useMemo(() => {
     const c: Record<string, number> = {
@@ -239,27 +573,93 @@ export function AnaliticoManutencao() {
       critico_so_emergencial: 0,
       sem_dados: 0,
     };
+    const set = new Set(municipiosSelecionados);
     for (const d of dados) {
+      if (set.size && (!d.municipio || !set.has(d.municipio))) continue;
       c[d.status_plano] = (c[d.status_plano] ?? 0) + 1;
     }
     return c;
-  }, [dados]);
+  }, [dados, municipiosSelecionados]);
 
   const linhasFiltradas = useMemo(() => {
     let list = dados;
+    if (municipiosSelecionados.length) {
+      const set = new Set(municipiosSelecionados);
+      list = list.filter((l) => l.municipio !== null && set.has(l.municipio));
+    }
     if (statusSelecionados.length) {
       const set = new Set(statusSelecionados);
       list = list.filter((l) => set.has(l.status_plano));
     }
-    return [...list].sort((a, b) => {
-      const sa = ORDEM_STATUS[a.status_plano] ?? 99;
-      const sb = ORDEM_STATUS[b.status_plano] ?? 99;
-      if (sa !== sb) return sa - sb;
-      const da = a.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
-      const db = b.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
-      return db - da;
-    });
-  }, [dados, statusSelecionados]);
+    if (ocultarSemDados) {
+      list = list.filter((l) => l.status_plano !== "sem_dados");
+    }
+    const busca = buscaNome.trim().toLowerCase();
+    if (busca) {
+      list = list.filter((l) => (l.nome || l.planta || "").toLowerCase().includes(busca));
+    }
+    const rMin = razaoMin.trim() === "" ? null : Number(razaoMin);
+    const rMax = razaoMax.trim() === "" ? null : Number(razaoMax);
+    if (rMin !== null || rMax !== null) {
+      list = list.filter(
+        (l) =>
+          l.razao_corretiva_preventiva !== null &&
+          (rMin === null || l.razao_corretiva_preventiva >= rMin) &&
+          (rMax === null || l.razao_corretiva_preventiva <= rMax),
+      );
+    }
+    if (abaixoMeta) {
+      list = list.filter(
+        (l) => l.razao_corretiva_preventiva !== null && l.razao_corretiva_preventiva > 0.1,
+      );
+    }
+    const arr = [...list];
+    if (ordenacao.coluna) {
+      arr.sort((a, b) => compararLinhas(a, b, ordenacao.coluna!, ordenacao.direcao));
+    } else {
+      arr.sort((a, b) => {
+        const sa = ORDEM_STATUS[a.status_plano] ?? 99;
+        const sb = ORDEM_STATUS[b.status_plano] ?? 99;
+        if (sa !== sb) return sa - sb;
+        const da = a.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
+        const db = b.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
+        return db - da;
+      });
+    }
+    return arr;
+  }, [
+    dados,
+    municipiosSelecionados,
+    statusSelecionados,
+    ocultarSemDados,
+    buscaNome,
+    razaoMin,
+    razaoMax,
+    abaixoMeta,
+    ordenacao,
+  ]);
+
+  const tendenciaComRazao = useMemo<PontoTendenciaComRazao[]>(
+    () =>
+      tendencia.map((p) => ({
+        ...p,
+        razao: p.corretiva > 0 ? p.preventiva / p.corretiva : null,
+      })),
+    [tendencia],
+  );
+
+  const cardMensal = useMemo(() => {
+    if (!tendenciaComRazao.length) return { prev: 0, corr: 0, razao: null };
+    const ultimo = tendenciaComRazao[tendenciaComRazao.length - 1];
+    return { prev: ultimo.preventiva, corr: ultimo.corretiva, razao: ultimo.razao };
+  }, [tendenciaComRazao]);
+
+  const cardPeriodo = useMemo(
+    () => somaPrevCorr(tendenciaComRazao, janelaMeses),
+    [tendenciaComRazao, janelaMeses],
+  );
+
+  const cardAnual = useMemo(() => somaPrevCorr(tendenciaComRazao, 12), [tendenciaComRazao]);
 
   const criticos = useMemo(
     () => linhasFiltradas.filter((l) => l.status_plano === "critico_so_emergencial"),
@@ -270,6 +670,14 @@ export function AnaliticoManutencao() {
     setStatusSelecionados((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
     );
+  };
+
+  const toggleOrdenacao = (coluna: string) => {
+    setOrdenacao((prev) => {
+      if (prev.coluna !== coluna) return { coluna, direcao: "asc" };
+      if (prev.direcao === "asc") return { coluna, direcao: "desc" };
+      return { coluna: null, direcao: "asc" };
+    });
   };
 
   const exportarExcel = async () => {
@@ -504,6 +912,88 @@ export function AnaliticoManutencao() {
           </div>
         </div>
 
+        {/* Filtros extras */}
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <Switch checked={ocultarSemDados} onCheckedChange={setOcultarSemDados} />
+            Ocultar "Sem dados"
+          </label>
+          <MultiSelectMunicipio
+            opcoes={municipiosDisponiveis}
+            valor={municipiosSelecionados}
+            onChange={setMunicipiosSelecionados}
+          />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={buscaNome}
+              onChange={(e) => setBuscaNome(e.target.value)}
+              placeholder="Buscar elevatória..."
+              className="w-52 pl-8"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              step={0.1}
+              value={razaoMin}
+              onChange={(e) => setRazaoMin(e.target.value)}
+              placeholder="Razão mín"
+              className="w-24"
+            />
+            <span className="text-xs text-slate-400">a</span>
+            <Input
+              type="number"
+              min={0}
+              step={0.1}
+              value={razaoMax}
+              onChange={(e) => setRazaoMax(e.target.value)}
+              placeholder="Razão máx"
+              className="w-24"
+            />
+          </div>
+          <label
+            className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+            title="Elevatórias com razão Corr/Prev acima de 0,1 (menos de 10 preventivas por corretiva)"
+          >
+            <input
+              type="checkbox"
+              checked={abaixoMeta}
+              onChange={(e) => setAbaixoMeta(e.target.checked)}
+              className="h-4 w-4 accent-[#1f7ad6]"
+            />
+            Abaixo da meta (10:1)
+          </label>
+        </div>
+
+        {/* Razão Preventiva/Corretiva (meta 10:1) */}
+        <div className="mb-6">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-[#0b3a73] dark:text-white">
+            Razão Preventiva/Corretiva
+            <span className="font-normal text-slate-400 dark:text-slate-500">
+              meta de referência: 10 preventivas para cada corretiva (10:1)
+            </span>
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <CardRazao
+              titulo="Mensal (mês atual)"
+              sub="Preventivas ÷ corretivas no mês corrente"
+              d={cardMensal}
+            />
+            <CardRazao
+              titulo={`Do período (${janelaMeses} meses)`}
+              sub="Soma das preventivas ÷ corretivas na janela selecionada"
+              d={cardPeriodo}
+            />
+            <CardRazao
+              titulo="Anual (12 meses)"
+              sub="Soma das preventivas ÷ corretivas no último ano"
+              d={cardAnual}
+            />
+          </div>
+        </div>
+
         {/* Filtro de status */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -542,24 +1032,56 @@ export function AnaliticoManutencao() {
           </h2>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={tendencia}>
+              <ComposedChart data={tendenciaComRazao}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip
-                  formatter={(value: number | string, name: string) => [
-                    String(value),
-                    name === "preventiva" ? "Preventiva válida" : "Corretiva",
-                  ]}
+                <XAxis dataKey="mes" tickFormatter={formatMesTick} tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 11 }} allowDecimals={false} />
+                <YAxis
+                  yAxisId="ratio"
+                  orientation="right"
+                  tick={{ fontSize: 11 }}
+                  width={40}
+                  domain={[0, (dataMax: number) => Math.max(META_RAZAO, dataMax)]}
                 />
-                <Legend
-                  formatter={(value: string) =>
-                    value === "preventiva" ? "Preventiva válida" : "Corretiva"
-                  }
+                <Tooltip content={<TooltipTendencia />} />
+                <Legend />
+                <Bar
+                  yAxisId="left"
+                  dataKey="preventiva"
+                  name="Preventiva válida"
+                  fill="#10b981"
+                  radius={[3, 3, 0, 0]}
                 />
-                <Bar dataKey="preventiva" fill="#10b981" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="corretiva" fill="#ef4444" radius={[3, 3, 0, 0]} />
-              </BarChart>
+                <Bar
+                  yAxisId="left"
+                  dataKey="corretiva"
+                  name="Corretiva"
+                  fill="#ef4444"
+                  radius={[3, 3, 0, 0]}
+                />
+                <Line
+                  yAxisId="ratio"
+                  type="monotone"
+                  dataKey="razao"
+                  name="Razão Prev/Corr"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+                <ReferenceLine
+                  yAxisId="ratio"
+                  y={META_RAZAO}
+                  stroke="#d97706"
+                  strokeDasharray="6 4"
+                  label={{
+                    value: "Meta 10:1",
+                    position: "insideTopRight",
+                    fill: "#d97706",
+                    fontSize: 10,
+                  }}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -570,7 +1092,12 @@ export function AnaliticoManutencao() {
             <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800">
               <tr className="border-b border-slate-200 dark:border-slate-700">
                 {CABECALHO_COLUNAS.map((col) => (
-                  <CabecalhoCol key={col} col={col} />
+                  <CabecalhoCol
+                    key={col}
+                    col={col}
+                    ordenacao={ordenacao}
+                    onOrdenar={toggleOrdenacao}
+                  />
                 ))}
               </tr>
             </thead>
@@ -583,7 +1110,14 @@ export function AnaliticoManutencao() {
                     className="border-b border-slate-100 dark:border-slate-700/60 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700/40"
                   >
                     <td className="px-3 py-2 font-semibold text-[#0b3a73] dark:text-white">
-                      {l.nome || l.planta || `#${l.elevatoria_id}`}
+                      <Link
+                        to="/elevatorias/$id"
+                        params={{ id: String(l.elevatoria_id) }}
+                        className="hover:text-[#1f7ad6] hover:underline"
+                        title="Abrir ficha da elevatória"
+                      >
+                        {l.nome || l.planta || `#${l.elevatoria_id}`}
+                      </Link>
                     </td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                       {l.municipio || "—"}
