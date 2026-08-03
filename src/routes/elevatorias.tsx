@@ -93,6 +93,7 @@ function ElevatoriasPage() {
   const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc");
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
+  const [registrosGlobalOpen, setRegistrosGlobalOpen] = useState(false);
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false,
     podeEditar: false,
@@ -244,7 +245,12 @@ function ElevatoriasPage() {
 
       let geralTotal = 0, geralPreenchidos = 0, geralNa = 0;
       for (const s of secos) {
-        map.set(`${elev.id}:${s.key}`, calc(s.total, s.preenchidos, s.na));
+        const comp = calc(s.total, s.preenchidos, s.na);
+        if (s.total === 0) {
+          comp.percentual = 0;
+          comp.nivel = "critico";
+        }
+        map.set(`${elev.id}:${s.key}`, comp);
         geralTotal += s.total;
         geralPreenchidos += s.preenchidos;
         geralNa += s.na;
@@ -730,6 +736,14 @@ function ElevatoriasPage() {
               <Download className="h-4 w-4" /> Exportar
             </button>
           )}
+          {permissoes.podeVerRegistros && (
+            <button
+              onClick={() => setRegistrosGlobalOpen(true)}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <History className="h-4 w-4" /> Registros
+            </button>
+          )}
         </div>
       </div>
 
@@ -1088,6 +1102,20 @@ function ElevatoriasPage() {
             </div>
           </>
         )}
+
+      {/* Registros Globais Dialog */}
+      <Dialog open={registrosGlobalOpen} onOpenChange={setRegistrosGlobalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] dark:text-white flex items-center gap-2">
+              <History className="h-4 w-4" /> Registros
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {registrosGlobalOpen && <ListaRegistros permissoes={permissoes.permissoesRegistros} />}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Registros Dialog */}
       <Dialog open={registrosDialog !== null} onOpenChange={o => { if (!o) setRegistrosDialog(null); }}>
