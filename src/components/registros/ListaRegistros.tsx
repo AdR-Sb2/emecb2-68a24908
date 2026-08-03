@@ -53,7 +53,7 @@ const NATUREZA_CORES: Record<string, string> = {
 
 const STATUS_ENCERRADO = ["Encerrada", "Encerrada Técnica"];
 
-const PLANTA_GUARDA_CHUVA = "pl-rjb-sda1003";
+const PLANTA_GUARDA_CHUVA = "PL-RJB-SDA1003";
 
 type ElevatoriaOpt = {
   id: number;
@@ -197,17 +197,28 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       const infoQuery = supabase
         .from("registros_informacao")
         .select("*, profiles:autor_id(nome_completo)");
-      const atendQuery = supabase.from("registros_atendimento").select("*");
+      let atendQuery = supabase.from("registros_atendimento").select("*");
 
       if (elevNum != null) {
         infoQuery.eq("elevatoria_id", elevNum);
         atendQuery.eq("elevatoria_id", elevNum);
       }
 
-      const [infoRes, atendRes, elevRes] = await Promise.all([
+      const elevRes = await supabase.from("elevatorias").select("id, nome, planta").order("nome");
+      if (!active) return;
+      if (elevRes.data) setElevatorias(elevRes.data as ElevatoriaOpt[]);
+
+      if (elevNum == null) {
+        const plantas = (elevRes.data ?? [])
+          .map((e) => (e as ElevatoriaOpt).planta)
+          .filter((p): p is string => Boolean(p));
+        const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
+        if (lista.length) atendQuery = atendQuery.in("planta", lista);
+      }
+
+      const [infoRes, atendRes] = await Promise.all([
         infoQuery.order("criado_em", { ascending: false }).limit(300),
-        atendQuery.order("data_entrada", { ascending: false, nullsFirst: false }).limit(500),
-        supabase.from("elevatorias").select("id, nome, planta").order("nome"),
+        atendQuery.order("data_entrada", { ascending: false, nullsFirst: false }),
       ]);
 
       if (!active) return;
@@ -222,7 +233,6 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       }
       if (atendRes.error) toast.error("Erro ao carregar atendimentos: " + atendRes.error.message);
       else setAtendimentos((atendRes.data ?? []) as RegistroAtendimento[]);
-      if (elevRes.data) setElevatorias(elevRes.data as ElevatoriaOpt[]);
       setLoading(false);
     };
     load();
@@ -244,7 +254,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
     return atendimentos.filter((a) => {
       if (!a.planta) return false;
       const planta = a.planta.trim().toLowerCase();
-      return plantasCadastradas.has(planta) || planta === PLANTA_GUARDA_CHUVA;
+      return plantasCadastradas.has(planta) || planta === PLANTA_GUARDA_CHUVA.toLowerCase();
     });
   }, [atendimentos, elevatoriaId, plantasCadastradas]);
 
@@ -292,10 +302,14 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       const elevNum =
         elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
       let query = supabase.from("registros_atendimento").select("*");
-      if (elevNum != null) query = query.eq("elevatoria_id", elevNum);
-      const { data } = await query
-        .order("data_entrada", { ascending: false, nullsFirst: false })
-        .limit(500);
+      if (elevNum != null) {
+        query = query.eq("elevatoria_id", elevNum);
+      } else {
+        const plantas = elevatorias.map((e) => e.planta).filter((p): p is string => Boolean(p));
+        const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
+        if (lista.length) query = query.in("planta", lista);
+      }
+      const { data } = await query.order("data_entrada", { ascending: false, nullsFirst: false });
       if (data) setAtendimentos(data as RegistroAtendimento[]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao importar a planilha.");
