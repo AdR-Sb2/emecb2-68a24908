@@ -200,7 +200,7 @@ function Index() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 pt-8 md:px-6 md:pt-12">
+      <div className="mx-auto max-w-7xl px-4 pt-8 md:px-6 md:pt-12">
         {/* Loading */}
         {loadingPaineis ? (
           <div className="flex flex-1 items-center justify-center">
@@ -208,7 +208,7 @@ function Index() {
           </div>
         ) : (
           /* ===== GRADE DE CARDS ===== */
-          <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid w-full gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {/* Dashboard */}
             {shouldShowDashboard && (
               <CardButton onClick={() => setDashOpen(true)} chave="dashboard" delay={0}>
@@ -455,7 +455,7 @@ function CardButton({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
+      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-left xl:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       {children}
@@ -478,7 +478,7 @@ function CardLink({
   return (
     <Link
       to={to}
-      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
+      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-left xl:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       {children}
@@ -489,7 +489,7 @@ function CardLink({
 function CardDisabled({ delay }: { delay: number }) {
   return (
     <div
-      className="group flex animate-card cursor-not-allowed flex-col items-start gap-4 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-7 text-left opacity-60 shadow-sm dark:border-slate-600 dark:bg-slate-800/50"
+      className="group flex animate-card cursor-not-allowed flex-col items-start gap-4 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-6 text-left xl:p-5 opacity-60 shadow-sm dark:border-slate-600 dark:bg-slate-800/50"
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400 shadow-sm dark:bg-slate-700 dark:text-slate-500">

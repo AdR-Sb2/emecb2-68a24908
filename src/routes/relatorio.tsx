@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Home,
   Send,
   Search,
   FileText,
@@ -16,6 +15,7 @@ import {
   BarChart3,
   CheckCircle2,
 } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import logoHeader from "@/assets/logo-branca.png";
@@ -896,14 +896,7 @@ function RelatorioPage() {
                 </p>
               </div>
             </div>
-            <Link
-              to="/"
-              title="Voltar ao Hub"
-              aria-label="Voltar ao Hub"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
-            >
-              <Home className="h-5 w-5 sm:h-4 sm:w-4" />
-            </Link>
+            <NavVoltarHome />
           </div>
         </div>
 

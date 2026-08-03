@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Home, Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -75,12 +76,7 @@ function AnaliticoPage() {
               </p>
             </div>
           </div>
-          <Link
-            to="/"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
-          >
-            <Home className="h-5 w-5" />
-          </Link>
+          <NavVoltarHome />
         </div>
       </div>
 

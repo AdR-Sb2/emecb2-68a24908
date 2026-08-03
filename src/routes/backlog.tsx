@@ -14,7 +14,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  Home,
   SlidersHorizontal,
   Upload,
   Download,
@@ -33,6 +32,7 @@ import {
   Route as RouteIcon,
   Flag,
 } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/backlog.json";
 import elevatoriasData from "@/data/elevatorias.json";
@@ -1820,14 +1820,7 @@ function BacklogPage() {
               </p>
             </div>
           </div>
-          <Link
-            to="/"
-            title="Voltar ao Hub"
-            aria-label="Voltar ao Hub"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] dark:text-white shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white sm:h-9 sm:w-9"
-          >
-            <Home className="h-5 w-5 sm:h-4 sm:w-4" />
-          </Link>
+          <NavVoltarHome />
         </div>
       </div>
 
