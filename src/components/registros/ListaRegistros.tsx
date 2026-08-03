@@ -15,10 +15,12 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getPermissoesRegistros, type PermissoesRegistros } from "@/lib/registros-permissoes";
 import type { RegistroAtendimento, RegistroInformacao } from "@/lib/registros-types";
 import { importarRegistrosSAP } from "@/lib/registros-import";
+import { ConferirPendentes } from "@/components/registros/ConferirPendentes";
 
 type Props = {
   elevatoriaId?: string | number;
@@ -46,6 +48,7 @@ function formatDate(d: string | null): string {
 export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Props) {
   const { user, profile } = useAuth();
   const [aba, setAba] = useState<"informacao" | "atendimentos">("informacao");
+  const [conferirAtivo, setConferirAtivo] = useState(false);
   const [informacoes, setInformacoes] = useState<RegistroInformacao[]>([]);
   const [atendimentos, setAtendimentos] = useState<RegistroAtendimento[]>([]);
   const [elevatorias, setElevatorias] = useState<{ id: number; nome: string }[]>([]);
@@ -229,292 +232,306 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
         <h3 className="flex items-center gap-2 text-sm font-bold text-[#0b3a73] dark:text-white">
           <History className="h-4 w-4" /> Registros
         </h3>
-        {podeImportar && (
-          <button
-            onClick={() => importRef.current?.click()}
-            disabled={importando}
-            className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            {importando ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4" />
-            )}
-            Importar planilha
-          </button>
-        )}
-        <input
-          ref={importRef}
-          type="file"
-          accept=".xlsx,.xls"
-          className="hidden"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            await importar(file);
-            if (importRef.current) importRef.current.value = "";
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          {elevatoriaId == null && (
+            <label className="flex cursor-pointer items-center gap-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300">
+              <Switch checked={conferirAtivo} onCheckedChange={setConferirAtivo} />
+              Conferir
+            </label>
+          )}
+          {podeImportar && !conferirAtivo && (
+            <button
+              onClick={() => importRef.current?.click()}
+              disabled={importando}
+              className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              {importando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              Importar planilha
+            </button>
+          )}
+          <input
+            ref={importRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              await importar(file);
+              if (importRef.current) importRef.current.value = "";
+            }}
+          />
+        </div>
       </div>
 
-      <Tabs value={aba} onValueChange={(v) => setAba(v as "informacao" | "atendimentos")}>
-        <TabsList className="bg-slate-100 dark:bg-slate-700">
-          <TabsTrigger value="informacao" className="gap-1.5">
-            <Info className="h-4 w-4" /> Informação
-          </TabsTrigger>
-          <TabsTrigger value="atendimentos" className="gap-1.5">
-            <ClipboardList className="h-4 w-4" /> Atendimentos ({atendimentos.length})
-          </TabsTrigger>
-        </TabsList>
+      {conferirAtivo ? (
+        <ConferirPendentes permissoes={permissoes} />
+      ) : (
+        <Tabs value={aba} onValueChange={(v) => setAba(v as "informacao" | "atendimentos")}>
+          <TabsList className="bg-slate-100 dark:bg-slate-700">
+            <TabsTrigger value="informacao" className="gap-1.5">
+              <Info className="h-4 w-4" /> Informação
+            </TabsTrigger>
+            <TabsTrigger value="atendimentos" className="gap-1.5">
+              <ClipboardList className="h-4 w-4" /> Atendimentos ({atendimentos.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {/* ---- Aba Informação ---- */}
-        <TabsContent value="informacao" className="space-y-3">
-          {elevatoriaId == null && (
+          {/* ---- Aba Informação ---- */}
+          <TabsContent value="informacao" className="space-y-3">
+            {elevatoriaId == null && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Elevatória
+                </label>
+                <select
+                  value={elevatoriaSelecionada ?? ""}
+                  onChange={(e) =>
+                    setElevatoriaSelecionada(e.target.value ? Number(e.target.value) : null)
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                >
+                  <option value="">Selecione...</option>
+                  {elevatorias.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {podeCriar && (
+              <div className="flex gap-2">
+                <textarea
+                  value={novoTexto}
+                  onChange={(e) => setNovoTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      adicionarInformacao();
+                    }
+                  }}
+                  rows={2}
+                  placeholder="Digite uma informação sobre a elevatória..."
+                  className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                />
+                <button
+                  onClick={adicionarInformacao}
+                  disabled={!novoTexto.trim() || elevatoriaSelecionada == null}
+                  className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar
+                </button>
+              </div>
+            )}
+
+            {informacoes.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">
+                Nenhuma informação registrada.
+              </p>
+            ) : (
+              <div className="max-h-[400px] space-y-2 overflow-y-auto pr-1">
+                {informacoes.map((i) => (
+                  <div
+                    key={i.id}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-700/40"
+                  >
+                    <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                      {i.texto}
+                    </p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
+                      <span>
+                        {i.criado_em ? new Date(i.criado_em).toLocaleString("pt-BR") : ""}
+                      </span>
+                      {i.autor_nome && <span>· {i.autor_nome}</span>}
+                      {nomeElevatoria(i.elevatoria_id) && (
+                        <>
+                          <span>·</span>
+                          <span className="font-semibold text-slate-500 dark:text-slate-300">
+                            {nomeElevatoria(i.elevatoria_id)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ---- Aba Atendimentos ---- */}
+          <TabsContent value="atendimentos" className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Elevatória
-              </label>
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar por ordem, texto, nota..."
+                  className="w-full rounded-lg border border-slate-300 py-2 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                />
+              </div>
               <select
-                value={elevatoriaSelecionada ?? ""}
-                onChange={(e) =>
-                  setElevatoriaSelecionada(e.target.value ? Number(e.target.value) : null)
-                }
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
               >
-                <option value="">Selecione...</option>
-                {elevatorias.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nome}
+                <option value="TODOS">Status: todos</option>
+                {["Aberta", "Liberada", "Encerrada", "Encerrada Técnica"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {podeCriar && (
-            <div className="flex gap-2">
-              <textarea
-                value={novoTexto}
-                onChange={(e) => setNovoTexto(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    adicionarInformacao();
-                  }
-                }}
-                rows={2}
-                placeholder="Digite uma informação sobre a elevatória..."
-                className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-              />
-              <button
-                onClick={adicionarInformacao}
-                disabled={!novoTexto.trim() || elevatoriaSelecionada == null}
-                className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
+              <select
+                value={filtroNatureza}
+                onChange={(e) => setFiltroNatureza(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
               >
-                <Plus className="h-4 w-4" /> Adicionar
-              </button>
+                <option value="TODAS">Natureza: todas</option>
+                <option value="corretiva">Corretiva</option>
+                <option value="preventiva">Preventiva</option>
+                <option value="outras">Outras</option>
+              </select>
             </div>
-          )}
 
-          {informacoes.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400">
-              Nenhuma informação registrada.
-            </p>
-          ) : (
-            <div className="max-h-[400px] space-y-2 overflow-y-auto pr-1">
-              {informacoes.map((i) => (
-                <div
-                  key={i.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-700/40"
-                >
-                  <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
-                    {i.texto}
-                  </p>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
-                    <span>{i.criado_em ? new Date(i.criado_em).toLocaleString("pt-BR") : ""}</span>
-                    {i.autor_nome && <span>· {i.autor_nome}</span>}
-                    {nomeElevatoria(i.elevatoria_id) && (
-                      <>
-                        <span>·</span>
-                        <span className="font-semibold text-slate-500 dark:text-slate-300">
-                          {nomeElevatoria(i.elevatoria_id)}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ---- Aba Atendimentos ---- */}
-        <TabsContent value="atendimentos" className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[200px] flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar por ordem, texto, nota..."
-                className="w-full rounded-lg border border-slate-300 py-2 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-              />
-            </div>
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-            >
-              <option value="TODOS">Status: todos</option>
-              {["Aberta", "Liberada", "Encerrada", "Encerrada Técnica"].map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filtroNatureza}
-              onChange={(e) => setFiltroNatureza(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-            >
-              <option value="TODAS">Natureza: todas</option>
-              <option value="corretiva">Corretiva</option>
-              <option value="preventiva">Preventiva</option>
-              <option value="outras">Outras</option>
-            </select>
-          </div>
-
-          {atendimentosFiltrados.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400 dark:border-slate-600">
-              Nenhum atendimento encontrado.
-              {podeImportar && (
-                <button
-                  onClick={() => importRef.current?.click()}
-                  className="mx-auto mt-2 block font-semibold text-[#1f7ad6] hover:underline"
-                >
-                  Importar planilha do SAP
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
-              {atendimentosFiltrados.map((a) => {
-                const natureza = a.natureza ?? "outras";
-                const encerrado = STATUS_ENCERRADO.includes(a.status_simplificado ?? "");
-                return (
-                  <div
-                    key={a.id}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-700/40"
+            {atendimentosFiltrados.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400 dark:border-slate-600">
+                Nenhum atendimento encontrado.
+                {podeImportar && (
+                  <button
+                    onClick={() => importRef.current?.click()}
+                    className="mx-auto mt-2 block font-semibold text-[#1f7ad6] hover:underline"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-sm font-bold text-[#0b3a73] dark:text-white">
-                            {a.ordem ?? "—"}
-                          </span>
-                          <Badge
-                            className={`border ${NATUREZA_CORES[natureza] ?? NATUREZA_CORES.outras}`}
-                          >
-                            {natureza === "corretiva"
-                              ? "Corretiva"
-                              : natureza === "preventiva"
-                                ? "Preventiva"
-                                : "Outras"}
-                          </Badge>
-                          {a.status_simplificado ? (
-                            <Badge
-                              variant="outline"
-                              className="border-slate-300 text-slate-600 dark:border-slate-500 dark:text-slate-300"
-                            >
-                              {a.status_simplificado}
-                            </Badge>
-                          ) : a.status_sistema ? (
-                            <Badge
-                              variant="outline"
-                              className="border-slate-300 text-slate-500 dark:border-slate-500 dark:text-slate-400"
-                            >
-                              {a.status_sistema}
-                            </Badge>
-                          ) : null}
-                          {a.prioridade && (
-                            <Badge
-                              variant="outline"
-                              className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                            >
-                              {a.prioridade}
-                            </Badge>
-                          )}
-                        </div>
-                        {a.texto_breve && (
-                          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                            {a.texto_breve}
-                          </p>
-                        )}
-                        {a.nota && (
-                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                            Nota: {a.nota}
-                          </p>
-                        )}
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
-                          {a.data_entrada && (
-                            <span className="inline-flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> {formatDate(a.data_entrada)}
+                    Importar planilha do SAP
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
+                {atendimentosFiltrados.map((a) => {
+                  const natureza = a.natureza ?? "outras";
+                  const encerrado = STATUS_ENCERRADO.includes(a.status_simplificado ?? "");
+                  return (
+                    <div
+                      key={a.id}
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-700/40"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-bold text-[#0b3a73] dark:text-white">
+                              {a.ordem ?? "—"}
                             </span>
-                          )}
-                          {nomeElevatoria(a.elevatoria_id) && (
-                            <span>· {nomeElevatoria(a.elevatoria_id)}</span>
-                          )}
-                          {a.planta && <span>· {a.planta}</span>}
-                          {a.criado_por && <span>· Criado por {a.criado_por}</span>}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        {a.pdf_anexo_url ? (
-                          <a
-                            href={a.pdf_anexo_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#1f7ad6] bg-[#eaf3fb] px-2.5 py-1.5 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:border-[#38bdf8] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
-                          >
-                            <FileText className="h-3.5 w-3.5" /> Ver PDF
-                          </a>
-                        ) : podeAnexarPdf && encerrado ? (
-                          <button
-                            onClick={() => anexoRef.current[a.id]?.click()}
-                            disabled={anexando === a.id}
-                            className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                          >
-                            {anexando === a.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Paperclip className="h-3.5 w-3.5" />
+                            <Badge
+                              className={`border ${NATUREZA_CORES[natureza] ?? NATUREZA_CORES.outras}`}
+                            >
+                              {natureza === "corretiva"
+                                ? "Corretiva"
+                                : natureza === "preventiva"
+                                  ? "Preventiva"
+                                  : "Outras"}
+                            </Badge>
+                            {a.status_simplificado ? (
+                              <Badge
+                                variant="outline"
+                                className="border-slate-300 text-slate-600 dark:border-slate-500 dark:text-slate-300"
+                              >
+                                {a.status_simplificado}
+                              </Badge>
+                            ) : a.status_sistema ? (
+                              <Badge
+                                variant="outline"
+                                className="border-slate-300 text-slate-500 dark:border-slate-500 dark:text-slate-400"
+                              >
+                                {a.status_sistema}
+                              </Badge>
+                            ) : null}
+                            {a.prioridade && (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                              >
+                                {a.prioridade}
+                              </Badge>
                             )}
-                            Anexar PDF
-                          </button>
-                        ) : null}
-                        <input
-                          ref={(el) => {
-                            anexoRef.current[a.id] = el;
-                          }}
-                          type="file"
-                          accept="application/pdf"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            await anexarPdf(a, file);
-                            if (anexoRef.current[a.id]) anexoRef.current[a.id]!.value = "";
-                          }}
-                        />
+                          </div>
+                          {a.texto_breve && (
+                            <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                              {a.texto_breve}
+                            </p>
+                          )}
+                          {a.nota && (
+                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                              Nota: {a.nota}
+                            </p>
+                          )}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
+                            {a.data_entrada && (
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> {formatDate(a.data_entrada)}
+                              </span>
+                            )}
+                            {nomeElevatoria(a.elevatoria_id) && (
+                              <span>· {nomeElevatoria(a.elevatoria_id)}</span>
+                            )}
+                            {a.planta && <span>· {a.planta}</span>}
+                            {a.criado_por && <span>· Criado por {a.criado_por}</span>}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {a.pdf_anexo_url ? (
+                            <a
+                              href={a.pdf_anexo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#1f7ad6] bg-[#eaf3fb] px-2.5 py-1.5 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:border-[#38bdf8] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
+                            >
+                              <FileText className="h-3.5 w-3.5" /> Ver PDF
+                            </a>
+                          ) : podeAnexarPdf && encerrado ? (
+                            <button
+                              onClick={() => anexoRef.current[a.id]?.click()}
+                              disabled={anexando === a.id}
+                              className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                            >
+                              {anexando === a.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Paperclip className="h-3.5 w-3.5" />
+                              )}
+                              Anexar PDF
+                            </button>
+                          ) : null}
+                          <input
+                            ref={(el) => {
+                              anexoRef.current[a.id] = el;
+                            }}
+                            type="file"
+                            accept="application/pdf"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              await anexarPdf(a, file);
+                              if (anexoRef.current[a.id]) anexoRef.current[a.id]!.value = "";
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

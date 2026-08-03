@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TestesRouteImport } from './routes/testes'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
+import { Route as RegistrosRouteImport } from './routes/registros'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as OiRouteImport } from './routes/oi'
@@ -38,6 +39,11 @@ const TestesRoute = TestesRouteImport.update({
 const RelatorioRoute = RelatorioRouteImport.update({
   id: '/relatorio',
   path: '/relatorio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistrosRoute = RegistrosRouteImport.update({
+  id: '/registros',
+  path: '/registros',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
+  '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
+  '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
   '/register': typeof RegisterRoute
+  '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/oi'
     | '/pending'
     | '/register'
+    | '/registros'
     | '/relatorio'
     | '/testes'
     | '/api/equipe-override'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/oi'
     | '/pending'
     | '/register'
+    | '/registros'
     | '/relatorio'
     | '/testes'
     | '/api/equipe-override'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/oi'
     | '/pending'
     | '/register'
+    | '/registros'
     | '/relatorio'
     | '/testes'
     | '/api/equipe-override'
@@ -283,6 +295,7 @@ export interface RootRouteChildren {
   OiRoute: typeof OiRoute
   PendingRoute: typeof PendingRoute
   RegisterRoute: typeof RegisterRoute
+  RegistrosRoute: typeof RegistrosRoute
   RelatorioRoute: typeof RelatorioRoute
   TestesRoute: typeof TestesRoute
   ApiEquipeOverrideRoute: typeof ApiEquipeOverrideRoute
@@ -303,6 +316,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorio'
       fullPath: '/relatorio'
       preLoaderRoute: typeof RelatorioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registros': {
+      id: '/registros'
+      path: '/registros'
+      fullPath: '/registros'
+      preLoaderRoute: typeof RegistrosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -462,6 +482,7 @@ const rootRouteChildren: RootRouteChildren = {
   OiRoute: OiRoute,
   PendingRoute: PendingRoute,
   RegisterRoute: RegisterRoute,
+  RegistrosRoute: RegistrosRoute,
   RelatorioRoute: RelatorioRoute,
   TestesRoute: TestesRoute,
   ApiEquipeOverrideRoute: ApiEquipeOverrideRoute,

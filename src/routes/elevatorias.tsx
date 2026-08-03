@@ -93,7 +93,7 @@ function ElevatoriasPage() {
   const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc");
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
-  const [registrosGlobalOpen, setRegistrosGlobalOpen] = useState(false);
+  const [pendentesRegistros, setPendentesRegistros] = useState(0);
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false,
     podeEditar: false,
@@ -126,6 +126,7 @@ function ElevatoriasPage() {
       if (!panelData) { navigate({ to: "/", replace: true }); return; }
 
       const perms = await getPermissoesCargo(profile.cargo_id);
+      const podeVerRegistros = temPermissao(perms, "registros", "visualizar");
       setPermissoes({
         podeVer: temPermissao(perms, "ficha_elevatoria", "ver"),
         podeEditar: temPermissao(perms, "ficha_elevatoria", "editar"),
@@ -133,14 +134,22 @@ function ElevatoriasPage() {
         podeEditarMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.editar"),
         podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
         podeImportar: temPermissao(perms, "ficha_elevatoria", "importar"),
-        podeVerRegistros: temPermissao(perms, "registros", "visualizar"),
+        podeVerRegistros,
         permissoesRegistros: {
-          visualizar: temPermissao(perms, "registros", "visualizar"),
+          visualizar: podeVerRegistros,
           criar: temPermissao(perms, "registros", "criar"),
           importar: temPermissao(perms, "registros", "importar"),
           anexarPdf: temPermissao(perms, "registros", "anexar_pdf"),
         },
       });
+
+      if (podeVerRegistros) {
+        const { count } = await supabase
+          .from("registros_atendimento")
+          .select("*", { count: "exact", head: true })
+          .is("elevatoria_id", null);
+        setPendentesRegistros(count ?? 0);
+      }
 
       await carregarDados();
     };
@@ -738,10 +747,15 @@ function ElevatoriasPage() {
           )}
           {permissoes.podeVerRegistros && (
             <button
-              onClick={() => setRegistrosGlobalOpen(true)}
+              onClick={() => navigate({ to: "/registros" })}
               className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               <History className="h-4 w-4" /> Registros
+              {pendentesRegistros > 0 && (
+                <span className="ml-0.5 inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+                  {pendentesRegistros}
+                </span>
+              )}
             </button>
           )}
         </div>
@@ -1102,20 +1116,6 @@ function ElevatoriasPage() {
             </div>
           </>
         )}
-
-      {/* Registros Globais Dialog */}
-      <Dialog open={registrosGlobalOpen} onOpenChange={setRegistrosGlobalOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="text-[#0b3a73] dark:text-white flex items-center gap-2">
-              <History className="h-4 w-4" /> Registros
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
-            {registrosGlobalOpen && <ListaRegistros permissoes={permissoes.permissoesRegistros} />}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Registros Dialog */}
       <Dialog open={registrosDialog !== null} onOpenChange={o => { if (!o) setRegistrosDialog(null); }}>
