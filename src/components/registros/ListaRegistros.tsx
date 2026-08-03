@@ -13,6 +13,7 @@ import {
   Paperclip,
   Plus,
   Search,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -169,6 +170,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [filtroNatureza, setFiltroNatureza] = useState("TODAS");
   const [anexando, setAnexando] = useState<number | null>(null);
+  const [removendo, setRemovendo] = useState<number | null>(null);
   const [vinculando, setVinculando] = useState<number | null>(null);
   const [selecao, setSelecao] = useState<Record<number, number | null>>({});
   const importRef = useRef<HTMLInputElement>(null);
@@ -335,6 +337,32 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       toast.success("PDF anexado com sucesso");
     } finally {
       setAnexando(null);
+    }
+  };
+
+  const removerPdf = async (atend: RegistroAtendimento) => {
+    if (!podeAnexarPdf) return;
+    setRemovendo(atend.id);
+    try {
+      await supabase.storage.from("registros").remove([`atendimentos/${atend.id}.pdf`]);
+      const { error } = await supabase
+        .from("registros_atendimento")
+        .update({ pdf_anexo_url: null, anexado_por: null, anexado_em: null })
+        .eq("id", atend.id);
+      if (error) {
+        toast.error("Erro ao remover o PDF: " + error.message);
+        return;
+      }
+      setAtendimentos((prev) =>
+        prev.map((a) =>
+          a.id === atend.id
+            ? { ...a, pdf_anexo_url: null, anexado_por: null, anexado_em: null }
+            : a,
+        ),
+      );
+      toast.success("PDF removido com sucesso");
+    } finally {
+      setRemovendo(null);
     }
   };
 
@@ -673,14 +701,30 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         {a.pdf_anexo_url ? (
-                          <a
-                            href={a.pdf_anexo_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#1f7ad6] bg-[#eaf3fb] px-2.5 py-1.5 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:border-[#38bdf8] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
-                          >
-                            <FileText className="h-3.5 w-3.5" /> Ver PDF
-                          </a>
+                          <>
+                            <a
+                              href={a.pdf_anexo_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#1f7ad6] bg-[#eaf3fb] px-2.5 py-1.5 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:border-[#38bdf8] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
+                            >
+                              <FileText className="h-3.5 w-3.5" /> Ver PDF
+                            </a>
+                            {podeAnexarPdf && (
+                              <button
+                                onClick={() => removerPdf(a)}
+                                disabled={removendo === a.id}
+                                className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/40"
+                              >
+                                {removendo === a.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                                Remover
+                              </button>
+                            )}
+                          </>
                         ) : podeAnexarPdf && encerrado ? (
                           <button
                             onClick={() => anexoRef.current[a.id]?.click()}
