@@ -55,6 +55,25 @@ const STATUS_ENCERRADO = ["Encerrada", "Encerrada Técnica"];
 
 const PLANTA_GUARDA_CHUVA = "PL-RJB-SDA1003";
 
+type AtendQuery = ReturnType<ReturnType<typeof supabase.from>["select"]>;
+
+const TAMANHO_PAGINA = 1000;
+
+async function buscarAtendimentos(query: AtendQuery): Promise<RegistroAtendimento[] | null> {
+  const todos: RegistroAtendimento[] = [];
+  for (let i = 0; i < 100; i++) {
+    const { data, error } = await query.range(i * TAMANHO_PAGINA, (i + 1) * TAMANHO_PAGINA - 1);
+    if (error) {
+      toast.error("Erro ao carregar atendimentos: " + error.message);
+      return null;
+    }
+    if (!data || data.length === 0) break;
+    todos.push(...(data as RegistroAtendimento[]));
+    if (data.length < TAMANHO_PAGINA) break;
+  }
+  return todos;
+}
+
 type ElevatoriaOpt = {
   id: number;
   nome: string;
@@ -216,9 +235,11 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
         if (lista.length) atendQuery = atendQuery.in("planta", lista);
       }
 
-      const [infoRes, atendRes] = await Promise.all([
+      const [infoRes, atendimentos] = await Promise.all([
         infoQuery.order("criado_em", { ascending: false }).limit(300),
-        atendQuery.order("data_entrada", { ascending: false, nullsFirst: false }),
+        buscarAtendimentos(
+          atendQuery.order("data_entrada", { ascending: false, nullsFirst: false }),
+        ),
       ]);
 
       if (!active) return;
@@ -231,8 +252,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
           })) as RegistroInformacao[],
         );
       }
-      if (atendRes.error) toast.error("Erro ao carregar atendimentos: " + atendRes.error.message);
-      else setAtendimentos((atendRes.data ?? []) as RegistroAtendimento[]);
+      if (atendimentos) setAtendimentos(atendimentos);
       setLoading(false);
     };
     load();
@@ -309,8 +329,10 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
         const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
         if (lista.length) query = query.in("planta", lista);
       }
-      const { data } = await query.order("data_entrada", { ascending: false, nullsFirst: false });
-      if (data) setAtendimentos(data as RegistroAtendimento[]);
+      const data = await buscarAtendimentos(
+        query.order("data_entrada", { ascending: false, nullsFirst: false }),
+      );
+      if (data) setAtendimentos(data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao importar a planilha.");
     } finally {
