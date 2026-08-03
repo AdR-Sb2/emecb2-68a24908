@@ -177,28 +177,34 @@ function fmtDate(d: Date | null): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-// Latitude: -25 a -20 (RJ). Dados podem vir crus (/100000) ou já corretos.
-function parseLat(raw: string | null | undefined): number | null {
-  if (raw === null || raw === undefined || raw === "") return null;
-  let n = parseFloat(String(raw).replace(",", "."));
+// Converte coordenada do Field/SAP para graus decimais.
+// O export do Field traz o valor como inteiro escalado com separador de
+// milhar (ex.: "-2.281.507" = -22.81507) ou já em graus ("-22.8113").
+function parseCoord(raw: string | null | undefined, min: number, max: number): number | null {
+  if (raw === null || raw === undefined || String(raw).trim() === "") return null;
+  const s = String(raw).trim().replace(",", ".");
+  const n = parseFloat(s);
   if (!Number.isFinite(n)) return null;
-  if (n >= -25 && n <= -20) return n;
-  n = n / 100000;
-  if (n > -10) n = n * 10;
-  if (n >= -25 && n <= -20) return n;
+  if (n >= min && n <= max) return n;
+  const intStr = s.replace(/\./g, "");
+  if (/^-?\d+$/.test(intStr)) {
+    const iv = parseInt(intStr, 10);
+    for (const div of [100000, 10000, 1000, 100, 10]) {
+      const v = iv / div;
+      if (v >= min && v <= max) return v;
+    }
+  }
   return null;
+}
+
+// Latitude: -25 a -20 (RJ).
+function parseLat(raw: string | null | undefined): number | null {
+  return parseCoord(raw, -25, -20);
 }
 
 // Longitude: -45 a -40 (RJ).
 function parseLon(raw: string | null | undefined): number | null {
-  if (raw === null || raw === undefined || raw === "") return null;
-  const orig = parseFloat(String(raw).replace(",", "."));
-  if (!Number.isFinite(orig)) return null;
-  for (const div of [1, 10, 100, 1000, 10000, 100000]) {
-    const v = orig / div;
-    if (v >= -45 && v <= -40) return v;
-  }
-  return null;
+  return parseCoord(raw, -45, -40);
 }
 
 // ---------- faixa ----------
