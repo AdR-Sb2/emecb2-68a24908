@@ -25,6 +25,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronogramaRouteImport } from './routes/cronograma'
 import { Route as BloqueadoRouteImport } from './routes/bloqueado'
 import { Route as BacklogRouteImport } from './routes/backlog'
+import { Route as AnaliticoRouteImport } from './routes/analitico'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
@@ -111,6 +112,11 @@ const BacklogRoute = BacklogRouteImport.update({
   path: '/backlog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AnaliticoRoute = AnaliticoRouteImport.update({
+  id: '/analitico',
+  path: '/analitico',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -140,6 +146,7 @@ const CronogramaPublicoTokenRoute = CronogramaPublicoTokenRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/analitico': typeof AnaliticoRoute
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
@@ -163,6 +170,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/analitico': typeof AnaliticoRoute
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
@@ -187,6 +195,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/analitico': typeof AnaliticoRoute
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/analitico'
     | '/backlog'
     | '/bloqueado'
     | '/cronograma'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/analitico'
     | '/backlog'
     | '/bloqueado'
     | '/cronograma'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/analitico'
     | '/backlog'
     | '/bloqueado'
     | '/cronograma'
@@ -282,6 +294,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AnaliticoRoute: typeof AnaliticoRoute
   BacklogRoute: typeof BacklogRoute
   BloqueadoRoute: typeof BloqueadoRoute
   CronogramaRoute: typeof CronogramaRouteWithChildren
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BacklogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/analitico': {
+      id: '/analitico'
+      path: '/analitico'
+      fullPath: '/analitico'
+      preLoaderRoute: typeof AnaliticoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -469,6 +489,7 @@ const CronogramaRouteWithChildren = CronogramaRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AnaliticoRoute: AnaliticoRoute,
   BacklogRoute: BacklogRoute,
   BloqueadoRoute: BloqueadoRoute,
   CronogramaRoute: CronogramaRouteWithChildren,
