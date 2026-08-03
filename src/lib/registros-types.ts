@@ -11,6 +11,7 @@ export type RegistroAtendimento = {
   id: number;
   elevatoria_id: number | null;
   planta: string | null;
+  local_instalacao: string | null;
   ordem: string | null;
   nota: string | null;
   texto_breve: string | null;

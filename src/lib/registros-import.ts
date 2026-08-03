@@ -38,11 +38,14 @@ const FIELD_ALIASES: Record<string, string> = {
   "texto descritivo": "texto_breve",
   descricao: "texto_breve",
   "texto longo": "texto_longo",
-  "local de instalacao": "planta",
-  "local instalacao": "planta",
-  "local instal.": "planta",
-  planta: "planta",
-  local: "planta",
+  "nome da lista": "lista",
+  "nome lista": "lista",
+  lista: "lista",
+  "local de instalacao": "local_instalacao",
+  "local instalacao": "local_instalacao",
+  "local instal.": "local_instalacao",
+  planta: "local_instalacao",
+  local: "local_instalacao",
   "tipo de ordem": "tipo_ordem",
   "tipo ordem": "tipo_ordem",
   "tipo de atividade": "tipo_ordem",
@@ -145,7 +148,9 @@ export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosR
 
   for (const r of rows) {
     const ordem = toText(get(r, "ordem"));
-    const planta = toText(get(r, "planta"));
+    const localInstalacao = toText(get(r, "local_instalacao"));
+    const lista = toText(get(r, "lista"));
+    const planta = lista ? lista.split(" - ")[0].trim() || null : localInstalacao;
     const textoBreve = toText(get(r, "texto_breve"));
     if (!ordem && !planta && !textoBreve && !toText(get(r, "nota"))) continue;
 
@@ -158,6 +163,7 @@ export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosR
     registros.push({
       elevatoria_id: elevatoriaId,
       planta,
+      local_instalacao: localInstalacao,
       ordem,
       nota: toText(get(r, "nota")),
       texto_breve: textoBreve,
