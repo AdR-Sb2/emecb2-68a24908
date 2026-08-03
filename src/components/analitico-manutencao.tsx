@@ -65,6 +65,7 @@ type LinhaAnalitico = {
   qtd_ztpc_janela: number;
   razao_corretiva_preventiva: number | null;
   status_plano: string;
+  justificativa_sem_preventiva: string | null;
 };
 
 type PontoTendencia = {
@@ -80,6 +81,10 @@ type PontoTendenciaComRazao = PontoTendencia & {
 type Ordenacao = { coluna: string | null; direcao: "asc" | "desc" };
 
 const JANELAS = [3, 6, 12, 24];
+
+const ATALHOS_DIAS = [45, 90, 180, 365];
+
+const SUGESTOES_JUSTIFICATIVA = ["NOVO", "INSTALANDO", "EM ANÁLISE"];
 
 const META_RAZAO = 10;
 
@@ -241,6 +246,7 @@ const CABECALHO_COLUNAS = [
   "ZTPC (janela)",
   "Razão Corr/Prev",
   "Status",
+  "Justificativa (sem preventiva)",
 ];
 
 const COLUNA_TOOLTIP: Record<string, string> = {
@@ -259,6 +265,8 @@ const COLUNA_TOOLTIP: Record<string, string> = {
     "Corretivas dividido por preventivas válidas na janela. Acima de 1 indica que a elevatória está recebendo mais corretiva do que preventiva",
   Status:
     "Classificação: Normal (<45 dias sem preventiva), Atrasado (45–89 dias), Parado (90+ dias), Crítico (zero preventiva válida com corretiva ocorrendo), Sem dados (nenhuma O.S. registrada no período)",
+  "Justificativa (sem preventiva)":
+    "Anotação livre (ex.: NOVO, INSTALANDO, EM ANÁLISE) para elevatórias que nunca tiveram preventiva válida — permite explicar o motivo de estarem sem preventiva",
 };
 
 function CabecalhoCol({
@@ -332,6 +340,8 @@ function valorCelula(linha: LinhaAnalitico, coluna: string): string {
         : "sem base";
     case "Status":
       return STATUS_INFO[linha.status_plano]?.label ?? linha.status_plano;
+    case "Justificativa (sem preventiva)":
+      return linha.justificativa_sem_preventiva || "—";
     default:
       return "";
   }
@@ -357,6 +367,10 @@ function valorOrdenacao(linha: LinhaAnalitico, coluna: string): string | number 
       return linha.razao_corretiva_preventiva;
     case "Status":
       return linha.status_plano;
+    case "Justificativa (sem preventiva)":
+      return linha.justificativa_sem_preventiva
+        ? linha.justificativa_sem_preventiva.toLowerCase()
+        : null;
     default:
       return null;
   }
@@ -464,6 +478,92 @@ function MultiSelectMunicipio({
   );
 }
 
+function CelulaJustificativa({
+  linha,
+  onSalvar,
+}: {
+  linha: LinhaAnalitico;
+  onSalvar: (elevatoriaId: number, valor: string) => Promise<boolean>;
+}) {
+  const [rascunho, setRascunho] = useState(linha.justificativa_sem_preventiva ?? "");
+  const [salvando, setSalvando] = useState(false);
+  const [salvo, setSalvo] = useState(false);
+
+  useEffect(() => {
+    setRascunho(linha.justificativa_sem_preventiva ?? "");
+  }, [linha.justificativa_sem_preventiva]);
+
+  const salvar = async (valor: string) => {
+    if (salvando) return;
+    setSalvando(true);
+    try {
+      const ok = await onSalvar(linha.elevatoria_id, valor);
+      if (ok) {
+        setSalvo(true);
+        window.setTimeout(() => setSalvo(false), 1500);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="flex max-w-[230px] flex-col gap-1">
+      <input
+        value={rascunho}
+        onChange={(e) => setRascunho(e.target.value)}
+        onBlur={() => {
+          const atual = (linha.justificativa_sem_preventiva ?? "").trim();
+          if (rascunho.trim() !== atual) void salvar(rascunho.trim());
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+        }}
+        disabled={salvando}
+        placeholder="Digitar justificativa..."
+        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+      />
+      <div className="flex flex-wrap items-center gap-1">
+        {SUGESTOES_JUSTIFICATIVA.map((op) => {
+          const ativa = rascunho.trim().toUpperCase() === op;
+          return (
+            <button
+              key={op}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setRascunho(op);
+                void salvar(op);
+              }}
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                ativa
+                  ? "border-[#1f7ad6] bg-[#eaf3fb] text-[#0b3a73] dark:bg-slate-600 dark:text-white"
+                  : "border-slate-300 text-slate-500 hover:border-[#1f7ad6] dark:border-slate-600 dark:text-slate-300"
+              }`}
+            >
+              {op}
+            </button>
+          );
+        })}
+        {rascunho.trim() !== "" && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setRascunho("");
+              void salvar("");
+            }}
+            className="text-[10px] font-semibold text-red-500 hover:underline"
+          >
+            limpar
+          </button>
+        )}
+      </div>
+      {salvo && <span className="text-[10px] font-semibold text-emerald-600">salvo</span>}
+    </div>
+  );
+}
+
 function CardRazao({
   titulo,
   sub,
@@ -548,6 +648,8 @@ export function AnaliticoManutencao() {
   const [razaoMin, setRazaoMin] = useState("");
   const [razaoMax, setRazaoMax] = useState("");
   const [abaixoMeta, setAbaixoMeta] = useState(false);
+  const [diasMin, setDiasMin] = useState("");
+  const [diasMax, setDiasMax] = useState("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>({ coluna: null, direcao: "asc" });
   const [exportando, setExportando] = useState(false);
   const [modalExport, setModalExport] = useState<"pdf" | "excel" | null>(null);
@@ -615,6 +717,40 @@ export function AnaliticoManutencao() {
     return c;
   }, [dados, municipiosSelecionados]);
 
+  const contagemDias = useMemo(() => {
+    const dMin = diasMin.trim() === "" ? null : Number(diasMin);
+    const dMax = diasMax.trim() === "" ? null : Number(diasMax);
+    if (dMin === null && dMax === null) return dados.length;
+    let n = 0;
+    for (const l of dados) {
+      const d = l.dias_sem_preventiva_valida;
+      if (d === null) {
+        if (dMin !== null) n++;
+      } else if ((dMin === null || d >= dMin) && (dMax === null || d <= dMax)) {
+        n++;
+      }
+    }
+    return n;
+  }, [dados, diasMin, diasMax]);
+
+  const salvarJustificativa = async (elevatoriaId: number, valor: string) => {
+    const novo = valor.trim() === "" ? null : valor.trim();
+    const { error } = await supabase
+      .from("elevatorias")
+      .update({ justificativa_sem_preventiva: novo })
+      .eq("id", elevatoriaId);
+    if (error) {
+      toast.error("Erro ao salvar justificativa: " + error.message);
+      return false;
+    }
+    setDados((prev) =>
+      prev.map((l) =>
+        l.elevatoria_id === elevatoriaId ? { ...l, justificativa_sem_preventiva: novo } : l,
+      ),
+    );
+    return true;
+  };
+
   const linhasFiltradas = useMemo(() => {
     let list = dados;
     if (municipiosSelecionados.length) {
@@ -647,6 +783,15 @@ export function AnaliticoManutencao() {
         (l) => l.razao_corretiva_preventiva !== null && l.razao_corretiva_preventiva > 0.1,
       );
     }
+    const dMin = diasMin.trim() === "" ? null : Number(diasMin);
+    const dMax = diasMax.trim() === "" ? null : Number(diasMax);
+    if (dMin !== null || dMax !== null) {
+      list = list.filter((l) => {
+        const d = l.dias_sem_preventiva_valida;
+        if (d === null) return dMin !== null;
+        return (dMin === null || d >= dMin) && (dMax === null || d <= dMax);
+      });
+    }
     const arr = [...list];
     if (ordenacao.coluna) {
       arr.sort((a, b) => compararLinhas(a, b, ordenacao.coluna!, ordenacao.direcao));
@@ -663,6 +808,8 @@ export function AnaliticoManutencao() {
     razaoMin,
     razaoMax,
     abaixoMeta,
+    diasMin,
+    diasMax,
     ordenacao,
   ]);
 
@@ -985,6 +1132,69 @@ export function AnaliticoManutencao() {
               className="w-52 pl-8"
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Dias sem preventiva
+              </span>
+              <Input
+                type="number"
+                min={0}
+                value={diasMin}
+                onChange={(e) => setDiasMin(e.target.value)}
+                placeholder="Mín. dias"
+                className="w-20"
+              />
+              <span className="text-xs text-slate-400">a</span>
+              <Input
+                type="number"
+                min={0}
+                value={diasMax}
+                onChange={(e) => setDiasMax(e.target.value)}
+                placeholder="Máx. dias"
+                className="w-20"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              {ATALHOS_DIAS.map((n) => {
+                const ativo = diasMin === String(n) && diasMax === "";
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      setDiasMin(String(n));
+                      setDiasMax("");
+                    }}
+                    title={`Dias sem preventiva >= ${n}`}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
+                      ativo
+                        ? "border-[#1f7ad6] bg-[#eaf3fb] text-[#0b3a73] dark:bg-slate-600 dark:text-white"
+                        : "border-slate-300 text-slate-500 hover:border-[#1f7ad6] dark:border-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    +{n} dias
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  setDiasMin("");
+                  setDiasMax("");
+                }}
+                className="rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:border-red-300 hover:text-red-500 dark:border-slate-600 dark:text-slate-300"
+              >
+                Limpar
+              </button>
+              <span
+                className="text-[11px] font-bold text-[#1f7ad6]"
+                title="Elevatórias que passam na faixa atual de dias sem preventiva"
+              >
+                {contagemDias} elevatórias
+              </span>
+            </div>
+          </div>
           <div className="flex items-center gap-1.5">
             <Input
               type="number"
@@ -1191,6 +1401,13 @@ export function AnaliticoManutencao() {
                         </span>
                       ) : (
                         "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {l.dias_sem_preventiva_valida == null ? (
+                        <CelulaJustificativa linha={l} onSalvar={salvarJustificativa} />
+                      ) : (
+                        l.justificativa_sem_preventiva || "—"
                       )}
                     </td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
