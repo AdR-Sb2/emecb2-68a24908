@@ -255,7 +255,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       if (filtroNatureza !== "TODAS" && (a.natureza ?? "outras") !== filtroNatureza) return false;
       if (filtroStatus !== "TODOS" && a.status_simplificado !== filtroStatus) return false;
       if (!b) return true;
-      return [a.ordem, a.texto_breve, a.nota, a.planta]
+      return [a.ordem, a.texto_breve, a.nota, a.planta, a.local_instalacao]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(b));
     });
@@ -696,6 +696,9 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                             <span>· {nomeElevatoria(a.elevatoria_id)}</span>
                           )}
                           {a.planta && <span>· {a.planta}</span>}
+                          {a.local_instalacao && a.local_instalacao !== a.planta && (
+                            <span>· {a.local_instalacao}</span>
+                          )}
                           {a.criado_por && <span>· Criado por {a.criado_por}</span>}
                         </div>
                       </div>
