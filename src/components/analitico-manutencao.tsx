@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -27,6 +28,14 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -129,6 +138,29 @@ function somaPrevCorr(
   const prev = slice.reduce((s, p) => s + p.preventiva, 0);
   const corr = slice.reduce((s, p) => s + p.corretiva, 0);
   return { prev, corr, razao: corr > 0 ? prev / corr : null };
+}
+
+function ordenarPadrao(lista: LinhaAnalitico[]): LinhaAnalitico[] {
+  return [...lista].sort((a, b) => {
+    const sa = ORDEM_STATUS[a.status_plano] ?? 99;
+    const sb = ORDEM_STATUS[b.status_plano] ?? 99;
+    if (sa !== sb) return sa - sb;
+    const da = a.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
+    const db = b.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
+    return db - da;
+  });
+}
+
+function contarStatus(lista: LinhaAnalitico[]): Record<string, number> {
+  const c: Record<string, number> = {
+    normal: 0,
+    atrasado: 0,
+    parado: 0,
+    critico_so_emergencial: 0,
+    sem_dados: 0,
+  };
+  for (const l of lista) c[l.status_plano] = (c[l.status_plano] ?? 0) + 1;
+  return c;
 }
 
 const STATUS_INFO: Record<
@@ -518,6 +550,8 @@ export function AnaliticoManutencao() {
   const [abaixoMeta, setAbaixoMeta] = useState(false);
   const [ordenacao, setOrdenacao] = useState<Ordenacao>({ coluna: null, direcao: "asc" });
   const [exportando, setExportando] = useState(false);
+  const [modalExport, setModalExport] = useState<"pdf" | "excel" | null>(null);
+  const [escopoExportacao, setEscopoExportacao] = useState<"todas" | "aparecendo">("aparecendo");
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -617,14 +651,7 @@ export function AnaliticoManutencao() {
     if (ordenacao.coluna) {
       arr.sort((a, b) => compararLinhas(a, b, ordenacao.coluna!, ordenacao.direcao));
     } else {
-      arr.sort((a, b) => {
-        const sa = ORDEM_STATUS[a.status_plano] ?? 99;
-        const sb = ORDEM_STATUS[b.status_plano] ?? 99;
-        if (sa !== sb) return sa - sb;
-        const da = a.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
-        const db = b.dias_sem_preventiva_valida ?? Number.MAX_SAFE_INTEGER;
-        return db - da;
-      });
+      return ordenarPadrao(arr);
     }
     return arr;
   }, [
@@ -661,10 +688,17 @@ export function AnaliticoManutencao() {
 
   const cardAnual = useMemo(() => somaPrevCorr(tendenciaComRazao, 12), [tendenciaComRazao]);
 
-  const criticos = useMemo(
-    () => linhasFiltradas.filter((l) => l.status_plano === "critico_so_emergencial"),
-    [linhasFiltradas],
+  const listaExport = useMemo(
+    () => (escopoExportacao === "todas" ? ordenarPadrao(dados) : linhasFiltradas),
+    [escopoExportacao, dados, linhasFiltradas],
   );
+
+  const criticosExport = useMemo(
+    () => listaExport.filter((l) => l.status_plano === "critico_so_emergencial"),
+    [listaExport],
+  );
+
+  const resumoExport = useMemo(() => contarStatus(listaExport), [listaExport]);
 
   const toggleStatus = (s: string) => {
     setStatusSelecionados((prev) =>
@@ -680,10 +714,13 @@ export function AnaliticoManutencao() {
     });
   };
 
-  const exportarExcel = async () => {
+  const exportarExcel = async (escopo: "todas" | "aparecendo") => {
     setExportando(true);
     try {
       const { default: ExcelJS } = await import("exceljs");
+      const lista = escopo === "todas" ? ordenarPadrao(dados) : linhasFiltradas;
+      const crit = lista.filter((l) => l.status_plano === "critico_so_emergencial");
+      const resumoStatus = contarStatus(lista);
       const wb = new ExcelJS.Workbook();
       wb.creator = "EMEC Baixada 2";
       const ws = wb.addWorksheet("Analítico Manutenção");
@@ -711,7 +748,8 @@ export function AnaliticoManutencao() {
       const sub = ws.getCell("A2");
       sub.value =
         `EMEC Baixada 2 - Águas do Rio | Gerado em ${new Date().toLocaleString("pt-BR")} | ` +
-        `Janela de análise: ${janelaMeses} meses | Ordenado por criticidade`;
+        `Janela de análise: ${janelaMeses} meses | ` +
+        `Escopo: ${escopo === "todas" ? `todas as elevatórias (${lista.length})` : `filtros ativos da tela (${lista.length})`}`;
       sub.font = { name: "Calibri", size: 10, italic: true, color: { argb: "475569" } };
       sub.alignment = { horizontal: "center", vertical: "middle" };
       ws.getRow(2).height = 20;
@@ -720,7 +758,7 @@ export function AnaliticoManutencao() {
       const resumo = ws.getCell("A3");
       const partes = Object.keys(ORDEM_STATUS).map((s) => {
         const info = STATUS_INFO[s];
-        return `${info.label}: ${contagemStatus[s] ?? 0}`;
+        return `${info.label}: ${resumoStatus[s] ?? 0}`;
       });
       resumo.value = `Resumo — ${partes.join("  |  ")} | Emergenciais (ZNTE, 30 dias): ${emergenciais30dias}`;
       resumo.font = { name: "Calibri", size: 10, bold: true, color: { argb: "0B3A73" } };
@@ -764,16 +802,16 @@ export function AnaliticoManutencao() {
 
       let r = 5;
 
-      if (criticos.length) {
+      if (crit.length) {
         ws.mergeCells(r, 1, r, numColunas);
         const sec = ws.getCell(r, 1);
-        sec.value = `GRUPO CRÍTICO — SOMENTE EMERGENCIAL (${criticos.length})`;
+        sec.value = `GRUPO CRÍTICO — SOMENTE EMERGENCIAL (${crit.length})`;
         sec.font = { name: "Calibri", size: 11, bold: true, color: { argb: BRANCO } };
         sec.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PRETO } };
         r++;
         cabecalhoLinha(r);
         r++;
-        for (const l of criticos) {
+        for (const l of crit) {
           escreverLinha(l, r);
           r++;
         }
@@ -782,13 +820,13 @@ export function AnaliticoManutencao() {
 
       ws.mergeCells(r, 1, r, numColunas);
       const sec2 = ws.getCell(r, 1);
-      sec2.value = `TODAS AS ELEVATÓRIAS (${linhasFiltradas.length})`;
+      sec2.value = `TODAS AS ELEVATÓRIAS (${lista.length})`;
       sec2.font = { name: "Calibri", size: 11, bold: true, color: { argb: AZUL } };
       sec2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CINZA } };
       r++;
       cabecalhoLinha(r);
       r++;
-      for (const l of linhasFiltradas) {
+      for (const l of lista) {
         escreverLinha(l, r);
         r++;
       }
@@ -819,8 +857,23 @@ export function AnaliticoManutencao() {
     }
   };
 
-  const exportarPdf = () => {
-    window.print();
+  const exportarPdf = (escopo: "todas" | "aparecendo") => {
+    flushSync(() => setEscopoExportacao(escopo));
+    try {
+      window.print();
+    } finally {
+      setEscopoExportacao("aparecendo");
+    }
+  };
+
+  const confirmarExport = (escopo: "todas" | "aparecendo") => {
+    const tipo = modalExport;
+    setModalExport(null);
+    if (tipo === "excel") {
+      void exportarExcel(escopo);
+    } else if (tipo === "pdf") {
+      exportarPdf(escopo);
+    }
   };
 
   if (loading && !dados.length) {
@@ -857,14 +910,14 @@ export function AnaliticoManutencao() {
               ))}
             </select>
             <button
-              onClick={exportarExcel}
+              onClick={() => setModalExport("excel")}
               disabled={exportando}
               className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] disabled:opacity-60"
             >
               <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
             </button>
             <button
-              onClick={exportarPdf}
+              onClick={() => setModalExport("pdf")}
               className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               <Printer className="h-4 w-4" /> Exportar PDF
@@ -1193,7 +1246,7 @@ export function AnaliticoManutencao() {
             {Object.keys(ORDEM_STATUS).map((s) => (
               <div key={s} className="rounded-md border border-slate-300 p-2">
                 <span className="font-semibold">{STATUS_INFO[s].label}:</span>{" "}
-                {contagemStatus[s] ?? 0}
+                {resumoExport[s] ?? 0}
               </div>
             ))}
             <div className="rounded-md border border-slate-300 p-2">
@@ -1203,10 +1256,10 @@ export function AnaliticoManutencao() {
           </div>
         </div>
 
-        {criticos.length > 0 && (
+        {criticosExport.length > 0 && (
           <div className="mb-4">
             <h3 className="mb-2 rounded bg-slate-900 px-2 py-1 text-sm font-bold text-white">
-              GRUPO CRÍTICO — SOMENTE EMERGENCIAL ({criticos.length})
+              GRUPO CRÍTICO — SOMENTE EMERGENCIAL ({criticosExport.length})
             </h3>
             <table className="w-full text-left text-xs">
               <thead>
@@ -1219,7 +1272,7 @@ export function AnaliticoManutencao() {
                 </tr>
               </thead>
               <tbody>
-                {criticos.map((l) => (
+                {criticosExport.map((l) => (
                   <tr key={l.elevatoria_id}>
                     {CABECALHO_COLUNAS.map((col) => (
                       <td key={col} className="border border-slate-300 px-2 py-1">
@@ -1234,7 +1287,7 @@ export function AnaliticoManutencao() {
         )}
 
         <h3 className="mb-2 rounded bg-slate-200 px-2 py-1 text-sm font-bold text-[#002d74]">
-          TODAS AS ELEVATÓRIAS ({linhasFiltradas.length})
+          TODAS AS ELEVATÓRIAS ({listaExport.length})
         </h3>
         <table className="w-full text-left text-xs">
           <thead>
@@ -1247,7 +1300,7 @@ export function AnaliticoManutencao() {
             </tr>
           </thead>
           <tbody>
-            {linhasFiltradas.map((l) => (
+            {listaExport.map((l) => (
               <tr key={l.elevatoria_id}>
                 {CABECALHO_COLUNAS.map((col) => (
                   <td key={col} className="border border-slate-300 px-2 py-1">
@@ -1259,6 +1312,62 @@ export function AnaliticoManutencao() {
           </tbody>
         </table>
       </div>
+
+      {/* ==== MODAL DE ESCOPO DE EXPORTAÇÃO ==== */}
+      <Dialog open={modalExport !== null} onOpenChange={(o) => !o && setModalExport(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{modalExport === "pdf" ? "Exportar PDF" : "Exportar Excel"}</DialogTitle>
+            <DialogDescription>Qual escopo de dados você quer exportar?</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <button
+              type="button"
+              onClick={() => confirmarExport("todas")}
+              className="rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-[#0b3a73] dark:text-white">
+                  Todas as elevatórias
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  {dados.length}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Conjunto completo, sem os filtros ativos da tela (janela de {janelaMeses} meses
+                mantida).
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => confirmarExport("aparecendo")}
+              className="rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-[#0b3a73] dark:text-white">
+                  Apenas as que estão aparecendo
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  {linhasFiltradas.length} — com filtros
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Exatamente o resultado exibido na tabela, respeitando filtros e ordenação atuais.
+              </p>
+            </button>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setModalExport(null)}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Cancelar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
