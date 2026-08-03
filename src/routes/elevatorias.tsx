@@ -144,10 +144,17 @@ function ElevatoriasPage() {
       });
 
       if (podeVerRegistros) {
-        const { count } = await supabase
+        const elevRes = await supabase.from("elevatorias").select("planta");
+        const plantas = (elevRes.data ?? [])
+          .map((e) => (e as { planta?: string | null }).planta)
+          .filter((p): p is string => Boolean(p));
+        const lista = [...new Set([...plantas, "PL-RJB-SDA1003"])];
+        let q = supabase
           .from("registros_atendimento")
           .select("*", { count: "exact", head: true })
           .is("elevatoria_id", null);
+        if (lista.length) q = q.in("planta", lista);
+        const { count } = await q;
         setPendentesRegistros(count ?? 0);
       }
 
