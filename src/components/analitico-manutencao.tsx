@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Printer, FileSpreadsheet, ShieldAlert } from "lucide-react";
+import { Loader2, Printer, FileSpreadsheet, ShieldAlert, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   ResponsiveContainer,
@@ -13,6 +13,12 @@ import {
   Legend,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip as UiTooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type LinhaAnalitico = {
   elevatoria_id: number;
@@ -71,6 +77,14 @@ const STATUS_INFO: Record<
     coluna:
       "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800",
   },
+  sem_dados: {
+    label: "Sem dados",
+    ordem: 4,
+    chip: "bg-slate-200 text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
+    card: "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-700/60 dark:text-slate-300",
+    coluna:
+      "bg-slate-200 text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
+  },
 };
 
 const ORDEM_STATUS: Record<string, number> = {
@@ -78,6 +92,7 @@ const ORDEM_STATUS: Record<string, number> = {
   parado: 1,
   atrasado: 2,
   normal: 3,
+  sem_dados: 4,
 };
 
 function formatDate(d: string | null): string {
@@ -106,6 +121,46 @@ const CABECALHO_COLUNAS = [
   "Razão Corr/Prev",
   "Status",
 ];
+
+const COLUNA_TOOLTIP: Record<string, string> = {
+  Elevatória: "Nome da elevatória (estação de bombeamento)",
+  Município: "Cidade onde a elevatória está localizada",
+  "Última preventiva válida":
+    "Data da O.S. mais recente do tipo Preventiva por Frequência (ZTPF) ou Preditiva (ZTPD)",
+  "Dias sem preventiva": "Quantidade de dias corridos desde a última preventiva válida até hoje",
+  "Preventiva (janela)":
+    "Quantidade de preventivas válidas (ZTPF + ZTPD) dentro do período selecionado no filtro de janela",
+  "Corretiva (janela)":
+    "Quantidade de corretivas (ZNTE + ZNTP + ZTRE) dentro do período selecionado",
+  "ZTPC (janela)":
+    "Manutenções por Condição no período — não contam como preventiva válida; indicam que a frequência pode ter falhado",
+  "Razão Corr/Prev":
+    "Corretivas dividido por preventivas válidas na janela. Acima de 1 indica que a elevatória está recebendo mais corretiva do que preventiva",
+  Status:
+    "Classificação: Normal (<45 dias sem preventiva), Atrasado (45–89 dias), Parado (90+ dias), Crítico (zero preventiva válida com corretiva ocorrendo), Sem dados (nenhuma O.S. registrada no período)",
+};
+
+function CabecalhoCol({ col }: { col: string }) {
+  return (
+    <th className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <span className="inline-flex items-center gap-1">
+        {col}
+        {COLUNA_TOOLTIP[col] && (
+          <UiTooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help text-slate-400 dark:text-slate-500">
+                <Info className="h-3.5 w-3.5" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[280px]">
+              <p>{COLUNA_TOOLTIP[col]}</p>
+            </TooltipContent>
+          </UiTooltip>
+        )}
+      </span>
+    </th>
+  );
+}
 
 function valorCelula(linha: LinhaAnalitico, coluna: string): string {
   switch (coluna) {
@@ -182,6 +237,7 @@ export function AnaliticoManutencao() {
       atrasado: 0,
       parado: 0,
       critico_so_emergencial: 0,
+      sem_dados: 0,
     };
     for (const d of dados) {
       c[d.status_plano] = (c[d.status_plano] ?? 0) + 1;
@@ -227,6 +283,7 @@ export function AnaliticoManutencao() {
       const AZUL = "002d74";
       const BRANCO = "FFFFFF";
       const CINZA = "F1F5F9";
+      const CINZA_SEM_DADOS = "E2E8F0";
       const PRETO = "1E293B";
       const AMARELO = "FEF3C7";
       const VERMELHO = "FEE2E2";
@@ -276,6 +333,7 @@ export function AnaliticoManutencao() {
         if (status === "critico_so_emergencial") return PRETO;
         if (status === "parado") return VERMELHO;
         if (status === "atrasado") return AMARELO;
+        if (status === "sem_dados") return CINZA_SEM_DADOS;
         return VERDE;
       };
 
@@ -366,7 +424,7 @@ export function AnaliticoManutencao() {
   }
 
   return (
-    <div>
+    <TooltipProvider delayDuration={200}>
       {/* ==== ÁREA INTERATIVA (não sai no print) ==== */}
       <div className="print:hidden">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -407,7 +465,7 @@ export function AnaliticoManutencao() {
         </div>
 
         {/* Indicadores */}
-        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Object.keys(ORDEM_STATUS).map((s) => {
             const info = STATUS_INFO[s];
             const ativo = statusSelecionados.includes(s);
@@ -424,6 +482,11 @@ export function AnaliticoManutencao() {
                 <div className="mt-1 text-3xl font-bold">{contagemStatus[s] ?? 0}</div>
                 {s === "critico_so_emergencial" && (
                   <div className="mt-1 text-[11px] opacity-80">maior prioridade de cobrança</div>
+                )}
+                {s === "sem_dados" && (
+                  <div className="mt-1 text-[11px] opacity-80">
+                    sem O.S. registrada no período — verificar importação
+                  </div>
                 )}
               </button>
             );
@@ -502,17 +565,12 @@ export function AnaliticoManutencao() {
         </div>
 
         {/* Tabela ranqueada */}
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="overflow-x-auto overflow-y-clip rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-700/40">
+            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
                 {CABECALHO_COLUNAS.map((col) => (
-                  <th
-                    key={col}
-                    className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                  >
-                    {col}
-                  </th>
+                  <CabecalhoCol key={col} col={col} />
                 ))}
               </tr>
             </thead>
@@ -667,7 +725,7 @@ export function AnaliticoManutencao() {
           </tbody>
         </table>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
