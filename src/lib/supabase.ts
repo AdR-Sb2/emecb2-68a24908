@@ -10,6 +10,8 @@ const readEnv = (...keys: string[]) => {
 
 const supabaseUrl = readEnv("VITE_SUPABASE_URL", "SUPABASE_URL", "PUBLIC_SUPABASE_URL");
 const supabaseAnonKey = readEnv(
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
   "VITE_SUPABASE_ANON_KEY",
   "SUPABASE_ANON_KEY",
   "PUBLIC_SUPABASE_ANON_KEY",
@@ -17,8 +19,9 @@ const supabaseAnonKey = readEnv(
 
 const isLocalDev =
   import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
-const fallbackSupabaseUrl = "https://byxmnmebvqdxpzcuutak.supabase.co";
-const fallbackSupabaseAnonKey = "sb_publishable_ltY4BfcrdlBw91KH5BHfgg_ZHDurfuZ";
+const fallbackSupabaseUrl = "https://ncwqawuphmweiufkswjg.supabase.co";
+const fallbackSupabaseAnonKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jd3Fhd3VwaG13ZWl1Zmtzd2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NTc0OTMsImV4cCI6MjA5OTEzMzQ5M30.w1a5NOzWGnnQStOyqdyrw59cu5Wji-5jiM3ZD3gyqpw";
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 const shouldUseFallback = !hasSupabaseConfig;
 
