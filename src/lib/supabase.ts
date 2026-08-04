@@ -19,14 +19,22 @@ const supabaseAnonKey = readEnv(
 
 const isLocalDev =
   import.meta.env.DEV && typeof window !== "undefined" && window.location.hostname === "localhost";
-const fallbackSupabaseUrl = "https://ncwqawuphmweiufkswjg.supabase.co";
-const fallbackSupabaseAnonKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jd3Fhd3VwaG13ZWl1Zmtzd2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NTc0OTMsImV4cCI6MjA5OTEzMzQ5M30.w1a5NOzWGnnQStOyqdyrw59cu5Wji-5jiM3ZD3gyqpw";
+// Projeto com todos os dados (elevatórias, O.S., painéis).
+const fallbackSupabaseUrl = "https://byxmnmebvqdxpzcuutak.supabase.co";
+const fallbackSupabaseAnonKey = "sb_publishable_ltY4BfcrdlBw91KH5BHfgg_ZHDurfuZ";
+// Projeto vazio criado durante o ajuste da API key (sem as tabelas do app).
+const projetoVazioUrl = "https://ncwqawuphmweiufkswjg.supabase.co";
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 const shouldUseFallback = !hasSupabaseConfig;
 
-const resolvedSupabaseUrl = supabaseUrl ?? fallbackSupabaseUrl;
-const resolvedSupabaseAnonKey = supabaseAnonKey ?? fallbackSupabaseAnonKey;
+let resolvedSupabaseUrl = supabaseUrl ?? fallbackSupabaseUrl;
+let resolvedSupabaseAnonKey = supabaseAnonKey ?? fallbackSupabaseAnonKey;
+
+// Ambiente apontando para o projeto vazio → volta para o projeto com os dados.
+if (resolvedSupabaseUrl === projetoVazioUrl) {
+  resolvedSupabaseUrl = fallbackSupabaseUrl;
+  resolvedSupabaseAnonKey = fallbackSupabaseAnonKey;
+}
 
 export const supabaseConfigError = hasSupabaseConfig
   ? null
