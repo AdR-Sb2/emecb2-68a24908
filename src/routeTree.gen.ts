@@ -9,112 +9,32 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TestesRouteImport } from './routes/testes'
-import { Route as RelatorioRouteImport } from './routes/relatorio'
-import { Route as RegistrosRouteImport } from './routes/registros'
-import { Route as RegisterRouteImport } from './routes/register'
-import { Route as PendingRouteImport } from './routes/pending'
-import { Route as OiRouteImport } from './routes/oi'
-import { Route as ManuaisAvaliacaoRouteImport } from './routes/manuais-avaliacao'
-import { Route as ManuaisRouteImport } from './routes/manuais'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as EstoqueRouteImport } from './routes/estoque'
-import { Route as EscalaRouteImport } from './routes/escala'
-import { Route as ElevatoriasRouteImport } from './routes/elevatorias'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as CronogramaRouteImport } from './routes/cronograma'
-import { Route as BloqueadoRouteImport } from './routes/bloqueado'
-import { Route as BacklogRouteImport } from './routes/backlog'
-import { Route as AnaliticoRouteImport } from './routes/analitico'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AnaliticoRouteImport } from './routes/analitico'
+import { Route as BacklogRouteImport } from './routes/backlog'
+import { Route as BloqueadoRouteImport } from './routes/bloqueado'
+import { Route as CronogramaRouteImport } from './routes/cronograma'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ElevatoriasRouteImport } from './routes/elevatorias'
+import { Route as EscalaRouteImport } from './routes/escala'
+import { Route as EstoqueRouteImport } from './routes/estoque'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ManuaisRouteImport } from './routes/manuais'
+import { Route as ManuaisAvaliacaoRouteImport } from './routes/manuais-avaliacao'
+import { Route as OiRouteImport } from './routes/oi'
+import { Route as PendingRouteImport } from './routes/pending'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RegistrosRouteImport } from './routes/registros'
+import { Route as RelatorioRouteImport } from './routes/relatorio'
+import { Route as TestesRouteImport } from './routes/testes'
 import { Route as ApiEquipeOverrideRouteImport } from './routes/api/equipe-override'
+import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
 import { Route as CronogramaPublicoTokenRouteImport } from './routes/cronograma/publico/$token'
 
-const TestesRoute = TestesRouteImport.update({
-  id: '/testes',
-  path: '/testes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RelatorioRoute = RelatorioRouteImport.update({
-  id: '/relatorio',
-  path: '/relatorio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegistrosRoute = RegistrosRouteImport.update({
-  id: '/registros',
-  path: '/registros',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PendingRoute = PendingRouteImport.update({
-  id: '/pending',
-  path: '/pending',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OiRoute = OiRouteImport.update({
-  id: '/oi',
-  path: '/oi',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManuaisAvaliacaoRoute = ManuaisAvaliacaoRouteImport.update({
-  id: '/manuais-avaliacao',
-  path: '/manuais-avaliacao',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManuaisRoute = ManuaisRouteImport.update({
-  id: '/manuais',
-  path: '/manuais',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EstoqueRoute = EstoqueRouteImport.update({
-  id: '/estoque',
-  path: '/estoque',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EscalaRoute = EscalaRouteImport.update({
-  id: '/escala',
-  path: '/escala',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ElevatoriasRoute = ElevatoriasRouteImport.update({
-  id: '/elevatorias',
-  path: '/elevatorias',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CronogramaRoute = CronogramaRouteImport.update({
-  id: '/cronograma',
-  path: '/cronograma',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BloqueadoRoute = BloqueadoRouteImport.update({
-  id: '/bloqueado',
-  path: '/bloqueado',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BacklogRoute = BacklogRouteImport.update({
-  id: '/backlog',
-  path: '/backlog',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnaliticoRoute = AnaliticoRouteImport.update({
-  id: '/analitico',
-  path: '/analitico',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -122,19 +42,99 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AnaliticoRoute = AnaliticoRouteImport.update({
+  id: '/analitico',
+  path: '/analitico',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ElevatoriasIdRoute = ElevatoriasIdRouteImport.update({
-  id: '/elevatorias_/$id',
-  path: '/elevatorias/$id',
+const BacklogRoute = BacklogRouteImport.update({
+  id: '/backlog',
+  path: '/backlog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BloqueadoRoute = BloqueadoRouteImport.update({
+  id: '/bloqueado',
+  path: '/bloqueado',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CronogramaRoute = CronogramaRouteImport.update({
+  id: '/cronograma',
+  path: '/cronograma',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ElevatoriasRoute = ElevatoriasRouteImport.update({
+  id: '/elevatorias',
+  path: '/elevatorias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EscalaRoute = EscalaRouteImport.update({
+  id: '/escala',
+  path: '/escala',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueRoute = EstoqueRouteImport.update({
+  id: '/estoque',
+  path: '/estoque',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManuaisRoute = ManuaisRouteImport.update({
+  id: '/manuais',
+  path: '/manuais',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManuaisAvaliacaoRoute = ManuaisAvaliacaoRouteImport.update({
+  id: '/manuais-avaliacao',
+  path: '/manuais-avaliacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OiRoute = OiRouteImport.update({
+  id: '/oi',
+  path: '/oi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendingRoute = PendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistrosRoute = RegistrosRouteImport.update({
+  id: '/registros',
+  path: '/registros',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatorioRoute = RelatorioRouteImport.update({
+  id: '/relatorio',
+  path: '/relatorio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestesRoute = TestesRouteImport.update({
+  id: '/testes',
+  path: '/testes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEquipeOverrideRoute = ApiEquipeOverrideRouteImport.update({
   id: '/api/equipe-override',
   path: '/api/equipe-override',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ElevatoriasIdRoute = ElevatoriasIdRouteImport.update({
+  id: '/elevatorias_/$id',
+  path: '/elevatorias/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CronogramaPublicoTokenRoute = CronogramaPublicoTokenRouteImport.update({
@@ -317,123 +317,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/testes': {
-      id: '/testes'
-      path: '/testes'
-      fullPath: '/testes'
-      preLoaderRoute: typeof TestesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/relatorio': {
-      id: '/relatorio'
-      path: '/relatorio'
-      fullPath: '/relatorio'
-      preLoaderRoute: typeof RelatorioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/registros': {
-      id: '/registros'
-      path: '/registros'
-      fullPath: '/registros'
-      preLoaderRoute: typeof RegistrosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pending': {
-      id: '/pending'
-      path: '/pending'
-      fullPath: '/pending'
-      preLoaderRoute: typeof PendingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/oi': {
-      id: '/oi'
-      path: '/oi'
-      fullPath: '/oi'
-      preLoaderRoute: typeof OiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manuais-avaliacao': {
-      id: '/manuais-avaliacao'
-      path: '/manuais-avaliacao'
-      fullPath: '/manuais-avaliacao'
-      preLoaderRoute: typeof ManuaisAvaliacaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manuais': {
-      id: '/manuais'
-      path: '/manuais'
-      fullPath: '/manuais'
-      preLoaderRoute: typeof ManuaisRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/estoque': {
-      id: '/estoque'
-      path: '/estoque'
-      fullPath: '/estoque'
-      preLoaderRoute: typeof EstoqueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/escala': {
-      id: '/escala'
-      path: '/escala'
-      fullPath: '/escala'
-      preLoaderRoute: typeof EscalaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/elevatorias': {
-      id: '/elevatorias'
-      path: '/elevatorias'
-      fullPath: '/elevatorias'
-      preLoaderRoute: typeof ElevatoriasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cronograma': {
-      id: '/cronograma'
-      path: '/cronograma'
-      fullPath: '/cronograma'
-      preLoaderRoute: typeof CronogramaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bloqueado': {
-      id: '/bloqueado'
-      path: '/bloqueado'
-      fullPath: '/bloqueado'
-      preLoaderRoute: typeof BloqueadoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/backlog': {
-      id: '/backlog'
-      path: '/backlog'
-      fullPath: '/backlog'
-      preLoaderRoute: typeof BacklogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/analitico': {
-      id: '/analitico'
-      path: '/analitico'
-      fullPath: '/analitico'
-      preLoaderRoute: typeof AnaliticoRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -443,18 +331,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/analitico': {
+      id: '/analitico'
+      path: '/analitico'
+      fullPath: '/analitico'
+      preLoaderRoute: typeof AnaliticoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/elevatorias_/$id': {
-      id: '/elevatorias_/$id'
-      path: '/elevatorias/$id'
-      fullPath: '/elevatorias/$id'
-      preLoaderRoute: typeof ElevatoriasIdRouteImport
+    '/backlog': {
+      id: '/backlog'
+      path: '/backlog'
+      fullPath: '/backlog'
+      preLoaderRoute: typeof BacklogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bloqueado': {
+      id: '/bloqueado'
+      path: '/bloqueado'
+      fullPath: '/bloqueado'
+      preLoaderRoute: typeof BloqueadoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cronograma': {
+      id: '/cronograma'
+      path: '/cronograma'
+      fullPath: '/cronograma'
+      preLoaderRoute: typeof CronogramaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/elevatorias': {
+      id: '/elevatorias'
+      path: '/elevatorias'
+      fullPath: '/elevatorias'
+      preLoaderRoute: typeof ElevatoriasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/escala': {
+      id: '/escala'
+      path: '/escala'
+      fullPath: '/escala'
+      preLoaderRoute: typeof EscalaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque': {
+      id: '/estoque'
+      path: '/estoque'
+      fullPath: '/estoque'
+      preLoaderRoute: typeof EstoqueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manuais': {
+      id: '/manuais'
+      path: '/manuais'
+      fullPath: '/manuais'
+      preLoaderRoute: typeof ManuaisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manuais-avaliacao': {
+      id: '/manuais-avaliacao'
+      path: '/manuais-avaliacao'
+      fullPath: '/manuais-avaliacao'
+      preLoaderRoute: typeof ManuaisAvaliacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oi': {
+      id: '/oi'
+      path: '/oi'
+      fullPath: '/oi'
+      preLoaderRoute: typeof OiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pending': {
+      id: '/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registros': {
+      id: '/registros'
+      path: '/registros'
+      fullPath: '/registros'
+      preLoaderRoute: typeof RegistrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorio': {
+      id: '/relatorio'
+      path: '/relatorio'
+      fullPath: '/relatorio'
+      preLoaderRoute: typeof RelatorioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/testes': {
+      id: '/testes'
+      path: '/testes'
+      fullPath: '/testes'
+      preLoaderRoute: typeof TestesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/equipe-override': {
@@ -462,6 +455,13 @@ declare module '@tanstack/react-router' {
       path: '/api/equipe-override'
       fullPath: '/api/equipe-override'
       preLoaderRoute: typeof ApiEquipeOverrideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/elevatorias_/$id': {
+      id: '/elevatorias_/$id'
+      path: '/elevatorias/$id'
+      fullPath: '/elevatorias/$id'
+      preLoaderRoute: typeof ElevatoriasIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cronograma/publico/$token': {
@@ -512,3 +512,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
