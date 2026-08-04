@@ -133,6 +133,7 @@ export type Database = {
     }
     Functions: {
       delete_user: { Args: { user_id: string }; Returns: undefined }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
