@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef, useCallback, useContext, createContext } from "react";
 import {
-  Home,
   ArrowLeft,
   Loader2,
   MapPin,
@@ -20,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -454,12 +454,7 @@ function ElevatoriaFichaPage() {
               <p className="truncate text-sm text-cyan-50/90">Eletromecânica · Ficha da Elevatória</p>
             </div>
           </div>
-          <Link
-            to="/"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-[#0b3a73] shadow-md ring-1 ring-black/10 backdrop-blur transition hover:scale-105 hover:bg-white"
-          >
-            <Home className="h-5 w-5" />
-          </Link>
+          <NavVoltarHome />
         </div>
       </div>
 
