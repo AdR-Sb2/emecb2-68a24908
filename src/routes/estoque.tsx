@@ -87,6 +87,189 @@ export const Route = createFileRoute("/estoque")({
 
 const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
 
+const slugifyChave = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const toBoolean = (v: string | undefined) =>
+  ["true", "sim", "s", "yes", "1", "x"].includes((v || "").toLowerCase());
+
+function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const src = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+  const linhas = src.split("\n").filter((l) => l.trim() !== "");
+  if (linhas.length === 0) return { headers: [], rows: [] };
+  const parseLinha = (linha: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let emAspas = false;
+    for (let i = 0; i < linha.length; i++) {
+      const ch = linha[i];
+      if (emAspas) {
+        if (ch === '"') {
+          if (linha[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            emAspas = false;
+          }
+        } else {
+          cur += ch;
+        }
+      } else if (ch === '"') {
+        emAspas = true;
+      } else if (ch === ",") {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+  const headers = parseLinha(linhas[0]).map((h) => h.trim());
+  const rows = linhas.slice(1).map((linha) => {
+    const vals = parseLinha(linha);
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      obj[h] = (vals[i] ?? "").trim();
+    });
+    return obj;
+  });
+  return { headers, rows };
+}
+
+const normalizarLinha = (
+  headers: string[],
+  row: Record<string, string>,
+  aliases: Record<string, string>,
+): Record<string, string> => {
+  const d: Record<string, string> = {};
+  headers.forEach((h) => {
+    const chave = aliases[slugifyChave(h)] ?? slugifyChave(h);
+    if (!(chave in d)) d[chave] = row[h] ?? "";
+  });
+  return d;
+};
+
+const ALIASES_IMPORT_MATERIAIS: Record<string, string> = {
+  cod_sap: "cod_sap",
+  codigo_sap: "cod_sap",
+  codigo_material: "cod_sap",
+  codigo: "cod_sap",
+  sap: "cod_sap",
+  descricao: "descricao",
+  descricao_material: "descricao",
+  nome: "descricao",
+  material: "descricao",
+  unidade_medida: "unidade_medida",
+  unidade: "unidade_medida",
+  um: "unidade_medida",
+  categoria: "categoria",
+  categoria_id: "categoria_id",
+  fabricante: "fabricante",
+  marca: "fabricante",
+  local_armazenagem: "local_armazenagem",
+  local: "local_armazenagem",
+  armazenagem: "local_armazenagem",
+  estoque_minimo: "estoque_minimo",
+  minimo: "estoque_minimo",
+  estoque_min: "estoque_minimo",
+  material_critico: "material_critico",
+  critico: "material_critico",
+  vinculo_elevatoria: "vinculo_elevatoria",
+  elevatoria: "vinculo_elevatoria",
+  vinculo: "vinculo_elevatoria",
+  saldo_atual: "saldo_atual",
+  saldo: "saldo_atual",
+  custo_unitario: "custo_unitario",
+  custo: "custo_unitario",
+  ativo: "ativo",
+};
+
+const ALIASES_IMPORT_COMPRAS: Record<string, string> = {
+  requisicao: "requisicao",
+  requisicao_compra: "requisicao",
+  numero_requisicao: "requisicao",
+  nr_requisicao: "requisicao",
+  item_rc: "item_rc",
+  item: "item_rc",
+  numero_item: "item_rc",
+  nr_item: "item_rc",
+  cod_sap: "cod_sap",
+  codigo_sap: "cod_sap",
+  codigo_material: "cod_sap",
+  codigo: "cod_sap",
+  sap: "cod_sap",
+  descricao_material: "descricao_material",
+  descricao_do_material: "descricao_material",
+  descricao: "descricao_material",
+  material: "descricao_material",
+  qtde_rc: "qtde_rc",
+  quantidade_rc: "qtde_rc",
+  quantidade: "qtde_rc",
+  qtd: "qtde_rc",
+  qtde: "qtde_rc",
+  comprador_cotacao: "comprador_cotacao",
+  comprador: "comprador_cotacao",
+  pedido: "pedido",
+  numero_pedido: "pedido",
+  nr_pedido: "pedido",
+  fornecedor: "fornecedor",
+  deposito_rc: "deposito_rc",
+  deposito: "deposito_rc",
+  armazem: "deposito_rc",
+  status_geral: "status_geral",
+  status: "status_geral",
+  situacao: "status_geral",
+  dt_criacao_rc: "dt_criacao_rc",
+  data_criacao_rc: "dt_criacao_rc",
+  data_criacao: "dt_criacao_rc",
+  criacao_rc: "dt_criacao_rc",
+  dt_aprovacao_rc: "dt_aprovacao_rc",
+  data_aprovacao_rc: "dt_aprovacao_rc",
+  aprovacao_rc: "dt_aprovacao_rc",
+  dt_criacao_pedido: "dt_criacao_pedido",
+  data_criacao_pedido: "dt_criacao_pedido",
+  criacao_pedido: "dt_criacao_pedido",
+  dt_remessa_pedido: "dt_remessa_pedido",
+  data_remessa_pedido: "dt_remessa_pedido",
+  remessa_pedido: "dt_remessa_pedido",
+  previsao_entrega: "dt_remessa_pedido",
+  data_confirmada: "data_confirmada",
+  data_confirmacao: "data_confirmada",
+  dt_prevista_entrega: "dt_prevista_entrega",
+  data_prevista_entrega: "dt_prevista_entrega",
+  emissao_nf: "emissao_nf",
+  emissao_nota_fiscal: "emissao_nf",
+  nota_fiscal: "emissao_nf",
+  dt_pagamento: "dt_pagamento",
+  data_pagamento: "dt_pagamento",
+  pagamento: "dt_pagamento",
+  chegou: "chegou",
+  recebido: "chegou",
+  data_chegou: "data_chegou",
+  data_recebimento: "data_chegou",
+  foi_retirado: "foi_retirado",
+  retirado: "foi_retirado",
+  data_retirado: "data_retirado",
+  data_retirada: "data_retirado",
+  cobrado_via_email: "cobrado_via_email",
+  cobrado_email: "cobrado_via_email",
+  cobranca_email: "cobrado_via_email",
+  observacao: "observacao",
+  obs: "observacao",
+  rc_em_fila: "rc_em_fila",
+  em_fila: "rc_em_fila",
+  fila: "rc_em_fila",
+  afeta_saldo: "afeta_saldo",
+  afeta_estoque: "afeta_saldo",
+};
+
 function EstoquePage() {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
@@ -864,21 +1047,25 @@ function EstoquePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const lines = text.split("\n").filter(Boolean);
-    const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
-    const dados = lines.slice(1).map((line) => {
-      const vals = line.split(",").map((v) => v.trim().replace(/"/g, ""));
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => {
-        obj[h] = vals[i] || "";
-      });
-      return obj;
-    });
+    const { headers, rows } = parseCSV(text);
+    if (rows.length === 0) {
+      toast.error("Nenhuma linha com dados encontrada no CSV.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     let importados = 0;
-    for (const d of dados) {
-      if (!d.cod_sap || !d.descricao) continue;
+    let ignorados = 0;
+    for (const linha of rows) {
+      const d = normalizarLinha(headers, linha, ALIASES_IMPORT_MATERIAIS);
+      if (!d.cod_sap || !d.descricao) {
+        ignorados++;
+        continue;
+      }
       const categoriaId = resolverCategoriaId(d.categoria || d.categoria_id || "");
-      if (!categoriaId) continue;
+      if (!categoriaId) {
+        ignorados++;
+        continue;
+      }
       const { error } = await supabase.from("materiais").upsert(
         {
           cod_sap: d.cod_sap,
@@ -888,7 +1075,7 @@ function EstoquePage() {
           fabricante: d.fabricante || "",
           local_armazenagem: d.local_armazenagem || "",
           estoque_minimo: Number(d.estoque_minimo) || 0,
-          material_critico: d.material_critico === "true" || d.material_critico === "sim",
+          material_critico: toBoolean(d.material_critico),
           vinculo_elevatoria: d.vinculo_elevatoria || "",
           ativo: d.ativo !== "false",
           saldo_atual: Number(d.saldo_atual) || 0,
@@ -896,8 +1083,14 @@ function EstoquePage() {
         { onConflict: "cod_sap" },
       );
       if (!error) importados++;
+      else ignorados++;
     }
-    toast.success(`${importados} materiais importados/atualizados com sucesso!`);
+    toast.success(
+      `${importados} materiais importados/atualizados com sucesso!` +
+        (ignorados > 0
+          ? ` ${ignorados} linha(s) ignorada(s) (sem código SAP/descrição válidos).`
+          : ""),
+    );
     await carregarDados();
     setDialogImportar(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -907,27 +1100,28 @@ function EstoquePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const lines = text.split("\n").filter(Boolean);
-    const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
-    const dados = lines.slice(1).map((line) => {
-      const vals = line.split(",").map((v) => v.trim().replace(/"/g, ""));
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => {
-        obj[h] = vals[i] || "";
-      });
-      return obj;
-    });
+    const { headers, rows } = parseCSV(text);
+    if (rows.length === 0) {
+      toast.error("Nenhuma linha com dados encontrada no CSV.");
+      if (fileInputRefCompras.current) fileInputRefCompras.current.value = "";
+      return;
+    }
     let importados = 0;
-    for (const d of dados) {
+    let ignorados = 0;
+    for (const linha of rows) {
+      const d = normalizarLinha(headers, linha, ALIASES_IMPORT_COMPRAS);
       const requisicao = Number(d.requisicao) || null;
       const item_rc = Number(d.item_rc) || null;
-      if (!requisicao || !item_rc) continue;
+      if (!requisicao || !item_rc) {
+        ignorados++;
+        continue;
+      }
       const { error } = await supabase.from("compras").upsert(
         {
           requisicao,
           item_rc,
           cod_sap: d.cod_sap || null,
-          descricao_material: d.descricao_material || d.descricao || "",
+          descricao_material: d.descricao_material || "",
           qtde_rc: Number(d.qtde_rc) || 0,
           comprador_cotacao: d.comprador_cotacao || null,
           pedido: d.pedido || null,
@@ -941,21 +1135,25 @@ function EstoquePage() {
           data_confirmada: d.data_confirmada || d.dt_prevista_entrega || null,
           emissao_nf: d.emissao_nf || null,
           dt_pagamento: d.dt_pagamento || null,
-          chegou: d.chegou === "true" || d.chegou === "sim",
+          chegou: toBoolean(d.chegou),
           data_chegou: d.data_chegou || null,
-          foi_retirado: d.foi_retirado === "true" || d.foi_retirado === "sim",
+          foi_retirado: toBoolean(d.foi_retirado),
           data_retirado: d.data_retirado || null,
-          cobrado_via_email: d.cobrado_via_email === "true" || d.cobrado_via_email === "sim",
+          cobrado_via_email: toBoolean(d.cobrado_via_email),
           observacao: d.observacao || null,
-          rc_em_fila: d.rc_em_fila === "true" || d.rc_em_fila === "sim",
-          afeta_saldo: d.afeta_saldo === "true" || d.afeta_saldo === "sim",
+          rc_em_fila: toBoolean(d.rc_em_fila),
+          afeta_saldo: toBoolean(d.afeta_saldo),
           criado_por: "IMPORTACAO_PLANILHA",
         },
         { onConflict: "requisicao,item_rc" },
       );
       if (!error) importados++;
+      else ignorados++;
     }
-    toast.success(`${importados} pedidos importados/atualizados com sucesso!`);
+    toast.success(
+      `${importados} pedidos importados/atualizados com sucesso!` +
+        (ignorados > 0 ? ` ${ignorados} linha(s) ignorada(s) (sem requisição/item válidos).` : ""),
+    );
     await carregarDados();
     setDialogImportarCompras(false);
     if (fileInputRefCompras.current) fileInputRefCompras.current.value = "";
@@ -997,6 +1195,74 @@ function EstoquePage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `materiais-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const baixarModeloCompras = () => {
+    const headers = [
+      "requisicao",
+      "item_rc",
+      "cod_sap",
+      "descricao_material",
+      "qtde_rc",
+      "comprador_cotacao",
+      "pedido",
+      "fornecedor",
+      "deposito_rc",
+      "status_geral",
+      "dt_criacao_rc",
+      "dt_aprovacao_rc",
+      "dt_criacao_pedido",
+      "dt_remessa_pedido",
+      "data_confirmada",
+      "emissao_nf",
+      "dt_pagamento",
+      "chegou",
+      "data_chegou",
+      "foi_retirado",
+      "data_retirado",
+      "cobrado_via_email",
+      "observacao",
+      "rc_em_fila",
+      "afeta_saldo",
+    ];
+    const exemplo = [
+      "123456",
+      "1",
+      "4000123",
+      "Exemplo: PARAFUSO M8X30",
+      "10",
+      "",
+      "PED-0001",
+      "Fornecedor Exemplo",
+      "DP98",
+      "PC - Em Aprovação",
+      "2026-08-05",
+      "",
+      "2026-08-06",
+      "2026-08-10",
+      "2026-08-10",
+      "",
+      "",
+      "false",
+      "",
+      "false",
+      "",
+      "false",
+      "",
+      "false",
+      "true",
+    ];
+    const linhas = headers
+      .map((h, i) => `"${String(exemplo[i] ?? "").replace(/"/g, '""')}"`)
+      .join(",");
+    const csv = [headers.join(","), linhas].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modelo-compras.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1068,6 +1334,16 @@ function EstoquePage() {
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
 
+    const resolveCodigo = () => {
+      const q = normalize(query.trim());
+      if (!q || value) return;
+      const exato = materiais.find((m) => normalize(m.cod_sap) === q);
+      if (exato) {
+        onChange(exato);
+        setOpen(false);
+      }
+    };
+
     const filtered = query
       ? materiais.filter(
           (m) =>
@@ -1094,8 +1370,15 @@ function EstoquePage() {
           }}
           onFocus={() => {
             setOpen(true);
-            setQuery(displayText || "");
+            setQuery("");
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              resolveCodigo();
+            }
+          }}
+          onBlur={() => resolveCodigo()}
           placeholder={placeholder}
           className="min-h-11 w-full rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
         />
@@ -1996,6 +2279,11 @@ function EstoquePage() {
         toast.error("Erro ao salvar material: " + error.message);
         return;
       }
+      await supabase
+        .from("compras")
+        .update({ descricao_material: descricao.trim() })
+        .eq("cod_sap", codSap.trim())
+        .eq("rc_em_fila", true);
       await carregarDados();
       toast.success("Material cadastrado!");
       setDialogMaterial(false);
@@ -3051,7 +3339,10 @@ function EstoquePage() {
             <>
               {permissoes.registrarEntrada && (
                 <button
-                  onClick={() => setDialogMov("entrada")}
+                  onClick={() => {
+                    setMaterialSelecionado(null);
+                    setDialogMov("entrada");
+                  }}
                   className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 shadow"
                 >
                   <Plus className="h-4 w-4" /> Entrada
@@ -3059,7 +3350,10 @@ function EstoquePage() {
               )}
               {permissoes.registrarSaida && (
                 <button
-                  onClick={() => setDialogMov("saida")}
+                  onClick={() => {
+                    setMaterialSelecionado(null);
+                    setDialogMov("saida");
+                  }}
                   className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-red-700 shadow"
                 >
                   <Minus className="h-4 w-4" /> Saída
@@ -3067,7 +3361,10 @@ function EstoquePage() {
               )}
               {permissoes.registrarAjuste && (
                 <button
-                  onClick={() => setDialogMov("ajuste")}
+                  onClick={() => {
+                    setMaterialSelecionado(null);
+                    setDialogMov("ajuste");
+                  }}
                   className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-amber-700 shadow"
                 >
                   <Edit3 className="h-4 w-4" /> Ajuste
@@ -4741,6 +5038,12 @@ function EstoquePage() {
               <code>data_confirmada</code>, <code>fornecedor</code>, etc. Registros com mesma{" "}
               <code>requisicao</code> + <code>item_rc</code> serão atualizados.
             </p>
+            <button
+              onClick={baixarModeloCompras}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              <Download className="h-4 w-4" /> Baixar modelo do CSV
+            </button>
             <input
               ref={fileInputRefCompras}
               type="file"
@@ -4822,6 +5125,74 @@ function EstoquePage() {
                   Mínimo: {solicitarRcMaterial.estoque_minimo}
                 </div>
               </div>
+              {(() => {
+                const historico = compras
+                  .filter((c) => c.cod_sap === solicitarRcMaterial.cod_sap)
+                  .sort((a, b) =>
+                    String(b.dt_criacao_rc || b.criado_em || "").localeCompare(
+                      String(a.dt_criacao_rc || a.criado_em || ""),
+                    ),
+                  );
+                const emFila = historico.filter((c) => c.rc_em_fila);
+                return (
+                  <div>
+                    {emFila.length > 0 && (
+                      <div className="mb-2 flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        Este código já está em RC EM FILA ({emFila.length}{" "}
+                        {emFila.length === 1 ? "item" : "itens"}).
+                      </div>
+                    )}
+                    <div className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white text-[12px] dark:border-slate-700 dark:bg-slate-800">
+                      <div className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                        Histórico de compras · {solicitarRcMaterial.cod_sap}
+                      </div>
+                      {historico.length === 0 ? (
+                        <div className="px-3 py-3 text-slate-400">
+                          Nenhuma compra registrada para este código.
+                        </div>
+                      ) : (
+                        historico.map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-start justify-between gap-2 border-b border-slate-100 px-3 py-2 last:border-0 dark:border-slate-700/50"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-700 dark:text-slate-200">
+                                {c.descricao_material || "—"}
+                              </div>
+                              <div className="mt-0.5 text-slate-400 dark:text-slate-500">
+                                {c.requisicao
+                                  ? `Req ${c.requisicao}.${c.item_rc ?? ""}`
+                                  : "Sem requisição"}{" "}
+                                · Qtd {c.qtde_rc ?? "—"}
+                                {c.status_geral ? ` · ${c.status_geral}` : ""}
+                              </div>
+                              <div className="text-slate-400 dark:text-slate-500">
+                                {c.dt_criacao_rc
+                                  ? `RC criada em ${c.dt_criacao_rc}`
+                                  : "RC sem data de criação"}
+                                {c.rc_em_fila && c.criado_em
+                                  ? ` · Adicionado à fila em ${c.criado_em}`
+                                  : ""}
+                              </div>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                c.rc_em_fila
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                  : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+                              }`}
+                            >
+                              {c.rc_em_fila ? "Em fila" : "Fora da fila"}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Quantidade
