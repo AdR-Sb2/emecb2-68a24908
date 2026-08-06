@@ -31,6 +31,8 @@ import {
   TrendingUp,
   Route as RouteIcon,
   Flag,
+  StickyNote,
+  Plus,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
@@ -41,6 +43,8 @@ import type { RouteStart, RouteStop } from "@/components/backlog-map";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { toast } from "sonner";
 import {
   computeEquipe,
   computeResponsabilidade,
@@ -86,6 +90,15 @@ type Row = {
 };
 
 const DATA = rawData as unknown as Row[];
+
+type BacklogObservacao = {
+  id: number;
+  om: string;
+  texto: string;
+  autor_id: string | null;
+  autor_nome: string | null;
+  criado_em: string | null;
+};
 const EQUIPE_OVERRIDES = rawEquipeOverrides as Record<string, string>;
 const RESP_OVERRIDES = rawEquipeOverrides as Record<string, string>;
 
@@ -862,6 +875,82 @@ function BacklogPage() {
       setSortKey(k);
       setSortDir("asc");
     }
+  };
+
+  // ---------- observações por O.S. ----------
+  const { user, profile } = useAuth();
+  const [obsPorOm, setObsPorOm] = useState<Record<string, BacklogObservacao[]>>({});
+  const [obsDialogOm, setObsDialogOm] = useState<string | null>(null);
+  const [novoObsTexto, setNovoObsTexto] = useState("");
+  const [obsEnviando, setObsEnviando] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const faltantes = Array.from(new Set(sortedRows.map((e) => e.om).filter(Boolean))).filter(
+      (om) => !(om in obsPorOm),
+    );
+    if (faltantes.length === 0) return;
+    const CHUNK = 200;
+    const run = async () => {
+      const todas: BacklogObservacao[] = [];
+      for (let i = 0; i < faltantes.length; i += CHUNK) {
+        const chunk = faltantes.slice(i, i + CHUNK);
+        const { data, error } = await supabase
+          .from("backlog_observacoes")
+          .select("*, profiles:autor_id(nome_completo)")
+          .in("om", chunk);
+        if (error) {
+          console.warn("Falha ao carregar observações do backlog", error);
+          break;
+        }
+        for (const r of data ?? []) {
+          todas.push({
+            ...(r as Omit<BacklogObservacao, "autor_nome">),
+            autor_nome: (r.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
+          });
+        }
+      }
+      if (!active) return;
+      setObsPorOm((prev) => {
+        const next = { ...prev };
+        for (const om of faltantes) if (!(om in next)) next[om] = [];
+        for (const obs of todas) next[obs.om] = [...(next[obs.om] ?? []), obs];
+        return next;
+      });
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, [sortedRows, obsPorOm]);
+
+  const adicionarObservacao = async () => {
+    if (!obsDialogOm || !novoObsTexto.trim() || obsEnviando) return;
+    setObsEnviando(true);
+    const { data, error } = await supabase
+      .from("backlog_observacoes")
+      .insert({
+        om: obsDialogOm,
+        texto: novoObsTexto.trim(),
+        autor_id: user?.id ?? null,
+      })
+      .select("*, profiles:autor_id(nome_completo)")
+      .single();
+    if (error) {
+      toast.error("Erro ao adicionar observação: " + error.message);
+      setObsEnviando(false);
+      return;
+    }
+    const criada: BacklogObservacao = {
+      ...(data as Omit<BacklogObservacao, "autor_nome">),
+      autor_nome: (data.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
+    };
+    setObsPorOm((prev) => ({
+      ...prev,
+      [obsDialogOm]: [criada, ...(prev[obsDialogOm] ?? [])],
+    }));
+    setNovoObsTexto("");
+    setObsEnviando(false);
   };
 
   // ---------- upload ----------
@@ -3017,6 +3106,7 @@ function BacklogPage() {
                 <th className="px-2 py-2 font-semibold">SLA</th>
                 <th className="px-2 py-2 font-semibold">Resp.</th>
                 <th className="px-2 py-2 font-semibold">Equipe</th>
+                <th className="px-2 py-2 font-semibold">Observação</th>
               </tr>
             </thead>
             <tbody>
@@ -3178,6 +3268,21 @@ function BacklogPage() {
                       <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                     )}
                   </td>
+                  <td className="whitespace-nowrap px-2 py-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setObsDialogOm(e.om)}
+                      title="Ver/Adicionar observações"
+                      className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 cursor-pointer"
+                    >
+                      <StickyNote className="h-4 w-4" />
+                      {(obsPorOm[e.om]?.length ?? 0) > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
+                          {obsPorOm[e.om]!.length}
+                        </span>
+                      )}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -3218,6 +3323,7 @@ function BacklogPage() {
                   <th className="px-2 py-2 font-semibold">SLA</th>
                   <th className="px-2 py-2 font-semibold">Resp.</th>
                   <th className="px-2 py-2 font-semibold">Equipe</th>
+                  <th className="px-2 py-2 font-semibold">Observação</th>
                 </tr>
               </thead>
               <tbody>
@@ -3381,11 +3487,85 @@ function BacklogPage() {
                         <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                       )}
                     </td>
+                    <td className="whitespace-nowrap px-2 py-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setObsDialogOm(e.om)}
+                        title="Ver/Adicionar observações"
+                        className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 cursor-pointer"
+                      >
+                        <StickyNote className="h-4 w-4" />
+                        {(obsPorOm[e.om]?.length ?? 0) > 0 && (
+                          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
+                            {obsPorOm[e.om]!.length}
+                          </span>
+                        )}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Observações da O.S. */}
+      <Dialog open={obsDialogOm !== null} onOpenChange={(o) => !o && setObsDialogOm(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-bold text-[#0b3a73] dark:text-white">
+              <StickyNote className="h-4 w-4 text-orange-500" /> Observações · {obsDialogOm}
+            </DialogTitle>
+          </DialogHeader>
+          {obsDialogOm && (
+            <div className="space-y-3 text-sm">
+              <div className="max-h-[40vh] space-y-2 overflow-y-auto pr-1">
+                {(obsPorOm[obsDialogOm] ?? []).length === 0 ? (
+                  <p className="py-6 text-center text-sm text-slate-400">
+                    Nenhuma observação para esta O.S.
+                  </p>
+                ) : (
+                  (obsPorOm[obsDialogOm] ?? []).map((o) => (
+                    <div
+                      key={o.id}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-700/40"
+                    >
+                      <p className="whitespace-pre-wrap text-[13px] text-slate-700 dark:text-slate-200">
+                        {o.texto}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {o.criado_em ? new Date(o.criado_em).toLocaleString("pt-BR") : ""}
+                        {o.autor_nome ? ` · ${o.autor_nome}` : ""}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <textarea
+                  value={novoObsTexto}
+                  onChange={(e) => setNovoObsTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      adicionarObservacao();
+                    }
+                  }}
+                  rows={2}
+                  placeholder="Digite uma observação sobre a O.S...."
+                  className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                />
+                <button
+                  onClick={adicionarObservacao}
+                  disabled={!novoObsTexto.trim() || obsEnviando}
+                  className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" /> Adicionar
+                </button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
