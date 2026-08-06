@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Material,
   Movimentacao,
@@ -5107,23 +5108,33 @@ function EstoquePage() {
       <Dialog open={dialogSolicitarRc} onOpenChange={setDialogSolicitarRc}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-orange-700">
-              <ShoppingCart className="mr-1 inline h-4 w-4" /> Solicitar RC
+            <DialogTitle className="flex items-center gap-2 font-semibold">
+              <ShoppingCart className="h-4 w-4 text-orange-500" /> Solicitar RC
             </DialogTitle>
           </DialogHeader>
           {solicitarRcMaterial && (
-            <div className="grid gap-3 py-2 text-sm">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px] dark:border-slate-700 dark:bg-slate-800">
-                <div className="font-mono font-bold text-slate-700 dark:text-slate-200">
-                  {solicitarRcMaterial.cod_sap}
+            <div className="space-y-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-mono text-[13px] font-bold text-slate-800 dark:text-slate-100">
+                    {solicitarRcMaterial.cod_sap}
+                  </div>
+                  <div className="mt-0.5 text-[13px] text-slate-600 dark:text-slate-300">
+                    {solicitarRcMaterial.descricao}
+                  </div>
                 </div>
-                <div className="text-slate-600 dark:text-slate-300">
-                  {solicitarRcMaterial.descricao}
-                </div>
-                <div className="mt-1 text-[12px] text-slate-400 dark:text-slate-500">
-                  Saldo: {solicitarRcMaterial.saldo_atual} {solicitarRcMaterial.unidade_medida} ·
-                  Mínimo: {solicitarRcMaterial.estoque_minimo}
-                </div>
+                {solicitarRcMaterial.saldo_atual < solicitarRcMaterial.estoque_minimo ? (
+                  <Badge variant="destructive" className="shrink-0 whitespace-nowrap">
+                    Saldo: {solicitarRcMaterial.saldo_atual} {solicitarRcMaterial.unidade_medida}
+                  </Badge>
+                ) : (
+                  <span className="shrink-0 whitespace-nowrap rounded-md border px-2.5 py-0.5 text-xs font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-300">
+                    Saldo: {solicitarRcMaterial.saldo_atual} {solicitarRcMaterial.unidade_medida}
+                  </span>
+                )}
+              </div>
+              <div className="text-[12px] text-slate-400 dark:text-slate-500">
+                Mínimo: {solicitarRcMaterial.estoque_minimo} {solicitarRcMaterial.unidade_medida}
               </div>
               {(() => {
                 const historico = compras
@@ -5135,65 +5146,69 @@ function EstoquePage() {
                   );
                 const emFila = historico.filter((c) => c.rc_em_fila);
                 return (
-                  <div>
+                  <div className="space-y-2.5">
+                    <Separator />
                     {emFila.length > 0 && (
-                      <div className="mb-2 flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                      <div className="flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         Este código já está em RC EM FILA ({emFila.length}{" "}
                         {emFila.length === 1 ? "item" : "itens"}).
                       </div>
                     )}
-                    <div className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white text-[12px] dark:border-slate-700 dark:bg-slate-800">
-                      <div className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                        Histórico de compras · {solicitarRcMaterial.cod_sap}
+                    <div>
+                      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Histórico de compras
                       </div>
                       {historico.length === 0 ? (
-                        <div className="px-3 py-3 text-slate-400">
+                        <div className="text-[12px] text-slate-400">
                           Nenhuma compra registrada para este código.
                         </div>
                       ) : (
-                        historico.map((c) => (
-                          <div
-                            key={c.id}
-                            className="flex items-start justify-between gap-2 border-b border-slate-100 px-3 py-2 last:border-0 dark:border-slate-700/50"
-                          >
-                            <div className="min-w-0">
-                              <div className="font-semibold text-slate-700 dark:text-slate-200">
-                                {c.descricao_material || "—"}
-                              </div>
-                              <div className="mt-0.5 text-slate-400 dark:text-slate-500">
-                                {c.requisicao
-                                  ? `Req ${c.requisicao}.${c.item_rc ?? ""}`
-                                  : "Sem requisição"}{" "}
-                                · Qtd {c.qtde_rc ?? "—"}
-                                {c.status_geral ? ` · ${c.status_geral}` : ""}
-                              </div>
-                              <div className="text-slate-400 dark:text-slate-500">
-                                {c.dt_criacao_rc
-                                  ? `RC criada em ${c.dt_criacao_rc}`
-                                  : "RC sem data de criação"}
-                                {c.rc_em_fila && c.criado_em
-                                  ? ` · Adicionado à fila em ${c.criado_em}`
-                                  : ""}
-                              </div>
-                            </div>
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                c.rc_em_fila
-                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                  : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"
-                              }`}
+                        <ul className="max-h-40 divide-y divide-slate-100 overflow-auto rounded-md border border-slate-200 dark:divide-slate-700/50 dark:border-slate-700">
+                          {historico.map((c) => (
+                            <li
+                              key={c.id}
+                              className="flex items-start justify-between gap-2 px-3 py-2"
                             >
-                              {c.rc_em_fila ? "Em fila" : "Fora da fila"}
-                            </span>
-                          </div>
-                        ))
+                              <div className="min-w-0">
+                                <div className="truncate text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+                                  {c.descricao_material || "—"}
+                                </div>
+                                <div className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+                                  {c.requisicao
+                                    ? `Req ${c.requisicao}.${c.item_rc ?? ""}`
+                                    : "Sem requisição"}{" "}
+                                  · Qtd {c.qtde_rc ?? "—"}
+                                  {c.status_geral ? ` · ${c.status_geral}` : ""}
+                                </div>
+                                <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                                  {c.dt_criacao_rc
+                                    ? `RC criada em ${c.dt_criacao_rc}`
+                                    : "RC sem data de criação"}
+                                  {c.rc_em_fila && c.criado_em
+                                    ? ` · Adicionado à fila em ${c.criado_em}`
+                                    : ""}
+                                </div>
+                              </div>
+                              <Badge
+                                className={
+                                  c.rc_em_fila
+                                    ? "shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                    : "shrink-0 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                                }
+                              >
+                                {c.rc_em_fila ? "Em fila" : "Fora da fila"}
+                              </Badge>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   </div>
                 );
               })()}
-              <label className="flex flex-col gap-1">
+              <Separator />
+              <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Quantidade
                 </span>
@@ -5202,11 +5217,23 @@ function EstoquePage() {
                   min={1}
                   value={solicitarRcQtd}
                   onChange={(e) => setSolicitarRcQtd(Number(e.target.value) || 0)}
-                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                   autoFocus
                 />
+                {(() => {
+                  const deficit =
+                    solicitarRcMaterial.estoque_minimo - solicitarRcMaterial.saldo_atual;
+                  if (solicitarRcQtd > 0 && solicitarRcQtd < deficit) {
+                    return (
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                        Mínimo recomendado: {deficit} para atingir o estoque mínimo.
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => {
                     if (solicitarRcQtd <= 0) return;
@@ -5222,13 +5249,13 @@ function EstoquePage() {
                     setDialogSolicitarRc(false);
                   }}
                   disabled={solicitarRcQtd <= 0}
-                  className="flex-1 rounded-md bg-orange-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                  className="flex-1 rounded-md bg-orange-500 px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
                 >
                   Adicionar à Fila
                 </button>
                 <button
                   onClick={() => setDialogSolicitarRc(false)}
-                  className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  className="flex-1 rounded-md border border-input bg-transparent px-3 py-2.5 text-[13px] font-semibold text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Cancelar
                 </button>
