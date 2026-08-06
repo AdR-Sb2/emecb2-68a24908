@@ -6,15 +6,18 @@ import {
   ChevronsUpDown,
   ClipboardList,
   FileText,
+  Hash,
   History,
   Info,
   Link2,
   Loader2,
+  MapPin,
   Paperclip,
   Plus,
   Search,
   Trash2,
   Upload,
+  User,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -708,7 +711,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                 return (
                   <div
                     key={a.id}
-                    className={`rounded-lg border bg-slate-50 p-3 dark:bg-slate-700/40 ${
+                    className={`rounded-lg border bg-slate-50 px-3 py-2.5 dark:bg-slate-700/40 ${
                       semVinculo
                         ? "border-amber-300 dark:border-amber-700"
                         : "border-slate-200 dark:border-slate-600"
@@ -721,7 +724,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                             type="button"
                             title="Copiar ordem"
                             onClick={() => a.ordem && copiarOrdem(a.ordem)}
-                            className="inline-flex items-center gap-1 text-sm font-bold text-[#0b3a73] hover:text-[#1f7ad6] dark:text-white dark:hover:text-[#1f7ad6]"
+                            className="inline-flex items-center gap-1 text-sm font-bold text-[#0b3a73] underline-offset-2 hover:text-[#1f7ad6] hover:underline dark:text-white dark:hover:text-[#1f7ad6]"
                           >
                             {a.ordem ?? "—"}
                             {ordemCopiada === a.ordem && (
@@ -748,14 +751,15 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                               {a.status_sistema}
                             </Badge>
                           ) : null}
-                          {a.prioridade && (
-                            <Badge
-                              variant="outline"
-                              className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                            >
-                              {a.prioridade}
-                            </Badge>
-                          )}
+                          {a.prioridade &&
+                            a.prioridade.trim().toLowerCase() !== natureza.toLowerCase() && (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                              >
+                                {a.prioridade}
+                              </Badge>
+                            )}
                           {semVinculo && (
                             <Badge
                               variant="outline"
@@ -766,13 +770,8 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                           )}
                         </div>
                         {a.texto_breve && (
-                          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                          <p className="mt-1 line-clamp-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                             {a.texto_breve}
-                          </p>
-                        )}
-                        {a.nota && (
-                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                            Nota: {a.nota}
                           </p>
                         )}
                         {a.texto_longo && (
@@ -786,20 +785,40 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                             {a.texto_longo}
                           </p>
                         )}
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           {a.data_entrada && (
                             <span className="inline-flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> {formatDate(a.data_entrada)}
+                              <Calendar className="h-3.5 w-3.5 shrink-0 opacity-70" />{" "}
+                              {formatDate(a.data_entrada)}
+                            </span>
+                          )}
+                          {a.nota && (
+                            <span className="inline-flex items-center gap-1">
+                              <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> Nota {a.nota}
                             </span>
                           )}
                           {nomeElevatoria(a.elevatoria_id) && (
-                            <span>· {nomeElevatoria(a.elevatoria_id)}</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />{" "}
+                              {nomeElevatoria(a.elevatoria_id)}
+                            </span>
                           )}
-                          {a.planta && <span>· {a.planta}</span>}
+                          {a.planta && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 shrink-0 opacity-70" /> {a.planta}
+                            </span>
+                          )}
                           {a.local_instalacao && a.local_instalacao !== a.planta && (
-                            <span>· {a.local_instalacao}</span>
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 shrink-0 opacity-70" />{" "}
+                              {a.local_instalacao}
+                            </span>
                           )}
-                          {a.criado_por && <span>· Criado por {a.criado_por}</span>}
+                          {a.criado_por && (
+                            <span className="inline-flex items-center gap-1">
+                              <User className="h-3.5 w-3.5 shrink-0 opacity-70" /> {a.criado_por}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
