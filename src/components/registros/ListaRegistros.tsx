@@ -215,6 +215,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [anexando, setAnexando] = useState<number | null>(null);
   const [removendo, setRemovendo] = useState<number | null>(null);
   const [vinculando, setVinculando] = useState<number | null>(null);
+  const [ordemCopiada, setOrdemCopiada] = useState<string | null>(null);
   const [selecao, setSelecao] = useState<Record<number, number | null>>({});
   const importRef = useRef<HTMLInputElement>(null);
   const anexoRef = useRef<Record<number, HTMLInputElement | null>>({});
@@ -301,6 +302,16 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
     if (aba === "atendimentos") carregarAtendimentos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aba, atendimentosCarregados, carregandoAtendimentos]);
+
+  const copiarOrdem = async (ordem: string) => {
+    try {
+      await navigator.clipboard.writeText(ordem);
+      setOrdemCopiada(ordem);
+      setTimeout(() => setOrdemCopiada((cur) => (cur === ordem ? null : cur)), 1500);
+    } catch {
+      toast.error("Não foi possível copiar a ordem.");
+    }
+  };
 
   const plantasCadastradas = useMemo(() => {
     const s = new Set<string>();
@@ -706,9 +717,17 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-sm font-bold text-[#0b3a73] dark:text-white">
+                          <button
+                            type="button"
+                            title="Copiar ordem"
+                            onClick={() => a.ordem && copiarOrdem(a.ordem)}
+                            className="inline-flex items-center gap-1 text-sm font-bold text-[#0b3a73] hover:text-[#1f7ad6] dark:text-white dark:hover:text-[#1f7ad6]"
+                          >
                             {a.ordem ?? "—"}
-                          </span>
+                            {ordemCopiada === a.ordem && (
+                              <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            )}
+                          </button>
                           <Badge
                             className={`border ${NATUREZA_CORES[natureza] ?? NATUREZA_CORES.outras}`}
                           >
