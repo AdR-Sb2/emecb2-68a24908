@@ -97,6 +97,7 @@ supabase/
     ...
     00054_analitico_justificativa_sem_preventiva.sql
     00055_backlog_observacoes.sql
+    00056_backlog_obs_unica.sql
 ```
 
 ## Convencoes
@@ -169,9 +170,10 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 
 ## Modulo Backlog (src/routes/backlog.tsx) - notas
 
-- Coluna "Observação" em cada linha da tabela (normal e expandida) abre dialog com comentarios multiplos por O.S. (tabela `backlog_observacoes`, migration 00055): id, om, texto, autor_id (FK profiles), criado_em. Consulta com join `profiles:autor_id(nome_completo)`.
-- Carregamento em lote: useEffect carrega observacoes das O.S. visiveis (chunks de 200 com `.in("om", ...)`) e guarda em `obsPorOm`; badge laranja com a contagem no botao. Insercao usa `.insert(...).select("*, profiles:autor_id(nome_completo)").single()` e adiciona ao topo da lista.
-- O texto do botao/coluna e visual segue o padrao do modulo Registros (`ListaRegistros.tsx`): textarea + botao "Adicionar" (bg-[#0b3a73]), Enter adiciona (Shift+Enter quebra linha), lista com autor + data.
+- Coluna "Observação" (input editavel direto na linha, ambas tabelas) salva observação única por O.S. na tabela `backlog_obs_unica` (migration 00056): om (PK), obs, atualizado_em. Autosave com debounce ~700ms + flush no blur (`atualizarObsUnica`/`flushObsUnica`/`salvarObsUnica`), carregada em lote por chunks de 200 (guarda em `obsUnica` + `obsUnicaLoaded` ref).
+- Coluna "Comentários" abre dialog com comentarios multiplos por O.S. (tabela `backlog_observacoes`, migration 00055): id, om, texto, autor_id (FK profiles), criado_em. Consulta com join `profiles:autor_id(nome_completo)`.
+- Carregamento em lote das observações/comentarios das O.S. visiveis (chunks de 200 com `.in("om", ...)`) e badge laranja com a contagem no botao. Insercao usa `.insert(...).select("*, profiles:autor_id(nome_completo)").single()` e adiciona ao topo da lista.
+- O dialog de comentarios segue o padrao do modulo Registros (`ListaRegistros.tsx`): textarea + botao "Adicionar" (bg-[#0b3a73]), Enter adiciona (Shift+Enter quebra linha), lista com autor + data.
 
 ## Validacao (antes de commitar)
 
