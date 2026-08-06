@@ -175,6 +175,12 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 - Carregamento em lote das observações/comentarios das O.S. visiveis (chunks de 200 com `.in("om", ...)`) e badge laranja com a contagem no botao. Insercao usa `.insert(...).select("*, profiles:autor_id(nome_completo)").single()` e adiciona ao topo da lista.
 - O dialog de comentarios segue o padrao do modulo Registros (`ListaRegistros.tsx`): textarea + botao "Adicionar" (bg-[#0b3a73]), Enter adiciona (Shift+Enter quebra linha), lista com autor + data.
 
+## Modulo Registros (src/components/registros/ListaRegistros.tsx) - notas de performance
+
+- Aba "Atendimentos" e lazy: so carrega ao abrir a aba (`carregarAtendimentos` + `atendimentosCarregados`/`carregandoAtendimentos`). Enquanto nao carregado, badge do tab nao mostra contagem e o conteudo mostra spinner "Carregando atendimentos...".
+- Carga inicial paralela (`Promise.all`): informacoes + elevatorias juntas. Quando `elevatoriaId != null` (ficha da elevatoria), busca so a elevatoria via `.eq("id", elevNum)` em vez de todas; o filtro por planta da query de atendimentos usa o state `elevatorias` (ja carregado quando a aba fica visivel).
+- `buscarAtendimentos` usa `ATEND_COLUNAS` (colunas minimas, sem `profiles` join) em vez de `select("*")`; paginacao com `range()` em lotes de `TAMANHO_PAGINA` (1000). Tipo `AtendQuery` e estrutural (`{ range(from, to): unknown }`) para aceitar o builder com colunas especificas.
+
 ## Validacao (antes de commitar)
 
 - `npx tsc --noEmit` — erros PRE-EXISTENTES esperados (nao corrigir fora de escopo): `src/routes/elevatorias.tsx` linhas ~963 e ~1090 (tipo de Link de rota).
