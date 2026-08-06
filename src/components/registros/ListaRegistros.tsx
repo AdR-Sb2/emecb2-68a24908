@@ -66,14 +66,25 @@ const STATUS_ENCERRADO = ["Encerrada", "Encerrada Técnica"];
 
 const PLANTA_GUARDA_CHUVA = "PL-RJB-SDA1003";
 
-type AtendQuery = ReturnType<ReturnType<typeof supabase.from>["select"]>;
+type AtendQuery = {
+  range(from: number, to: number): unknown;
+};
 
 const TAMANHO_PAGINA = 1000;
+
+const ATEND_COLUNAS =
+  "id, elevatoria_id, planta, ordem, nota, texto_breve, texto_longo, tipo_ordem, natureza, prioridade, status_sistema, status_simplificado, data_entrada, data_modificacao, pdf_anexo_url, anexado_por, anexado_em, local_instalacao, criado_por";
 
 async function buscarAtendimentos(query: AtendQuery): Promise<RegistroAtendimento[] | null> {
   const todos: RegistroAtendimento[] = [];
   for (let i = 0; i < 100; i++) {
-    const { data, error } = await query.range(i * TAMANHO_PAGINA, (i + 1) * TAMANHO_PAGINA - 1);
+    const { data, error } = (await query.range(
+      i * TAMANHO_PAGINA,
+      (i + 1) * TAMANHO_PAGINA - 1,
+    )) as {
+      data: unknown[] | null;
+      error: { message: string } | null;
+    };
     if (error) {
       toast.error("Erro ao carregar atendimentos: " + error.message);
       return null;
@@ -189,6 +200,8 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [conferirAtivo, setConferirAtivo] = useState(false);
   const [informacoes, setInformacoes] = useState<RegistroInformacao[]>([]);
   const [atendimentos, setAtendimentos] = useState<RegistroAtendimento[]>([]);
+  const [atendimentosCarregados, setAtendimentosCarregados] = useState(false);
+  const [carregandoAtendimentos, setCarregandoAtendimentos] = useState(false);
   const [elevatorias, setElevatorias] = useState<ElevatoriaOpt[]>([]);
   const [novoTexto, setNovoTexto] = useState("");
   const [elevatoriaSelecionada, setElevatoriaSelecionada] = useState<number | null>(
@@ -227,33 +240,22 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       const infoQuery = supabase
         .from("registros_informacao")
         .select("*, profiles:autor_id(nome_completo)");
-      let atendQuery = supabase.from("registros_atendimento").select("*");
 
-      if (elevNum != null) {
-        infoQuery.eq("elevatoria_id", elevNum);
-        atendQuery.eq("elevatoria_id", elevNum);
-      }
+      if (elevNum != null) infoQuery.eq("elevatoria_id", elevNum);
 
-      const elevRes = await supabase.from("elevatorias").select("id, nome, planta").order("nome");
-      if (!active) return;
-      if (elevRes.data) setElevatorias(elevRes.data as ElevatoriaOpt[]);
+      const elevQuery =
+        elevNum != null
+          ? supabase.from("elevatorias").select("id, nome, planta").eq("id", elevNum)
+          : supabase.from("elevatorias").select("id, nome, planta").order("nome");
 
-      if (elevNum == null) {
-        const plantas = (elevRes.data ?? [])
-          .map((e) => (e as ElevatoriaOpt).planta)
-          .filter((p): p is string => Boolean(p));
-        const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
-        if (lista.length) atendQuery = atendQuery.in("planta", lista);
-      }
-
-      const [infoRes, atendimentos] = await Promise.all([
+      const [infoRes, elevRes] = await Promise.all([
         infoQuery.order("criado_em", { ascending: false }).limit(300),
-        buscarAtendimentos(
-          atendQuery.order("data_entrada", { ascending: false, nullsFirst: false }),
-        ),
+        elevQuery,
       ]);
 
       if (!active) return;
+      if (elevRes.error) console.warn("Falha ao carregar elevatórias: " + elevRes.error.message);
+      else if (elevRes.data) setElevatorias(elevRes.data as ElevatoriaOpt[]);
       if (infoRes.error) toast.error("Erro ao carregar informações: " + infoRes.error.message);
       else {
         setInformacoes(
@@ -263,7 +265,6 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
           })) as RegistroInformacao[],
         );
       }
-      if (atendimentos) setAtendimentos(atendimentos);
       setLoading(false);
     };
     load();
@@ -271,6 +272,35 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       active = false;
     };
   }, [podeVisualizar, elevatoriaId]);
+
+  const carregarAtendimentos = async () => {
+    if (!podeVisualizar || atendimentosCarregados || carregandoAtendimentos) return;
+    setCarregandoAtendimentos(true);
+    const elevNum =
+      elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
+
+    let query = supabase.from("registros_atendimento").select(ATEND_COLUNAS);
+
+    if (elevNum != null) {
+      query = query.eq("elevatoria_id", elevNum);
+    } else {
+      const plantas = elevatorias.map((e) => e.planta).filter((p): p is string => Boolean(p));
+      const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
+      if (lista.length) query = query.in("planta", lista);
+    }
+
+    const dados = await buscarAtendimentos(
+      query.order("data_entrada", { ascending: false, nullsFirst: false }),
+    );
+    if (dados) setAtendimentos(dados);
+    setAtendimentosCarregados(true);
+    setCarregandoAtendimentos(false);
+  };
+
+  useEffect(() => {
+    if (aba === "atendimentos") carregarAtendimentos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aba, atendimentosCarregados, carregandoAtendimentos]);
 
   const plantasCadastradas = useMemo(() => {
     const s = new Set<string>();
@@ -332,7 +362,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       );
       const elevNum =
         elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
-      let query = supabase.from("registros_atendimento").select("*");
+      let query = supabase.from("registros_atendimento").select(ATEND_COLUNAS);
       if (elevNum != null) {
         query = query.eq("elevatoria_id", elevNum);
       } else {
@@ -344,6 +374,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
         query.order("data_entrada", { ascending: false, nullsFirst: false }),
       );
       if (data) setAtendimentos(data);
+      setAtendimentosCarregados(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao importar a planilha.");
     } finally {
@@ -509,7 +540,8 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             <Info className="h-4 w-4" /> Informação
           </TabsTrigger>
           <TabsTrigger value="atendimentos" className="gap-1.5">
-            <ClipboardList className="h-4 w-4" /> Atendimentos ({atendimentosUniverso.length})
+            <ClipboardList className="h-4 w-4" /> Atendimentos
+            {atendimentosCarregados ? ` (${atendimentosUniverso.length})` : ""}
           </TabsTrigger>
         </TabsList>
 
@@ -638,7 +670,11 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             </select>
           </div>
 
-          {atendimentosFiltrados.length === 0 ? (
+          {!atendimentosCarregados ? (
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-8 text-sm text-slate-400 dark:border-slate-600">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando atendimentos...
+            </div>
+          ) : atendimentosFiltrados.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400 dark:border-slate-600">
               {conferirAtivo
                 ? "Nenhuma O.S. pendente de conferência."
