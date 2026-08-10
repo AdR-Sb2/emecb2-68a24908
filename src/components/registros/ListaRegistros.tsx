@@ -224,6 +224,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [filtroNatureza, setFiltroNatureza] = useState("TODAS");
+  const [limiteVisiveis, setLimiteVisiveis] = useState(100);
   const [anexando, setAnexando] = useState<number | null>(null);
   const [removendo, setRemovendo] = useState<number | null>(null);
   const [vinculando, setVinculando] = useState<number | null>(null);
@@ -370,6 +371,15 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
         .some((v) => String(v).toLowerCase().includes(b));
     });
   }, [atendimentosUniverso, conferirAtivo, busca, filtroStatus, filtroNatureza]);
+
+  useEffect(() => {
+    setLimiteVisiveis(100);
+  }, [atendimentosFiltrados]);
+
+  const atendimentosVisiveis = useMemo(
+    () => atendimentosFiltrados.slice(0, limiteVisiveis),
+    [atendimentosFiltrados, limiteVisiveis],
+  );
 
   const adicionarInformacao = async () => {
     if (!podeCriar || !novoTexto.trim()) return;
@@ -723,6 +733,14 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             </select>
           </div>
 
+          {atendimentosCarregados && atendimentosFiltrados.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Mostrando {atendimentosVisiveis.length} de {atendimentosFiltrados.length}{" "}
+              {atendimentosFiltrados.length === 1 ? "atendimento" : "atendimentos"}
+              {busca.trim() ? " (filtrados)" : ""}
+            </p>
+          )}
+
           {!atendimentosCarregados ? (
             <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-8 text-sm text-slate-400 dark:border-slate-600">
               <Loader2 className="h-4 w-4 animate-spin" /> Carregando atendimentos...
@@ -743,7 +761,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             </div>
           ) : (
             <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
-              {atendimentosFiltrados.map((a) => {
+              {atendimentosVisiveis.map((a) => {
                 const natureza = a.natureza ?? "outras";
                 const encerrado = STATUS_ENCERRADO.includes(a.status_simplificado ?? "");
                 const semVinculo = a.elevatoria_id == null;
@@ -946,6 +964,18 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                   </div>
                 );
               })}
+            </div>
+          )}
+          {atendimentosCarregados && atendimentosVisiveis.length < atendimentosFiltrados.length && (
+            <div className="flex justify-center pt-1">
+              <button
+                type="button"
+                onClick={() => setLimiteVisiveis((cur) => cur + 200)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Carregar mais ({atendimentosFiltrados.length - atendimentosVisiveis.length}{" "}
+                restantes)
+              </button>
             </div>
           )}
         </TabsContent>
