@@ -30,7 +30,7 @@ export interface Equipamento {
   categorias?: EquipamentoCategoria | null;
   origem: string | null;
   codigo_sap: string | null;
-  localizacao: string | null;
+  local: string | null;
   observacao: string | null;
   critico: boolean;
   cadastrado: boolean;

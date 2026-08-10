@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   Check,
+  ChevronDown,
   ClipboardList,
   Edit3,
   Link2,
@@ -208,6 +209,131 @@ function PaletaCores({
   );
 }
 
+function LocalCombobox({
+  value,
+  onChange,
+  opcoes,
+  disabled,
+  compacto,
+  placeholder = "Selecionar local...",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  opcoes: string[];
+  disabled?: boolean;
+  compacto?: boolean;
+  placeholder?: string;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const abrir = () => {
+    if (disabled) return;
+    const r = wrapperRef.current?.getBoundingClientRect();
+    if (r) {
+      const esquerda = Math.max(8, Math.min(r.left, window.innerWidth - 280));
+      setPos({ top: r.bottom + 4, left: esquerda, width: Math.max(r.width, 260) });
+    }
+    setBusca("");
+    setAberto((v) => !v);
+  };
+
+  const filtradas = opcoes.filter((o) => o.toLowerCase().includes(busca.trim().toLowerCase()));
+
+  useEffect(() => {
+    if (!aberto) return;
+    const fechar = (ev: Event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(ev.target as Node)) {
+        setAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", fechar);
+    window.addEventListener("scroll", fechar, true);
+    return () => {
+      document.removeEventListener("mousedown", fechar);
+      window.removeEventListener("scroll", fechar, true);
+    };
+  }, [aberto]);
+
+  return (
+    <div ref={wrapperRef} className={compacto ? "relative" : "relative w-full"}>
+      <button
+        type="button"
+        onClick={abrir}
+        disabled={disabled}
+        title={value || placeholder}
+        className={
+          compacto
+            ? "flex min-h-7 w-full max-w-[170px] items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[12px] text-slate-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            : "flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+        }
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="truncate">{value || placeholder}</span>
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+      </button>
+      {aberto && pos && (
+        <div
+          className="fixed z-50 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
+          <div className="border-b border-slate-100 p-2 dark:border-slate-700">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Pesquisar local..."
+                autoFocus
+                className="min-h-9 w-full rounded-md border border-slate-300 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              />
+            </div>
+          </div>
+          <ul className="max-h-56 overflow-y-auto p-1">
+            {filtradas.length === 0 && (
+              <li className="px-2 py-2 text-sm text-slate-400">Nenhum local encontrado.</li>
+            )}
+            {filtradas.map((o) => (
+              <li key={o}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(o);
+                    setAberto(false);
+                  }}
+                  className={`w-full rounded-md px-2 py-1.5 text-left text-sm ${
+                    o === value
+                      ? "bg-[#1f7ad6]/10 font-semibold text-[#1f7ad6]"
+                      : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {o}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {value && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setAberto(false);
+              }}
+              className="w-full border-t border-slate-100 px-2 py-1.5 text-left text-xs text-slate-400 hover:text-red-600 dark:border-slate-700"
+            >
+              Limpar local
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EquipamentosTab() {
   const { user, profile } = useAuth();
   const [perms, setPerms] = useState({
@@ -219,6 +345,7 @@ export default function EquipamentosTab() {
   });
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
   const [categorias, setCategorias] = useState<EquipamentoCategoria[]>([]);
+  const [elevatorias, setElevatorias] = useState<{ id: number; nome: string }[]>([]);
   const [fotos, setFotos] = useState<Record<string, EquipamentoFoto[]>>({});
   const [loading, setLoading] = useState(true);
   const [permLoading, setPermLoading] = useState(true);
@@ -241,7 +368,7 @@ export default function EquipamentosTab() {
     categoria_id: "",
     origem: "",
     codigo_sap: "",
-    localizacao: "",
+    local: "",
     observacao: "",
     critico: false,
     cadastrado: false,
@@ -284,18 +411,20 @@ export default function EquipamentosTab() {
 
   const carregar = async () => {
     setLoading(true);
-    const [eqRes, catRes, fotRes] = await Promise.all([
+    const [eqRes, catRes, fotRes, elevRes] = await Promise.all([
       supabase
         .from("equipamentos")
         .select("*, categorias:equipamento_categorias(id, nome, ordem, cor)")
         .order("tag"),
       supabase.from("equipamento_categorias").select("*").order("ordem"),
       supabase.from("equipamento_fotos").select("*").order("criado_em", { ascending: false }),
+      supabase.from("elevatorias").select("id, nome").order("nome"),
     ]);
     if (eqRes.error) toast.error("Erro ao carregar equipamentos: " + eqRes.error.message);
     if (catRes.error) console.warn("Erro ao carregar categorias:", catRes.error.message);
     if (eqRes.data) setEquipamentos(eqRes.data as Equipamento[]);
     if (catRes.data) setCategorias(catRes.data as EquipamentoCategoria[]);
+    if (elevRes.data) setElevatorias(elevRes.data as { id: number; nome: string }[]);
     if (fotRes.data) {
       const map: Record<string, EquipamentoFoto[]> = {};
       for (const f of fotRes.data as EquipamentoFoto[]) {
@@ -330,6 +459,15 @@ export default function EquipamentosTab() {
     });
   }, [equipamentos, busca, filtroCategoria, filtroCritico, filtroStatus]);
 
+  const locais = useMemo(() => {
+    const set = new Set<string>();
+    set.add("Oficina");
+    for (const e of elevatorias) {
+      if (e.nome && e.nome.trim()) set.add(e.nome.trim());
+    }
+    return [...set];
+  }, [elevatorias]);
+
   const alternarCritico = async (e: Equipamento) => {
     if (!perms.editar || salvandoCritico === e.id) return;
     const novoValor = !e.critico;
@@ -354,6 +492,16 @@ export default function EquipamentosTab() {
     if (error) {
       setEquipamentos((prev) => prev.map((x) => (x.id === e.id ? { ...x, status: e.status } : x)));
       toast.error("Erro ao atualizar status: " + error.message);
+    }
+  };
+
+  const salvarLocal = async (e: Equipamento, valor: string) => {
+    const local = valor || null;
+    setEquipamentos((prev) => prev.map((x) => (x.id === e.id ? { ...x, local } : x)));
+    const { error } = await supabase.from("equipamentos").update({ local }).eq("id", e.id);
+    if (error) {
+      setEquipamentos((prev) => prev.map((x) => (x.id === e.id ? { ...x, local: e.local } : x)));
+      toast.error("Erro ao atualizar local: " + error.message);
     }
   };
 
@@ -411,7 +559,7 @@ export default function EquipamentosTab() {
       categoria_id: "",
       origem: "",
       codigo_sap: "",
-      localizacao: "",
+      local: "",
       observacao: "",
       critico: false,
       cadastrado: false,
@@ -429,7 +577,7 @@ export default function EquipamentosTab() {
       categoria_id: e.categoria_id ?? "",
       origem: e.origem ?? "",
       codigo_sap: e.codigo_sap ?? "",
-      localizacao: e.localizacao ?? "",
+      local: e.local ?? "",
       observacao: e.observacao ?? "",
       critico: e.critico,
       cadastrado: e.cadastrado,
@@ -453,7 +601,7 @@ export default function EquipamentosTab() {
       categoria_id: form.categoria_id || null,
       origem: form.origem.trim() || null,
       codigo_sap: form.codigo_sap.trim() || null,
-      localizacao: form.localizacao.trim() || null,
+      local: form.local.trim() || null,
       observacao: form.observacao,
       critico: form.critico,
       cadastrado: form.cadastrado,
@@ -752,7 +900,7 @@ export default function EquipamentosTab() {
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Origem</th>
                   <th className="px-3 py-2">Cód. SAP</th>
-                  <th className="px-3 py-2">Localização</th>
+                  <th className="px-3 py-2">Local</th>
                   <th className="px-3 py-2">Cadastrado?</th>
                   <th className="px-3 py-2">Está bom?</th>
                   <th className="px-3 py-2">Vínculo</th>
@@ -849,13 +997,20 @@ export default function EquipamentosTab() {
                       <td className="px-3 py-2 font-mono text-[12px] text-slate-600 dark:text-slate-300">
                         {e.codigo_sap || "—"}
                       </td>
-                      <td className="px-3 py-2 text-[13px] text-slate-600 dark:text-slate-300">
-                        <span className="inline-flex items-center gap-1">
-                          {e.localizacao && (
-                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                          )}
-                          {e.localizacao || "—"}
-                        </span>
+                      <td className="px-3 py-2">
+                        {perms.editar ? (
+                          <LocalCombobox
+                            compacto
+                            value={e.local ?? ""}
+                            onChange={(v) => salvarLocal(e, v)}
+                            opcoes={locais}
+                            placeholder="—"
+                          />
+                        ) : (
+                          <span className="text-[13px] text-slate-600 dark:text-slate-300">
+                            {e.local || "—"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center">
                         <input
@@ -1020,13 +1175,13 @@ export default function EquipamentosTab() {
                 className={inputCls}
               />
             </label>
-            <label className="block">
-              <span className={labelCls}>Localização</span>
-              <input
-                value={form.localizacao}
-                onChange={(e) => setForm({ ...form, localizacao: e.target.value })}
-                placeholder="Aonde se encontra o equipamento"
-                className={inputCls}
+            <label className="block sm:col-span-2">
+              <span className={labelCls}>Local</span>
+              <LocalCombobox
+                value={form.local}
+                onChange={(v) => setForm({ ...form, local: v })}
+                opcoes={locais}
+                placeholder="Selecionar local (Oficina, elevatória...)"
               />
             </label>
             <label className="block">
@@ -1159,13 +1314,13 @@ export default function EquipamentosTab() {
                 className={inputCls}
               />
             </label>
-            <label className="block">
-              <span className={labelCls}>Localização</span>
-              <input
-                value={form.localizacao}
-                onChange={(e) => setForm({ ...form, localizacao: e.target.value })}
-                placeholder="Aonde se encontra o equipamento"
-                className={inputCls}
+            <label className="block sm:col-span-2">
+              <span className={labelCls}>Local</span>
+              <LocalCombobox
+                value={form.local}
+                onChange={(v) => setForm({ ...form, local: v })}
+                opcoes={locais}
+                placeholder="Selecionar local (Oficina, elevatória...)"
               />
             </label>
             <label className="block">
