@@ -245,7 +245,10 @@ export default function EquipamentosTab() {
   const carregar = async () => {
     setLoading(true);
     const [eqRes, catRes, fotRes] = await Promise.all([
-      supabase.from("equipamentos").select("*, categorias(id, nome, ordem)").order("tag"),
+      supabase
+        .from("equipamentos")
+        .select("*, categorias:equipamento_categorias(id, nome, ordem)")
+        .order("tag"),
       supabase.from("equipamento_categorias").select("*").order("ordem"),
       supabase.from("equipamento_fotos").select("*").order("criado_em", { ascending: false }),
     ]);
