@@ -78,23 +78,32 @@ const TAMANHO_PAGINA = 1000;
 const ATEND_COLUNAS =
   "id, elevatoria_id, planta, ordem, nota, texto_breve, texto_longo, tipo_ordem, natureza, prioridade, status_sistema, status_simplificado, data_entrada, data_modificacao, pdf_anexo_url, anexado_por, anexado_em, local_instalacao, criado_por";
 
-async function buscarAtendimentos(query: AtendQuery): Promise<RegistroAtendimento[] | null> {
+async function buscarAtendimentos(
+  query: AtendQuery,
+  total: number,
+): Promise<RegistroAtendimento[] | null> {
   const todos: RegistroAtendimento[] = [];
-  for (let i = 0; i < 100; i++) {
-    const { data, error } = (await query.range(
-      i * TAMANHO_PAGINA,
-      (i + 1) * TAMANHO_PAGINA - 1,
-    )) as {
-      data: unknown[] | null;
-      error: { message: string } | null;
-    };
-    if (error) {
-      toast.error("Erro ao carregar atendimentos: " + error.message);
-      return null;
+  const paginas = Math.ceil(total / TAMANHO_PAGINA);
+  const indices = Array.from({ length: paginas }, (_, i) => i);
+  const CONCORRENCIA = 8;
+  let pos = 0;
+  while (pos < indices.length) {
+    const lote = indices.slice(pos, pos + CONCORRENCIA);
+    const resultados = await Promise.all(
+      lote.map((i) => query.range(i * TAMANHO_PAGINA, (i + 1) * TAMANHO_PAGINA - 1)),
+    );
+    for (const r of resultados) {
+      const { data, error } = (await r) as {
+        data: unknown[] | null;
+        error: { message: string } | null;
+      };
+      if (error) {
+        toast.error("Erro ao carregar atendimentos: " + error.message);
+        return null;
+      }
+      if (data) todos.push(...(data as RegistroAtendimento[]));
     }
-    if (!data || data.length === 0) break;
-    todos.push(...(data as RegistroAtendimento[]));
-    if (data.length < TAMANHO_PAGINA) break;
+    pos += CONCORRENCIA;
   }
   return todos;
 }
@@ -284,17 +293,33 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
 
     let query = supabase.from("registros_atendimento").select(ATEND_COLUNAS);
+    let countQuery = supabase.from("registros_atendimento").select("*", {
+      count: "exact",
+      head: true,
+    });
 
     if (elevNum != null) {
       query = query.eq("elevatoria_id", elevNum);
+      countQuery = countQuery.eq("elevatoria_id", elevNum);
     } else {
       const plantas = elevatorias.map((e) => e.planta).filter((p): p is string => Boolean(p));
       const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
-      if (lista.length) query = query.in("planta", lista);
+      if (lista.length) {
+        query = query.in("planta", lista);
+        countQuery = countQuery.in("planta", lista);
+      }
     }
 
+    const { count, error: countError } = await countQuery;
+    if (countError) {
+      toast.error("Erro ao carregar atendimentos: " + countError.message);
+      setAtendimentosCarregados(true);
+      setCarregandoAtendimentos(false);
+      return;
+    }
     const dados = await buscarAtendimentos(
       query.order("data_entrada", { ascending: false, nullsFirst: false }),
+      count ?? 0,
     );
     if (dados) setAtendimentos(dados);
     setAtendimentosCarregados(true);
@@ -377,15 +402,29 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       const elevNum =
         elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
       let query = supabase.from("registros_atendimento").select(ATEND_COLUNAS);
+      let countQuery = supabase.from("registros_atendimento").select("*", {
+        count: "exact",
+        head: true,
+      });
       if (elevNum != null) {
         query = query.eq("elevatoria_id", elevNum);
+        countQuery = countQuery.eq("elevatoria_id", elevNum);
       } else {
         const plantas = elevatorias.map((e) => e.planta).filter((p): p is string => Boolean(p));
         const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
-        if (lista.length) query = query.in("planta", lista);
+        if (lista.length) {
+          query = query.in("planta", lista);
+          countQuery = countQuery.in("planta", lista);
+        }
+      }
+      const { count, error: countError } = await countQuery;
+      if (countError) {
+        toast.error("Erro ao carregar atendimentos: " + countError.message);
+        return;
       }
       const data = await buscarAtendimentos(
         query.order("data_entrada", { ascending: false, nullsFirst: false }),
+        count ?? 0,
       );
       if (data) setAtendimentos(data);
       setAtendimentosCarregados(true);
@@ -724,7 +763,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                             type="button"
                             title="Copiar ordem"
                             onClick={() => a.ordem && copiarOrdem(a.ordem)}
-                            className="inline-flex items-center gap-1 text-sm font-bold text-[#0b3a73] hover:text-[#1f7ad6] dark:text-white dark:hover:text-[#1f7ad6]"
+                            className="inline-flex items-center gap-1 text-sm font-bold text-[#0b3a73] underline-offset-2 hover:text-[#1f7ad6] hover:underline dark:text-white dark:hover:text-[#1f7ad6]"
                           >
                             {a.ordem ?? "—"}
                             {ordemCopiada === a.ordem && (
