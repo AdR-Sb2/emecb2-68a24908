@@ -188,6 +188,7 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 - Tabelas de observacao (`backlog_obs_unica` e `backlog_observacoes`, migrations 00055/00056) foram criadas SEM `DISABLE ROW LEVEL SECURITY`, diferente de `equipe_overrides` (00003) e `responsabilidade_overrides` (00030). Resultado: o client com publishable key nao consegue ler/gravar (erro 401 "new row violates row-level security policy") — as observacoes nao persistem e somem ao recarregar. A migration 00057 desabilita RLS nas duas tabelas (aplicar no SQL editor do Lovable).
 - A busca do backlog procura tambem na observacao editavel (`obsUnica[om]`) e nos comentarios (`obsPorOm[om]`).
 - Observacao editavel salva com debounce de 700ms; em blur (`flushObsUnica`) e no unmount do componente as mudancas pendentes sao gravadas (`obsUnicaTimer` guarda `{ id, valor }`).
+- Icone de informacao (i) ao lado da O.S.: `src/components/os-info-icon.tsx` + parser `src/lib/parse-log-os.ts` (formato `* DD.MM.AAAA HH:MM:SS BRAZIL (USUARIO)` com campos `CHAVE: valor` separados por `*` e possivel `**negrito**`). Usa o campo `TEXTO LONGO` que ja vem na listagem (`e.r["TEXTO LONGO"]`) — sem fetch extra. Hover mostra a ultima entrada; clique abre dialog com historico completo; O.S. sem log (preventivas por frequencia) nao renderiza o icone.
 
 ## Validacao (antes de commitar)
 
