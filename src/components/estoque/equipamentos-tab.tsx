@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
+  Check,
   ClipboardList,
   Edit3,
+  Link2,
   Loader2,
+  MapPin,
   Plus,
   Search,
   Settings,
@@ -28,19 +31,6 @@ import {
   type StatusEquipamento,
 } from "@/lib/estoque-equipamentos-types";
 
-const CATEGORIA_CORES: Record<string, string> = {
-  Motor:
-    "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800",
-  Bomba:
-    "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800",
-  Inversor:
-    "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800",
-  Softstarter:
-    "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800",
-  outras:
-    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600",
-};
-
 const STATUS_CORES: Record<StatusEquipamento, string> = {
   Operacional:
     "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800",
@@ -53,6 +43,21 @@ const STATUS_CORES: Record<StatusEquipamento, string> = {
 };
 
 const TIPOS_REGISTRO = ["Manutenção", "Troca", "Inspeção", "Observação"];
+
+const PALETA_CORES = [
+  "#2563eb",
+  "#059669",
+  "#f97316",
+  "#9333ea",
+  "#dc2626",
+  "#0891b2",
+  "#d97706",
+  "#16a34a",
+  "#db2777",
+  "#64748b",
+];
+
+const corDoTipo = (e: Equipamento): string => e.categorias?.cor ?? "#64748b";
 
 const inputCls =
   "min-h-10 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20";
@@ -175,6 +180,34 @@ function ObservacaoCell({
   );
 }
 
+function PaletaCores({
+  selecionada,
+  onSelecionar,
+}: {
+  selecionada: string;
+  onSelecionar: (cor: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {PALETA_CORES.map((cor) => (
+        <button
+          key={cor}
+          type="button"
+          onClick={() => onSelecionar(cor)}
+          title={cor}
+          aria-label={`Usar cor ${cor}`}
+          className={`h-5 w-5 rounded-full border transition ${
+            selecionada === cor
+              ? "scale-110 border-slate-900 ring-2 ring-slate-400 dark:border-white"
+              : "border-transparent hover:scale-110"
+          }`}
+          style={{ backgroundColor: cor }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function EquipamentosTab() {
   const { user, profile } = useAuth();
   const [perms, setPerms] = useState({
@@ -208,12 +241,17 @@ export default function EquipamentosTab() {
     categoria_id: "",
     origem: "",
     codigo_sap: "",
+    localizacao: "",
     observacao: "",
     critico: false,
+    cadastrado: false,
+    esta_bom: false,
     status: "Operacional" as StatusEquipamento,
   });
   const [salvandoForm, setSalvandoForm] = useState(false);
   const [salvandoCritico, setSalvandoCritico] = useState<string | null>(null);
+  const [salvandoCheck, setSalvandoCheck] = useState<string | null>(null);
+  const [salvandoVinculo, setSalvandoVinculo] = useState<string | null>(null);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const fotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,8 +262,10 @@ export default function EquipamentosTab() {
   const [salvandoRegistro, setSalvandoRegistro] = useState(false);
 
   const [novaCategoria, setNovaCategoria] = useState("");
+  const [novaCategoriaCor, setNovaCategoriaCor] = useState(PALETA_CORES[0]);
   const [editCategoriaId, setEditCategoriaId] = useState<string | null>(null);
   const [editCategoriaNome, setEditCategoriaNome] = useState("");
+  const [editCategoriaCor, setEditCategoriaCor] = useState(PALETA_CORES[0]);
 
   useEffect(() => {
     if (!profile?.cargo_id) return;
@@ -247,7 +287,7 @@ export default function EquipamentosTab() {
     const [eqRes, catRes, fotRes] = await Promise.all([
       supabase
         .from("equipamentos")
-        .select("*, categorias:equipamento_categorias(id, nome, ordem)")
+        .select("*, categorias:equipamento_categorias(id, nome, ordem, cor)")
         .order("tag"),
       supabase.from("equipamento_categorias").select("*").order("ordem"),
       supabase.from("equipamento_fotos").select("*").order("criado_em", { ascending: false }),
@@ -317,6 +357,39 @@ export default function EquipamentosTab() {
     }
   };
 
+  const atualizarChecklist = async (
+    e: Equipamento,
+    campo: "cadastrado" | "esta_bom",
+    valor: boolean,
+  ) => {
+    setSalvandoCheck(e.id);
+    setEquipamentos((prev) => prev.map((x) => (x.id === e.id ? { ...x, [campo]: valor } : x)));
+    const { error } = await supabase
+      .from("equipamentos")
+      .update({ [campo]: valor })
+      .eq("id", e.id);
+    setSalvandoCheck(null);
+    if (error) {
+      setEquipamentos((prev) => prev.map((x) => (x.id === e.id ? { ...x, [campo]: !valor } : x)));
+      toast.error("Erro ao atualizar checklist: " + error.message);
+    }
+  };
+
+  const atualizarVinculo = async (e: Equipamento, valor: string) => {
+    if (valor === e.id) return;
+    const vinculo_id = valor || null;
+    setSalvandoVinculo(e.id);
+    setEquipamentos((prev) => prev.map((x) => (x.id === e.id ? { ...x, vinculo_id } : x)));
+    const { error } = await supabase.from("equipamentos").update({ vinculo_id }).eq("id", e.id);
+    setSalvandoVinculo(null);
+    if (error) {
+      setEquipamentos((prev) =>
+        prev.map((x) => (x.id === e.id ? { ...x, vinculo_id: e.vinculo_id } : x)),
+      );
+      toast.error("Erro ao atualizar vínculo: " + error.message);
+    }
+  };
+
   const salvarObservacao = async (id: string, valor: string): Promise<boolean> => {
     const { error } = await supabase
       .from("equipamentos")
@@ -338,8 +411,11 @@ export default function EquipamentosTab() {
       categoria_id: "",
       origem: "",
       codigo_sap: "",
+      localizacao: "",
       observacao: "",
       critico: false,
+      cadastrado: false,
+      esta_bom: false,
       status: "Operacional",
     });
     setDialogNovo(true);
@@ -349,12 +425,15 @@ export default function EquipamentosTab() {
     setForm({
       tag: e.tag,
       descricao: e.descricao,
-      tipo: e.tipo,
+      tipo: e.categorias?.nome ?? e.tipo,
       categoria_id: e.categoria_id ?? "",
       origem: e.origem ?? "",
       codigo_sap: e.codigo_sap ?? "",
+      localizacao: e.localizacao ?? "",
       observacao: e.observacao ?? "",
       critico: e.critico,
+      cadastrado: e.cadastrado,
+      esta_bom: e.esta_bom,
       status: e.status,
     });
     setDialogEditar(e);
@@ -374,8 +453,11 @@ export default function EquipamentosTab() {
       categoria_id: form.categoria_id || null,
       origem: form.origem.trim() || null,
       codigo_sap: form.codigo_sap.trim() || null,
+      localizacao: form.localizacao.trim() || null,
       observacao: form.observacao,
       critico: form.critico,
+      cadastrado: form.cadastrado,
+      esta_bom: form.esta_bom,
       status: form.status,
     };
     const { error } = editando
@@ -514,9 +596,9 @@ export default function EquipamentosTab() {
     if (!nome) return;
     const { error } = await supabase
       .from("equipamento_categorias")
-      .insert({ nome, ordem: categorias.length + 1 });
+      .insert({ nome, cor: novaCategoriaCor, ordem: categorias.length + 1 });
     if (error) {
-      toast.error("Erro ao criar categoria: " + error.message);
+      toast.error("Erro ao criar tipo: " + error.message);
       return;
     }
     setNovaCategoria("");
@@ -529,7 +611,10 @@ export default function EquipamentosTab() {
       setEditCategoriaId(null);
       return;
     }
-    const { error } = await supabase.from("equipamento_categorias").update({ nome }).eq("id", id);
+    const { error } = await supabase
+      .from("equipamento_categorias")
+      .update({ nome, cor: editCategoriaCor })
+      .eq("id", id);
     if (error) {
       toast.error("Erro ao renomear: " + error.message);
       return;
@@ -588,7 +673,7 @@ export default function EquipamentosTab() {
             onChange={(e) => setFiltroCategoria(e.target.value)}
             className={selectCls}
           >
-            <option value="TODAS">Categoria: todas</option>
+            <option value="TODAS">Tipo: todos</option>
             {categorias.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nome}
@@ -620,7 +705,7 @@ export default function EquipamentosTab() {
         <div className="flex flex-wrap items-center gap-2">
           {perms.categorias && (
             <button onClick={() => setDialogCategorias(true)} className={btnOutlineCls}>
-              <Settings className="h-4 w-4" /> Gerenciar Categorias
+              <Settings className="h-4 w-4" /> Gerenciar Tipos
             </button>
           )}
           {perms.criar && (
@@ -655,7 +740,7 @@ export default function EquipamentosTab() {
               : ""}
           </p>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[1200px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                   <th className="px-3 py-2 text-center" title="Crítico">
@@ -667,6 +752,10 @@ export default function EquipamentosTab() {
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Origem</th>
                   <th className="px-3 py-2">Cód. SAP</th>
+                  <th className="px-3 py-2">Localização</th>
+                  <th className="px-3 py-2">Cadastrado?</th>
+                  <th className="px-3 py-2">Está bom?</th>
+                  <th className="px-3 py-2">Vínculo</th>
                   <th className="px-3 py-2">Observação</th>
                   <th className="px-3 py-2 text-right">Ações</th>
                 </tr>
@@ -720,7 +809,12 @@ export default function EquipamentosTab() {
                       </td>
                       <td className="px-3 py-2">
                         <Badge
-                          className={`border ${CATEGORIA_CORES[nomeCategoria(e)] ?? CATEGORIA_CORES.outras}`}
+                          className="border"
+                          style={{
+                            backgroundColor: `${corDoTipo(e)}22`,
+                            color: corDoTipo(e),
+                            borderColor: `${corDoTipo(e)}55`,
+                          }}
                         >
                           {nomeCategoria(e)}
                         </Badge>
@@ -754,6 +848,76 @@ export default function EquipamentosTab() {
                       </td>
                       <td className="px-3 py-2 font-mono text-[12px] text-slate-600 dark:text-slate-300">
                         {e.codigo_sap || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-[13px] text-slate-600 dark:text-slate-300">
+                        <span className="inline-flex items-center gap-1">
+                          {e.localizacao && (
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                          )}
+                          {e.localizacao || "—"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={e.cadastrado}
+                          onChange={(ev) => atualizarChecklist(e, "cadastrado", ev.target.checked)}
+                          disabled={salvandoCheck === e.id || !perms.editar}
+                          title={e.cadastrado ? "Desmarcar cadastrado" : "Marcar cadastrado"}
+                          className="h-4 w-4 accent-emerald-600 disabled:opacity-60"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={e.esta_bom}
+                          onChange={(ev) => atualizarChecklist(e, "esta_bom", ev.target.checked)}
+                          disabled={salvandoCheck === e.id || !perms.editar}
+                          title={e.esta_bom ? "Desmarcar 'está bom'" : "Marcar 'está bom'"}
+                          className="h-4 w-4 accent-blue-600 disabled:opacity-60"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        {perms.editar ? (
+                          <div className="flex items-center gap-1">
+                            <Link2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <select
+                              value={e.vinculo_id ?? ""}
+                              onChange={(ev) => atualizarVinculo(e, ev.target.value)}
+                              disabled={salvandoVinculo === e.id}
+                              title="Vincular a outro equipamento"
+                              className="min-h-7 max-w-[160px] rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[12px] text-slate-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                            >
+                              <option value="">—</option>
+                              {equipamentos
+                                .filter((x) => x.id !== e.id)
+                                .sort((a, b) => a.tag.localeCompare(b.tag))
+                                .map((x) => (
+                                  <option key={x.id} value={x.id}>
+                                    {x.tag}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-slate-500">
+                            {e.vinculo_id
+                              ? (equipamentos.find((x) => x.id === e.vinculo_id)?.tag ?? "—")
+                              : "—"}
+                          </span>
+                        )}
+                        {(() => {
+                          const vinculados = equipamentos.filter((x) => x.vinculo_id === e.id);
+                          if (vinculados.length === 0) return null;
+                          return (
+                            <div
+                              className="mt-1 max-w-[170px] truncate text-[10px] text-slate-400"
+                              title={`Vínculo de: ${vinculados.map((v) => v.tag).join(", ")}`}
+                            >
+                              ← {vinculados.map((v) => v.tag).join(", ")}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2">
                         <ObservacaoCell
@@ -833,12 +997,16 @@ export default function EquipamentosTab() {
               <span className={labelCls}>Tipo *</span>
               <select
                 value={form.tipo}
-                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                onChange={(e) => {
+                  const tipo = categorias.find((c) => c.nome === e.target.value);
+                  setForm({ ...form, tipo: e.target.value, categoria_id: tipo?.id ?? "" });
+                }}
                 className={inputCls}
               >
-                {TIPOS_EQUIPAMENTO.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {categorias.length === 0 && <option value="">Sem tipos cadastrados</option>}
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.nome}>
+                    {c.nome}
                   </option>
                 ))}
               </select>
@@ -853,19 +1021,13 @@ export default function EquipamentosTab() {
               />
             </label>
             <label className="block">
-              <span className={labelCls}>Categoria</span>
-              <select
-                value={form.categoria_id}
-                onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
+              <span className={labelCls}>Localização</span>
+              <input
+                value={form.localizacao}
+                onChange={(e) => setForm({ ...form, localizacao: e.target.value })}
+                placeholder="Aonde se encontra o equipamento"
                 className={inputCls}
-              >
-                <option value="">Sem categoria</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="block">
               <span className={labelCls}>Status</span>
@@ -909,15 +1071,35 @@ export default function EquipamentosTab() {
                 className={inputCls + " resize-none"}
               />
             </label>
-            <label className="flex items-center gap-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={form.critico}
-                onChange={(e) => setForm({ ...form, critico: e.target.checked })}
-                className="h-4 w-4 accent-amber-500"
-              />
-              Equipamento crítico
-            </label>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.critico}
+                  onChange={(e) => setForm({ ...form, critico: e.target.checked })}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Equipamento crítico
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.cadastrado}
+                  onChange={(e) => setForm({ ...form, cadastrado: e.target.checked })}
+                  className="h-4 w-4 accent-emerald-600"
+                />
+                Cadastrado?
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.esta_bom}
+                  onChange={(e) => setForm({ ...form, esta_bom: e.target.checked })}
+                  className="h-4 w-4 accent-blue-600"
+                />
+                Está bom?
+              </label>
+            </div>
           </div>
           <div className="mt-2 flex justify-end gap-2">
             <button onClick={() => setDialogNovo(false)} className={btnOutlineCls}>
@@ -955,12 +1137,16 @@ export default function EquipamentosTab() {
               <span className={labelCls}>Tipo *</span>
               <select
                 value={form.tipo}
-                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                onChange={(e) => {
+                  const tipo = categorias.find((c) => c.nome === e.target.value);
+                  setForm({ ...form, tipo: e.target.value, categoria_id: tipo?.id ?? "" });
+                }}
                 className={inputCls}
               >
-                {TIPOS_EQUIPAMENTO.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {categorias.length === 0 && <option value="">Sem tipos cadastrados</option>}
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.nome}>
+                    {c.nome}
                   </option>
                 ))}
               </select>
@@ -974,19 +1160,13 @@ export default function EquipamentosTab() {
               />
             </label>
             <label className="block">
-              <span className={labelCls}>Categoria</span>
-              <select
-                value={form.categoria_id}
-                onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
+              <span className={labelCls}>Localização</span>
+              <input
+                value={form.localizacao}
+                onChange={(e) => setForm({ ...form, localizacao: e.target.value })}
+                placeholder="Aonde se encontra o equipamento"
                 className={inputCls}
-              >
-                <option value="">Sem categoria</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="block">
               <span className={labelCls}>Status</span>
@@ -1027,15 +1207,35 @@ export default function EquipamentosTab() {
                 className={inputCls + " resize-none"}
               />
             </label>
-            <label className="flex items-center gap-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={form.critico}
-                onChange={(e) => setForm({ ...form, critico: e.target.checked })}
-                className="h-4 w-4 accent-amber-500"
-              />
-              Equipamento crítico
-            </label>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.critico}
+                  onChange={(e) => setForm({ ...form, critico: e.target.checked })}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Equipamento crítico
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.cadastrado}
+                  onChange={(e) => setForm({ ...form, cadastrado: e.target.checked })}
+                  className="h-4 w-4 accent-emerald-600"
+                />
+                Cadastrado?
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.esta_bom}
+                  onChange={(e) => setForm({ ...form, esta_bom: e.target.checked })}
+                  className="h-4 w-4 accent-blue-600"
+                />
+                Está bom?
+              </label>
+            </div>
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
             {perms.remover && dialogEditar && (
@@ -1229,74 +1429,103 @@ export default function EquipamentosTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Gerenciar Categorias */}
+      {/* Dialog Gerenciar Tipos */}
       <Dialog open={dialogCategorias} onOpenChange={setDialogCategorias}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0b3a73]">
-              <Settings className="mr-1 inline h-4 w-4" /> Gerenciar Categorias de Equipamento
+              <Settings className="mr-1 inline h-4 w-4" /> Gerenciar Tipos de Equipamento
             </DialogTitle>
           </DialogHeader>
           <div className="py-2">
-            <div className="mb-4 flex gap-2">
-              <input
-                value={novaCategoria}
-                onChange={(e) => setNovaCategoria(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
-                placeholder="Nome da nova categoria..."
-                className="min-h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-              />
-              <button
-                onClick={criarCategoria}
-                disabled={!novaCategoria.trim()}
-                className="rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
-              >
-                <Plus className="mr-1 inline h-4 w-4" /> Criar
-              </button>
+            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+              <p className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Novo tipo
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={novaCategoria}
+                  onChange={(e) => setNovaCategoria(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
+                  placeholder="Nome do novo tipo..."
+                  className="min-h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                />
+                <button
+                  onClick={criarCategoria}
+                  disabled={!novaCategoria.trim()}
+                  className="rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+                >
+                  <Plus className="mr-1 inline h-4 w-4" /> Criar
+                </button>
+              </div>
+              <div className="mt-2">
+                <PaletaCores selecionada={novaCategoriaCor} onSelecionar={setNovaCategoriaCor} />
+              </div>
             </div>
             <div className="max-h-80 space-y-2 overflow-auto">
               {categorias.length === 0 && (
-                <p className="py-4 text-center text-sm text-slate-400">
-                  Nenhuma categoria cadastrada.
-                </p>
+                <p className="py-4 text-center text-sm text-slate-400">Nenhum tipo cadastrado.</p>
               )}
               {categorias.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800"
                 >
                   {editCategoriaId === c.id ? (
-                    <input
-                      value={editCategoriaNome}
-                      onChange={(e) => setEditCategoriaNome(e.target.value)}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") renomearCategoria(c.id);
-                        if (e.key === "Escape") setEditCategoriaId(null);
-                      }}
-                      className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={editCategoriaNome}
+                          onChange={(e) => setEditCategoriaNome(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") renomearCategoria(c.id);
+                            if (e.key === "Escape") setEditCategoriaId(null);
+                          }}
+                          className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => renomearCategoria(c.id)}
+                          title="Salvar nome e cor"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <PaletaCores
+                        selecionada={editCategoriaCor}
+                        onSelecionar={setEditCategoriaCor}
+                      />
+                    </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditCategoriaId(c.id);
-                        setEditCategoriaNome(c.nome);
-                      }}
-                      title="Clique para renomear"
-                      className="flex-1 text-left text-sm font-semibold text-slate-700 hover:text-[#1f7ad6] dark:text-slate-200"
-                    >
-                      {c.nome}
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditCategoriaId(c.id);
+                          setEditCategoriaNome(c.nome);
+                          setEditCategoriaCor(c.cor ?? PALETA_CORES[0]);
+                        }}
+                        title="Clique para renomear ou mudar a cor"
+                        className="flex items-center gap-2 text-left text-sm font-semibold text-slate-700 hover:text-[#1f7ad6] dark:text-slate-200"
+                      >
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10 dark:border-white/20"
+                          style={{ backgroundColor: c.cor ?? PALETA_CORES[0] }}
+                        />
+                        {c.nome}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removerCategoria(c.id, c.nome)}
+                        title="Remover"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => removerCategoria(c.id, c.nome)}
-                    title="Remover"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
               ))}
             </div>

@@ -18,6 +18,7 @@ export interface EquipamentoCategoria {
   id: string;
   nome: string;
   ordem: number;
+  cor: string | null;
 }
 
 export interface Equipamento {
@@ -29,8 +30,12 @@ export interface Equipamento {
   categorias?: EquipamentoCategoria | null;
   origem: string | null;
   codigo_sap: string | null;
+  localizacao: string | null;
   observacao: string | null;
   critico: boolean;
+  cadastrado: boolean;
+  esta_bom: boolean;
+  vinculo_id: string | null;
   status: StatusEquipamento;
   foto_url: string | null;
   criado_por: string | null;
