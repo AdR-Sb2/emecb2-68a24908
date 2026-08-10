@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -34,8 +34,8 @@ import {
   StickyNote,
   Plus,
 } from "lucide-react";
-import logoHeader from "@/assets/logo-branca.png";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
+import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/backlog.json";
 import elevatoriasData from "@/data/elevatorias.json";
 import rawEquipeOverrides from "@/data/equipe-overrides.json";
@@ -578,6 +578,16 @@ function BacklogPage() {
     [data, now, equipeOverrides, responsabilidadeOverrides],
   );
 
+  // ---------- observações por O.S. ----------
+  const { user, profile } = useAuth();
+  const [obsPorOm, setObsPorOm] = useState<Record<string, BacklogObservacao[]>>({});
+  const [obsDialogOm, setObsDialogOm] = useState<string | null>(null);
+  const [novoObsTexto, setNovoObsTexto] = useState("");
+  const [obsEnviando, setObsEnviando] = useState(false);
+  const [obsUnica, setObsUnica] = useState<Record<string, string>>({});
+  const obsUnicaLoaded = useRef<Set<string>>(new Set());
+  const obsUnicaTimer = useRef<Record<string, { id: number; valor: string }>>({});
+
   // ---------- filtros ----------
   const [fPlantas, setFPlantas] = useState<string[]>([]);
   const [fResp, setFResp] = useState<string[]>(["Baixada 2"]);
@@ -613,6 +623,8 @@ function BacklogPage() {
     const q = fSearch.toLowerCase().trim();
     return rows.filter((e) => {
       if (q) {
+        const observacao = obsUnica[e.om] ?? "";
+        const comentarios = (obsPorOm[e.om] ?? []).map((o) => o.texto).join(" ");
         const haystack = [
           e.om,
           e.planta,
@@ -627,6 +639,8 @@ function BacklogPage() {
           e.r["DESCRIÇÃO EQUIPAMENTO"],
           e.r.Endereço,
           e.r.BAIRRO,
+          observacao,
+          comentarios,
         ]
           .filter(Boolean)
           .join(" ")
@@ -667,6 +681,8 @@ function BacklogPage() {
       onlyLate,
       onlyEmerg,
       fSlaBefore,
+      obsUnica,
+      obsPorOm,
     ],
   );
 
@@ -877,16 +893,6 @@ function BacklogPage() {
     }
   };
 
-  // ---------- observações por O.S. ----------
-  const { user, profile } = useAuth();
-  const [obsPorOm, setObsPorOm] = useState<Record<string, BacklogObservacao[]>>({});
-  const [obsDialogOm, setObsDialogOm] = useState<string | null>(null);
-  const [novoObsTexto, setNovoObsTexto] = useState("");
-  const [obsEnviando, setObsEnviando] = useState(false);
-  const [obsUnica, setObsUnica] = useState<Record<string, string>>({});
-  const obsUnicaLoaded = useRef<Set<string>>(new Set());
-  const obsUnicaTimer = useRef<Record<string, number>>({});
-
   useEffect(() => {
     let active = true;
     const faltantes = Array.from(new Set(sortedRows.map((e) => e.om).filter(Boolean))).filter(
@@ -929,17 +935,32 @@ function BacklogPage() {
 
   const atualizarObsUnica = (om: string, valor: string) => {
     setObsUnica((prev) => ({ ...prev, [om]: valor }));
-    if (obsUnicaTimer.current[om]) window.clearTimeout(obsUnicaTimer.current[om]);
-    obsUnicaTimer.current[om] = window.setTimeout(() => salvarObsUnica(om, valor), 700);
+    if (obsUnicaTimer.current[om]) window.clearTimeout(obsUnicaTimer.current[om].id);
+    obsUnicaTimer.current[om] = {
+      id: window.setTimeout(() => salvarObsUnica(om, valor), 700),
+      valor,
+    };
   };
 
   const flushObsUnica = (om: string) => {
-    if (obsUnicaTimer.current[om]) {
-      window.clearTimeout(obsUnicaTimer.current[om]);
+    const pendente = obsUnicaTimer.current[om];
+    if (pendente) {
+      window.clearTimeout(pendente.id);
+      salvarObsUnica(om, pendente.valor);
       delete obsUnicaTimer.current[om];
     }
-    salvarObsUnica(om, obsUnica[om] ?? "");
   };
+
+  useEffect(() => {
+    return () => {
+      const timers = obsUnicaTimer.current;
+      for (const om of Object.keys(timers)) {
+        window.clearTimeout(timers[om].id);
+        salvarObsUnica(om, timers[om].valor);
+      }
+      obsUnicaTimer.current = {};
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -2043,7 +2064,7 @@ function BacklogPage() {
             type="text"
             value={fSearch}
             onChange={(e) => setFSearch(e.target.value)}
-            placeholder="Buscar por O.S., planta, cidade, texto breve, responsabilidade, equipe…"
+            placeholder="Buscar por O.S., planta, cidade, texto breve, responsabilidade, equipe, observação…"
             className="w-full rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 py-3.5 pl-12 pr-10 text-[15px] shadow-sm placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none dark:text-white"
           />
           {fSearch && (
