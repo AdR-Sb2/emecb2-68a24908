@@ -185,12 +185,39 @@ export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosR
 
   const ordens = [...new Set(registros.map((r) => r.ordem).filter((o): o is string => Boolean(o)))];
   const existingOrdens = new Set<string>();
+  const dadosExistentes = new Map<
+    string,
+    {
+      elevatoria_id: number | null;
+      pdf_anexo_url: string | null;
+      anexado_por: string | null;
+      anexado_em: string | null;
+    }
+  >();
   for (let i = 0; i < ordens.length; i += CHUNK) {
     const { data } = await supabase
       .from("registros_atendimento")
-      .select("ordem")
+      .select("ordem, elevatoria_id, pdf_anexo_url, anexado_por, anexado_em")
       .in("ordem", ordens.slice(i, i + CHUNK));
-    for (const d of data ?? []) existingOrdens.add(String(d.ordem));
+    for (const d of data ?? []) {
+      existingOrdens.add(String(d.ordem));
+      dadosExistentes.set(String(d.ordem), {
+        elevatoria_id: (d.elevatoria_id as number | null) ?? null,
+        pdf_anexo_url: (d.pdf_anexo_url as string | null) ?? null,
+        anexado_por: (d.anexado_por as string | null) ?? null,
+        anexado_em: (d.anexado_em as string | null) ?? null,
+      });
+    }
+  }
+
+  for (const r of registros) {
+    if (!r.ordem) continue;
+    const ex = dadosExistentes.get(String(r.ordem));
+    if (!ex) continue;
+    r.elevatoria_id = ex.elevatoria_id;
+    r.pdf_anexo_url = ex.pdf_anexo_url;
+    r.anexado_por = ex.anexado_por;
+    r.anexado_em = ex.anexado_em;
   }
 
   const atualizados = registros.filter(

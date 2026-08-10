@@ -11,6 +11,7 @@ export type Profile = {
   criado_em: string | null;
   ultimo_acesso: string | null;
   cargo_nome?: string | null;
+  tamanho_pagina_atendimentos?: number | null;
 };
 
 type AuthContextType = {
