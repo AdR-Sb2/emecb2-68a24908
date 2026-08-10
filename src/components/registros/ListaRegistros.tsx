@@ -3,6 +3,8 @@ import {
   Building2,
   Calendar,
   Check,
+  ChevronLeft,
+  ChevronRight,
   ChevronsUpDown,
   ClipboardList,
   FileText,
@@ -69,43 +71,38 @@ const STATUS_ENCERRADO = ["Encerrada", "Encerrada Técnica"];
 
 const PLANTA_GUARDA_CHUVA = "PL-RJB-SDA1003";
 
+const LOTE_CARGA = 1000;
+
+const PADRAO_TAMANHO_PAGINA = 500;
+const OPCOES_TAMANHO_PAGINA = [200, 500, 1000] as const;
+
 type AtendQuery = {
   range(from: number, to: number): unknown;
+  not(column: string, operator: string, value: string): unknown;
+  is(column: string, value: null): unknown;
+  eq(column: string, value: string): unknown;
+  or(filters: string): unknown;
+  in(column: string, values: string[]): unknown;
+  order(column: string, options?: unknown): unknown;
 };
-
-const TAMANHO_PAGINA = 1000;
 
 const ATEND_COLUNAS =
   "id, elevatoria_id, planta, ordem, nota, texto_breve, texto_longo, tipo_ordem, natureza, prioridade, status_sistema, status_simplificado, data_entrada, data_modificacao, pdf_anexo_url, anexado_por, anexado_em, local_instalacao, criado_por";
 
-async function buscarAtendimentos(
+async function buscarLoteAtendimentos(
   query: AtendQuery,
-  total: number,
+  offset: number,
+  lote: number,
 ): Promise<RegistroAtendimento[] | null> {
-  const todos: RegistroAtendimento[] = [];
-  const paginas = Math.ceil(total / TAMANHO_PAGINA);
-  const indices = Array.from({ length: paginas }, (_, i) => i);
-  const CONCORRENCIA = 8;
-  let pos = 0;
-  while (pos < indices.length) {
-    const lote = indices.slice(pos, pos + CONCORRENCIA);
-    const resultados = await Promise.all(
-      lote.map((i) => query.range(i * TAMANHO_PAGINA, (i + 1) * TAMANHO_PAGINA - 1)),
-    );
-    for (const r of resultados) {
-      const { data, error } = (await r) as {
-        data: unknown[] | null;
-        error: { message: string } | null;
-      };
-      if (error) {
-        toast.error("Erro ao carregar atendimentos: " + error.message);
-        return null;
-      }
-      if (data) todos.push(...(data as RegistroAtendimento[]));
-    }
-    pos += CONCORRENCIA;
+  const { data, error } = (await query.range(offset, offset + lote - 1)) as {
+    data: RegistroAtendimento[] | null;
+    error: { message: string } | null;
+  };
+  if (error) {
+    toast.error("Erro ao carregar atendimentos: " + error.message);
+    return null;
   }
-  return todos;
+  return data ?? [];
 }
 
 type ElevatoriaOpt = {
@@ -224,7 +221,10 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("TODOS");
   const [filtroNatureza, setFiltroNatureza] = useState("TODAS");
-  const [limiteVisiveis, setLimiteVisiveis] = useState(100);
+  const [buscaDebounced, setBuscaDebounced] = useState("");
+  const [tamanhoPagina, setTamanhoPagina] = useState(PADRAO_TAMANHO_PAGINA);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalAtendimentos, setTotalAtendimentos] = useState<number | null>(null);
   const [anexando, setAnexando] = useState<number | null>(null);
   const [removendo, setRemovendo] = useState<number | null>(null);
   const [vinculando, setVinculando] = useState<number | null>(null);
@@ -232,6 +232,8 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [selecao, setSelecao] = useState<Record<number, number | null>>({});
   const importRef = useRef<HTMLInputElement>(null);
   const anexoRef = useRef<Record<number, HTMLInputElement | null>>({});
+  const atendReqId = useRef(0);
+  const atendimentosLenRef = useRef(0);
 
   const permissoes = useMemo<PermissoesRegistros>(
     () => permissoesProp ?? getPermissoesRegistros(profile?.cargo_nome),
@@ -287,9 +289,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
     };
   }, [podeVisualizar, elevatoriaId]);
 
-  const carregarAtendimentos = async () => {
-    if (!podeVisualizar || atendimentosCarregados || carregandoAtendimentos) return;
-    setCarregandoAtendimentos(true);
+  const montarQueryAtendimentos = () => {
     const elevNum =
       elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
 
@@ -311,26 +311,130 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       }
     }
 
+    if (conferirAtivo) {
+      query = query.is("elevatoria_id", null);
+      countQuery = countQuery.is("elevatoria_id", null);
+    }
+
+    if (filtroStatus !== "TODOS") {
+      query = query.eq("status_simplificado", filtroStatus);
+      countQuery = countQuery.eq("status_simplificado", filtroStatus);
+    }
+
+    if (filtroNatureza !== "TODAS") {
+      if (filtroNatureza === "outras") {
+        query = query.not("natureza", "in", `(${TIPOS_ORDEM.join(",")})`);
+        countQuery = countQuery.not("natureza", "in", `(${TIPOS_ORDEM.join(",")})`);
+      } else {
+        query = query.eq("natureza", filtroNatureza);
+        countQuery = countQuery.eq("natureza", filtroNatureza);
+      }
+    }
+
+    const termo = buscaDebounced
+      .trim()
+      .replace(/[%,()*"\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (termo) {
+      const buscaStr = `ordem.ilike.%${termo}%,texto_breve.ilike.%${termo}%,nota.ilike.%${termo}%,planta.ilike.%${termo}%,local_instalacao.ilike.%${termo}%`;
+      query = query.or(buscaStr);
+      countQuery = countQuery.or(buscaStr);
+    }
+
+    query = query.order("data_entrada", { ascending: false, nullsFirst: false });
+    return { query, countQuery };
+  };
+
+  const recarregarAtendimentos = async () => {
+    if (!podeVisualizar) return;
+    if (elevatoriaId == null && elevatorias.length === 0) return;
+    const reqId = ++atendReqId.current;
+    setCarregandoAtendimentos(true);
+    const { query, countQuery } = montarQueryAtendimentos();
+
     const { count, error: countError } = await countQuery;
+    if (reqId !== atendReqId.current) return;
     if (countError) {
       toast.error("Erro ao carregar atendimentos: " + countError.message);
       setAtendimentosCarregados(true);
       setCarregandoAtendimentos(false);
       return;
     }
-    const dados = await buscarAtendimentos(
-      query.order("data_entrada", { ascending: false, nullsFirst: false }),
-      count ?? 0,
-    );
-    if (dados) setAtendimentos(dados);
+
+    setTotalAtendimentos(count ?? 0);
+    const dados = await buscarLoteAtendimentos(query, 0, LOTE_CARGA);
+    if (reqId !== atendReqId.current) return;
+    if (dados) {
+      atendimentosLenRef.current = dados.length;
+      setAtendimentos(dados);
+      setPaginaAtual(1);
+    }
     setAtendimentosCarregados(true);
     setCarregandoAtendimentos(false);
   };
 
+  const carregarProximoLote = async () => {
+    if (carregandoAtendimentos) return;
+    if (atendimentosLenRef.current >= (totalAtendimentos ?? 0)) return;
+    const reqId = atendReqId.current;
+    setCarregandoAtendimentos(true);
+    const { query } = montarQueryAtendimentos();
+    const dados = await buscarLoteAtendimentos(query, atendimentosLenRef.current, LOTE_CARGA);
+    if (reqId !== atendReqId.current) return;
+    if (dados && dados.length) {
+      atendimentosLenRef.current += dados.length;
+      setAtendimentos((prev) => [...prev, ...dados]);
+    }
+    setCarregandoAtendimentos(false);
+  };
+
   useEffect(() => {
-    if (aba === "atendimentos") carregarAtendimentos();
+    if (aba !== "atendimentos") return;
+    recarregarAtendimentos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aba, atendimentosCarregados, carregandoAtendimentos]);
+  }, [aba, buscaDebounced, filtroStatus, filtroNatureza, conferirAtivo, elevatoriaId, elevatorias]);
+
+  useEffect(() => {
+    if (aba !== "atendimentos" || !atendimentosCarregados) return;
+    const fimDesejado = paginaAtual * tamanhoPagina;
+    if (
+      atendimentosLenRef.current < fimDesejado &&
+      atendimentosLenRef.current < (totalAtendimentos ?? 0)
+    ) {
+      carregarProximoLote();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    aba,
+    paginaAtual,
+    tamanhoPagina,
+    atendimentosCarregados,
+    atendimentos.length,
+    totalAtendimentos,
+  ]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaDebounced(busca), 400);
+    return () => clearTimeout(t);
+  }, [busca]);
+
+  useEffect(() => {
+    const v = profile?.tamanho_pagina_atendimentos;
+    if (v && v > 0) setTamanhoPagina(v);
+  }, [profile?.tamanho_pagina_atendimentos]);
+
+  const totalPaginas =
+    totalAtendimentos != null ? Math.max(1, Math.ceil(totalAtendimentos / tamanhoPagina)) : 1;
+
+  const atendimentosPagina = useMemo(() => {
+    const inicio = (paginaAtual - 1) * tamanhoPagina;
+    return atendimentos.slice(inicio, Math.min(paginaAtual * tamanhoPagina, atendimentos.length));
+  }, [atendimentos, paginaAtual, tamanhoPagina]);
+
+  const irParaPagina = (p: number) => {
+    setPaginaAtual(Math.min(Math.max(1, p), totalPaginas));
+  };
 
   const copiarOrdem = async (ordem: string) => {
     try {
@@ -341,45 +445,6 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       toast.error("Não foi possível copiar a ordem.");
     }
   };
-
-  const plantasCadastradas = useMemo(() => {
-    const s = new Set<string>();
-    for (const e of elevatorias) {
-      if (e.planta) s.add(e.planta.trim().toLowerCase());
-    }
-    return s;
-  }, [elevatorias]);
-
-  const atendimentosUniverso = useMemo(() => {
-    if (elevatoriaId != null) return atendimentos;
-    return atendimentos.filter((a) => {
-      if (!a.planta) return false;
-      const planta = a.planta.trim().toLowerCase();
-      return plantasCadastradas.has(planta) || planta === PLANTA_GUARDA_CHUVA.toLowerCase();
-    });
-  }, [atendimentos, elevatoriaId, plantasCadastradas]);
-
-  const atendimentosFiltrados = useMemo(() => {
-    const b = busca.trim().toLowerCase();
-    return atendimentosUniverso.filter((a) => {
-      if (conferirAtivo && a.elevatoria_id != null) return false;
-      if (filtroNatureza !== "TODAS" && (a.natureza ?? "outras") !== filtroNatureza) return false;
-      if (filtroStatus !== "TODOS" && a.status_simplificado !== filtroStatus) return false;
-      if (!b) return true;
-      return [a.ordem, a.texto_breve, a.nota, a.planta, a.local_instalacao]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(b));
-    });
-  }, [atendimentosUniverso, conferirAtivo, busca, filtroStatus, filtroNatureza]);
-
-  useEffect(() => {
-    setLimiteVisiveis(100);
-  }, [atendimentosFiltrados]);
-
-  const atendimentosVisiveis = useMemo(
-    () => atendimentosFiltrados.slice(0, limiteVisiveis),
-    [atendimentosFiltrados, limiteVisiveis],
-  );
 
   const adicionarInformacao = async () => {
     if (!podeCriar || !novoTexto.trim()) return;
@@ -409,35 +474,14 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       toast.success(
         `Importação concluída: ${resumo.importados} novos, ${resumo.atualizados} atualizados, ${resumo.semElevatoria} sem elevatória.`,
       );
-      const elevNum =
-        elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null;
-      let query = supabase.from("registros_atendimento").select(ATEND_COLUNAS);
-      let countQuery = supabase.from("registros_atendimento").select("*", {
-        count: "exact",
-        head: true,
-      });
-      if (elevNum != null) {
-        query = query.eq("elevatoria_id", elevNum);
-        countQuery = countQuery.eq("elevatoria_id", elevNum);
+      if (aba === "atendimentos") {
+        await recarregarAtendimentos();
       } else {
-        const plantas = elevatorias.map((e) => e.planta).filter((p): p is string => Boolean(p));
-        const lista = [...new Set([...plantas, PLANTA_GUARDA_CHUVA])];
-        if (lista.length) {
-          query = query.in("planta", lista);
-          countQuery = countQuery.in("planta", lista);
-        }
+        atendimentosLenRef.current = 0;
+        setAtendimentos([]);
+        setAtendimentosCarregados(false);
+        setTotalAtendimentos(null);
       }
-      const { count, error: countError } = await countQuery;
-      if (countError) {
-        toast.error("Erro ao carregar atendimentos: " + countError.message);
-        return;
-      }
-      const data = await buscarAtendimentos(
-        query.order("data_entrada", { ascending: false, nullsFirst: false }),
-        count ?? 0,
-      );
-      if (data) setAtendimentos(data);
-      setAtendimentosCarregados(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao importar a planilha.");
     } finally {
@@ -523,9 +567,15 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
         toast.error("Erro ao vincular: " + error.message);
         return;
       }
-      setAtendimentos((prev) =>
-        prev.map((a) => (a.id === atend.id ? { ...a, elevatoria_id: elevId } : a)),
-      );
+      if (conferirAtivo) {
+        setAtendimentos((prev) => prev.filter((a) => a.id !== atend.id));
+        atendimentosLenRef.current = Math.max(0, atendimentosLenRef.current - 1);
+        setTotalAtendimentos((cur) => (cur != null ? Math.max(0, cur - 1) : cur));
+      } else {
+        setAtendimentos((prev) =>
+          prev.map((a) => (a.id === atend.id ? { ...a, elevatoria_id: elevId } : a)),
+        );
+      }
       setSelecao((prev) => {
         const next = { ...prev };
         delete next[atend.id];
@@ -604,7 +654,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
           </TabsTrigger>
           <TabsTrigger value="atendimentos" className="gap-1.5">
             <ClipboardList className="h-4 w-4" /> Atendimentos
-            {atendimentosCarregados ? ` (${atendimentosUniverso.length})` : ""}
+            {atendimentosCarregados ? ` (${totalAtendimentos ?? atendimentos.length})` : ""}
           </TabsTrigger>
         </TabsList>
 
@@ -731,12 +781,35 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                 </option>
               ))}
             </select>
+            <select
+              value={tamanhoPagina}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setTamanhoPagina(v);
+                setPaginaAtual(1);
+                if (user) {
+                  supabase
+                    .from("profiles")
+                    .update({ tamanho_pagina_atendimentos: v })
+                    .eq("id", user.id)
+                    .then();
+                }
+              }}
+              title="O.S. por página"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+            >
+              {OPCOES_TAMANHO_PAGINA.map((n) => (
+                <option key={n} value={n}>
+                  Por página: {n}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {atendimentosCarregados && atendimentosFiltrados.length > 0 && (
+          {atendimentosCarregados && totalAtendimentos != null && totalAtendimentos > 0 && (
             <p className="text-xs text-muted-foreground">
-              Mostrando {atendimentosVisiveis.length} de {atendimentosFiltrados.length}{" "}
-              {atendimentosFiltrados.length === 1 ? "atendimento" : "atendimentos"}
+              Página {paginaAtual} de {totalPaginas} · {totalAtendimentos}{" "}
+              {totalAtendimentos === 1 ? "atendimento" : "atendimentos"}
               {busca.trim() ? " (filtrados)" : ""}
             </p>
           )}
@@ -745,7 +818,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-8 text-sm text-slate-400 dark:border-slate-600">
               <Loader2 className="h-4 w-4 animate-spin" /> Carregando atendimentos...
             </div>
-          ) : atendimentosFiltrados.length === 0 ? (
+          ) : atendimentos.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-400 dark:border-slate-600">
               {conferirAtivo
                 ? "Nenhuma O.S. pendente de conferência."
@@ -761,7 +834,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             </div>
           ) : (
             <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
-              {atendimentosVisiveis.map((a) => {
+              {atendimentosPagina.map((a) => {
                 const natureza = a.natureza ?? "outras";
                 const encerrado = STATUS_ENCERRADO.includes(a.status_simplificado ?? "");
                 const semVinculo = a.elevatoria_id == null;
@@ -966,15 +1039,27 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
               })}
             </div>
           )}
-          {atendimentosCarregados && atendimentosVisiveis.length < atendimentosFiltrados.length && (
-            <div className="flex justify-center pt-1">
+          {atendimentosCarregados && totalPaginas > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setLimiteVisiveis((cur) => cur + 200)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                disabled={paginaAtual <= 1 || carregandoAtendimentos}
+                onClick={() => irParaPagina(paginaAtual - 1)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
-                Carregar mais ({atendimentosFiltrados.length - atendimentosVisiveis.length}{" "}
-                restantes)
+                <ChevronLeft className="h-4 w-4" /> Voltar
+              </button>
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                Página {paginaAtual} de {totalPaginas}
+                {carregandoAtendimentos && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              </span>
+              <button
+                type="button"
+                disabled={paginaAtual >= totalPaginas || carregandoAtendimentos}
+                onClick={() => irParaPagina(paginaAtual + 1)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Próximo <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           )}
