@@ -186,6 +186,15 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 - UI do card de atendimento (apresentacao apenas): numero da OS em botao com copiar-ao-clicar (check verde temporario, `ordemCopiada`); badge de natureza e a unica solida/semantica; badge de prioridade so aparece se nao duplicar a natureza (mesmo texto ignorado); status sempre slate outline; linha de metadados com icones (Calendar data, Hash nota/PL, Building2 base, MapPin LI, User criado por) em `text-xs text-muted-foreground`; descricao com `line-clamp-2`; padding do card `px-3 py-2.5`.
 - Import (`registros-import.ts`): `upsert` com `onConflict: "ordem"` sobrescrevia `elevatoria_id`/`pdf_anexo_url`/`anexado_*` no re-import, apagando vinculos manuais. Agora seleciona `ordem, elevatoria_id, pdf_anexo_url, anexado_por, anexado_em` dos existentes e preserva esses campos no payload do upsert.
 
+## Modulo Equipamentos (src/components/estoque/equipamentos-tab.tsx)
+
+- Aba "Equipamentos" dentro de `/estoque` (estado `aba` inclui `"equipamentos"`), lazy-loaded via `lazy(() => import("@/components/estoque/equipamentos-tab"))` — o componente usa DEFAULT export (padrao do `backlog-map`). Auto-contido: carrega proprios dados e permissoes.
+- Tabelas: `equipamentos` (tag, descricao, tipo, categoria_id, origem, codigo_sap, observacao, critico, status, foto_url, criado_por), `equipamento_categorias` (Motor/Bomba/Inversor/Softstarter), `equipamento_fotos` (galeria/historico visual), `equipamento_registros` (Manutencao/Troca/Inspecao/Observacao). RLS desabilitado. Migration `00059`.
+- Permissoes novas com `panel_key = 'estoque'`: `estoque.equipamentos_ver`, `estoque.equipamentos_criar`, `estoque.equipamentos_editar`, `estoque.equipamentos_remover`, `estoque.equipamentos_categorias`. Migracao concede ver+criar a quem tem o painel estoque, e editar/remover/categorias a quem ja tem `estoque.gerenciar_categorias`; Admin recebe todas.
+- Fotos: bucket `equipamentos` (publico, jpeg/png/webp, 10MB). Capa na linha da tabela = `foto_url`; upload atualiza `foto_url` para a foto mais recente; remocao faz parse do storage path via "/object/public/equipamentos/" para apagar o objeto.
+- Estrela critico faz update otimista; observacao edita inline com autosave debounce de 500ms (`ObservacaoCell`, flush no blur); status editavel inline via select colorido.
+- Tipos em `src/lib/estoque-equipamentos-types.ts`; `form.tipo` no componente e `string` (setForm inicial com `TIPOS_EQUIPAMENTO[0] as string`) para aceitar valor de <select>.
+
 ## Modulo Backlog (src/routes/backlog.tsx) - observacoes
 
 - Tabelas de observacao (`backlog_obs_unica` e `backlog_observacoes`, migrations 00055/00056) foram criadas SEM `DISABLE ROW LEVEL SECURITY`, diferente de `equipe_overrides` (00003) e `responsabilidade_overrides` (00030). Resultado: o client com publishable key nao consegue ler/gravar (erro 401 "new row violates row-level security policy") — as observacoes nao persistem e somem ao recarregar. A migration 00057 desabilita RLS nas duas tabelas (aplicar no SQL editor do Lovable).
