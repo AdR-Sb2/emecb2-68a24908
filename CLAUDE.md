@@ -183,6 +183,12 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 - Velocidade da aba Atendimentos: `buscarAtendimentos(query, total)` recebe o total exato (via `supabase.from(...).select("*", { count: "exact", head: true })` com os mesmos filtros de planta/elevatoria — o metodo `.count()` nao existe nessa versao do supabase-js) e busca as paginas em lotes paralelos de `CONCORRENCIA = 8` via `Promise.all`, em vez de ~33 requests sequenciais.
 - UI do card de atendimento (apresentacao apenas): numero da OS em botao com copiar-ao-clicar (check verde temporario, `ordemCopiada`); badge de natureza e a unica solida/semantica; badge de prioridade so aparece se nao duplicar a natureza (mesmo texto ignorado); status sempre slate outline; linha de metadados com icones (Calendar data, Hash nota/PL, Building2 base, MapPin LI, User criado por) em `text-xs text-muted-foreground`; descricao com `line-clamp-2`; padding do card `px-3 py-2.5`.
 
+## Modulo Backlog (src/routes/backlog.tsx) - observacoes
+
+- Tabelas de observacao (`backlog_obs_unica` e `backlog_observacoes`, migrations 00055/00056) foram criadas SEM `DISABLE ROW LEVEL SECURITY`, diferente de `equipe_overrides` (00003) e `responsabilidade_overrides` (00030). Resultado: o client com publishable key nao consegue ler/gravar (erro 401 "new row violates row-level security policy") — as observacoes nao persistem e somem ao recarregar. A migration 00057 desabilita RLS nas duas tabelas (aplicar no SQL editor do Lovable).
+- A busca do backlog procura tambem na observacao editavel (`obsUnica[om]`) e nos comentarios (`obsPorOm[om]`).
+- Observacao editavel salva com debounce de 700ms; em blur (`flushObsUnica`) e no unmount do componente as mudancas pendentes sao gravadas (`obsUnicaTimer` guarda `{ id, valor }`).
+
 ## Validacao (antes de commitar)
 
 - `npx tsc --noEmit` — erros PRE-EXISTENTES esperados (nao corrigir fora de escopo): `src/routes/elevatorias.tsx` linhas ~963 e ~1090 (tipo de Link de rota).
