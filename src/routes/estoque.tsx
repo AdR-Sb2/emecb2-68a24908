@@ -30,9 +30,11 @@ import {
   ArrowUp,
   ArrowDown,
   Tag,
+  Wrench,
 } from "lucide-react";
 import logoHeader from "@/assets/logo-branca.png";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
+const LazyEquipamentosTab = lazy(() => import("@/components/estoque/equipamentos-tab"));
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -274,7 +276,7 @@ const ALIASES_IMPORT_COMPRAS: Record<string, string> = {
 function EstoquePage() {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
-  const [aba, setAba] = useState<"estoque" | "compras" | "registros">("estoque");
+  const [aba, setAba] = useState<"estoque" | "compras" | "registros" | "equipamentos">("estoque");
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
@@ -3334,6 +3336,16 @@ function EstoquePage() {
           >
             <List className="h-4 w-4" /> Registros
           </button>
+          <button
+            onClick={() => setAba("equipamentos")}
+            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+              aba === "equipamentos"
+                ? "bg-[#0b3a73] text-white shadow"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+            }`}
+          >
+            <Wrench className="h-4 w-4" /> Equipamentos
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {aba === "estoque" && (
@@ -3971,6 +3983,10 @@ function EstoquePage() {
             </div>
           </div>
         </>
+      ) : aba === "equipamentos" ? (
+        <Suspense fallback={null}>
+          <LazyEquipamentosTab />
+        </Suspense>
       ) : aba === "compras" ? (
         /* ---------- ABA COMPRAS ---------- */
         <>
