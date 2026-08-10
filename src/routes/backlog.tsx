@@ -35,6 +35,7 @@ import {
   Plus,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
+import { OsInfoIcon } from "@/components/os-info-icon";
 import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/backlog.json";
 import elevatoriasData from "@/data/elevatorias.json";
@@ -3195,23 +3196,30 @@ function BacklogPage() {
                   className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
                   <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(e.om);
-                        setCopiedOm(e.om);
-                        setTimeout(() => setCopiedOm(null), 1500);
-                      }}
-                      className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
-                      title="Clique para copiar a O.S."
-                    >
-                      {e.om}
-                      {copiedOm === e.om && (
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
-                          Copiado!
-                        </span>
-                      )}
-                    </button>
+                    <span className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(e.om);
+                          setCopiedOm(e.om);
+                          setTimeout(() => setCopiedOm(null), 1500);
+                        }}
+                        className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
+                        title="Clique para copiar a O.S."
+                      >
+                        {e.om}
+                        {copiedOm === e.om && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
+                            Copiado!
+                          </span>
+                        )}
+                      </button>
+                      <OsInfoIcon
+                        textoLongo={e.r["TEXTO LONGO"]}
+                        numeroOs={e.om}
+                        textoBreve={e.r["TEXTO BREVE"] ?? undefined}
+                      />
+                    </span>
                   </td>
                   <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
                   <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
@@ -3422,23 +3430,30 @@ function BacklogPage() {
                     className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
                   >
                     <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(e.om);
-                          setCopiedOm(e.om);
-                          setTimeout(() => setCopiedOm(null), 1500);
-                        }}
-                        className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
-                        title="Clique para copiar a O.S."
-                      >
-                        {e.om}
-                        {copiedOm === e.om && (
-                          <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
-                            Copiado!
-                          </span>
-                        )}
-                      </button>
+                      <span className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(e.om);
+                            setCopiedOm(e.om);
+                            setTimeout(() => setCopiedOm(null), 1500);
+                          }}
+                          className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
+                          title="Clique para copiar a O.S."
+                        >
+                          {e.om}
+                          {copiedOm === e.om && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
+                              Copiado!
+                            </span>
+                          )}
+                        </button>
+                        <OsInfoIcon
+                          textoLongo={e.r["TEXTO LONGO"]}
+                          numeroOs={e.om}
+                          textoBreve={e.r["TEXTO BREVE"] ?? undefined}
+                        />
+                      </span>
                     </td>
                     <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
                     <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
