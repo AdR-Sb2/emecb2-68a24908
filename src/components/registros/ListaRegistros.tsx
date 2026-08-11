@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
   Calendar,
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -10,6 +11,7 @@ import {
   FileText,
   Hash,
   History,
+  ImagePlus,
   Info,
   Link2,
   Loader2,
@@ -20,6 +22,7 @@ import {
   Trash2,
   Upload,
   User,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -39,7 +42,11 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { getPermissoesRegistros, type PermissoesRegistros } from "@/lib/registros-permissoes";
-import type { RegistroAtendimento, RegistroInformacao } from "@/lib/registros-types";
+import type {
+  RegistroAtendimento,
+  RegistroInformacao,
+  RegistroInformacaoFoto,
+} from "@/lib/registros-types";
 import { TIPOS_ORDEM } from "@/lib/registros-types";
 import { importarRegistrosSAP } from "@/lib/registros-import";
 
@@ -47,6 +54,33 @@ type Props = {
   elevatoriaId?: string | number;
   permissoes?: PermissoesRegistros;
 };
+
+const BUCKET_FOTOS = "registros";
+
+function storagePathFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const marker = "/object/public/registros/";
+    const idx = u.pathname.indexOf(marker);
+    if (idx >= 0) return u.pathname.slice(idx + marker.length);
+  } catch {
+    /* url inválida */
+  }
+  return "";
+}
+
+function fotoStoragePath(registroId: number, arquivo: File): string {
+  const nome = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `informacoes/${registroId}/${Date.now()}-${nome}`;
+}
+
+function formatDataHora(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("pt-BR");
+  } catch {
+    return iso;
+  }
+}
 
 const NATUREZA_CORES: Record<string, string> = {
   EMERGENCIAL:
@@ -213,6 +247,10 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [carregandoAtendimentos, setCarregandoAtendimentos] = useState(false);
   const [elevatorias, setElevatorias] = useState<ElevatoriaOpt[]>([]);
   const [novoTexto, setNovoTexto] = useState("");
+  const [novasFotos, setNovasFotos] = useState<{ file: File; preview: string }[]>([]);
+  const [salvandoInformacao, setSalvandoInformacao] = useState(false);
+  const [removendoFoto, setRemovendoFoto] = useState<number | null>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
   const [elevatoriaSelecionada, setElevatoriaSelecionada] = useState<number | null>(
     elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null,
   );
@@ -274,12 +312,36 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       else if (elevRes.data) setElevatorias(elevRes.data as ElevatoriaOpt[]);
       if (infoRes.error) toast.error("Erro ao carregar informações: " + infoRes.error.message);
       else {
-        setInformacoes(
-          (infoRes.data ?? []).map((r) => ({
-            ...r,
-            autor_nome: (r.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
-          })) as RegistroInformacao[],
-        );
+        const lista = (
+          (infoRes.data ?? []) as (RegistroInformacao & {
+            profiles?: { nome_completo?: string } | null;
+          })[]
+        ).map((r) => ({
+          ...r,
+          autor_nome: r.profiles?.nome_completo ?? null,
+          fotos: [] as RegistroInformacaoFoto[],
+        })) as RegistroInformacao[];
+
+        if (lista.length > 0) {
+          const ids = lista.map((r) => r.id);
+          const { data: fotos, error: fotosErr } = await supabase
+            .from("registros_informacao_fotos")
+            .select("*")
+            .in("registro_id", ids)
+            .order("criado_em", { ascending: false });
+          if (fotosErr) {
+            console.warn("Falha ao carregar fotos: " + fotosErr.message);
+          } else if (fotos) {
+            const porRegistro = new Map<number, RegistroInformacaoFoto[]>();
+            for (const f of fotos as RegistroInformacaoFoto[]) {
+              const arr = porRegistro.get(f.registro_id);
+              if (arr) arr.push(f);
+              else porRegistro.set(f.registro_id, [f]);
+            }
+            for (const r of lista) r.fotos = porRegistro.get(r.id) ?? [];
+          }
+        }
+        setInformacoes(lista);
       }
       setLoading(false);
     };
@@ -452,19 +514,110 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       toast.error("Selecione a elevatória antes de adicionar uma informação.");
       return;
     }
-    const { data, error } = await supabase.rpc("adicionar_registro_informacao", {
-      p_elevatoria_id: elevatoriaSelecionada,
-      p_texto: novoTexto.trim(),
-      p_autor_id: user?.id ?? null,
-    });
-    if (error) {
-      toast.error("Erro ao adicionar informação: " + error.message);
-      return;
+    if (salvandoInformacao) return;
+    setSalvandoInformacao(true);
+    try {
+      const { data, error } = await supabase.rpc("adicionar_registro_informacao", {
+        p_elevatoria_id: elevatoriaSelecionada,
+        p_texto: novoTexto.trim(),
+        p_autor_id: user?.id ?? null,
+      });
+      if (error) {
+        toast.error("Erro ao adicionar informação: " + error.message);
+        return;
+      }
+      const reg = data as RegistroInformacao | null;
+      if (!reg) return;
+
+      const fotosCriadas: RegistroInformacaoFoto[] = [];
+      if (novasFotos.length > 0) {
+        const urls: string[] = [];
+        for (const f of novasFotos) {
+          const path = fotoStoragePath(reg.id, f.file);
+          const { error: upErr } = await supabase.storage
+            .from(BUCKET_FOTOS)
+            .upload(path, f.file, { upsert: false, contentType: f.file.type });
+          if (upErr) {
+            toast.error("Erro no upload da foto: " + upErr.message);
+            continue;
+          }
+          const { data: pub } = supabase.storage.from(BUCKET_FOTOS).getPublicUrl(path);
+          urls.push(pub?.publicUrl ?? path);
+        }
+        if (urls.length > 0) {
+          const { data: rows, error: insErr } = await supabase
+            .from("registros_informacao_fotos")
+            .insert(urls.map((url) => ({ registro_id: reg.id, url, autor_id: user?.id ?? null })))
+            .select();
+          if (insErr) {
+            toast.error("Erro ao salvar fotos: " + insErr.message);
+          } else {
+            fotosCriadas.push(...((rows as RegistroInformacaoFoto[]) ?? []));
+          }
+        }
+      }
+
+      setInformacoes((prev) => [
+        {
+          ...reg,
+          autor_nome: profile?.nome_completo ?? null,
+          fotos: fotosCriadas,
+        },
+        ...prev,
+      ]);
+      setNovoTexto("");
+      setNovasFotos([]);
+      if (fotoInputRef.current) fotoInputRef.current.value = "";
+    } finally {
+      setSalvandoInformacao(false);
     }
-    const reg = data as RegistroInformacao | null;
-    if (reg)
-      setInformacoes((prev) => [{ ...reg, autor_nome: profile?.nome_completo ?? null }, ...prev]);
-    setNovoTexto("");
+  };
+
+  const adicionarFotosAoNovo = (files: FileList | null) => {
+    if (!files) return;
+    const aceitos: { file: File; preview: string }[] = [];
+    for (const file of Array.from(files)) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+        toast.error(`"${file.name}" não é uma imagem JPG, PNG ou WEBP.`);
+        continue;
+      }
+      aceitos.push({ file, preview: URL.createObjectURL(file) });
+    }
+    if (aceitos.length) {
+      setNovasFotos((prev) => [...prev, ...aceitos]);
+    }
+  };
+
+  const removerFotoNovo = (idx: number) => {
+    setNovasFotos((prev) => {
+      const alvo = prev[idx];
+      if (alvo) URL.revokeObjectURL(alvo.preview);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const removerFoto = async (f: RegistroInformacaoFoto) => {
+    if (!podeCriar || removendoFoto != null) return;
+    setRemovendoFoto(f.id);
+    try {
+      const { error } = await supabase.from("registros_informacao_fotos").delete().eq("id", f.id);
+      if (error) {
+        toast.error("Erro ao remover foto: " + error.message);
+        return;
+      }
+      const path = storagePathFromUrl(f.url);
+      if (path) await supabase.storage.from(BUCKET_FOTOS).remove([path]);
+      setInformacoes((prev) =>
+        prev.map((i) =>
+          i.id === f.registro_id
+            ? { ...i, fotos: (i.fotos ?? []).filter((x) => x.id !== f.id) }
+            : i,
+        ),
+      );
+      toast.success("Foto removida.");
+    } finally {
+      setRemovendoFoto(null);
+    }
   };
 
   const importar = async (file: File) => {
@@ -683,27 +836,88 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
           )}
 
           {podeCriar && (
-            <div className="flex gap-2">
-              <textarea
-                value={novoTexto}
-                onChange={(e) => setNovoTexto(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    adicionarInformacao();
+            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-700/40">
+              <div className="flex gap-2">
+                <textarea
+                  value={novoTexto}
+                  onChange={(e) => setNovoTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      adicionarInformacao();
+                    }
+                  }}
+                  rows={2}
+                  placeholder="Digite uma informação sobre a elevatória..."
+                  className="flex-1 resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                />
+                <button
+                  onClick={adicionarInformacao}
+                  disabled={
+                    !novoTexto.trim() || elevatoriaSelecionada == null || salvandoInformacao
                   }
-                }}
-                rows={2}
-                placeholder="Digite uma informação sobre a elevatória..."
-                className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-              />
-              <button
-                onClick={adicionarInformacao}
-                disabled={!novoTexto.trim() || elevatoriaSelecionada == null}
-                className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" /> Adicionar
-              </button>
+                  className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
+                >
+                  {salvandoInformacao ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Adicionar
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fotoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    adicionarFotosAoNovo(e.target.files);
+                    if (fotoInputRef.current) fotoInputRef.current.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fotoInputRef.current?.click()}
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Adicionar fotos
+                  {novasFotos.length > 0 && (
+                    <span className="rounded-full bg-[#1f7ad6] px-1.5 text-[10px] font-bold text-white">
+                      {novasFotos.length}
+                    </span>
+                  )}
+                </button>
+                {novasFotos.length > 0 && (
+                  <span className="text-[11px] text-slate-400">
+                    As fotos serão enviadas junto com a informação.
+                  </span>
+                )}
+              </div>
+              {novasFotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {novasFotos.map((f, idx) => (
+                    <div key={idx} className="group relative">
+                      <img
+                        src={f.preview}
+                        alt=""
+                        className="h-16 w-16 rounded-lg border border-slate-200 object-cover dark:border-slate-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removerFotoNovo(idx)}
+                        title="Remover foto"
+                        className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -722,7 +936,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                     {i.texto}
                   </p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
-                    <span>{i.criado_em ? new Date(i.criado_em).toLocaleString("pt-BR") : ""}</span>
+                    <span>{i.criado_em ? formatDataHora(i.criado_em) : ""}</span>
                     {i.autor_nome && <span>· {i.autor_nome}</span>}
                     {nomeElevatoria(i.elevatoria_id) && (
                       <>
@@ -733,6 +947,40 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                       </>
                     )}
                   </p>
+                  {(i.fotos ?? []).length > 0 && (
+                    <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {(i.fotos ?? []).map((f) => (
+                        <div key={f.id} className="group relative">
+                          <a href={f.url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={f.url}
+                              alt=""
+                              loading="lazy"
+                              className="h-20 w-full rounded-md border border-slate-200 object-cover dark:border-slate-600"
+                            />
+                          </a>
+                          {podeCriar && (
+                            <button
+                              type="button"
+                              onClick={() => removerFoto(f)}
+                              disabled={removendoFoto === f.id}
+                              title="Remover foto"
+                              className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition hover:bg-red-600 disabled:opacity-50 group-hover:opacity-100"
+                            >
+                              {removendoFoto === f.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <X className="h-3 w-3" />
+                              )}
+                            </button>
+                          )}
+                          <span className="mt-0.5 block truncate text-center text-[9px] text-slate-400">
+                            {formatDataHora(f.criado_em)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

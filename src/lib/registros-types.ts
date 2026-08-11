@@ -1,3 +1,11 @@
+export type RegistroInformacaoFoto = {
+  id: number;
+  registro_id: number;
+  url: string;
+  autor_id: string | null;
+  criado_em: string;
+};
+
 export type RegistroInformacao = {
   id: number;
   elevatoria_id: number | null;
@@ -5,6 +13,7 @@ export type RegistroInformacao = {
   autor_id: string | null;
   autor_nome: string | null;
   criado_em: string;
+  fotos?: RegistroInformacaoFoto[];
 };
 
 export type RegistroAtendimento = {
