@@ -1901,14 +1901,14 @@ function BacklogPage() {
     }
   };
 
-  const mapCard = (heightPx: number, showToolbar = true) => (
+  const mapCard = (heightPx: number | "responsive", showToolbar = true) => (
     <>
       {showToolbar && (
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="text-sm font-semibold text-[#0b3a73] dark:text-white">
             <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {fPlantas.length > 0 && (
               <button
                 onClick={() => setFPlantas([])}
@@ -1935,8 +1935,12 @@ function BacklogPage() {
         </div>
       )}
       <div
-        style={{ height: heightPx, width: "100%" }}
-        className="overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
+        style={heightPx === "responsive" ? undefined : { height: heightPx, width: "100%" }}
+        className={
+          heightPx === "responsive"
+            ? "h-[300px] w-full overflow-hidden rounded-md bg-slate-100 sm:h-[400px] lg:h-[500px] dark:bg-slate-800"
+            : "overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
+        }
       >
         {mounted ? (
           <Suspense
@@ -2474,7 +2478,7 @@ function BacklogPage() {
       {/* Mapa + Programar */}
       <div className="mb-4 grid gap-3 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          {mapCard(mapWidgetHeight)}
+          {mapCard("responsive")}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
