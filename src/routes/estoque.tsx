@@ -3775,8 +3775,110 @@ function EstoquePage() {
             </div>
           </div>
 
+          {/* Cards mobile */}
+          <div className="mb-3 space-y-2 md:hidden">
+            {materiaisFiltrados.map((m) => (
+              <div
+                key={m.cod_sap}
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <button
+                    onClick={() => {
+                      setMaterialSelecionado(m);
+                      setDialogHistorico(true);
+                    }}
+                    className="min-w-0 text-left"
+                  >
+                    <div className="font-mono text-[12px] font-bold text-[#1f7ad6] dark:text-blue-400">
+                      {m.cod_sap}
+                    </div>
+                    <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {m.descricao}
+                    </div>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Semaforo saldo={m.saldo_atual} minimo={m.estoque_minimo} />
+                    {permissoes.editarConfigMaterial ? (
+                      <button onClick={() => toggleCritico(m)} className="cursor-pointer">
+                        {m.material_critico ? (
+                          <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        ) : (
+                          <Star className="h-4 w-4 text-slate-300" />
+                        )}
+                      </button>
+                    ) : m.material_critico ? (
+                      <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                    ) : null}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[13px] text-slate-600 dark:text-slate-300">
+                  <div>
+                    <span className="text-slate-400">Saldo: </span>
+                    <span
+                      className={`font-bold ${m.saldo_atual === 0 ? "text-red-700" : m.saldo_atual <= m.estoque_minimo ? "text-orange-600" : "text-emerald-600"}`}
+                    >
+                      {m.saldo_atual} {m.unidade_medida}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Mínimo: </span>
+                    {m.estoque_minimo}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-slate-400">Categoria: </span>
+                    {getCategoriaNome(m)}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-slate-400">Local: </span>
+                    {m.local_armazenagem || "—"}
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {permissoes.registrarEntrada && (
+                    <button
+                      onClick={() => {
+                        setMaterialSelecionado(m);
+                        setDialogMov("entrada");
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1 rounded bg-emerald-100 px-2.5 py-1.5 text-[12px] font-bold text-emerald-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Entrada
+                    </button>
+                  )}
+                  {permissoes.registrarSaida && (
+                    <button
+                      onClick={() => {
+                        setMaterialSelecionado(m);
+                        setDialogMov("saida");
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1 rounded bg-red-100 px-2.5 py-1.5 text-[12px] font-bold text-red-700"
+                    >
+                      <Minus className="h-3.5 w-3.5" /> Saída
+                    </button>
+                  )}
+                  {permissoes.solicitarCompra && (
+                    <button
+                      onClick={() => {
+                        setSolicitarRcMaterial(m);
+                        setSolicitarRcQtd(1);
+                        setDialogSolicitarRc(true);
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1 rounded bg-orange-100 px-2.5 py-1.5 text-[12px] font-bold text-orange-700"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" /> RC
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {materiaisFiltrados.length === 0 && (
+              <div className="py-8 text-center text-slate-400">Nenhum material encontrado.</div>
+            )}
+          </div>
+
           {/* Tabela */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <div className="hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-700 dark:bg-slate-800">
             <div className="max-h-[600px] overflow-auto">
               <table className="min-w-[900px] w-full text-left text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-800 dark:text-slate-200">

@@ -699,7 +699,7 @@ function ManuaisPage() {
       </div>
 
       {/* Abas */}
-      <div className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700">
+      <div className="mb-6 flex gap-1 overflow-x-auto whitespace-nowrap border-b border-slate-200 pb-px dark:border-slate-700 sm:flex-wrap sm:whitespace-normal">
         {abas.map((aba) => {
           const isRealCategory = aba.chave !== "__em_breve";
           const cat = categorias.find((c) => c.chave === aba.chave);
@@ -707,7 +707,7 @@ function ManuaisPage() {
             <div key={aba.chave} className="relative flex items-center">
               <button
                 onClick={() => setAbaAtiva(aba.chave)}
-                className={`px-4 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer border-b-2 ${
+                className={`shrink-0 px-3 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer border-b-2 sm:px-4 ${
                   abaAtiva === aba.chave
                     ? "border-[#1f7ad6] text-[#1f7ad6]"
                     : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
