@@ -304,7 +304,9 @@ function Index() {
               <CardLink to="/elevatorias" chave="ficha_elevatoria" delay={9}>
                 <CardIcon chave="ficha_elevatoria" icon={Building2} />
                 <CardTitle>Ficha da Elevatória</CardTitle>
-                <CardDesc>Ficha técnica completa de elevatórias, equipamentos, elétrica e hidráulica.</CardDesc>
+                <CardDesc>
+                  Ficha técnica completa de elevatórias, equipamentos, elétrica e hidráulica.
+                </CardDesc>
                 <CardCta>Abrir fichas</CardCta>
               </CardLink>
             )}

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   Package,
@@ -4856,8 +4856,7 @@ function EstoquePage() {
                       : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
                   }`}
                 >
-                  {opt.label}{" "}
-                  {filaSortKey === opt.key && (filaSortDir === "asc" ? "↑" : "↓")}
+                  {opt.label} {filaSortKey === opt.key && (filaSortDir === "asc" ? "↑" : "↓")}
                 </button>
               ))}
             </div>
@@ -4882,7 +4881,10 @@ function EstoquePage() {
                     const bv = b.status_fila || "Pendente";
                     return av.localeCompare(bv) * dir;
                   }
-                  return ((b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1) * (dir === 1 ? 1 : -1);
+                  return (
+                    ((b.dt_criacao_rc || "") > (a.dt_criacao_rc || "") ? 1 : -1) *
+                    (dir === 1 ? 1 : -1)
+                  );
                 })
                 .map((c) => {
                   const STATUS_FILA_STAGES = ["Pendente", "Em Andamento", "RC Criada"] as const;
@@ -4929,7 +4931,10 @@ function EstoquePage() {
                               className="w-20 rounded-md border border-blue-300 px-2 py-1 text-[13px] shadow-sm dark:border-blue-600 dark:bg-slate-700 dark:text-slate-200"
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  handleAlterarQtdeFila(c.id, Number((e.target as HTMLInputElement).value));
+                                  handleAlterarQtdeFila(
+                                    c.id,
+                                    Number((e.target as HTMLInputElement).value),
+                                  );
                                 }
                                 if (e.key === "Escape") setFilaEditQtd(null);
                               }}

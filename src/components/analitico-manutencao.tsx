@@ -402,82 +402,6 @@ function compararLinhas(
   return direcao === "asc" ? cmp : -cmp;
 }
 
-function MultiSelectMunicipio({
-  opcoes,
-  valor,
-  onChange,
-}: {
-  opcoes: { nome: string; contagem: number }[];
-  valor: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const toggle = (o: string) => {
-    if (valor.includes(o)) onChange(valor.filter((v) => v !== o));
-    else onChange([...valor, o]);
-  };
-  const label =
-    valor.length === 0
-      ? "Todos os municípios"
-      : valor.length === 1
-        ? valor[0]
-        : `${valor.length} municípios`;
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="flex min-h-10 max-w-[220px] items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:border-[#1f7ad6] dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-        >
-          <span className="truncate">{label}</span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[280px] p-0">
-        <Command>
-          <CommandInput placeholder="Buscar município..." />
-          <CommandList>
-            <CommandEmpty>Nenhum município encontrado</CommandEmpty>
-            {opcoes.map((op) => {
-              const marcado = valor.includes(op.nome);
-              return (
-                <CommandItem
-                  key={op.nome}
-                  onSelect={() => toggle(op.nome)}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span
-                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                        marcado
-                          ? "border-[#1f7ad6] bg-[#1f7ad6] text-white"
-                          : "border-slate-300 dark:border-slate-500"
-                      }`}
-                    >
-                      {marcado && <Check className="h-3 w-3" />}
-                    </span>
-                    <span className="truncate">{op.nome}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-400">{op.contagem}</span>
-                </CommandItem>
-              );
-            })}
-          </CommandList>
-          <div className="border-t p-1.5">
-            <button
-              type="button"
-              onClick={() => onChange([])}
-              className="w-full rounded px-2 py-1 text-left text-xs font-semibold text-[#1f7ad6] hover:bg-slate-100 dark:hover:bg-slate-700"
-            >
-              Limpar seleção (todos)
-            </button>
-          </div>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function CelulaJustificativa({
   linha,
   onSalvar,
@@ -561,6 +485,82 @@ function CelulaJustificativa({
       </div>
       {salvo && <span className="text-[10px] font-semibold text-emerald-600">salvo</span>}
     </div>
+  );
+}
+
+function MultiSelectMunicipio({
+  opcoes,
+  valor,
+  onChange,
+}: {
+  opcoes: { nome: string; contagem: number }[];
+  valor: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (o: string) => {
+    if (valor.includes(o)) onChange(valor.filter((v) => v !== o));
+    else onChange([...valor, o]);
+  };
+  const label =
+    valor.length === 0
+      ? "Todos os municípios"
+      : valor.length === 1
+        ? valor[0]
+        : `${valor.length} municípios`;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex min-h-10 max-w-[220px] items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:border-[#1f7ad6] dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[280px] p-0">
+        <Command>
+          <CommandInput placeholder="Buscar município..." />
+          <CommandList>
+            <CommandEmpty>Nenhum município encontrado</CommandEmpty>
+            {opcoes.map((op) => {
+              const marcado = valor.includes(op.nome);
+              return (
+                <CommandItem
+                  key={op.nome}
+                  onSelect={() => toggle(op.nome)}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        marcado
+                          ? "border-[#1f7ad6] bg-[#1f7ad6] text-white"
+                          : "border-slate-300 dark:border-slate-500"
+                      }`}
+                    >
+                      {marcado && <Check className="h-3 w-3" />}
+                    </span>
+                    <span className="truncate">{op.nome}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">{op.contagem}</span>
+                </CommandItem>
+              );
+            })}
+          </CommandList>
+          <div className="border-t p-1.5">
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="w-full rounded px-2 py-1 text-left text-xs font-semibold text-[#1f7ad6] hover:bg-slate-100 dark:hover:bg-slate-700"
+            >
+              Limpar seleção (todos)
+            </button>
+          </div>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -1428,6 +1428,13 @@ export function AnaliticoManutencao() {
                       <Badge className={`border ${info?.chip ?? ""}`}>
                         {info?.label ?? l.status_plano}
                       </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {l.dias_sem_preventiva_valida == null ? (
+                        <CelulaJustificativa linha={l} onSalvar={salvarJustificativa} />
+                      ) : (
+                        l.justificativa_sem_preventiva || "—"
+                      )}
                     </td>
                   </tr>
                 );

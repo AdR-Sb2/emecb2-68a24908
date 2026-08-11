@@ -157,7 +157,8 @@ export type ElevatoriaRolamentoSelo = {
   atualizado_em: string | null;
 };
 
-export type StatusImplantacao = 'planejada' | 'em_construcao' | 'instalada' | 'em_testes' | 'operacional';
+export type StatusImplantacao =
+  "planejada" | "em_construcao" | "instalada" | "em_testes" | "operacional";
 
 export type ElevatoriaImplantacao = {
   id: number;
@@ -210,22 +211,22 @@ export type ElevatoriaCampoNA = {
 };
 
 export const IMPLANTACAO_STATUS_OPCOES: { value: StatusImplantacao; label: string }[] = [
-  { value: 'planejada', label: 'Planejada' },
-  { value: 'em_construcao', label: 'Em Construção' },
-  { value: 'instalada', label: 'Instalada' },
-  { value: 'em_testes', label: 'Em Testes' },
-  { value: 'operacional', label: 'Operacional' },
+  { value: "planejada", label: "Planejada" },
+  { value: "em_construcao", label: "Em Construção" },
+  { value: "instalada", label: "Instalada" },
+  { value: "em_testes", label: "Em Testes" },
+  { value: "operacional", label: "Operacional" },
 ];
 
 export const IMPLANTACAO_STATUS_CORES: Record<string, string> = {
-  planejada: 'bg-slate-100 text-slate-600 border-slate-300',
-  em_construcao: 'bg-amber-100 text-amber-700 border-amber-200',
-  instalada: 'bg-blue-100 text-blue-700 border-blue-200',
-  em_testes: 'bg-purple-100 text-purple-700 border-purple-200',
-  operacional: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  planejada: "bg-slate-100 text-slate-600 border-slate-300",
+  em_construcao: "bg-amber-100 text-amber-700 border-amber-200",
+  instalada: "bg-blue-100 text-blue-700 border-blue-200",
+  em_testes: "bg-purple-100 text-purple-700 border-purple-200",
+  operacional: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
 
-export type CompletudeNivel = 'critico' | 'atencao' | 'bom';
+export type CompletudeNivel = "critico" | "atencao" | "bom";
 
 export type ElevatoriaCompletude = {
   elevatoria_id: number;
@@ -236,27 +237,31 @@ export type ElevatoriaCompletude = {
   nivel: CompletudeNivel;
 };
 
-export function calcCompletude(preenchidos: number, total: number, naAplicaveis: number): CompletudeNivel {
+export function calcCompletude(
+  preenchidos: number,
+  total: number,
+  naAplicaveis: number,
+): CompletudeNivel {
   const aplicaveis = total - naAplicaveis;
-  if (aplicaveis <= 0) return 'bom';
+  if (aplicaveis <= 0) return "bom";
   const pct = (preenchidos / aplicaveis) * 100;
-  if (pct >= 80) return 'bom';
-  if (pct >= 50) return 'atencao';
-  return 'critico';
+  if (pct >= 80) return "bom";
+  if (pct >= 50) return "atencao";
+  return "critico";
 }
 
 export function getCompletudeCor(nivel: CompletudeNivel): string {
-  if (nivel === 'bom') return 'bg-emerald-100 text-emerald-700 border-emerald-300';
-  if (nivel === 'atencao') return 'bg-amber-100 text-amber-700 border-amber-300';
-  return 'bg-red-100 text-red-700 border-red-300';
+  if (nivel === "bom") return "bg-emerald-100 text-emerald-700 border-emerald-300";
+  if (nivel === "atencao") return "bg-amber-100 text-amber-700 border-amber-300";
+  return "bg-red-100 text-red-700 border-red-300";
 }
 
 export const TABELAS_DADOS_MESTRES = [
-  { key: 'equipamento', label: 'Equipamento Instalado', table: 'elevatoria_equipamento' },
-  { key: 'eletrica', label: 'Elétrica & Automação', table: 'elevatoria_eletrica' },
-  { key: 'eletrica_geral', label: 'Elétrica Geral', table: 'elevatoria_eletrica_geral' },
-  { key: 'hidraulica', label: 'Hidráulica', table: 'elevatoria_hidraulica' },
-  { key: 'rolamentos', label: 'Rolamentos & Selos', table: 'elevatoria_rolamentos_selos' },
-  { key: 'area_influencia', label: 'Área de Influência', table: 'elevatoria_area_influencia' },
-  { key: 'implantacao', label: 'Implantação', table: 'elevatoria_implantacao' },
+  { key: "equipamento", label: "Equipamento Instalado", table: "elevatoria_equipamento" },
+  { key: "eletrica", label: "Elétrica & Automação", table: "elevatoria_eletrica" },
+  { key: "eletrica_geral", label: "Elétrica Geral", table: "elevatoria_eletrica_geral" },
+  { key: "hidraulica", label: "Hidráulica", table: "elevatoria_hidraulica" },
+  { key: "rolamentos", label: "Rolamentos & Selos", table: "elevatoria_rolamentos_selos" },
+  { key: "area_influencia", label: "Área de Influência", table: "elevatoria_area_influencia" },
+  { key: "implantacao", label: "Implantação", table: "elevatoria_implantacao" },
 ] as const;

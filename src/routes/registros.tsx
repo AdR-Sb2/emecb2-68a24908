@@ -1,8 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { History, Loader2 } from "lucide-react";
-import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
