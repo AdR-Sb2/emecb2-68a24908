@@ -21,10 +21,10 @@ import {
   Plus,
   GripVertical,
 } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import logoHeader from "@/assets/logo-branca.png";
-import { NavVoltarHome } from "@/components/nav-voltar-home";
 
 export const Route = createFileRoute("/escala")({
   component: EscalaPage,

@@ -28,11 +28,11 @@ import {
   Trash2,
   Filter,
 } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { temPermissao } from "../lib/permissoes";
 import logoHeader from "@/assets/logo-branca.png";
-import { NavVoltarHome } from "@/components/nav-voltar-home";
 
 export const Route = createFileRoute("/manuais")({
   component: ManuaisPage,

@@ -17,8 +17,8 @@ import {
 } from "recharts";
 import logoHeader from "@/assets/logo-branca.png";
 import rawData from "@/data/elevatorias.json";
-import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { SlidersHorizontal } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({

@@ -15,10 +15,10 @@ import {
   BarChart3,
   CheckCircle2,
 } from "lucide-react";
+import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import logoHeader from "@/assets/logo-branca.png";
-import { NavVoltarHome } from "@/components/nav-voltar-home";
 import elevatorias from "@/data/elevatorias.json";
 
 export const Route = createFileRoute("/relatorio")({

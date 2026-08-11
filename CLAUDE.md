@@ -4,6 +4,21 @@
 
 Sistema web interno da equipe de Eletromecanica da Baixada 2 (Aguas do Rio). React 19 + TypeScript + TanStack Start (SSR) + Supabase (PostgreSQL).
 
+## Git / Deploy (IMPORTANTE)
+
+- `origin` = HiBigGuy/emecb2-68a24908 (nosso). `upstream` = AdR-Sb2/emecb2-68a24908 (conectado ao Lovable).
+- O deploy e gerado pelo Lovable a partir de `upstream/main`. Alteracoes no `main` local NAO vao para o deploy sozinhas: criar PR para `upstream` (base `main`) e pedir merge ao usuario.
+- NAO reescrever historico publicado (force push / rebase / amend / squash de commits ja enviados) — o Lovable sincroniza pelo historico.
+- Token GitHub com permissao limitada no repo AdR-Sb2: consegue criar/atualizar PRs, mas NAO mergear, fechar nem comentar (GraphQL "Resource not accessible by integration"). Merge/close ficam com o usuario.
+- Se um PR de sync (merge do `main` inteiro) der conflito, portar os itens especificos: branch novo a partir de `upstream/main` + `git cherry-pick <commit>`. Feito assim para justificativa/nav (#36) e fixes de estoque (#38).
+- PRs/commits no `upstream/main` em que se referem: #34 (supabase projeto antigo), #36 (justificativa + nav voltar-home), #38 (correcoes de estoque/compras).
+
+## Supabase
+
+- Cliente em `src/lib/supabase.ts`. Desde o fix (commits `02eb59d`/`13311f2`), o app FORCA o projeto com dados: `byxmnmebvqdxpzcuutak.supabase.co` (anon key `sb_publishable_...`). Se o ambiente apontar para o projeto vazio (`ncwqawuphmweiufkswjg`), o codigo volta para o projeto com dados. NAO reverter para o projeto vazio nem refatorar de forma que remova esse fallback.
+- RLS permanece DESABILITADO em todas as tabelas; controle via aplicacao (permissoes de cargo).
+- Executar migrations manualmente no SQL Editor do Supabase + `NOTIFY pgrst`.
+
 ## Stack
 
 | Camada | Tecnologia |
@@ -42,6 +57,11 @@ src/
     oi.tsx         # /oi - Gerador de OI
     backlog.tsx    # /backlog - Backlog BI
     dashboard.tsx  # /dashboard - Dashboard Automacao
+    elevatorias.tsx        # /elevatorias - Elevadores
+    elevatorias_.$id.tsx   # /elevatorias/:id - Detalhe do elevador
+    analitico.tsx  # /analitico - Analitico
+    manuais-avaliacao.tsx  # /manuais-avaliacao
+    registros.tsx  # /registros - Registros
     testes.tsx     # /testes - Testes e Afericoes
     relatorio.tsx  # /relatorio - Relatorios Tecnicos
     manuais.tsx    # /manuais - Manuais Tecnicos
@@ -52,14 +72,18 @@ src/
     bloqueado.tsx  # /bloqueado
   lib/
     auth.tsx       # AuthProvider, useAuth, Profile type
-    supabase.ts    # Cliente Supabase
+    supabase.ts    # Cliente Supabase (forca projeto com dados)
     permissoes.ts  # getPermissoesCargo(), temPermissao(), temPainel()
     tema.tsx       # TemaProvider (dark/light mode)
     utils.ts       # cn() helper
     cronograma-types.ts  # Tipos do modulo Cronograma
+    estoque-types.ts     # Tipos do modulo Estoque
+    estoque-permissoes.ts# Permissoes do modulo Estoque
   components/
     ui/            # 46 componentes shadcn/ui (Radix)
     backlog-map.tsx
+    nav-voltar-home.tsx       # Botao voltar para o Hub
+    analitico-manutencao.tsx  # Lista de manutencao do Analitico
   styles.css       # Tailwind v4 + design tokens
   routeTree.gen.ts # Auto-gerado - NAO editar manualmente
 
@@ -70,6 +94,10 @@ supabase/
     ...
     00038_gerador_oi.sql
     00039_cronograma_instalacao.sql
+    ...
+    00054_analitico_justificativa_sem_preventiva.sql
+    00055_backlog_observacoes.sql
+    00056_backlog_obs_unica.sql
 ```
 
 ## Convencoes
@@ -107,7 +135,7 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 ### Exports
 - ExcelJS (import dinamico: await import("exceljs")) para XLSX
 - xlsx (import) para leitura de planilhas
-- Blob + URL.createObjectURL para CSV ("\uFEFF" + csv, separador ";")
+- Blob + URL.createObjectURL para CSV (BOM "\uFEFF" + csv). No estoque o separador e "," e o import usa o parser robusto `parseCSV` (remove BOM, trata CRLF do Excel e campos com aspas) + `slugifyChave`/`normalizarLinha` com aliases de cabecalhos (`ALIASES_IMPORT_MATERIAIS` / `ALIASES_IMPORT_COMPRAS`).
 - docx + Packer + file-saver para .docx
 - window.print() para PDF (CSS @media print)
 
@@ -131,6 +159,55 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 | Cronograma de Instalação | /cronograma | Planejamento com Gantt, drag-and-drop, autosave |
 | Relatórios | /relatorio | Relatórios técnicos e de planta |
 | Painel Administrativo | /admin | Gestão de usuários, cargos e permissões |
+
+## Modulo Estoque / Compras (src/routes/estoque.tsx) - notas
+
+- Import CSV de compras ("Atualizar Pedidos") usa `requisicao` + `item_rc` como chave de upsert (`onConflict: "requisicao,item_rc"`); colunas podem variar em nome/acentuacao (aliases). Ha botao "Baixar modelo do CSV" (`baixarModeloCompras`). O toast reporta linhas ignoradas.
+- `AutoCompleteMaterial`: ao focar, limpa a busca; digitar o codigo SAP completo resolve no Enter ou ao sair do campo; dialogs de Entrada/Saida/Ajuste exigem material existente (valido = selected !== null).
+- Botoes Entrada/Saida/Ajuste do topo resetam `materialSelecionado` (nao herdam o da linha).
+- Renomear material (Novo Material com codigo SAP existente = upsert) tambem atualiza `compras.descricao_material` onde `rc_em_fila = true`.
+- Dialog "Solicitar RC" (carrinho na linha do material) mostra historico de compras do codigo e avisa se ja esta em RC EM FILA. UI revisada: header com icone do carrinho em text-orange-500; saldo destaca com Badge variant="destructive" quando saldo_atual < estoque_minimo; historico como lista compacta com Badge semantico (amber "Em fila" / slate "Fora da fila"); secoes separadas por `<Separator>` do shadcn (sem cards empilhados); input de quantidade com foco laranja e hint "Mínimo recomendado: N" quando qtd digitada < deficit (estoque_minimo - saldo_atual); CTA bg-orange-500 e Cancelar com border-input + text-foreground.
+
+## Modulo Backlog (src/routes/backlog.tsx) - notas
+
+- Coluna "Observação" (input editavel direto na linha, ambas tabelas) salva observação única por O.S. na tabela `backlog_obs_unica` (migration 00056): om (PK), obs, atualizado_em. Autosave com debounce ~700ms + flush no blur (`atualizarObsUnica`/`flushObsUnica`/`salvarObsUnica`), carregada em lote por chunks de 200 (guarda em `obsUnica` + `obsUnicaLoaded` ref).
+- Coluna "Comentários" abre dialog com comentarios multiplos por O.S. (tabela `backlog_observacoes`, migration 00055): id, om, texto, autor_id (FK profiles), criado_em. Consulta com join `profiles:autor_id(nome_completo)`.
+- Carregamento em lote das observações/comentarios das O.S. visiveis (chunks de 200 com `.in("om", ...)`) e badge laranja com a contagem no botao. Insercao usa `.insert(...).select("*, profiles:autor_id(nome_completo)").single()` e adiciona ao topo da lista.
+- O dialog de comentarios segue o padrao do modulo Registros (`ListaRegistros.tsx`): textarea + botao "Adicionar" (bg-[#0b3a73]), Enter adiciona (Shift+Enter quebra linha), lista com autor + data.
+
+## Modulo Registros (src/components/registros/ListaRegistros.tsx) - notas de performance
+
+- Aba "Atendimentos" e lazy: so carrega ao abrir a aba. Enquanto nao carregado, badge do tab nao mostra contagem e o conteudo mostra spinner "Carregando atendimentos...".
+- Carga inicial paralela (`Promise.all`): informacoes + elevatorias juntas. Quando `elevatoriaId != null` (ficha da elevatoria), busca so a elevatoria via `.eq("id", elevNum)` em vez de todas; o filtro por planta da query de atendimentos usa o state `elevatorias` (ja carregado quando a aba fica visivel).
+- `buscarLoteAtendimentos` usa `ATEND_COLUNAS` (colunas minimas, sem `profiles` join) em vez de `select("*")`; busca um lote por vez com `range()` de `LOTE_CARGA` (1000). Tipo `AtendQuery` e estrutural (metodos `range/not/is/eq/or/in/order`) para aceitar o builder.
+- Paginacao SERVER-SIDE, NAO busca mais as ~32 mil linhas de uma vez: `recarregarAtendimentos` busca so as primeiras 1000 (count exato via `select("*", { count: "exact", head: true })` com os mesmos filtros — o metodo `.count()` nao existe nessa versao do supabase-js). "Proximo" navega por `tamanhoPagina` (padrao 500); ao ultrapassar o ja carregado, `carregarProximoLote` busca +1000 e faz append (efeito em `paginaAtual/tamanhoPagina/atendimentos.length` cuida do auto-fetch). Cache contiguo em `atendimentos` + `atendimentosLenRef`.
+- Filtros (busca/status/tipo/conferir) BUSCAM NO SERVIDOR: `montarQueryAtendimentos` aplica `.eq/.is/.not("natureza","in","(...)")` e `.or("ordem.ilike.%t%,...")` (termo saneado de `% , ( ) * " \`) tanto na query quanto no count. Busca com debounce de 400ms (`buscaDebounced`). Mudanca de filtro chama `recarregarAtendimentos` (invalida cache via `atendReqId` para descartar respostas antigas). "Conferir" = `.is("elevatoria_id", null)`; vincular em modo conferir remove o card e decrementa o total localmente.
+- `tamanhoPagina` (O.S. por pagina) e configurado por usuario no seletor "Por pagina" (200/500/1000) e salvo na conta na coluna `profiles.tamanho_pagina_atendimentos` (migration 00058) — mesmo padrao do `tema_preferido` (update direto no `profiles`).
+- UI do card de atendimento (apresentacao apenas): numero da OS em botao com copiar-ao-clicar (check verde temporario, `ordemCopiada`); badge de natureza e a unica solida/semantica; badge de prioridade so aparece se nao duplicar a natureza (mesmo texto ignorado); status sempre slate outline; linha de metadados com icones (Calendar data, Hash nota/PL, Building2 base, MapPin LI, User criado por) em `text-xs text-muted-foreground`; descricao com `line-clamp-2`; padding do card `px-3 py-2.5`.
+- Import (`registros-import.ts`): `upsert` com `onConflict: "ordem"` sobrescrevia `elevatoria_id`/`pdf_anexo_url`/`anexado_*` no re-import, apagando vinculos manuais. Agora seleciona `ordem, elevatoria_id, pdf_anexo_url, anexado_por, anexado_em` dos existentes e preserva esses campos no payload do upsert.
+
+## Modulo Equipamentos (src/components/estoque/equipamentos-tab.tsx)
+
+- Aba "Equipamentos" dentro de `/estoque` (estado `aba` inclui `"equipamentos"`), lazy-loaded via `lazy(() => import("@/components/estoque/equipamentos-tab"))` — o componente usa DEFAULT export (padrao do `backlog-map`). Auto-contido: carrega proprios dados e permissoes.
+- Tabelas: `equipamentos` (tag, descricao, tipo, categoria_id, origem, codigo_sap, observacao, critico, status, foto_url, criado_por), `equipamento_categorias` (Motor/Bomba/Inversor/Softstarter), `equipamento_fotos` (galeria/historico visual), `equipamento_registros` (Manutencao/Troca/Inspecao/Observacao). RLS desabilitado. Migration `00059`.
+- Permissoes novas com `panel_key = 'estoque'`: `estoque.equipamentos_ver`, `estoque.equipamentos_criar`, `estoque.equipamentos_editar`, `estoque.equipamentos_remover`, `estoque.equipamentos_categorias`. Migracao concede ver+criar a quem tem o painel estoque, e editar/remover/categorias a quem ja tem `estoque.gerenciar_categorias`; Admin recebe todas.
+- Fotos: bucket `equipamentos` (publico, jpeg/png/webp, 10MB). Capa na linha da tabela = `foto_url`; upload atualiza `foto_url` para a foto mais recente; remocao faz parse do storage path via "/object/public/equipamentos/" para apagar o objeto.
+- Estrela critico faz update otimista; observacao edita inline com autosave debounce de 500ms (`ObservacaoCell`, flush no blur); status editavel inline via select colorido.
+- Tipos em `src/lib/estoque-equipamentos-types.ts`; `form.tipo` no componente e `string` (setForm inicial com `TIPOS_EQUIPAMENTO[0] as string`) para aceitar valor de <select>.
+
+## Modulo Backlog (src/routes/backlog.tsx) - observacoes
+
+- Tabelas de observacao (`backlog_obs_unica` e `backlog_observacoes`, migrations 00055/00056) foram criadas SEM `DISABLE ROW LEVEL SECURITY`, diferente de `equipe_overrides` (00003) e `responsabilidade_overrides` (00030). Resultado: o client com publishable key nao consegue ler/gravar (erro 401 "new row violates row-level security policy") — as observacoes nao persistem e somem ao recarregar. A migration 00057 desabilita RLS nas duas tabelas (aplicar no SQL editor do Lovable).
+- A busca do backlog procura tambem na observacao editavel (`obsUnica[om]`) e nos comentarios (`obsPorOm[om]`).
+- Observacao editavel salva com debounce de 700ms; em blur (`flushObsUnica`) e no unmount do componente as mudancas pendentes sao gravadas (`obsUnicaTimer` guarda `{ id, valor }`).
+- Icone de informacao (i) ao lado da O.S.: `src/components/os-info-icon.tsx` + parser `src/lib/parse-log-os.ts` (formato `* DD.MM.AAAA HH:MM:SS BRAZIL (USUARIO)` com campos `CHAVE: valor` separados por `*` e possivel `**negrito**`). Usa o campo `TEXTO LONGO` que ja vem na listagem (`e.r["TEXTO LONGO"]`) — sem fetch extra. Hover mostra a ultima entrada; clique abre dialog com historico completo; O.S. sem log (preventivas por frequencia) nao renderiza o icone.
+
+## Validacao (antes de commitar)
+
+- `npx tsc --noEmit` — erros PRE-EXISTENTES esperados (nao corrigir fora de escopo): `src/routes/elevatorias.tsx` linhas ~963 e ~1090 (tipo de Link de rota).
+- `npx eslint <arquivo>` — ha ~1174 erros pre-existentes de prettier/any no codigo do Lovable; nao "corrigir" fora do escopo. No estoque.tsx os 4 erros pre-existentes sao: `any` (~linha 1950) e prettier (~4842/4868/4915).
+- `npx vite build` — deve passar; regenera `src/routeTree.gen.ts` (reverter antes de commitar).
+- Nao adicionar erros novos de lint/tsc nas alteracoes.
 
 ## Como criar um novo modulo
 
