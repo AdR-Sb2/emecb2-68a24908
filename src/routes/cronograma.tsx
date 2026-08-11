@@ -1065,7 +1065,7 @@ function CronogramaPage() {
 
             {/* Parâmetros do projeto */}
             <section className={`${cardCls} mb-4`}>
-              <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="flex-1 min-w-[200px]">
                   <label className={labelCls}>Nome do projeto</label>
                   <input
@@ -1078,7 +1078,7 @@ function CronogramaPage() {
                     className={inputCls + " min-h-9 font-semibold"}
                   />
                 </div>
-                <div className="w-[140px]">
+                <div className="w-full sm:w-[140px]">
                   <label className={labelCls}>Data base</label>
                   <input
                     type="date"
@@ -1091,7 +1091,7 @@ function CronogramaPage() {
                     className={inputCls + " min-h-9"}
                   />
                 </div>
-                <div className="w-[120px]">
+                <div className="w-full sm:w-[120px]">
                   <label className={labelCls}>Duração padrão (dias)</label>
                   <input
                     type="number"
@@ -1105,7 +1105,7 @@ function CronogramaPage() {
                     className={inputCls + " min-h-9"}
                   />
                 </div>
-                <div className="w-[160px]">
+                <div className="w-full sm:w-[160px]">
                   <label className={labelCls}>Rótulo de agrupamento</label>
                   <input
                     value={editAgrupamento}
@@ -1271,16 +1271,16 @@ function CronogramaPage() {
               >
                 <Download className="h-3.5 w-3.5" /> PDF
               </button>
-              <div className="ml-auto flex gap-1">
+              <div className="ml-auto flex w-full gap-1 sm:w-auto">
                 <button
                   onClick={() => setZoom("mes")}
-                  className={`inline-flex items-center gap-1 rounded-md px-3 py-2 text-xs font-semibold transition ${zoom === "mes" ? "bg-[#1f7ad6] text-white" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"}`}
+                  className={`inline-flex flex-1 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold transition sm:flex-none ${zoom === "mes" ? "bg-[#1f7ad6] text-white" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"}`}
                 >
                   <ZoomOut className="h-3.5 w-3.5" /> Mês
                 </button>
                 <button
                   onClick={() => setZoom("semana")}
-                  className={`inline-flex items-center gap-1 rounded-md px-3 py-2 text-xs font-semibold transition ${zoom === "semana" ? "bg-[#1f7ad6] text-white" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"}`}
+                  className={`inline-flex flex-1 items-center justify-center gap-1 rounded-md px-3 py-2 text-xs font-semibold transition sm:flex-none ${zoom === "semana" ? "bg-[#1f7ad6] text-white" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"}`}
                 >
                   <ZoomIn className="h-3.5 w-3.5" /> Semana
                 </button>
@@ -1329,7 +1329,7 @@ function CronogramaPage() {
                 <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
                   {/* Gantt timeline header */}
                   <div className="sticky top-0 z-10 flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                    <div className="flex-shrink-0 w-[300px] p-2 text-xs font-semibold text-slate-500 uppercase tracking-wide border-r border-slate-200 dark:border-slate-700">
+                    <div className="flex-shrink-0 w-[200px] sm:w-[300px] p-2 text-xs font-semibold text-slate-500 uppercase tracking-wide border-r border-slate-200 dark:border-slate-700">
                       Item
                     </div>
                     <div className="flex overflow-hidden" style={{ minWidth: ganttWidth }}>
@@ -1346,7 +1346,7 @@ function CronogramaPage() {
                       <div key={grupo}>
                         {/* Grupo header */}
                         <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700/50">
-                          <div className="flex-shrink-0 w-[300px] p-2 text-xs font-bold text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                          <div className="flex-shrink-0 w-[200px] sm:w-[300px] p-2 text-xs font-bold text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 flex items-center gap-2">
                             <div
                               className="h-3 w-3 rounded"
                               style={{ backgroundColor: corGrupo }}
@@ -1383,7 +1383,7 @@ function CronogramaPage() {
                               className={`flex border-b border-slate-100 dark:border-slate-700/50 transition hover:bg-slate-50 dark:hover:bg-slate-700/30 ${dragItemIdx === globalIdx ? "opacity-50" : ""}`}
                             >
                               {/* Nome + campos */}
-                              <div className="flex-shrink-0 w-[300px] p-2 border-r border-slate-200 dark:border-slate-700">
+                              <div className="flex-shrink-0 w-[200px] sm:w-[300px] p-2 border-r border-slate-200 dark:border-slate-700">
                                 <div className="flex items-center gap-1">
                                   {isDono && (
                                     <GripVertical className="h-3.5 w-3.5 flex-shrink-0 text-slate-400 cursor-grab" />
@@ -1567,7 +1567,7 @@ function CronogramaPage() {
                 placeholder="Ex: Boosters Contêineres — Baixada 2"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className={labelCls}>
                   Data base <span className="text-red-500">*</span>
@@ -1733,7 +1733,7 @@ function CronogramaPage() {
 
               {itemDrawerTab === "detalhes" && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelCls}>Nome</label>
                       <input
@@ -1751,7 +1751,7 @@ function CronogramaPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelCls}>Início</label>
                       <input
@@ -1769,7 +1769,7 @@ function CronogramaPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelCls}>Duração (dias)</label>
                       <input
@@ -1789,7 +1789,7 @@ function CronogramaPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelCls}>O.S. Referência</label>
                       <input

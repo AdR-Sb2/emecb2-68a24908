@@ -427,8 +427,8 @@ function AdminPage() {
         ) : tab === "usuarios" ? (
           <>
             {/* Filtros */}
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="relative flex-1">
+            <div className="mb-4 flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+              <div className="relative min-w-full flex-1 sm:min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-[#64748b]" />
                 <input
                   type="text"
@@ -441,7 +441,7 @@ function AdminPage() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc]"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc] sm:w-auto"
               >
                 <option value="TODOS">Todos status</option>
                 <option value="pendente">Pendente</option>
@@ -451,7 +451,7 @@ function AdminPage() {
               <select
                 value={filterCargo}
                 onChange={(e) => setFilterCargo(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc]"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-[#0ea5e9] focus:ring-2 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#f8fafc] sm:w-auto"
               >
                 <option value="TODOS">Todos cargos</option>
                 {cargos.map((c) => (

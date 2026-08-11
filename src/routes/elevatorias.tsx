@@ -1241,7 +1241,7 @@ function ElevatoriasPage() {
                       >
                         <td className="whitespace-nowrap px-3 py-2 font-medium text-[#0b3a73] dark:text-white">
                           <Link
-                            to={`/elevatorias/${elev.id}`}
+                            to="/elevatorias/$id" params={{ id: String(elev.id) }}
                             className="hover:text-[#1f7ad6] hover:underline"
                           >
                             {elev.nome}
@@ -1415,7 +1415,7 @@ function ElevatoriasPage() {
                         <td className="whitespace-nowrap px-3 py-2">
                           <div className="flex items-center gap-1.5">
                             <Link
-                              to={`/elevatorias/${elev.id}`}
+                              to="/elevatorias/$id" params={{ id: String(elev.id) }}
                               className="rounded-md bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
                             >
                               Abrir ficha

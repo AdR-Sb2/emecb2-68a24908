@@ -2897,7 +2897,7 @@ function EstoquePage() {
         </div>
 
         {/* Filtros */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value as TipoMovimentacao | "TODAS")}
@@ -2922,7 +2922,7 @@ function EstoquePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar código ou descrição..."
-            className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[13px] shadow-sm placeholder:text-slate-400 sm:w-48 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <select
             value={destinoFilter}
@@ -2956,8 +2956,82 @@ function EstoquePage() {
           </span>
         </div>
 
+        {/* Cards mobile */}
+        <div className="mb-3 space-y-2 md:hidden">
+          {paginated.length === 0 && (
+            <div className="py-8 text-center text-slate-400">Nenhum registro encontrado.</div>
+          )}
+          {paginated.map((m) => {
+            const mat = mats.find((mat) => mat.cod_sap === m.cod_sap);
+            return (
+              <div
+                key={m.id}
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-mono text-[11px] text-[#0b3a73] dark:text-blue-400">
+                      {m.cod_sap}
+                    </div>
+                    <div className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {mat?.descricao || m.cod_sap}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      m.tipo === "ENTRADA"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : m.tipo === "SAIDA"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {m.tipo === "ENTRADA" ? "Entrada" : m.tipo === "SAIDA" ? "Saída" : "Ajuste"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[13px] text-slate-600 dark:text-slate-300">
+                  <div>
+                    <span className="text-slate-400">Data: </span>
+                    {m.data ? new Date(m.data).toLocaleDateString("pt-BR") : "—"}
+                  </div>
+                  <div className="text-right font-semibold">
+                    <span
+                      className={
+                        m.tipo === "ENTRADA"
+                          ? "text-emerald-600"
+                          : m.tipo === "SAIDA"
+                            ? "text-red-600"
+                            : "text-amber-600"
+                      }
+                    >
+                      {m.tipo === "AJUSTE"
+                        ? m.quantidade
+                        : m.tipo === "ENTRADA"
+                          ? `+${m.quantidade}`
+                          : `-${m.quantidade}`}
+                    </span>
+                  </div>
+                  <div className="truncate">
+                    <span className="text-slate-400">Destino: </span>
+                    {m.destino || "—"}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-slate-400">Resp.: </span>
+                    {m.solicitante || m.responsavel || "—"}
+                  </div>
+                </div>
+                {m.observacao && (
+                  <div className="mt-1 truncate text-[12px] text-slate-400 dark:text-slate-500">
+                    {m.observacao}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
         {/* Tabela */}
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-700 dark:bg-slate-800">
           <table className="w-full text-left text-[13px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
@@ -3304,11 +3378,11 @@ function EstoquePage() {
       </div>
 
       {/* Toggle e ações */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <button
             onClick={() => setAba("estoque")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "estoque"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3318,7 +3392,7 @@ function EstoquePage() {
           </button>
           <button
             onClick={() => setAba("compras")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "compras"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3328,7 +3402,7 @@ function EstoquePage() {
           </button>
           <button
             onClick={() => setAba("registros")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "registros"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3338,7 +3412,7 @@ function EstoquePage() {
           </button>
           <button
             onClick={() => setAba("equipamentos")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "equipamentos"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3701,8 +3775,8 @@ function EstoquePage() {
 
           {/* Filtros */}
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
@@ -3722,7 +3796,7 @@ function EstoquePage() {
               <select
                 value={filtroCategoria}
                 onChange={(e) => setFiltroCategoria(e.target.value)}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todas categorias</option>
                 {categorias.map((c) => (
@@ -3734,7 +3808,7 @@ function EstoquePage() {
               <select
                 value={filtroStatus}
                 onChange={(e) => setFiltroStatus(e.target.value as StatusEstoque | "TODAS")}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todos status</option>
                 <option value="sem_estoque">Sem Estoque</option>
@@ -3746,7 +3820,7 @@ function EstoquePage() {
                 <select
                   value={filtroElevatoria}
                   onChange={(e) => setFiltroElevatoria(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">Todas elevatórias</option>
                   {elevatoriaOptions.map((e) => (
@@ -3775,8 +3849,110 @@ function EstoquePage() {
             </div>
           </div>
 
+          {/* Cards mobile */}
+          <div className="mb-3 space-y-2 md:hidden">
+            {materiaisFiltrados.map((m) => (
+              <div
+                key={m.cod_sap}
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <button
+                    onClick={() => {
+                      setMaterialSelecionado(m);
+                      setDialogHistorico(true);
+                    }}
+                    className="min-w-0 text-left"
+                  >
+                    <div className="font-mono text-[12px] font-bold text-[#1f7ad6] dark:text-blue-400">
+                      {m.cod_sap}
+                    </div>
+                    <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {m.descricao}
+                    </div>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Semaforo saldo={m.saldo_atual} minimo={m.estoque_minimo} />
+                    {permissoes.editarConfigMaterial ? (
+                      <button onClick={() => toggleCritico(m)} className="cursor-pointer">
+                        {m.material_critico ? (
+                          <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        ) : (
+                          <Star className="h-4 w-4 text-slate-300" />
+                        )}
+                      </button>
+                    ) : m.material_critico ? (
+                      <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                    ) : null}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[13px] text-slate-600 dark:text-slate-300">
+                  <div>
+                    <span className="text-slate-400">Saldo: </span>
+                    <span
+                      className={`font-bold ${m.saldo_atual === 0 ? "text-red-700" : m.saldo_atual <= m.estoque_minimo ? "text-orange-600" : "text-emerald-600"}`}
+                    >
+                      {m.saldo_atual} {m.unidade_medida}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Mínimo: </span>
+                    {m.estoque_minimo}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-slate-400">Categoria: </span>
+                    {getCategoriaNome(m)}
+                  </div>
+                  <div className="truncate">
+                    <span className="text-slate-400">Local: </span>
+                    {m.local_armazenagem || "—"}
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {permissoes.registrarEntrada && (
+                    <button
+                      onClick={() => {
+                        setMaterialSelecionado(m);
+                        setDialogMov("entrada");
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1 rounded bg-emerald-100 px-2.5 py-1.5 text-[12px] font-bold text-emerald-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Entrada
+                    </button>
+                  )}
+                  {permissoes.registrarSaida && (
+                    <button
+                      onClick={() => {
+                        setMaterialSelecionado(m);
+                        setDialogMov("saida");
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1 rounded bg-red-100 px-2.5 py-1.5 text-[12px] font-bold text-red-700"
+                    >
+                      <Minus className="h-3.5 w-3.5" /> Saída
+                    </button>
+                  )}
+                  {permissoes.solicitarCompra && (
+                    <button
+                      onClick={() => {
+                        setSolicitarRcMaterial(m);
+                        setSolicitarRcQtd(1);
+                        setDialogSolicitarRc(true);
+                      }}
+                      className="inline-flex min-h-9 items-center gap-1 rounded bg-orange-100 px-2.5 py-1.5 text-[12px] font-bold text-orange-700"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" /> RC
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {materiaisFiltrados.length === 0 && (
+              <div className="py-8 text-center text-slate-400">Nenhum material encontrado.</div>
+            )}
+          </div>
+
           {/* Tabela */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <div className="hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block dark:border-slate-700 dark:bg-slate-800">
             <div className="max-h-[600px] overflow-auto">
               <table className="min-w-[900px] w-full text-left text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-800 dark:text-slate-200">
@@ -4037,8 +4213,8 @@ function EstoquePage() {
           </div>
 
           {/* Filtros */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="mb-3 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center dark:border-slate-700 dark:bg-slate-800">
+            <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"

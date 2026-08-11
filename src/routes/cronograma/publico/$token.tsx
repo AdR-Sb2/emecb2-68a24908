@@ -244,13 +244,13 @@ function PublicoCronogramaPage() {
       <div className="mx-auto max-w-7xl p-4 md:p-6">
         {/* Header */}
         <div className="mb-6 rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-lg print:bg-[#002d74]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
               <CalendarRange className="h-6 w-6 text-white" />
             </div>
-            <div className="text-white flex-1">
-              <h1 className="text-lg font-bold">{projeto.nome}</h1>
-              <p className="text-sm text-cyan-50/80">
+            <div className="min-w-0 text-white flex-1">
+              <h1 className="truncate text-lg font-bold">{projeto.nome}</h1>
+              <p className="truncate text-sm text-cyan-50/80">
                 {projeto.criado_por_nome ? `Criado por ${projeto.criado_por_nome}` : ""}
                 {projeto.descricao ? ` · ${projeto.descricao}` : ""}
               </p>
@@ -320,7 +320,7 @@ function PublicoCronogramaPage() {
         {/* Gantt */}
         <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
           <div className="sticky top-0 z-10 flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-            <div className="flex-shrink-0 w-[280px] p-2 text-xs font-semibold text-slate-500 uppercase border-r border-slate-200 dark:border-slate-700">
+            <div className="flex-shrink-0 w-[180px] sm:w-[280px] p-2 text-xs font-semibold text-slate-500 uppercase border-r border-slate-200 dark:border-slate-700">
               Item
             </div>
             <div className="flex overflow-hidden" style={{ minWidth: ganttWidth }}>
@@ -335,7 +335,7 @@ function PublicoCronogramaPage() {
             return (
               <div key={grupo}>
                 <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700/50">
-                  <div className="flex-shrink-0 w-[280px] p-2 text-xs font-bold text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                  <div className="flex-shrink-0 w-[180px] sm:w-[280px] p-2 text-xs font-bold text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 flex items-center gap-2">
                     <div className="h-3 w-3 rounded" style={{ backgroundColor: corGrupo }} />
                     {grupoLabel(grupo, projeto.campo_agrupamento_label)}
                   </div>
@@ -358,7 +358,7 @@ function PublicoCronogramaPage() {
                       key={item.id}
                       className="flex border-b border-slate-100 dark:border-slate-700/50"
                     >
-                      <div className="flex-shrink-0 w-[280px] p-2 border-r border-slate-200 dark:border-slate-700">
+                      <div className="flex-shrink-0 w-[180px] sm:w-[280px] p-2 border-r border-slate-200 dark:border-slate-700">
                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
                           {item.nome}
                         </p>
