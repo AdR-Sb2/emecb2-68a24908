@@ -893,12 +893,12 @@ function EscalaPage() {
         </div>
 
         {/* Botões superiores */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-[#1f7ad6]" />
             <h2 className="text-lg font-bold text-[#0b3a73] dark:text-white">Escala de Trabalho</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -1022,7 +1022,7 @@ function EscalaPage() {
         ) : (
           <>
             {/* KPI Cards */}
-            <div className="mb-6 grid gap-4 sm:grid-cols-5">
+            <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-500" />
                 <div className="p-4">
@@ -1112,8 +1112,8 @@ function EscalaPage() {
             </div>
 
             {/* Filtros */}
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="relative min-w-[200px] flex-1">
+            <div className="mb-4 flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+              <div className="relative min-w-full flex-1 sm:min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]" />
                 <input
                   type="text"
@@ -1172,22 +1172,22 @@ function EscalaPage() {
             </div>
 
             {/* Navegação de semanas */}
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-2">
               <button
                 onClick={() => setSemanaOffset((p) => p - 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:px-4"
               >
-                <ChevronLeft className="h-4 w-4" /> Semana anterior
+                <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Semana anterior</span>
               </button>
-              <span className="text-sm font-bold text-[#0b3a73] dark:text-white">
+              <span className="text-center text-xs font-bold text-[#0b3a73] dark:text-white sm:text-sm">
                 {diasSemana[0].toLocaleDateString("pt-BR")} —{" "}
                 {diasSemana[6].toLocaleDateString("pt-BR")}
               </span>
               <button
                 onClick={() => setSemanaOffset((p) => p + 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:px-4"
               >
-                Próxima semana <ChevronRight className="h-4 w-4" />
+                <span className="hidden sm:inline">Próxima semana</span> <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 

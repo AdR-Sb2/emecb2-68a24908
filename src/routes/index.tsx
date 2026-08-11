@@ -208,7 +208,7 @@ function Index() {
           </div>
         ) : (
           /* ===== GRADE DE CARDS ===== */
-          <div className="grid w-full gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {/* Dashboard */}
             {shouldShowDashboard && (
               <CardButton onClick={() => setDashOpen(true)} chave="dashboard" delay={0}>
@@ -418,19 +418,25 @@ function CardIcon({ chave, icon: Icon }: { chave: string; icon: typeof LayoutDas
   const color = getCardColor(chave);
   return (
     <div
-      className={`flex h-14 w-14 items-center justify-center rounded-xl ${color.bg} dark:bg-slate-700 ${color.icon} dark:text-slate-300 shadow-sm`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-14 sm:w-14 ${color.bg} dark:bg-slate-700 ${color.icon} dark:text-slate-300 shadow-sm`}
     >
-      <Icon className="h-7 w-7" />
+      <Icon className="h-5 w-5 sm:h-7 sm:w-7" />
     </div>
   );
 }
 
 function CardTitle({ children }: { children: string }) {
-  return <h2 className="text-lg font-semibold text-[#0b3a73] dark:text-white">{children}</h2>;
+  return (
+    <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white sm:text-lg">{children}</h2>
+  );
 }
 
 function CardDesc({ children }: { children: string }) {
-  return <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{children}</p>;
+  return (
+    <p className="hidden text-sm leading-relaxed text-slate-500 dark:text-slate-400 sm:block">
+      {children}
+    </p>
+  );
 }
 
 function CardCta({ children }: { children: string }) {
@@ -457,7 +463,7 @@ function CardButton({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-left xl:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
+      className={`group flex animate-card flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] sm:gap-4 sm:p-6 xl:p-5 ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       {children}
@@ -480,7 +486,7 @@ function CardLink({
   return (
     <Link
       to={to}
-      className={`group flex animate-card flex-col items-start gap-4 rounded-2xl border border-slate-200 bg-white p-6 text-left xl:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
+      className={`group flex animate-card flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] active:scale-[0.98] sm:gap-4 sm:p-6 xl:p-5 ${color.ring} hover:ring-2 dark:border-slate-700 dark:bg-slate-800`}
       style={{ animationDelay: `${delay * 80}ms` }}
     >
       {children}

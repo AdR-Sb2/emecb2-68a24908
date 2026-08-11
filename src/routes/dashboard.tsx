@@ -243,7 +243,7 @@ function DashboardPage() {
       </div>
 
       {/* KPIs */}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
         <Kpi label="Total de Ativos" value={total} />
         <Kpi label="Com PA" value={comPA} />
         <Kpi label="Com PCP" value={comPCP} />
@@ -398,9 +398,10 @@ function DashboardPage() {
       </div>
 
       {/* Charts row 1 */}
-      <div className="mb-4 grid gap-4 lg:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card title="Distribuição de Sensores nas Elevatórias">
-          <ResponsiveContainer width="100%" height={260}>
+          <div className="h-[220px] sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={sensorData}
@@ -418,10 +419,12 @@ function DashboardPage() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+          </div>
         </Card>
 
         <Card title="Total de elevatórias por município">
-          <ResponsiveContainer width="100%" height={260}>
+          <div className="h-[220px] sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={municipios} layout="vertical" margin={{ left: 20, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" />
@@ -436,10 +439,12 @@ function DashboardPage() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </Card>
 
         <Card title="Total de elevatórias por tipo construtivo">
-          <ResponsiveContainer width="100%" height={260}>
+          <div className="h-[220px] sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={tiposConstr} margin={{ left: 10, right: 20, top: 16 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} />
@@ -454,6 +459,7 @@ function DashboardPage() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </Card>
       </div>
 
@@ -461,7 +467,7 @@ function DashboardPage() {
       <div className={`mb-4 grid gap-4 ${tableExpanded ? "" : "lg:grid-cols-3"}`}>
         <div className={tableExpanded ? "" : "lg:col-span-2"}>
           <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Tabela de Elevatórias
               </h2>
@@ -471,7 +477,7 @@ function DashboardPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Pesquisar elevatória, planta, município..."
-                  className="w-64 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  className="w-full sm:w-64 min-h-9 rounded border border-slate-300 bg-white px-2.5 py-1 text-xs shadow-sm focus:border-blue-400 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 />
                 <button
                   type="button"
@@ -559,7 +565,7 @@ function DashboardPage() {
 
         {!tableExpanded && (
           <Card title="Relação de elevatórias com CLP/PCP por cidade (%)">
-            <ResponsiveContainer width="100%" height={Math.max(340, clpPorCidade.length * 28)}>
+            <ResponsiveContainer width="100%" height={Math.max(280, clpPorCidade.length * 24)}>
               <BarChart
                 data={clpPorCidade}
                 layout="vertical"

@@ -1993,7 +1993,7 @@ function BacklogPage() {
       </div>
 
       {/* Title + actions */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">
             Backlog BI
@@ -2002,7 +2002,7 @@ function BacklogPage() {
             Bucket Field/SAP · {data.length} O.S. · atualizado {fmtDate(now)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:justify-center">
           <button
             onClick={() => fileInputRef.current?.click()}
             className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
@@ -2474,7 +2474,7 @@ function BacklogPage() {
       {/* Mapa + Programar */}
       <div className="mb-4 grid gap-3 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          {mapCard(240)}
+          {mapCard(mapWidgetHeight)}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">

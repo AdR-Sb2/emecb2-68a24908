@@ -606,8 +606,8 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="flex items-center gap-2 text-sm font-bold text-[#0b3a73] dark:text-white">
           <History className="h-4 w-4" /> Registros
         </h3>
@@ -747,20 +747,20 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[200px] flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative w-full min-w-[200px] flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Buscar por ordem, texto, nota..."
-                className="w-full rounded-lg border border-slate-300 py-2 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                className="min-h-10 w-full rounded-lg border border-slate-300 py-2 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
               />
             </div>
             <select
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 sm:w-auto dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             >
               <option value="TODOS">Status: todos</option>
               {["Aberta", "Liberada", "Encerrada", "Encerrada Técnica"].map((s) => (
@@ -772,7 +772,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             <select
               value={filtroNatureza}
               onChange={(e) => setFiltroNatureza(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 sm:w-auto dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             >
               <option value="TODAS">Tipo de ordem: todos</option>
               {[...TIPOS_ORDEM, "outras"].map((t) => (
@@ -796,7 +796,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                 }
               }}
               title="O.S. por página"
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 sm:w-auto dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
             >
               {OPCOES_TAMANHO_PAGINA.map((n) => (
                 <option key={n} value={n}>
@@ -833,7 +833,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
               )}
             </div>
           ) : (
-            <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
+            <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1 sm:max-h-[500px]">
               {atendimentosPagina.map((a) => {
                 const natureza = a.natureza ?? "outras";
                 const encerrado = STATUS_ENCERRADO.includes(a.status_simplificado ?? "");
@@ -951,7 +951,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                           )}
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
+                      <div className="flex w-full shrink-0 flex-wrap items-center gap-1.5 sm:w-auto">
                         {a.pdf_anexo_url ? (
                           <>
                             <a
@@ -1040,12 +1040,12 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
             </div>
           )}
           {atendimentosCarregados && totalPaginas > 1 && (
-            <div className="flex items-center justify-center gap-3 pt-1">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
               <button
                 type="button"
                 disabled={paginaAtual <= 1 || carregandoAtendimentos}
                 onClick={() => irParaPagina(paginaAtual - 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <ChevronLeft className="h-4 w-4" /> Voltar
               </button>
@@ -1057,7 +1057,7 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                 type="button"
                 disabled={paginaAtual >= totalPaginas || carregandoAtendimentos}
                 onClick={() => irParaPagina(paginaAtual + 1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Próximo <ChevronRight className="h-4 w-4" />
               </button>

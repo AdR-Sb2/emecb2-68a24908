@@ -3304,11 +3304,11 @@ function EstoquePage() {
       </div>
 
       {/* Toggle e ações */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <button
             onClick={() => setAba("estoque")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "estoque"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3318,7 +3318,7 @@ function EstoquePage() {
           </button>
           <button
             onClick={() => setAba("compras")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "compras"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3328,7 +3328,7 @@ function EstoquePage() {
           </button>
           <button
             onClick={() => setAba("registros")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "registros"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3338,7 +3338,7 @@ function EstoquePage() {
           </button>
           <button
             onClick={() => setAba("equipamentos")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
               aba === "equipamentos"
                 ? "bg-[#0b3a73] text-white shadow"
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -3701,8 +3701,8 @@ function EstoquePage() {
 
           {/* Filtros */}
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
@@ -3722,7 +3722,7 @@ function EstoquePage() {
               <select
                 value={filtroCategoria}
                 onChange={(e) => setFiltroCategoria(e.target.value)}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todas categorias</option>
                 {categorias.map((c) => (
@@ -3734,7 +3734,7 @@ function EstoquePage() {
               <select
                 value={filtroStatus}
                 onChange={(e) => setFiltroStatus(e.target.value as StatusEstoque | "TODAS")}
-                className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               >
                 <option value="TODAS">Todos status</option>
                 <option value="sem_estoque">Sem Estoque</option>
@@ -3746,7 +3746,7 @@ function EstoquePage() {
                 <select
                   value={filtroElevatoria}
                   onChange={(e) => setFiltroElevatoria(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-[14px] shadow-sm sm:w-auto dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">Todas elevatórias</option>
                   {elevatoriaOptions.map((e) => (
