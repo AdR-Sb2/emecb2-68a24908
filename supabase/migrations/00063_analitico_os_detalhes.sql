@@ -13,6 +13,9 @@ ALTER TABLE registros_atendimento
 --    P. Condição do Analítico.
 --    As O.S. são agregadas em JSONB por elevatória (1 linha por elevatória)
 --    para não esbarrar no limite de 1000 linhas por resposta do PostgREST.
+--    DROP antes do CREATE porque a versão anterior tinha outro retorno (42P13).
+DROP FUNCTION IF EXISTS analitico_os_detalhes(integer);
+
 CREATE OR REPLACE FUNCTION analitico_os_detalhes(janela_meses integer DEFAULT 12)
 RETURNS TABLE (
   elevatoria_id bigint,
@@ -63,7 +66,7 @@ AS $$
     WHERE a.elevatoria_id IS NOT NULL
       AND a.data_entrada >= CURRENT_DATE - (janela_meses * interval '1 month')
       AND a.tipo_ordem IN ('ZTPF', 'ZTPD', 'ZNTE', 'ZNTP', 'ZTRE', 'ZTPC')
-  ) b
+  ) 
   WHERE b.categoria IS NOT NULL
   GROUP BY b.elevatoria_id
 $$;
