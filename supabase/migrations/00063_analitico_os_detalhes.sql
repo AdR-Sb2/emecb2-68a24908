@@ -66,7 +66,7 @@ AS $$
     WHERE a.elevatoria_id IS NOT NULL
       AND a.data_entrada >= CURRENT_DATE - (janela_meses * interval '1 month')
       AND a.tipo_ordem IN ('ZTPF', 'ZTPD', 'ZNTE', 'ZNTP', 'ZTRE', 'ZTPC')
-  ) 
+  ) b
   WHERE b.categoria IS NOT NULL
   GROUP BY b.elevatoria_id
 $$;
