@@ -434,8 +434,8 @@ function CelulaOSDetalhes({ quantidade, detalhes }: { quantidade: number; detalh
         </PopoverTrigger>
         <HoverCardContent side="top" sideOffset={6} className="w-80 text-xs">
           <p className="mb-1 font-bold text-slate-700 dark:text-slate-200">{quantidade} O.S.</p>
-          <ul className="max-h-44 space-y-1 overflow-y-auto pr-1">
-            {detalhes.slice(0, 6).map((d) => (
+          <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
+            {detalhes.map((d) => (
               <li key={d.ordem} className="flex items-start gap-2">
                 <span className="shrink-0 font-mono font-semibold text-[#0b3a73] dark:text-white">
                   {d.ordem}
@@ -445,11 +445,6 @@ function CelulaOSDetalhes({ quantidade, detalhes }: { quantidade: number; detalh
                 </span>
               </li>
             ))}
-            {detalhes.length > 6 && (
-              <li className="text-[11px] font-semibold text-[#1f7ad6]">
-                +{detalhes.length - 6} O.S. — clique para ver todas
-              </li>
-            )}
           </ul>
         </HoverCardContent>
       </HoverCard>
@@ -772,25 +767,14 @@ export function AnaliticoManutencao() {
         const mapa = new Map<number, DetalhesOSPorElevatoria>();
         for (const r of (osDet.data ?? []) as Array<{
           elevatoria_id: number;
-          categoria: "preventiva" | "corretiva" | "ztpc";
-          ordem: string;
-          texto_breve: string | null;
-          inicio_sla: string | null;
-          fim_sla: string | null;
-          data_entrada: string | null;
+          preventiva: DetalheOS[] | null;
+          corretiva: DetalheOS[] | null;
+          ztpc: DetalheOS[] | null;
         }>) {
-          if (!r.categoria) continue;
-          let grupo = mapa.get(r.elevatoria_id);
-          if (!grupo) {
-            grupo = { preventiva: [], corretiva: [], ztpc: [] };
-            mapa.set(r.elevatoria_id, grupo);
-          }
-          grupo[r.categoria].push({
-            ordem: r.ordem,
-            texto_breve: r.texto_breve,
-            inicio_sla: r.inicio_sla,
-            fim_sla: r.fim_sla,
-            data_entrada: r.data_entrada,
+          mapa.set(r.elevatoria_id, {
+            preventiva: r.preventiva ?? [],
+            corretiva: r.corretiva ?? [],
+            ztpc: r.ztpc ?? [],
           });
         }
         setOsDetalhes(mapa);
