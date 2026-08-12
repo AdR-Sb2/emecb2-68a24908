@@ -8,6 +8,10 @@
 ALTER TABLE elevatorias
   ADD COLUMN IF NOT EXISTS justificativa_sem_preventiva TEXT;
 
+-- PostgreSQL não permite mudar o tipo de retorno com CREATE OR REPLACE FUNCTION.
+-- Precisamos dropar a versão anterior (assinatura com OUT params) primeiro.
+DROP FUNCTION IF EXISTS analitico_manutencao(integer);
+
 CREATE OR REPLACE FUNCTION analitico_manutencao(janela_meses integer DEFAULT 12)
 RETURNS TABLE (
   elevatoria_id bigint,

@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  Clock,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
@@ -45,6 +46,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import {
   Command,
   CommandEmpty,
@@ -67,6 +69,16 @@ type LinhaAnalitico = {
   status_plano: string;
   justificativa_sem_preventiva: string | null;
 };
+
+type DetalheOS = {
+  ordem: string;
+  texto_breve: string | null;
+  inicio_sla: string | null;
+  fim_sla: string | null;
+  data_entrada: string | null;
+};
+
+type DetalhesOSPorElevatoria = Record<"preventiva" | "corretiva" | "ztpc", DetalheOS[]>;
 
 type PontoTendencia = {
   mes: string;
@@ -243,7 +255,7 @@ const CABECALHO_COLUNAS = [
   "Dias sem preventiva",
   "Preventiva (janela)",
   "Corretiva (janela)",
-  "ZTPC (janela)",
+  "P. Condição (janela)",
   "Razão Corr/Prev",
   "Status",
   "Justificativa (sem preventiva)",
@@ -259,8 +271,8 @@ const COLUNA_TOOLTIP: Record<string, string> = {
     "Quantidade de preventivas válidas (ZTPF + ZTPD) dentro do período selecionado no filtro de janela",
   "Corretiva (janela)":
     "Quantidade de corretivas (ZNTE + ZNTP + ZTRE) dentro do período selecionado",
-  "ZTPC (janela)":
-    "Manutenções por Condição no período — não contam como preventiva válida; indicam que a frequência pode ter falhado",
+  "P. Condição (janela)":
+    "Manutenções por Condição (ZTPC) no período — não contam como preventiva válida; indicam que a frequência pode ter falhado",
   "Razão Corr/Prev":
     "Corretivas dividido por preventivas válidas na janela. Acima de 1 indica que a elevatória está recebendo mais corretiva do que preventiva",
   Status:
@@ -332,7 +344,7 @@ function valorCelula(linha: LinhaAnalitico, coluna: string): string {
       return String(linha.qtd_preventiva_valida_janela);
     case "Corretiva (janela)":
       return String(linha.qtd_corretiva_janela);
-    case "ZTPC (janela)":
+    case "P. Condição (janela)":
       return String(linha.qtd_ztpc_janela);
     case "Razão Corr/Prev":
       return linha.razao_corretiva_preventiva != null
@@ -361,7 +373,7 @@ function valorOrdenacao(linha: LinhaAnalitico, coluna: string): string | number 
       return linha.qtd_preventiva_valida_janela;
     case "Corretiva (janela)":
       return linha.qtd_corretiva_janela;
-    case "ZTPC (janela)":
+    case "P. Condição (janela)":
       return linha.qtd_ztpc_janela;
     case "Razão Corr/Prev":
       return linha.razao_corretiva_preventiva;
@@ -400,6 +412,82 @@ function compararLinhas(
     cmp = 0;
   }
   return direcao === "asc" ? cmp : -cmp;
+}
+
+function CelulaOSDetalhes({ quantidade, detalhes }: { quantidade: number; detalhes: DetalheOS[] }) {
+  if (quantidade <= 0) {
+    return <span className="text-slate-600 dark:text-slate-300">{quantidade}</span>;
+  }
+  return (
+    <Popover>
+      <HoverCard openDelay={120}>
+        <PopoverTrigger asChild>
+          <HoverCardTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex min-w-8 cursor-pointer items-center justify-center rounded-md border border-transparent px-2 py-0.5 text-xs font-bold text-slate-700 transition hover:border-[#1f7ad6]/40 hover:bg-[#eaf3fb] hover:text-[#0b3a73] dark:text-slate-200 dark:hover:bg-slate-700"
+              title="Clique para ver as O.S. desta coluna"
+            >
+              {quantidade}
+            </button>
+          </HoverCardTrigger>
+        </PopoverTrigger>
+        <HoverCardContent side="top" sideOffset={6} className="w-80 text-xs">
+          <p className="mb-1 font-bold text-slate-700 dark:text-slate-200">{quantidade} O.S.</p>
+          <ul className="max-h-44 space-y-1 overflow-y-auto pr-1">
+            {detalhes.slice(0, 6).map((d) => (
+              <li key={d.ordem} className="flex items-start gap-2">
+                <span className="shrink-0 font-mono font-semibold text-[#0b3a73] dark:text-white">
+                  {d.ordem}
+                </span>
+                <span className="line-clamp-2 text-slate-500 dark:text-slate-400">
+                  {d.texto_breve || "—"}
+                </span>
+              </li>
+            ))}
+            {detalhes.length > 6 && (
+              <li className="text-[11px] font-semibold text-[#1f7ad6]">
+                +{detalhes.length - 6} O.S. — clique para ver todas
+              </li>
+            )}
+          </ul>
+        </HoverCardContent>
+      </HoverCard>
+      <PopoverContent side="right" align="start" className="w-[340px] p-0">
+        <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-700">
+          <p className="text-xs font-bold text-[#0b3a73] dark:text-white">
+            {quantidade} O.S. no período
+          </p>
+        </div>
+        <div className="max-h-[300px] overflow-y-auto">
+          {detalhes.map((d) => (
+            <div
+              key={d.ordem}
+              className="border-b border-slate-100 px-3 py-2 last:border-0 dark:border-slate-700/60"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs font-bold text-[#0b3a73] dark:text-white">
+                  {d.ordem}
+                </span>
+                <span className="shrink-0 text-[10px] text-slate-400">
+                  {d.data_entrada ? formatDate(d.data_entrada) : ""}
+                </span>
+              </div>
+              <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
+                {d.texto_breve || "—"}
+              </p>
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span>
+                  SLA: {d.inicio_sla || "—"} → {d.fim_sla || "—"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function CelulaJustificativa({
@@ -638,6 +726,7 @@ function TooltipTendencia({
 export function AnaliticoManutencao() {
   const [janelaMeses, setJanelaMeses] = useState<number>(12);
   const [dados, setDados] = useState<LinhaAnalitico[]>([]);
+  const [osDetalhes, setOsDetalhes] = useState<Map<number, DetalhesOSPorElevatoria>>(new Map());
   const [tendencia, setTendencia] = useState<PontoTendencia[]>([]);
   const [emergenciais30dias, setEmergenciais30dias] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -658,7 +747,7 @@ export function AnaliticoManutencao() {
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const [res, tend, emerg] = await Promise.all([
+      const [res, tend, emerg, osDet] = await Promise.all([
         supabase.rpc("analitico_manutencao", { janela_meses: janelaMeses }),
         supabase.rpc("analitico_tendencia_mensal", {
           ultimos_meses: 24,
@@ -670,12 +759,42 @@ export function AnaliticoManutencao() {
           .eq("tipo_ordem", "ZNTE")
           .not("elevatoria_id", "is", null)
           .gte("data_entrada", isoDaysAtras(30)),
+        supabase.rpc("analitico_os_detalhes", { janela_meses: janelaMeses }),
       ]);
       if (res.error) throw res.error;
       if (tend.error) throw tend.error;
       setDados((res.data ?? []) as LinhaAnalitico[]);
       setTendencia((tend.data ?? []) as PontoTendencia[]);
       setEmergenciais30dias(emerg.count ?? 0);
+      if (osDet.error) {
+        setOsDetalhes(new Map());
+      } else {
+        const mapa = new Map<number, DetalhesOSPorElevatoria>();
+        for (const r of (osDet.data ?? []) as Array<{
+          elevatoria_id: number;
+          categoria: "preventiva" | "corretiva" | "ztpc";
+          ordem: string;
+          texto_breve: string | null;
+          inicio_sla: string | null;
+          fim_sla: string | null;
+          data_entrada: string | null;
+        }>) {
+          if (!r.categoria) continue;
+          let grupo = mapa.get(r.elevatoria_id);
+          if (!grupo) {
+            grupo = { preventiva: [], corretiva: [], ztpc: [] };
+            mapa.set(r.elevatoria_id, grupo);
+          }
+          grupo[r.categoria].push({
+            ordem: r.ordem,
+            texto_breve: r.texto_breve,
+            inicio_sla: r.inicio_sla,
+            fim_sla: r.fim_sla,
+            data_entrada: r.data_entrada,
+          });
+        }
+        setOsDetalhes(mapa);
+      }
     } catch (err) {
       toast.error(
         "Erro ao carregar analítico: " + (err instanceof Error ? err.message : "desconhecido"),
@@ -1404,20 +1523,19 @@ export function AnaliticoManutencao() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
-                      {l.dias_sem_preventiva_valida == null ? (
-                        <CelulaJustificativa linha={l} onSalvar={salvarJustificativa} />
-                      ) : (
-                        l.justificativa_sem_preventiva || "—"
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                       {l.qtd_preventiva_valida_janela}
                     </td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
-                      {l.qtd_corretiva_janela}
+                    <td className="px-3 py-2 text-center">
+                      <CelulaOSDetalhes
+                        quantidade={l.qtd_corretiva_janela}
+                        detalhes={osDetalhes.get(l.elevatoria_id)?.corretiva ?? []}
+                      />
                     </td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
-                      {l.qtd_ztpc_janela}
+                    <td className="px-3 py-2 text-center">
+                      <CelulaOSDetalhes
+                        quantidade={l.qtd_ztpc_janela}
+                        detalhes={osDetalhes.get(l.elevatoria_id)?.ztpc ?? []}
+                      />
                     </td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                       {l.razao_corretiva_preventiva != null
