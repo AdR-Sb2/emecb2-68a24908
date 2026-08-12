@@ -766,7 +766,9 @@ export function AnaliticoManutencao() {
           .select("*", { count: "exact", head: true })
           .eq("tipo_ordem", "ZNTE")
           .not("elevatoria_id", "is", null)
-          .gte("data_entrada", isoDaysAtras(30)),
+          .or(
+            `data_modificacao.gte.${isoDaysAtras(30)},and(data_modificacao.is.null,data_entrada.gte.${isoDaysAtras(30)})`,
+          ),
         supabase.rpc("analitico_os_detalhes", { janela_meses: janelaMeses }),
       ]);
       if (res.error) throw res.error;
