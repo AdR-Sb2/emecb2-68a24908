@@ -41,6 +41,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getPermissoesRegistros, type PermissoesRegistros } from "@/lib/registros-permissoes";
 import type {
   RegistroAtendimento,
@@ -250,7 +251,13 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
   const [novasFotos, setNovasFotos] = useState<{ file: File; preview: string }[]>([]);
   const [salvandoInformacao, setSalvandoInformacao] = useState(false);
   const [removendoFoto, setRemovendoFoto] = useState<number | null>(null);
+  const [cameraAberto, setCameraAberto] = useState(false);
+  const [cameraPronta, setCameraPronta] = useState(false);
+  const [cameraErro, setCameraErro] = useState<string | null>(null);
+  const [capturando, setCapturando] = useState(false);
   const fotoInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [elevatoriaSelecionada, setElevatoriaSelecionada] = useState<number | null>(
     elevatoriaId != null && !isNaN(Number(elevatoriaId)) ? Number(elevatoriaId) : null,
   );
@@ -596,6 +603,84 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
     });
   };
 
+  const pararCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraPronta(false);
+  };
+
+  const iniciarCamera = async () => {
+    setCameraErro(null);
+    setCameraPronta(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+        } catch {
+          /* o play pode falhar se o vídeo ainda não estiver visível; ok */
+        }
+      }
+      setCameraPronta(true);
+    } catch {
+      setCameraErro("Não foi possível acessar a câmera. Verifique a permissão do navegador.");
+    }
+  };
+
+  const abrirCamera = () => {
+    setCameraAberto(true);
+    window.setTimeout(() => {
+      void iniciarCamera();
+    }, 80);
+  };
+
+  const fecharCamera = () => {
+    pararCamera();
+    setCameraAberto(false);
+  };
+
+  const capturarFoto = () => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || capturando) return;
+    setCapturando(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d")?.drawImage(video, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const file = new File([blob], `foto-${Date.now()}.jpg`, { type: "image/jpeg" });
+            const preview = URL.createObjectURL(blob);
+            setNovasFotos((prev) => [...prev, { file, preview }]);
+            toast.success("Foto capturada. Clique em Adicionar para salvar.");
+          }
+          setCapturando(false);
+        },
+        "image/jpeg",
+        0.85,
+      );
+    } catch {
+      setCapturando(false);
+      toast.error("Falha ao capturar a foto.");
+    }
+  };
+
+  useEffect(() => {
+    return () => pararCamera();
+  }, []);
+
   const removerFoto = async (f: RegistroInformacaoFoto) => {
     if (!podeCriar || removendoFoto != null) return;
     setRemovendoFoto(f.id);
@@ -880,11 +965,19 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                 />
                 <button
                   type="button"
+                  onClick={() => abrirCamera()}
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  <Camera className="h-4 w-4" />
+                  Tirar foto
+                </button>
+                <button
+                  type="button"
                   onClick={() => fotoInputRef.current?.click()}
                   className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                 >
                   <ImagePlus className="h-4 w-4" />
-                  Adicionar fotos
+                  Escolher da galeria
                   {novasFotos.length > 0 && (
                     <span className="rounded-full bg-[#1f7ad6] px-1.5 text-[10px] font-bold text-white">
                       {novasFotos.length}
@@ -920,6 +1013,58 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
               )}
             </div>
           )}
+
+          {/* Dialog da câmera para tirar foto */}
+          <Dialog open={cameraAberto} onOpenChange={(o) => !o && fecharCamera()}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="text-[#0b3a73] dark:text-white">
+                  <Camera className="mr-1 inline h-4 w-4" /> Tirar foto
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-200 bg-black dark:border-slate-600">
+                  <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+                  {!cameraPronta && !cameraErro && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    </div>
+                  )}
+                  {cameraErro && (
+                    <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-red-300">
+                      {cameraErro}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={capturarFoto}
+                    disabled={!cameraPronta || capturando}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
+                  >
+                    {capturando ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    Capturar foto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fecharCamera}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    Fechar
+                  </button>
+                </div>
+                <p className="text-center text-[11px] text-slate-400">
+                  A foto capturada entra na lista de fotos do registro. Pode tirar várias antes de
+                  clicar em Adicionar.
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {informacoes.length === 0 ? (
             <p className="py-6 text-center text-sm text-slate-400">
