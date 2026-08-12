@@ -342,7 +342,10 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
       countQuery = countQuery.or(buscaStr);
     }
 
-    query = query.order("data_entrada", { ascending: false, nullsFirst: false });
+    query = query
+      .order("data_entrada", { ascending: false, nullsFirst: false })
+      .order("data_modificacao", { ascending: false, nullsFirst: false })
+      .order("criado_em", { ascending: false });
     return { query, countQuery };
   };
 

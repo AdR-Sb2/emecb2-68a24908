@@ -66,6 +66,8 @@ const FIELD_ALIASES: Record<string, string> = {
   "data de entrada": "data_entrada",
   "data entrada": "data_entrada",
   "data do documento": "data_entrada",
+  data: "data_entrada",
+  "dt entrada": "data_entrada",
   "data de modif.mestre ordens": "data_modificacao",
   "data de modificacao": "data_modificacao",
   "data de modificaçao": "data_modificacao",
