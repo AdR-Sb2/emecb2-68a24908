@@ -86,6 +86,7 @@ type PontoTendencia = {
   mes: string;
   preventiva: number;
   corretiva: number;
+  total: number;
 };
 
 type PontoTendenciaComRazao = PontoTendencia & {
