@@ -925,6 +925,15 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
                               {formatDate(a.data_entrada)}
                             </span>
                           )}
+                          {encerrado && a.data_modificacao && (
+                            <span
+                              className="inline-flex items-center gap-1"
+                              title="Data de fechamento da nota (coluna W 'Data de modif.mestre ordens' do SAP)"
+                            >
+                              <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 opacity-70 dark:text-emerald-400" />{" "}
+                              Fechada em {formatDate(a.data_modificacao)}
+                            </span>
+                          )}
                           {a.nota && (
                             <span className="inline-flex items-center gap-1">
                               <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" /> Nota {a.nota}

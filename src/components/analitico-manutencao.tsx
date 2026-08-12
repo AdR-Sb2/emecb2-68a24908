@@ -68,6 +68,7 @@ type LinhaAnalitico = {
   razao_corretiva_preventiva: number | null;
   status_plano: string;
   justificativa_sem_preventiva: string | null;
+  data_nota_fechada: string | null;
 };
 
 type DetalheOS = {
@@ -76,6 +77,7 @@ type DetalheOS = {
   inicio_sla: string | null;
   fim_sla: string | null;
   data_entrada: string | null;
+  data_fechada: string | null;
 };
 
 type DetalhesOSPorElevatoria = Record<"preventiva" | "corretiva" | "ztpc", DetalheOS[]>;
@@ -253,6 +255,7 @@ const CABECALHO_COLUNAS = [
   "Município",
   "Última preventiva válida",
   "Dias sem preventiva",
+  "Data nota fechada",
   "Preventiva (janela)",
   "Corretiva (janela)",
   "P. Condição (janela)",
@@ -265,8 +268,10 @@ const COLUNA_TOOLTIP: Record<string, string> = {
   Elevatória: "Nome da elevatória (estação de bombeamento)",
   Município: "Cidade onde a elevatória está localizada",
   "Última preventiva válida":
-    "Data da O.S. mais recente do tipo Preventiva por Frequência (ZTPF) ou Preditiva (ZTPD)",
+    "Data da O.S. mais recente do tipo Preventiva por Frequência (ZTPF) ou Preditiva (ZTPD), considerando a data de fechamento da nota (coluna 'Data de modif.mestre ordens' do SAP, ou a data de entrada quando sem fechamento)",
   "Dias sem preventiva": "Quantidade de dias corridos desde a última preventiva válida até hoje",
+  "Data nota fechada":
+    "Data de fechamento da nota (coluna W 'Data de modif.mestre ordens' do SAP) da O.S. mais recente da elevatória",
   "Preventiva (janela)":
     "Quantidade de preventivas válidas (ZTPF + ZTPD) dentro do período selecionado no filtro de janela",
   "Corretiva (janela)":
@@ -276,7 +281,7 @@ const COLUNA_TOOLTIP: Record<string, string> = {
   "Razão Corr/Prev":
     "Corretivas dividido por preventivas válidas na janela. Acima de 1 indica que a elevatória está recebendo mais corretiva do que preventiva",
   Status:
-    "Classificação: Normal (<45 dias sem preventiva), Atrasado (45–89 dias), Parado (90+ dias), Crítico (zero preventiva válida com corretiva ocorrendo), Sem dados (nenhuma O.S. registrada no período)",
+    "Classificação: Normal (<45 dias sem preventiva), Atrasado (45–89 dias), Parado (90+ dias), Crítico (zero preventiva válida com corretiva ocorrendo), Sem dados (nenhuma O.S. registrada no período). A 'preventiva válida' considera a data de fechamento da nota (coluna 'Data de modif.mestre ordens')",
   "Justificativa (sem preventiva)":
     "Anotação livre (ex.: NOVO, INSTALANDO, EM ANÁLISE) para elevatórias que nunca tiveram preventiva válida — permite explicar o motivo de estarem sem preventiva",
 };
@@ -340,6 +345,8 @@ function valorCelula(linha: LinhaAnalitico, coluna: string): string {
       return linha.dias_sem_preventiva_valida != null
         ? String(linha.dias_sem_preventiva_valida)
         : "—";
+    case "Data nota fechada":
+      return formatDate(linha.data_nota_fechada);
     case "Preventiva (janela)":
       return String(linha.qtd_preventiva_valida_janela);
     case "Corretiva (janela)":
@@ -369,6 +376,8 @@ function valorOrdenacao(linha: LinhaAnalitico, coluna: string): string | number 
       return linha.ultima_preventiva_valida;
     case "Dias sem preventiva":
       return linha.dias_sem_preventiva_valida;
+    case "Data nota fechada":
+      return linha.data_nota_fechada;
     case "Preventiva (janela)":
       return linha.qtd_preventiva_valida_janela;
     case "Corretiva (janela)":
@@ -465,7 +474,11 @@ function CelulaOSDetalhes({ quantidade, detalhes }: { quantidade: number; detalh
                   {d.ordem}
                 </span>
                 <span className="shrink-0 text-[10px] text-slate-400">
-                  {d.data_entrada ? formatDate(d.data_entrada) : ""}
+                  {d.data_fechada
+                    ? `Fechada ${formatDate(d.data_fechada)}`
+                    : d.data_entrada
+                      ? formatDate(d.data_entrada)
+                      : ""}
                 </span>
               </div>
               <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
@@ -1505,6 +1518,12 @@ export function AnaliticoManutencao() {
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td
+                      className="px-3 py-2 text-slate-600 dark:text-slate-300"
+                      title="Data de fechamento da nota (coluna W 'Data de modif.mestre ordens' do SAP) da O.S. mais recente"
+                    >
+                      {formatDate(l.data_nota_fechada)}
                     </td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                       {l.qtd_preventiva_valida_janela}
