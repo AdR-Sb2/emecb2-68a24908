@@ -795,7 +795,7 @@ function ElevatoriaFichaPage() {
                     campo="tipo"
                     label="Tipo"
                     valor={elevatoria.tipo}
-                    opcoes={["EAT", "Booster", "Container"]}
+                    opcoes={["EAT", "Booster", "Container", "Condomínio"]}
                     tipo="select"
                     editOnly
                   />
