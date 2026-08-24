@@ -716,6 +716,9 @@ function TooltipTendencia({
       <p className="mb-1 font-bold text-slate-700 dark:text-slate-200">
         {formatMesLabel(ponto.mes)}
       </p>
+      <p className="text-[#1f7ad6] dark:text-[#60a5fa]">
+        Total executadas: {ponto.total}
+      </p>
       <p className="text-emerald-600 dark:text-emerald-400">
         Preventiva válida: {ponto.preventiva}
       </p>
