@@ -1091,6 +1091,8 @@ function ElevatoriaFichaPage() {
                             campo="tipo_construtivo_elevatoria"
                             label="Tipo Construtivo"
                             valor={eq.tipo_construtivo_elevatoria}
+                            tipo="select"
+                            opcoes={["Abrigada", "Submersa", "Tubulão", "Casinha", "Container"]}
                             grupo={eq.grupo}
                           />
                           <InputField

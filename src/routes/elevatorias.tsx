@@ -94,6 +94,7 @@ function ElevatoriasPage() {
   const [filtroKpi, setFiltroKpi] = useState("");
   const [editandoTipo, setEditandoTipo] = useState<number | null>(null);
   const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
+  const [editandoTipoConstrutivo, setEditandoTipoConstrutivo] = useState<number | null>(null);
   const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">(
     () => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc",
@@ -1408,8 +1409,72 @@ function ElevatoriasPage() {
                         </td>
                         {permissoes.podeVerMestres && (
                           <>
-                            <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
-                              {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || "—"}
+                            <td className="whitespace-nowrap px-3 py-2">
+                              {permissoes.podeEditarMestres && editandoTipoConstrutivo === elev.id ? (
+                                <select
+                                  value={equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || ""}
+                                  onChange={async (e) => {
+                                    const newVal = e.target.value || null;
+                                    setEditandoTipoConstrutivo(null);
+                                    const eq = equipPorElev.get(elev.id)?.[0];
+                                    if (eq) {
+                                      const { error } = await supabase
+                                        .from("elevatoria_equipamento")
+                                        .update({ tipo_construtivo_elevatoria: newVal })
+                                        .eq("id", eq.id);
+                                      if (error) {
+                                        toast.error("Erro ao salvar tipo construtivo");
+                                      } else {
+                                        setEquipamentos((prev) =>
+                                          prev.map((p) =>
+                                            p.id === eq.id
+                                              ? { ...p, tipo_construtivo_elevatoria: newVal }
+                                              : p,
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      const { data, error } = await supabase
+                                        .from("elevatoria_equipamento")
+                                        .insert({
+                                          elevatoria_id: elev.id,
+                                          grupo: 1,
+                                          tipo_construtivo_elevatoria: newVal,
+                                        })
+                                        .select()
+                                        .single();
+                                      if (error) {
+                                        toast.error("Erro ao salvar tipo construtivo");
+                                      } else if (data) {
+                                        setEquipamentos((prev) => [...prev, data]);
+                                      }
+                                    }
+                                  }}
+                                  onBlur={() => setEditandoTipoConstrutivo(null)}
+                                  className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                                  autoFocus
+                                >
+                                  <option value="">—</option>
+                                  <option value="ABRIGADA">Abrigada</option>
+                                  <option value="SUBMERSA">Submersa</option>
+                                  <option value="TUBULÃO">Tubulão</option>
+                                  <option value="CASINHA">Casinha</option>
+                                  <option value="CONTAINER">Container</option>
+                                </select>
+                              ) : permissoes.podeEditarMestres ? (
+                                <span
+                                  onClick={() => setEditandoTipoConstrutivo(elev.id)}
+                                  className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                >
+                                  <Badge variant="outline" className="text-[11px]">
+                                    {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || "—"}
+                                  </Badge>
+                                </span>
+                              ) : (
+                                <Badge variant="outline" className="text-[11px]">
+                                  {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || "—"}
+                                </Badge>
+                              )}
                             </td>
                             <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
                               {equipPorElev.get(elev.id)?.[0]?.potencia_motor_cv || "—"}
