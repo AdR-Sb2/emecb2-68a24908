@@ -31,6 +31,7 @@ import { getPermissoesCargo, temPermissao, temPainel } from "@/lib/permissoes";
 import type {
   Elevatoria,
   ElevatoriaEquipamento,
+  ElevatoriaEletricaGeral,
   ElevatoriaCompletude,
   CompletudeNivel,
   StatusImplantacao,
@@ -81,6 +82,7 @@ function ElevatoriasPage() {
   const [elevatorias, setElevatorias] = useState<Elevatoria[]>([]);
   const [implantacoes, setImplantacoes] = useState<ElevatoriaImplantacao[]>([]);
   const [equipamentos, setEquipamentos] = useState<ElevatoriaEquipamento[]>([]);
+  const [eletricaGeral, setEletricaGeral] = useState<ElevatoriaEletricaGeral[]>([]);
   const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
   const [filtroSecaoCompletude, setFiltroSecaoCompletude] = useState("geral");
   const [loading, setLoading] = useState(true);
@@ -184,14 +186,16 @@ function ElevatoriasPage() {
 
   const carregarDados = async () => {
     setLoading(true);
-    const [elevRes, impRes, equipRes] = await Promise.all([
+    const [elevRes, impRes, equipRes, egRes] = await Promise.all([
       supabase.from("elevatorias").select("*").order("nome"),
       supabase.from("elevatoria_implantacao").select("*"),
       supabase.from("elevatoria_equipamento").select("*"),
+      supabase.from("elevatoria_eletrica_geral").select("*"),
     ]);
     if (elevRes.data) setElevatorias(elevRes.data);
     if (impRes.data) setImplantacoes(impRes.data);
     if (equipRes.data) setEquipamentos(equipRes.data);
+    if (egRes.data) setEletricaGeral(egRes.data);
 
     if (elevRes.data) {
       await calcularCompletudes(elevRes.data);
@@ -377,6 +381,14 @@ function ElevatoriasPage() {
     return map;
   }, [equipamentos]);
 
+  const egPorElev = useMemo(() => {
+    const map = new Map<number, ElevatoriaEletricaGeral>();
+    for (const eg of eletricaGeral) {
+      map.set(eg.elevatoria_id, eg);
+    }
+    return map;
+  }, [eletricaGeral]);
+
   const tiposConstrutivos = useMemo(() => {
     const s = new Set(equipamentos.map((e) => e.tipo_construtivo_elevatoria).filter(Boolean));
     return Array.from(s).sort() as string[];
@@ -537,6 +549,33 @@ function ElevatoriasPage() {
     if (error) {
       toast.error("Erro ao salvar OBS");
       setElevatorias((prev) => prev.map((e) => (e.id === elev.id ? { ...e, obs: elev.obs } : e)));
+    }
+  };
+
+  const salvarUC = async (elevId: number, valor: string | null) => {
+    const eg = egPorElev.get(elevId);
+    if (eg) {
+      const { error } = await supabase
+        .from("elevatoria_eletrica_geral")
+        .update({ num_cliente: valor })
+        .eq("id", eg.id);
+      if (error) {
+        toast.error("Erro ao salvar UC");
+        setEletricaGeral((prev) =>
+          prev.map((p) => (p.id === eg.id ? { ...p, num_cliente: eg.num_cliente } : p)),
+        );
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("elevatoria_eletrica_geral")
+        .insert({ elevatoria_id: elevId, num_cliente: valor })
+        .select()
+        .single();
+      if (error) {
+        toast.error("Erro ao salvar UC");
+      } else if (data) {
+        setEletricaGeral((prev) => [...prev, data]);
+      }
     }
   };
 
@@ -914,12 +953,14 @@ function ElevatoriasPage() {
       const basicData = filtered.map((e) => {
         const imp = implantacoes.find((i) => i.elevatoria_id === e.id);
         const eq = equipPorElev.get(e.id)?.[0];
+        const eg = egPorElev.get(e.id);
         return {
           Nome: e.nome,
           Planta: e.planta || "",
           Tipo: e.tipo || "",
           "Tipo Construtivo": eq?.tipo_construtivo_elevatoria || "",
           "Potência Motor (CV)": eq?.potencia_motor_cv || "",
+          UC: eg?.num_cliente || "",
           Superintendência: e.superintendencia || "",
           Endereço: e.endereco || "",
           Bairro: e.bairro || "",
@@ -1331,6 +1372,9 @@ function ElevatoriasPage() {
                         {sortField === "implantacao" && <ArrowUpDown className="h-3 w-3" />}
                       </span>
                     </th>
+                    {permissoes.podeVerMestres && (
+                      <th className="whitespace-nowrap px-3 py-2.5 font-semibold">UC</th>
+                    )}
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">OBS</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Ações</th>
                   </tr>
@@ -1568,6 +1612,36 @@ function ElevatoriasPage() {
                             "—"
                           )}
                         </td>
+                        {permissoes.podeVerMestres && (
+                          <td className="whitespace-nowrap px-3 py-2 max-w-[120px]">
+                            {permissoes.podeEditarMestres ? (
+                              <input
+                                value={egPorElev.get(elev.id)?.num_cliente || ""}
+                                onChange={(e) => {
+                                  const newVal = e.target.value;
+                                  setEletricaGeral((prev) => {
+                                    const eg = prev.find((p) => p.elevatoria_id === elev.id);
+                                    if (eg) {
+                                      return prev.map((p) =>
+                                        p.elevatoria_id === elev.id
+                                          ? { ...p, num_cliente: newVal || null }
+                                          : p,
+                                      );
+                                    }
+                                    return prev;
+                                  });
+                                }}
+                                onBlur={(e) => salvarUC(elev.id, e.target.value || null)}
+                                placeholder="Clique para editar..."
+                                className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-slate-600 placeholder-slate-300 hover:border-slate-200 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-300 dark:placeholder-slate-500"
+                              />
+                            ) : (
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                {egPorElev.get(elev.id)?.num_cliente || "—"}
+                              </span>
+                            )}
+                          </td>
+                        )}
                         <td className="whitespace-nowrap px-3 py-2 max-w-[150px]">
                           {permissoes.podeEditar ? (
                             <input
