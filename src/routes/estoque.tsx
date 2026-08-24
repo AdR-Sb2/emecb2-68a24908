@@ -1119,37 +1119,50 @@ function EstoquePage() {
         ignorados++;
         continue;
       }
-      const { error } = await supabase.from("compras").upsert(
-        {
-          requisicao,
-          item_rc,
-          cod_sap: d.cod_sap || null,
-          descricao_material: d.descricao_material || "",
-          qtde_rc: Number(d.qtde_rc) || 0,
-          comprador_cotacao: d.comprador_cotacao || null,
-          pedido: d.pedido || null,
-          fornecedor: d.fornecedor || null,
-          deposito_rc: d.deposito_rc || null,
-          status_geral: d.status_geral || null,
-          dt_criacao_rc: d.dt_criacao_rc || null,
-          dt_aprovacao_rc: d.dt_aprovacao_rc || null,
-          dt_criacao_pedido: d.dt_criacao_pedido || null,
-          dt_remessa_pedido: d.dt_remessa_pedido || null,
-          data_confirmada: d.data_confirmada || d.dt_prevista_entrega || null,
-          emissao_nf: d.emissao_nf || null,
-          dt_pagamento: d.dt_pagamento || null,
-          chegou: toBoolean(d.chegou),
-          data_chegou: d.data_chegou || null,
-          foi_retirado: toBoolean(d.foi_retirado),
-          data_retirado: d.data_retirado || null,
-          cobrado_via_email: toBoolean(d.cobrado_via_email),
-          observacao: d.observacao || null,
-          rc_em_fila: toBoolean(d.rc_em_fila),
-          afeta_saldo: toBoolean(d.afeta_saldo),
-          criado_por: "IMPORTACAO_PLANILHA",
-        },
-        { onConflict: "requisicao,item_rc" },
-      );
+      const row: Record<string, unknown> = { requisicao, item_rc };
+      const str = (key: string) => {
+        const v = d[key];
+        if (v !== undefined && v !== null && String(v).trim() !== "") row[key] = v;
+      };
+      const num = (key: string) => {
+        const v = Number(d[key]);
+        if (d[key] !== undefined && d[key] !== null && String(d[key]).trim() !== "" && !isNaN(v))
+          row[key] = v;
+      };
+      const bool = (key: string) => {
+        const v = d[key];
+        if (v !== undefined && v !== null && String(v).trim() !== "") row[key] = toBoolean(v);
+      };
+
+      str("cod_sap");
+      str("descricao_material");
+      num("qtde_rc");
+      str("comprador_cotacao");
+      str("pedido");
+      str("fornecedor");
+      str("deposito_rc");
+      str("status_geral");
+      str("dt_criacao_rc");
+      str("dt_aprovacao_rc");
+      str("dt_criacao_pedido");
+      str("dt_remessa_pedido");
+      str("data_confirmada");
+      if (!row.data_confirmada && d.dt_prevista_entrega)
+        row.data_confirmada = d.dt_prevista_entrega;
+      str("emissao_nf");
+      str("dt_pagamento");
+      bool("chegou");
+      str("data_chegou");
+      bool("foi_retirado");
+      str("data_retirado");
+      bool("cobrado_via_email");
+      str("observacao");
+      bool("rc_em_fila");
+      bool("afeta_saldo");
+
+      const { error } = await supabase.from("compras").upsert(row, {
+        onConflict: "requisicao,item_rc",
+      });
       if (!error) importados++;
       else ignorados++;
     }
