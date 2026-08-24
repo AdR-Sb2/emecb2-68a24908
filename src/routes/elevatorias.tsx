@@ -30,6 +30,7 @@ import type { PermissoesRegistros } from "@/lib/registros-permissoes";
 import { getPermissoesCargo, temPermissao, temPainel } from "@/lib/permissoes";
 import type {
   Elevatoria,
+  ElevatoriaEquipamento,
   ElevatoriaCompletude,
   CompletudeNivel,
   StatusImplantacao,
@@ -79,6 +80,7 @@ function ElevatoriasPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [elevatorias, setElevatorias] = useState<Elevatoria[]>([]);
   const [implantacoes, setImplantacoes] = useState<ElevatoriaImplantacao[]>([]);
+  const [equipamentos, setEquipamentos] = useState<ElevatoriaEquipamento[]>([]);
   const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
   const [filtroSecaoCompletude, setFiltroSecaoCompletude] = useState("geral");
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,8 @@ function ElevatoriasPage() {
   const [filtroCompletude, setFiltroCompletude] = useState("TODAS");
   const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
+  const [filtroTipoConstrutivo, setFiltroTipoConstrutivo] = useState("TODAS");
+  const [filtroPotenciaMotor, setFiltroPotenciaMotor] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
   const [editandoTipo, setEditandoTipo] = useState<number | null>(null);
   const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
@@ -179,12 +183,14 @@ function ElevatoriasPage() {
 
   const carregarDados = async () => {
     setLoading(true);
-    const [elevRes, impRes] = await Promise.all([
+    const [elevRes, impRes, equipRes] = await Promise.all([
       supabase.from("elevatorias").select("*").order("nome"),
       supabase.from("elevatoria_implantacao").select("*"),
+      supabase.from("elevatoria_equipamento").select("*"),
     ]);
     if (elevRes.data) setElevatorias(elevRes.data);
     if (impRes.data) setImplantacoes(impRes.data);
+    if (equipRes.data) setEquipamentos(equipRes.data);
 
     if (elevRes.data) {
       await calcularCompletudes(elevRes.data);
@@ -360,6 +366,26 @@ function ElevatoriasPage() {
     return Array.from(s).sort();
   }, [elevatorias]);
 
+  const equipPorElev = useMemo(() => {
+    const map = new Map<number, ElevatoriaEquipamento[]>();
+    for (const eq of equipamentos) {
+      const list = map.get(eq.elevatoria_id) ?? [];
+      list.push(eq);
+      map.set(eq.elevatoria_id, list);
+    }
+    return map;
+  }, [equipamentos]);
+
+  const tiposConstrutivos = useMemo(() => {
+    const s = new Set(equipamentos.map((e) => e.tipo_construtivo_elevatoria).filter(Boolean));
+    return Array.from(s).sort() as string[];
+  }, [equipamentos]);
+
+  const potenciasMotor = useMemo(() => {
+    const s = new Set(equipamentos.map((e) => e.potencia_motor_cv).filter(Boolean));
+    return Array.from(s).sort() as string[];
+  }, [equipamentos]);
+
   const kpis = useMemo(() => {
     const total = elevatorias.length;
     let completudeMedia = 0;
@@ -408,6 +434,18 @@ function ElevatoriasPage() {
         list = list.filter((e) => idsFiltro.has(e.id));
       }
     }
+    if (filtroTipoConstrutivo !== "TODAS") {
+      list = list.filter((e) => {
+        const eqs = equipPorElev.get(e.id);
+        return eqs?.some((eq) => eq.tipo_construtivo_elevatoria === filtroTipoConstrutivo);
+      });
+    }
+    if (filtroPotenciaMotor !== "TODAS") {
+      list = list.filter((e) => {
+        const eqs = equipPorElev.get(e.id);
+        return eqs?.some((eq) => eq.potencia_motor_cv === filtroPotenciaMotor);
+      });
+    }
     if (filtroKpi === "criticas")
       list = list.filter((e) => completudes.get(`${e.id}:geral`)?.nivel === "critico");
     if (filtroKpi === "implantacao") {
@@ -432,6 +470,14 @@ function ElevatoriasPage() {
           ? IMPLANTACAO_STATUS_OPCOES.findIndex((o) => o.value === bImp.status)
           : -1;
         cmp = aVal - bVal;
+      } else if (sortField === "tipo_construtivo") {
+        const aEq = equipPorElev.get(a.id)?.[0]?.tipo_construtivo_elevatoria ?? "";
+        const bEq = equipPorElev.get(b.id)?.[0]?.tipo_construtivo_elevatoria ?? "";
+        cmp = aEq.localeCompare(bEq, "pt-BR", { numeric: true });
+      } else if (sortField === "potencia_motor") {
+        const aEq = equipPorElev.get(a.id)?.[0]?.potencia_motor_cv ?? "";
+        const bEq = equipPorElev.get(b.id)?.[0]?.potencia_motor_cv ?? "";
+        cmp = aEq.localeCompare(bEq, "pt-BR", { numeric: true });
       } else {
         const aVal = a[sortField as keyof Elevatoria];
         const bVal = b[sortField as keyof Elevatoria];
@@ -450,9 +496,12 @@ function ElevatoriasPage() {
     filtroCompletude,
     filtroSecaoCompletude,
     filtroImplantacao,
+    filtroTipoConstrutivo,
+    filtroPotenciaMotor,
     filtroKpi,
     completudes,
     implantacoes,
+    equipPorElev,
     sortField,
     sortDir,
   ]);
@@ -863,10 +912,13 @@ function ElevatoriasPage() {
 
       const basicData = filtered.map((e) => {
         const imp = implantacoes.find((i) => i.elevatoria_id === e.id);
+        const eq = equipPorElev.get(e.id)?.[0];
         return {
           Nome: e.nome,
           Planta: e.planta || "",
           Tipo: e.tipo || "",
+          "Tipo Construtivo": eq?.tipo_construtivo_elevatoria || "",
+          "Potência Motor (CV)": eq?.potencia_motor_cv || "",
           Superintendência: e.superintendencia || "",
           Endereço: e.endereco || "",
           Bairro: e.bairro || "",
@@ -1180,12 +1232,42 @@ function ElevatoriasPage() {
                 </option>
               ))}
             </select>
+
+            {permissoes.podeVerMestres && (
+              <select
+                value={filtroTipoConstrutivo}
+                onChange={(e) => setFiltroTipoConstrutivo(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="TODAS">Tipo construtivo</option>
+                {tiposConstrutivos.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {permissoes.podeVerMestres && (
+              <select
+                value={filtroPotenciaMotor}
+                onChange={(e) => setFiltroPotenciaMotor(e.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <option value="TODAS">Potência motor</option>
+                {potenciasMotor.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Table */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="max-h-[600px] overflow-auto">
-              <table className="min-w-[800px] w-full text-left text-[13px]">
+              <table className="min-w-[1100px] w-full text-left text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                   <tr>
                     {(["nome", "planta", "tipo", "municipio"] as const).map((f) => (
@@ -1207,15 +1289,37 @@ function ElevatoriasPage() {
                       </th>
                     ))}
                     {permissoes.podeVerMestres && (
-                      <th
-                        className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]"
-                        onClick={() => handleSort("completude")}
-                      >
-                        <span className="inline-flex items-center gap-1">
-                          Completude{" "}
-                          {sortField === "completude" && <ArrowUpDown className="h-3 w-3" />}
-                        </span>
-                      </th>
+                      <>
+                        <th
+                          className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]"
+                          onClick={() => handleSort("tipo_construtivo")}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            Tipo Construtivo
+                            {sortField === "tipo_construtivo" && (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                          </span>
+                        </th>
+                        <th
+                          className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]"
+                          onClick={() => handleSort("potencia_motor")}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            Potência Motor
+                            {sortField === "potencia_motor" && <ArrowUpDown className="h-3 w-3" />}
+                          </span>
+                        </th>
+                        <th
+                          className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]"
+                          onClick={() => handleSort("completude")}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            Completude{" "}
+                            {sortField === "completude" && <ArrowUpDown className="h-3 w-3" />}
+                          </span>
+                        </th>
+                      </>
                     )}
                     <th
                       className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]"
@@ -1303,13 +1407,21 @@ function ElevatoriasPage() {
                           {elev.municipio || "—"}
                         </td>
                         {permissoes.podeVerMestres && (
-                          <td className="whitespace-nowrap px-3 py-2">
-                            {comp ? (
-                              <BadgeCompletude nivel={comp.nivel} percentual={comp.percentual} />
-                            ) : (
-                              "—"
-                            )}
-                          </td>
+                          <>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
+                              {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
+                              {equipPorElev.get(elev.id)?.[0]?.potencia_motor_cv || "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2">
+                              {comp ? (
+                                <BadgeCompletude nivel={comp.nivel} percentual={comp.percentual} />
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </>
                         )}
                         <td className="whitespace-nowrap px-3 py-2">
                           {permissoes.podeEditarMestres && editandoImplantacao === elev.id ? (
