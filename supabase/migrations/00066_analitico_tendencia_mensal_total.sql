@@ -2,6 +2,8 @@
 -- Migration: Atualizar função analitico_tendencia_mensal com total
 -- ============================================================
 
+DROP FUNCTION IF EXISTS analitico_tendencia_mensal(integer, text[]);
+
 CREATE OR REPLACE FUNCTION analitico_tendencia_mensal(ultimos_meses integer DEFAULT 24, municipios text[] DEFAULT NULL)
 RETURNS TABLE (
   mes text,
