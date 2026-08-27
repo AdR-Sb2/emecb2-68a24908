@@ -6,8 +6,6 @@ import {
   Search,
   History,
   Calendar,
-  CheckCircle2,
-  AlertTriangle,
   HardHat,
   Eye,
 } from "lucide-react";
@@ -19,7 +17,6 @@ import type {
   Elevatoria,
   ElevatoriaEquipamento,
   ElevatoriaEletricaGeral,
-  ElevatoriaCompletude,
   ElevatoriaImplantacao,
   StatusImplantacao,
 } from "@/lib/elevatoria-types";
@@ -45,7 +42,6 @@ function PublicoElevatoriasPage() {
   const [implantacoes, setImplantacoes] = useState<ElevatoriaImplantacao[]>([]);
   const [equipamentos, setEquipamentos] = useState<ElevatoriaEquipamento[]>([]);
   const [eletricaGeral, setEletricaGeral] = useState<ElevatoriaEletricaGeral[]>([]);
-  const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [search, setSearch] = useState("");
