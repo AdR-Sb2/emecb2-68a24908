@@ -28,6 +28,7 @@ export type CronogramaItem = {
   os_referencia: string | null;
   rc_referencia: string | null;
   responsavel_id: string | null;
+  custo_material: number | null;
   metadados: Record<string, unknown> | null;
   criado_em: string | null;
   atualizado_em: string | null;

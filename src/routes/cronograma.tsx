@@ -348,7 +348,7 @@ function CronogramaPage() {
       return;
     }
     setProjetoAtivo((prev) => (prev ? { ...prev, link_publico_token: token } : null));
-    const url = `${window.location.origin}/cronograma/publico/${token}`;
+    const url = `${window.location.origin}/publico/${token}`;
     await navigator.clipboard.writeText(url);
     toast.success("Link copiado para área de transferência");
   }
