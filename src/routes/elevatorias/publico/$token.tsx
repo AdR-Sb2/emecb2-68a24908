@@ -79,43 +79,8 @@ function PublicoElevatoriasPage() {
       if (equipRes.data) setEquipamentos(equipRes.data as ElevatoriaEquipamento[]);
       if (egRes.data) setEletricaGeral(egRes.data as ElevatoriaEletricaGeral[]);
 
-      // Calculate completude
-      if (elevRes.data) {
-        const calcMap = new Map<string, ElevatoriaCompletude>();
-        for (const elev of elevRes.data) {
-          let total = 0;
-          let preenchidos = 0;
-          const fields = [
-            "nome",
-            "planta",
-            "tipo",
-            "municipio",
-            "endereco",
-            "bairro",
-            "cep",
-            "inicio_operacao",
-            "funcao",
-            "caracteristicas_area",
-          ];
-          for (const f of fields) {
-            total++;
-            if (elev[f as keyof Elevatoria] !== null && elev[f as keyof Elevatoria] !== "") {
-              preenchidos++;
-            }
-          }
-          const pct = total > 0 ? Math.round((preenchidos / total) * 100) : 100;
-          const nivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
-          calcMap.set(`${elev.id}:geral`, {
-            elevatoria_id: elev.id,
-            total_campos: total,
-            preenchidos,
-            na_aplicaveis: 0,
-            percentual: pct,
-            nivel,
-          });
-        }
-        setCompletudes(calcMap);
-      }
+
+
       setLoading(false);
     })();
   }, [token]);
