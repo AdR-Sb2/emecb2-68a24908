@@ -392,29 +392,22 @@ function PublicoElevatoriasPage() {
                             <span className="text-slate-400">—</span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          {comp ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${comp.percentual}%`,
-                                    backgroundColor:
-                                      comp.nivel === "bom"
-                                        ? "#22c55e"
-                                        : comp.nivel === "atencao"
-                                          ? "#f59e0b"
-                                          : "#ef4444",
-                                  }}
-                                />
-                              </div>
-                              <span className="text-[10px] text-slate-500">{comp.percentual}%</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                          {equip?.tipo_construtivo_elevatoria || "—"}
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                          {equip?.potencia_motor_cv || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                          {eg?.unidade_consumo || "—"}
+                        </td>
+                        <td
+                          className="max-w-[240px] truncate px-3 py-2.5 text-slate-600"
+                          title={elev.obs || ""}
+                        >
+                          {elev.obs || "—"}
+                        </td>
+
                         <td className="whitespace-nowrap px-3 py-2.5">
                           <button
                             onClick={() => setRegistrosDialog(elev.id)}
