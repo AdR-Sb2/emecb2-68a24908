@@ -346,8 +346,14 @@ function PublicoElevatoriasPage() {
                       </th>
                     ))}
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Implantação</th>
-                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Completude</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                      Tipo Construtivo
+                    </th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Potência Motor</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">UC</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Obs</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Ações</th>
+
                   </tr>
                 </thead>
                 <tbody>
