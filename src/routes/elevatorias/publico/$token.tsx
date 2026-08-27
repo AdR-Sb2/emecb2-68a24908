@@ -152,23 +152,13 @@ function PublicoElevatoriasPage() {
 
   const kpis = useMemo(() => {
     const total = elevatorias.length;
-    let completudeMedia = 0;
-    let criticas = 0;
     let operacionais = 0;
     for (const e of elevatorias) {
-      const c = completudes.get(`${e.id}:geral`);
-      if (c) completudeMedia += c.percentual;
-      if (c?.nivel === "critico") criticas++;
       const imp = implantacoes.find((i) => i.elevatoria_id === e.id);
       if (imp?.status === "operacional") operacionais++;
     }
-    return {
-      total,
-      completudeMedia: total > 0 ? Math.round(completudeMedia / total) : 0,
-      criticas,
-      operacionais,
-    };
-  }, [elevatorias, completudes, implantacoes]);
+    return { total, operacionais };
+  }, [elevatorias, implantacoes]);
 
   function toggleSort(field: string) {
     if (sortField === field) {
