@@ -31,6 +31,7 @@ import { Route as TestesRouteImport } from './routes/testes'
 import { Route as ApiEquipeOverrideRouteImport } from './routes/api/equipe-override'
 import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
 import { Route as CronogramaPublicoTokenRouteImport } from './routes/cronograma/publico/$token'
+import { Route as ElevatoriasPublicoTokenRouteImport } from './routes/elevatorias/publico/$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -142,6 +143,11 @@ const CronogramaPublicoTokenRoute = CronogramaPublicoTokenRouteImport.update({
   path: '/publico/$token',
   getParentRoute: () => CronogramaRoute,
 } as any)
+const ElevatoriasPublicoTokenRoute = ElevatoriasPublicoTokenRouteImport.update({
+  id: '/publico/$token',
+  path: '/publico/$token',
+  getParentRoute: () => ElevatoriasRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
   '/elevatorias/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
+  '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
   '/elevatorias/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
+  '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -289,6 +297,7 @@ export interface FileRouteTypes {
     | '/api/equipe-override'
     | '/elevatorias_/$id'
     | '/cronograma/publico/$token'
+    | '/elevatorias/publico/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -471,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CronogramaPublicoTokenRouteImport
       parentRoute: typeof CronogramaRoute
     }
+    '/elevatorias/publico/$token': {
+      id: '/elevatorias/publico/$token'
+      path: '/publico/$token'
+      fullPath: '/elevatorias/publico/$token'
+      preLoaderRoute: typeof ElevatoriasPublicoTokenRouteImport
+      parentRoute: typeof ElevatoriasRoute
+    }
   }
 }
 
@@ -486,6 +502,18 @@ const CronogramaRouteWithChildren = CronogramaRoute._addFileChildren(
   CronogramaRouteChildren,
 )
 
+interface ElevatoriasRouteChildren {
+  ElevatoriasPublicoTokenRoute: typeof ElevatoriasPublicoTokenRoute
+}
+
+const ElevatoriasRouteChildren: ElevatoriasRouteChildren = {
+  ElevatoriasPublicoTokenRoute: ElevatoriasPublicoTokenRoute,
+}
+
+const ElevatoriasRouteWithChildren = ElevatoriasRoute._addFileChildren(
+  ElevatoriasRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -494,7 +522,7 @@ const rootRouteChildren: RootRouteChildren = {
   BloqueadoRoute: BloqueadoRoute,
   CronogramaRoute: CronogramaRouteWithChildren,
   DashboardRoute: DashboardRoute,
-  ElevatoriasRoute: ElevatoriasRoute,
+  ElevatoriasRoute: ElevatoriasRouteWithChildren,
   EscalaRoute: EscalaRoute,
   EstoqueRoute: EstoqueRoute,
   LoginRoute: LoginRoute,

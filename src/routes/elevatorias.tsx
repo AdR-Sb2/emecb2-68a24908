@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useLocation, Outlet } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Building2,
@@ -15,6 +15,8 @@ import {
   Trash2,
   History,
   ArrowUpDown,
+  Share2,
+  Link2Off,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
@@ -43,8 +45,16 @@ export const Route = createFileRoute("/elevatorias")({
   head: () => ({
     meta: [{ title: "Eletromecânica · Ficha da Elevatória" }],
   }),
-  component: ElevatoriasPage,
+  component: ElevatoriasLayout,
 });
+
+function ElevatoriasLayout() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/elevatorias/publico/")) {
+    return <Outlet />;
+  }
+  return <ElevatoriasPage />;
+}
 
 type PermissoesElev = {
   podeVer: boolean;
@@ -54,6 +64,7 @@ type PermissoesElev = {
   podeExportar: boolean;
   podeImportar: boolean;
   podeVerRegistros: boolean;
+  podeGerarLink: boolean;
   permissoesRegistros: PermissoesRegistros;
 };
 
@@ -103,6 +114,7 @@ function ElevatoriasPage() {
   );
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
   const [pendentesRegistros, setPendentesRegistros] = useState(0);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
   const [permissoes, setPermissoes] = useState<PermissoesElev>({
     podeVer: false,
     podeEditar: false,
@@ -111,6 +123,7 @@ function ElevatoriasPage() {
     podeExportar: false,
     podeImportar: false,
     podeVerRegistros: false,
+    podeGerarLink: false,
     permissoesRegistros: { visualizar: false, criar: false, importar: false, anexarPdf: false },
   });
   const [dialogImportar, setDialogImportar] = useState(false);
@@ -148,6 +161,7 @@ function ElevatoriasPage() {
 
       const perms = await getPermissoesCargo(profile.cargo_id);
       const podeVerRegistros = temPermissao(perms, "registros", "visualizar");
+      const podeGerarLink = temPermissao(perms, "ficha_elevatoria", "gerar_link_publico");
       setPermissoes({
         podeVer: temPermissao(perms, "ficha_elevatoria", "ver"),
         podeEditar: temPermissao(perms, "ficha_elevatoria", "editar"),
@@ -156,6 +170,7 @@ function ElevatoriasPage() {
         podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
         podeImportar: temPermissao(perms, "ficha_elevatoria", "importar"),
         podeVerRegistros,
+        podeGerarLink,
         permissoesRegistros: {
           visualizar: podeVerRegistros,
           criar: temPermissao(perms, "registros", "criar"),
@@ -163,6 +178,16 @@ function ElevatoriasPage() {
           anexarPdf: temPermissao(perms, "registros", "anexar_pdf"),
         },
       });
+
+      // Load share link token
+      const { data: configData } = await supabase
+        .from("elevatorias_config")
+        .select("link_publico_token")
+        .eq("id", 1)
+        .maybeSingle();
+      if (configData?.link_publico_token) {
+        setLinkToken(configData.link_publico_token);
+      }
 
       if (podeVerRegistros) {
         const elevRes = await supabase.from("elevatorias").select("planta");
@@ -945,6 +970,37 @@ function ElevatoriasPage() {
     }
   };
 
+  // Gerar link público
+  const gerarLinkPublico = async () => {
+    const token = crypto.randomUUID();
+    const { error } = await supabase
+      .from("elevatorias_config")
+      .update({ link_publico_token: token })
+      .eq("id", 1);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setLinkToken(token);
+    const url = `${window.location.origin}/elevatorias/publico/${token}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copiado para área de transferência");
+  };
+
+  // Revogar link público
+  const revogarLinkPublico = async () => {
+    const { error } = await supabase
+      .from("elevatorias_config")
+      .update({ link_publico_token: null })
+      .eq("id", 1);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setLinkToken(null);
+    toast.success("Link revogado");
+  };
+
   const exportarPlanilha = async () => {
     try {
       toast.info("Gerando exportação...");
@@ -1090,6 +1146,27 @@ function ElevatoriasPage() {
             >
               <TrendingUp className="h-4 w-4" /> Analítico
             </button>
+          )}
+          {permissoes.podeGerarLink && (
+            <>
+              {linkToken ? (
+                <button
+                  onClick={revogarLinkPublico}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-red-300 bg-white dark:border-red-700 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
+                  title="Revogar link público"
+                >
+                  <Link2Off className="h-4 w-4" /> Revogar Link
+                </button>
+              ) : (
+                <button
+                  onClick={gerarLinkPublico}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
+                  title="Gerar link de apresentação"
+                >
+                  <Share2 className="h-4 w-4" /> Link
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1390,7 +1467,8 @@ function ElevatoriasPage() {
                       >
                         <td className="whitespace-nowrap px-3 py-2 font-medium text-[#0b3a73] dark:text-white">
                           <Link
-                            to="/elevatorias/$id" params={{ id: String(elev.id) }}
+                            to="/elevatorias/$id"
+                            params={{ id: String(elev.id) }}
                             className="hover:text-[#1f7ad6] hover:underline"
                           >
                             {elev.nome}
@@ -1455,9 +1533,13 @@ function ElevatoriasPage() {
                         {permissoes.podeVerMestres && (
                           <>
                             <td className="whitespace-nowrap px-3 py-2">
-                              {permissoes.podeEditarMestres && editandoTipoConstrutivo === elev.id ? (
+                              {permissoes.podeEditarMestres &&
+                              editandoTipoConstrutivo === elev.id ? (
                                 <select
-                                  value={equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || ""}
+                                  value={
+                                    equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria ||
+                                    ""
+                                  }
                                   onChange={async (e) => {
                                     const newVal = e.target.value || null;
                                     setEditandoTipoConstrutivo(null);
@@ -1512,12 +1594,14 @@ function ElevatoriasPage() {
                                   className="cursor-pointer rounded px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700"
                                 >
                                   <Badge variant="outline" className="text-[11px]">
-                                    {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || "—"}
+                                    {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria ||
+                                      "—"}
                                   </Badge>
                                 </span>
                               ) : (
                                 <Badge variant="outline" className="text-[11px]">
-                                  {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria || "—"}
+                                  {equipPorElev.get(elev.id)?.[0]?.tipo_construtivo_elevatoria ||
+                                    "—"}
                                 </Badge>
                               )}
                             </td>
@@ -1667,7 +1751,8 @@ function ElevatoriasPage() {
                         <td className="whitespace-nowrap px-3 py-2">
                           <div className="flex items-center gap-1.5">
                             <Link
-                              to="/elevatorias/$id" params={{ id: String(elev.id) }}
+                              to="/elevatorias/$id"
+                              params={{ id: String(elev.id) }}
                               className="rounded-md bg-[#eaf3fb] px-2.5 py-1 text-[11px] font-semibold text-[#1f7ad6] transition hover:bg-[#d4e6f7] dark:bg-slate-700 dark:text-[#38bdf8] dark:hover:bg-slate-600"
                             >
                               Abrir ficha
