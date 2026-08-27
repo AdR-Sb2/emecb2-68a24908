@@ -226,21 +226,9 @@ function PublicoElevatoriasPage() {
           <p className="mt-1 text-xs text-white/50">Águas do Rio · Eletromecânica Baixada 2</p>
 
           {/* KPIs */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-2">
             {[
               { label: "Total", value: kpis.total, icon: <Building2 className="h-4 w-4" /> },
-              {
-                label: "Completude",
-                value: `${kpis.completudeMedia}%`,
-                icon: <CheckCircle2 className="h-4 w-4" />,
-                accent: "#4ade80",
-              },
-              {
-                label: "Críticas",
-                value: kpis.criticas,
-                icon: <AlertTriangle className="h-4 w-4" />,
-                accent: "#f87171",
-              },
               {
                 label: "Operacionais",
                 value: kpis.operacionais,
