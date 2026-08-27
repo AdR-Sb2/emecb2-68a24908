@@ -46,6 +46,8 @@ function PublicoElevatoriasPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filtroMunicipio, setFiltroMunicipio] = useState("TODAS");
+  const [filtroTipo, setFiltroTipo] = useState("TODAS");
+  const [filtroTipoConstrutivo, setFiltroTipoConstrutivo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
   const [sortField, setSortField] = useState("nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -86,6 +88,16 @@ function PublicoElevatoriasPage() {
     return Array.from(s).sort() as string[];
   }, [elevatorias]);
 
+  const tipos = useMemo(() => {
+    const s = new Set(elevatorias.map((e) => e.tipo).filter(Boolean));
+    return Array.from(s).sort() as string[];
+  }, [elevatorias]);
+
+  const tiposConstrutivos = useMemo(() => {
+    const s = new Set(equipamentos.map((e) => e.tipo_construtivo_elevatoria).filter(Boolean));
+    return Array.from(s).sort() as string[];
+  }, [equipamentos]);
+
   const filtered = useMemo(() => {
     let result = elevatorias;
     if (search.trim()) {
@@ -96,6 +108,16 @@ function PublicoElevatoriasPage() {
     }
     if (filtroMunicipio !== "TODAS") {
       result = result.filter((e) => e.municipio === filtroMunicipio);
+    }
+    if (filtroTipo !== "TODAS") {
+      result = result.filter((e) => e.tipo === filtroTipo);
+    }
+    if (filtroTipoConstrutivo !== "TODAS") {
+      result = result.filter(
+        (e) =>
+          equipamentos.find((q) => q.elevatoria_id === e.id)?.tipo_construtivo_elevatoria ===
+          filtroTipoConstrutivo,
+      );
     }
     if (filtroImplantacao !== "TODAS") {
       result = result.filter((e) => {
