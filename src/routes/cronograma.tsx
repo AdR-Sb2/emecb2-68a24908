@@ -2092,6 +2092,15 @@ function CronogramaPage() {
                                   >
                                     <MessageSquare className="h-3 w-3" />
                                   </button>
+                                  {isDono && (
+                                    <button
+                                      onClick={() => setExcluirConfirmOpen(item.id)}
+                                      className="flex-shrink-0 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition"
+                                      title="Excluir item"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
                                   <input
@@ -2228,17 +2237,6 @@ function CronogramaPage() {
                                     </Tooltip>
                                   </TooltipProvider>
                                 </div>
-
-                                {/* Excluir */}
-                                {isDono && (
-                                  <button
-                                    onClick={() => setExcluirConfirmOpen(item.id)}
-                                    className="absolute top-0 right-0 p-1 text-red-400 hover:text-red-600 opacity-0 hover:opacity-100 transition"
-                                    title="Excluir item"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
                               </div>
                             </div>
                           );
