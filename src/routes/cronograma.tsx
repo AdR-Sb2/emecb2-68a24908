@@ -621,40 +621,471 @@ function CronogramaPage() {
   async function exportarXLSX() {
     if (!projetoAtivo || itens.length === 0) return;
     const { default: ExcelJS } = await import("exceljs");
+
+    const STATUS_FILL: Record<string, string> = {
+      nao_iniciado: "F1F5F9",
+      em_andamento: "EFF6FF",
+      concluido: "F0FDF4",
+      atrasado: "FEF2F2",
+    };
+    const ANO_CORES: Record<string, string> = {
+      "2026": "378ADD",
+      "2027": "E24B4A",
+      "2028": "639922",
+      "2029": "BA7517",
+    };
+    const ANO_DEFAULT = ["2563eb", "dc2626", "16a34a", "f59e0b"];
+
+    function slugify(s: string) {
+      return s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase();
+    }
+
     const wb = new ExcelJS.Workbook();
     wb.creator = "EMEC Baixada 2";
-    const ws = wb.addWorksheet(projetoAtivo.nome.slice(0, 31));
-    ws.columns = [
+    const wsName = projetoAtivo.nome.slice(0, 31);
+    const ws = wb.addWorksheet(wsName);
+
+    const thinBorder = {
+      top: { style: "thin" as const, color: { argb: "D1D5DB" } },
+      left: { style: "thin" as const, color: { argb: "D1D5DB" } },
+      bottom: { style: "thin" as const, color: { argb: "D1D5DB" } },
+      right: { style: "thin" as const, color: { argb: "D1D5DB" } },
+    };
+
+    // ── Metadata header ──
+    ws.mergeCells("A1:J1");
+    const metaRow1 = ws.getRow(1);
+    metaRow1.getCell(1).value = `Cronograma: ${projetoAtivo.nome}`;
+    metaRow1.getCell(1).font = { bold: true, size: 14, color: { argb: "0B3A73" } };
+    metaRow1.height = 24;
+
+    ws.mergeCells("A2:J2");
+    const metaRow2 = ws.getRow(2);
+    metaRow2.getCell(1).value =
+      `Data base: ${formatDate(projetoAtivo.data_inicio_base)}  |  Duração padrão: ${projetoAtivo.duracao_padrao_dias} dias  |  ${projetoAtivo.descricao || ""}`;
+    metaRow2.getCell(1).font = { size: 10, color: { argb: "64748B" } };
+    metaRow2.height = 18;
+
+    ws.mergeCells("A3:J3");
+    ws.getRow(3).height = 6;
+
+    const HEADER_ROW = 4;
+    const columns = [
       { header: "Ordem", key: "ordem", width: 8 },
-      { header: "Nome", key: "nome", width: 30 },
-      { header: projetoAtivo.campo_agrupamento_label, key: "grupo", width: 20 },
-      { header: "Duração (dias)", key: "duracao", width: 14 },
-      { header: "Início", key: "inicio", width: 12 },
-      { header: "Término", key: "termino", width: 12 },
-      { header: "Status", key: "status", width: 14 },
-      { header: "O.S.", key: "os", width: 15 },
-      { header: "RC", key: "rc", width: 15 },
+      { header: "Nome", key: "nome", width: 35 },
+      { header: projetoAtivo.campo_agrupamento_label, key: "grupo", width: 22 },
+      { header: "Duração (dias)", key: "duracao", width: 15 },
+      { header: "Início", key: "inicio", width: 13 },
+      { header: "Término", key: "termino", width: 13 },
+      { header: "Status", key: "status", width: 16 },
+      { header: "O.S.", key: "os", width: 16 },
+      { header: "RC", key: "rc", width: 16 },
+      { header: "Custo Material", key: "custo", width: 18 },
     ];
-    itens.forEach((i) => {
-      ws.addRow({
-        ordem: i.ordem,
-        nome: i.nome,
-        grupo: i.grupo,
-        duracao: i.duracao_dias ?? projetoAtivo.duracao_padrao_dias,
-        inicio: formatDate(i.data_inicio_calculada),
-        termino: formatDate(i.data_termino_calculada),
-        status: STATUS_OPCOES.find((s) => s.value === i.status)?.label ?? i.status,
-        os: i.os_referencia || "",
-        rc: i.rc_referencia || "",
-      });
+    ws.columns = columns;
+
+    // Style header row
+    const headerRow = ws.getRow(HEADER_ROW);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 11 };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "0B3A73" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = thinBorder;
     });
-    ws.getRow(1).font = { bold: true };
+
+    // Freeze header + autofilter
+    ws.views = [{ state: "frozen", ySplit: HEADER_ROW }];
+    ws.autoFilter = {
+      from: { row: HEADER_ROW, column: 1 },
+      to: { row: HEADER_ROW, column: columns.length },
+    };
+
+    // ── Group items by year ──
+    const itensPorAno = new Map<string, typeof itens>();
+    itens.forEach((item) => {
+      const ano = item.data_inicio_calculada?.slice(0, 4) ?? "Sem data";
+      if (!itensPorAno.has(ano)) itensPorAno.set(ano, []);
+      itensPorAno.get(ano)!.push(item);
+    });
+    const anosOrdenados = [...itensPorAno.keys()].sort();
+
+    let currentRow = HEADER_ROW + 1;
+    let totalGeralCusto = 0;
+    let totalGeralDias = 0;
+
+    for (const ano of anosOrdenados) {
+      const anoItens = itensPorAno.get(ano)!;
+      const corAno = ANO_CORES[ano] ?? ANO_DEFAULT[anosOrdenados.indexOf(ano) % ANO_DEFAULT.length];
+
+      // Year section header
+      ws.mergeCells(currentRow, 1, currentRow, columns.length);
+      const sectionRow = ws.getRow(currentRow);
+      sectionRow.getCell(1).value = `📅 ${ano}`;
+      sectionRow.getCell(1).font = { bold: true, color: { argb: "FFFFFF" }, size: 12 };
+      sectionRow.getCell(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: corAno },
+      };
+      sectionRow.getCell(1).alignment = { vertical: "middle" };
+      sectionRow.height = 26;
+      sectionRow.eachCell((cell) => {
+        cell.border = thinBorder;
+      });
+      currentRow++;
+
+      // Items in this year
+      const yearCustoTotal = anoItens.reduce((s, i) => s + (i.custo_material ?? 0), 0);
+      const yearDiasTotal = anoItens.reduce(
+        (s, i) => s + (i.duracao_dias ?? projetoAtivo.duracao_padrao_dias),
+        0,
+      );
+      totalGeralCusto += yearCustoTotal;
+      totalGeralDias += yearDiasTotal;
+
+      anoItens.forEach((item, idx) => {
+        const statusKey = item.status;
+        const fillColor = STATUS_FILL[statusKey] ?? (idx % 2 === 0 ? "FFFFFF" : "F8FAFC");
+        const rowBg = idx % 2 === 1 ? "F5F7FA" : "FFFFFF";
+
+        const duracao = item.duracao_dias ?? projetoAtivo.duracao_padrao_dias;
+        const inicioDate = item.data_inicio_calculada
+          ? new Date(item.data_inicio_calculada + "T12:00:00")
+          : null;
+        const terminoDate = item.data_termino_calculada
+          ? new Date(item.data_termino_calculada + "T12:00:00")
+          : null;
+
+        const rowData = {
+          ordem: item.ordem,
+          nome: item.nome,
+          grupo: item.grupo,
+          duracao: duracao,
+          inicio: inicioDate,
+          termino: terminoDate,
+          status: STATUS_OPCOES.find((s) => s.value === statusKey)?.label ?? statusKey,
+          os: item.os_referencia || "",
+          rc: item.rc_referencia || "",
+          custo: item.custo_material ?? 0,
+        };
+
+        const row = ws.addRow(rowData);
+        row.height = 20;
+
+        // Zebra stripe background
+        row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+          cell.border = thinBorder;
+          cell.alignment = { vertical: "middle" };
+
+          // Default zebra background
+          if (colNumber !== 7) {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: rowBg },
+            };
+          }
+        });
+
+        // Status cell coloring
+        const statusCell = row.getCell(7);
+        statusCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: fillColor },
+        };
+        statusCell.font = { bold: true };
+
+        // Duration: integer, right-aligned
+        const durCell = row.getCell(4);
+        durCell.numFmt = "0";
+        durCell.alignment = { vertical: "middle", horizontal: "right" };
+
+        // Dates: real Date, dd/mm/yyyy
+        const inicioCell = row.getCell(5);
+        if (inicioDate) {
+          inicioCell.numFmt = "dd/mm/yyyy";
+        } else {
+          inicioCell.value = "--";
+        }
+        inicioCell.alignment = { vertical: "middle", horizontal: "center" };
+
+        const terminoCell = row.getCell(6);
+        if (terminoDate) {
+          terminoCell.numFmt = "dd/mm/yyyy";
+        } else {
+          terminoCell.value = "--";
+        }
+        terminoCell.alignment = { vertical: "middle", horizontal: "center" };
+
+        // Currency format
+        const custoCell = row.getCell(10);
+        custoCell.numFmt = "#,##0.00";
+        custoCell.alignment = { vertical: "middle", horizontal: "right" };
+      });
+
+      // Year subtotal row
+      const subRow = ws.addRow({
+        ordem: "",
+        nome: "",
+        grupo: "",
+        duracao: yearDiasTotal,
+        inicio: "",
+        termino: "",
+        status: `Subtotal ${ano}`,
+        os: "",
+        rc: "",
+        custo: yearCustoTotal,
+      });
+      subRow.height = 20;
+      subRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+        cell.font = { bold: true, size: 10 };
+        cell.border = thinBorder;
+        cell.alignment = { vertical: "middle" };
+        if (colNumber === 10) {
+          cell.numFmt = "#,##0.00";
+          cell.alignment = { vertical: "middle", horizontal: "right" };
+        }
+        if (colNumber === 4) {
+          cell.numFmt = "0";
+          cell.alignment = { vertical: "middle", horizontal: "right" };
+        }
+      });
+      subRow.getCell(7).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "F1F5F9" },
+      };
+      currentRow++;
+    }
+
+    // ── Grand total row ──
+    const totalRow = ws.addRow({
+      ordem: "",
+      nome: "",
+      grupo: "",
+      duracao: totalGeralDias,
+      inicio: "",
+      termino: "",
+      status: "TOTAL GERAL",
+      os: "",
+      rc: "",
+      custo: totalGeralCusto,
+    });
+    totalRow.height = 24;
+    totalRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      cell.font = { bold: true, size: 11, color: { argb: "FFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "0B3A73" },
+      };
+      cell.border = thinBorder;
+      cell.alignment = { vertical: "middle" };
+      if (colNumber === 10) {
+        cell.numFmt = "#,##0.00";
+        cell.alignment = { vertical: "middle", horizontal: "right" };
+      }
+      if (colNumber === 4) {
+        cell.numFmt = "0";
+        cell.alignment = { vertical: "middle", horizontal: "right" };
+      }
+    });
+
+    // ── Gantt chart tab ──
+    const ganttWs = wb.addWorksheet("Gantt", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
+
+    // Build sorted items by start date
+    const itensSorted = [...itens].sort((a, b) => {
+      const da = a.data_inicio_calculada ?? "9999";
+      const db = b.data_inicio_calculada ?? "9999";
+      return da.localeCompare(db);
+    });
+
+    // Find date range
+    const allDates = itensSorted
+      .flatMap((i) => [i.data_inicio_calculada, i.data_termino_calculada])
+      .filter(Boolean) as string[];
+    if (allDates.length > 0) {
+      const minDate = allDates.reduce((a, b) => (a < b ? a : b));
+      const maxDate = allDates.reduce((a, b) => (a > b ? a : b));
+      const totalDays = diffDays(minDate, maxDate) + 1;
+
+      // Gantt header: Item | Start | End | Duration | then day columns
+      const ganttCols = [
+        { header: "Item", key: "nome", width: 30 },
+        { header: "Início", key: "inicio", width: 12 },
+        { header: "Término", key: "termino", width: 12 },
+        { header: "Dias", key: "dias", width: 8 },
+      ];
+      ganttWs.columns = ganttCols;
+
+      const ganttHeaderRow = ganttWs.getRow(1);
+      ganttHeaderRow.height = 22;
+      ganttHeaderRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 10 };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "0B3A73" },
+        };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = thinBorder;
+      });
+
+      // Add day columns header
+      const dayColStart = 5;
+      for (let d = 0; d < totalDays; d++) {
+        const dayDate = new Date(minDate + "T12:00:00");
+        dayDate.setDate(dayDate.getDate() + d);
+        const dayLabel = dayDate.getDate().toString();
+        const colIdx = dayColStart + d;
+        ganttWs.getColumn(colIdx).width = 3;
+        ganttHeaderRow.getCell(colIdx).value = dayLabel;
+        ganttHeaderRow.getCell(colIdx).font = { size: 7, color: { argb: "FFFFFF" } };
+        ganttHeaderRow.getCell(colIdx).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "0B3A73" },
+        };
+        ganttHeaderRow.getCell(colIdx).alignment = {
+          horizontal: "center",
+          vertical: "middle",
+        };
+      }
+
+      // Month header row
+      const monthRow = ganttWs.getRow(2);
+      monthRow.height = 16;
+      let currentMonthLabel = "";
+      let monthStartCol = dayColStart;
+      for (let d = 0; d < totalDays; d++) {
+        const dayDate = new Date(minDate + "T12:00:00");
+        dayDate.setDate(dayDate.getDate() + d);
+        const monthLabel = dayDate.toLocaleDateString("pt-BR", {
+          month: "short",
+          year: "2-digit",
+        });
+        if (monthLabel !== currentMonthLabel) {
+          if (currentMonthLabel && monthStartCol < dayColStart + d) {
+            ganttWs.mergeCells(2, monthStartCol, 2, dayColStart + d - 1);
+            monthRow.getCell(monthStartCol).value = currentMonthLabel;
+            monthRow.getCell(monthStartCol).font = { bold: true, size: 8 };
+            monthRow.getCell(monthStartCol).alignment = { horizontal: "center" };
+          }
+          currentMonthLabel = monthLabel;
+          monthStartCol = dayColStart + d;
+        }
+      }
+      if (currentMonthLabel) {
+        ganttWs.mergeCells(2, monthStartCol, 2, dayColStart + totalDays - 1);
+        monthRow.getCell(monthStartCol).value = currentMonthLabel;
+        monthRow.getCell(monthStartCol).font = { bold: true, size: 8 };
+        monthRow.getCell(monthStartCol).alignment = { horizontal: "center" };
+      }
+
+      // Add data rows
+      itensSorted.forEach((item, idx) => {
+        const inicio = item.data_inicio_calculada || minDate;
+        const termino =
+          item.data_termino_calculada ||
+          addDays(inicio, (item.duracao_dias ?? projetoAtivo.duracao_padrao_dias) - 1);
+        const duracao = diffDays(inicio, termino) + 1;
+        const offset = diffDays(minDate, inicio);
+
+        const ano = inicio.slice(0, 4);
+        const barColor = ANO_CORES[ano] ?? "3b82f6";
+        const rowBg = idx % 2 === 1 ? "F5F7FA" : "FFFFFF";
+
+        const ganttRow = ganttWs.addRow({
+          nome: item.nome,
+          inicio: new Date(inicio + "T12:00:00"),
+          termino: new Date(termino + "T12:00:00"),
+          dias: duracao,
+        });
+        ganttRow.height = 18;
+        ganttRow.getCell(1).border = thinBorder;
+        ganttRow.getCell(2).numFmt = "dd/mm/yyyy";
+        ganttRow.getCell(2).border = thinBorder;
+        ganttRow.getCell(3).numFmt = "dd/mm/yyyy";
+        ganttRow.getCell(3).border = thinBorder;
+        ganttRow.getCell(4).numFmt = "0";
+        ganttRow.getCell(4).alignment = { horizontal: "right" };
+        ganttRow.getCell(4).border = thinBorder;
+
+        // Zebra
+        for (let c = 1; c <= 4; c++) {
+          ganttRow.getCell(c).fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: rowBg },
+          };
+        }
+
+        // Draw bar
+        for (let d = 0; d < totalDays; d++) {
+          const colIdx = dayColStart + d;
+          const cell = ganttRow.getCell(colIdx);
+          cell.border = {
+            top: { style: "thin", color: { argb: "E2E8F0" } },
+            bottom: { style: "thin", color: { argb: "E2E8F0" } },
+          };
+          if (d >= offset && d < offset + duracao) {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: barColor },
+            };
+          }
+        }
+      });
+
+      // Legend row
+      const legendRowIdx = itensSorted.length + 3;
+      ganttWs.getCell(legendRowIdx, 1).value = "Legenda:";
+      ganttWs.getCell(legendRowIdx, 1).font = { bold: true, size: 9 };
+      const legendAnos = [
+        ...new Set(
+          itensSorted
+            .map((i) => i.data_inicio_calculada?.slice(0, 4))
+            .filter((a): a is string => Boolean(a)),
+        ),
+      ].sort();
+      legendAnos.forEach((ano, li) => {
+        const col = 2 + li * 2;
+        const c = ANO_CORES[ano] ?? "3b82f6";
+        ganttWs.getCell(legendRowIdx, col).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: c },
+        };
+        ganttWs.getCell(legendRowIdx, col).value = "  ";
+        ganttWs.getCell(legendRowIdx, col + 1).value = ano;
+        ganttWs.getCell(legendRowIdx, col + 1).font = { size: 9 };
+      });
+    }
+
+    // ── Save ──
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = `cronograma-${slugify(projetoAtivo.nome)}-${today}.xlsx`;
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer]);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${projetoAtivo.nome.replace(/\s+/g, "_")}.xlsx`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Planilha exportada");
@@ -673,6 +1104,7 @@ function CronogramaPage() {
       "Status",
       "O.S.",
       "RC",
+      "Custo Material",
     ];
     const rows = itens.map((i) => [
       i.ordem,
@@ -684,6 +1116,7 @@ function CronogramaPage() {
       STATUS_OPCOES.find((s) => s.value === i.status)?.label ?? i.status,
       i.os_referencia || "",
       i.rc_referencia || "",
+      (i.custo_material ?? 0).toFixed(2),
     ]);
     const csv = [headers, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";"))
@@ -736,9 +1169,201 @@ function CronogramaPage() {
     reader.readAsArrayBuffer(file);
   }
 
-  // PDF via impressão
+  // PDF via impressão com Gantt canvas
   function exportarPDF() {
+    if (!projetoAtivo || itens.length === 0) {
+      window.print();
+      return;
+    }
+
+    const ANO_CORES: Record<string, string> = {
+      "2026": "#378ADD",
+      "2027": "#E24B4A",
+      "2028": "#639922",
+      "2029": "#BA7517",
+    };
+    const ANO_FALLBACK = ["#2563eb", "#dc2626", "#16a34a", "#f59e0b"];
+
+    const itensSorted = [...itens].sort((a, b) => {
+      const da = a.data_inicio_calculada ?? "9999";
+      const db = b.data_inicio_calculada ?? "9999";
+      return da.localeCompare(db);
+    });
+
+    const allDates = itensSorted
+      .flatMap((i) => [i.data_inicio_calculada, i.data_termino_calculada])
+      .filter(Boolean) as string[];
+
+    if (allDates.length === 0) {
+      window.print();
+      return;
+    }
+
+    const minDate = allDates.reduce((a, b) => (a < b ? a : b));
+    const maxDate = allDates.reduce((a, b) => (a > b ? a : b));
+    const totalDays = diffDays(minDate, maxDate) + 1;
+
+    const rowHeight = 28;
+    const labelWidth = 200;
+    const dayWidth = Math.max(Math.min(20, 1200 / totalDays), 6);
+    const headerHeight = 40;
+    const barHeight = 18;
+    const barY = (rowHeight - barHeight) / 2;
+    const canvasWidth = labelWidth + totalDays * dayWidth + 20;
+    const canvasHeight = headerHeight + itensSorted.length * rowHeight + 40;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasWidth * 2;
+    canvas.height = canvasHeight * 2;
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(2, 2);
+
+    // Background
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // Title
+    ctx.fillStyle = "#0B3A73";
+    ctx.font = "bold 16px Arial";
+    ctx.fillText(`Gantt — ${projetoAtivo.nome}`, 10, 24);
+
+    // Header background
+    ctx.fillStyle = "#0B3A73";
+    ctx.fillRect(0, headerHeight - 2, canvasWidth, 2);
+
+    // Day columns header
+    ctx.fillStyle = "#F8FAFC";
+    ctx.fillRect(0, headerHeight, canvasWidth, 22);
+    ctx.fillStyle = "#64748B";
+    ctx.font = "8px Arial";
+    const meses: { label: string; start: number; days: number }[] = [];
+    let curMonth = "";
+    let curStart = 0;
+    let curCount = 0;
+    for (let d = 0; d < totalDays; d++) {
+      const dt = new Date(minDate + "T12:00:00");
+      dt.setDate(dt.getDate() + d);
+      const ml = dt.toLocaleDateString("pt-BR", { month: "short" });
+      if (ml !== curMonth) {
+        if (curMonth) meses.push({ label: curMonth, start: curStart, days: curCount });
+        curMonth = ml;
+        curStart = d;
+        curCount = 0;
+      }
+      curCount++;
+    }
+    if (curMonth) meses.push({ label: curMonth, start: curStart, days: curCount });
+
+    meses.forEach((m) => {
+      const x = labelWidth + m.start * dayWidth;
+      const w = m.days * dayWidth;
+      ctx.fillStyle = "#E2E8F0";
+      ctx.fillRect(x, headerHeight, w, 22);
+      ctx.fillStyle = "#334155";
+      ctx.font = "bold 9px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(m.label, x + w / 2, headerHeight + 15);
+    });
+    ctx.textAlign = "left";
+
+    // Separator line
+    ctx.fillStyle = "#CBD5E1";
+    ctx.fillRect(0, headerHeight + 22, canvasWidth, 1);
+
+    // Items
+    itensSorted.forEach((item, idx) => {
+      const y = headerHeight + 24 + idx * rowHeight;
+      const inicio = item.data_inicio_calculada || minDate;
+      const termino =
+        item.data_termino_calculada ||
+        addDays(inicio, (item.duracao_dias ?? projetoAtivo.duracao_padrao_dias) - 1);
+      const offset = diffDays(minDate, inicio);
+      const duracao = diffDays(inicio, termino) + 1;
+
+      const ano = inicio.slice(0, 4);
+      const barColor = ANO_CORES[ano] ?? ANO_FALLBACK[idx % ANO_FALLBACK.length];
+
+      // Zebra
+      if (idx % 2 === 1) {
+        ctx.fillStyle = "#F8FAFC";
+        ctx.fillRect(0, y, canvasWidth, rowHeight);
+      }
+
+      // Label
+      ctx.fillStyle = "#334155";
+      ctx.font = "10px Arial";
+      ctx.fillText(item.nome.slice(0, 35), 8, y + rowHeight / 2 + 3);
+
+      // Bar
+      const bx = labelWidth + offset * dayWidth;
+      const bw = duracao * dayWidth;
+      ctx.fillStyle = barColor + "33";
+      ctx.fillRect(bx, y + barY, bw, barHeight);
+      ctx.fillStyle = barColor;
+      ctx.fillRect(bx, y + barY, 3, barHeight);
+      ctx.fillRect(bx, y + barY, bw * 0.6, barHeight);
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(bx + bw * 0.6, y + barY, bw * 0.4, barHeight);
+      ctx.globalAlpha = 1;
+
+      // Bar text
+      if (bw > 60) {
+        ctx.fillStyle = "#1E293B";
+        ctx.font = "bold 8px Arial";
+        ctx.fillText(item.nome.slice(0, Math.floor(bw / 5)), bx + 6, y + barY + 12);
+      }
+
+      // Separator
+      ctx.fillStyle = "#E2E8F0";
+      ctx.fillRect(0, y + rowHeight - 1, canvasWidth, 1);
+    });
+
+    // Legend
+    const legendY = headerHeight + 24 + itensSorted.length * rowHeight + 10;
+    ctx.fillStyle = "#64748B";
+    ctx.font = "bold 10px Arial";
+    ctx.fillText("Legenda:", 10, legendY);
+    const anosUnicos = [
+      ...new Set(
+        itensSorted
+          .map((i) => i.data_inicio_calculada?.slice(0, 4))
+          .filter((a): a is string => Boolean(a)),
+      ),
+    ].sort();
+    let lx = 70;
+    anosUnicos.forEach((ano) => {
+      const c = ANO_CORES[ano] ?? "#3b82f6";
+      ctx.fillStyle = c;
+      ctx.fillRect(lx, legendY - 8, 12, 12);
+      ctx.fillStyle = "#334155";
+      ctx.font = "10px Arial";
+      ctx.fillText(ano, lx + 16, legendY);
+      lx += 60;
+    });
+
+    // Inject into print
+    const imgData = canvas.toDataURL("image/png");
+    const printDiv = document.createElement("div");
+    printDiv.id = "gantt-print";
+    printDiv.innerHTML = `
+      <style>
+        @media print {
+          body > *:not(#gantt-print) { display: none !important; }
+          #gantt-print { padding: 20px; }
+          #gantt-print img { max-width: 100%; height: auto; }
+          #gantt-print .meta { font-size: 12px; color: #64748B; margin-bottom: 12px; }
+        }
+      </style>
+      <div class="meta">
+        <strong>${projetoAtivo.nome}</strong> — Data base: ${formatDate(projetoAtivo.data_inicio_base)} — Duração padrão: ${projetoAtivo.duracao_padrao_dias} dias
+      </div>
+      <img src="${imgData}" style="width:100%" />
+    `;
+    document.body.appendChild(printDiv);
     window.print();
+    setTimeout(() => document.body.removeChild(printDiv), 1000);
   }
 
   // Gantt data
