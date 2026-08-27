@@ -258,7 +258,7 @@ function PublicoCronogramaPage() {
 
       {/* ─── HERO HEADER ─── */}
       <header
-        className="relative overflow-hidden px-4 pt-8 pb-6 md:px-8 md:pt-12 md:pb-8"
+        className="relative overflow-hidden px-4 pt-4 pb-4 md:px-8 md:pt-6 md:pb-5"
         style={{
           background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)",
         }}
@@ -267,77 +267,83 @@ function PublicoCronogramaPage() {
         <div className="hero-geo" style={{ width: 200, height: 200, bottom: -40, left: -30 }} />
         <div className="hero-geo" style={{ width: 120, height: 120, top: 20, left: "40%" }} />
         <div className="relative mx-auto max-w-6xl">
-          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
-            <CalendarRange className="h-3.5 w-3.5" />
+          <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+            <CalendarRange className="h-3 w-3" />
             Cronograma · Águas do Rio
           </div>
           <h1
-            className="text-2xl font-extrabold tracking-tight text-white md:text-4xl"
+            className="text-xl font-extrabold tracking-tight text-white md:text-3xl"
             style={{ fontWeight: 800, letterSpacing: "-0.02em" }}
           >
             {projeto.nome}
           </h1>
           {projeto.descricao && (
-            <p className="mt-2 max-w-2xl text-sm text-white/70 md:text-base">{projeto.descricao}</p>
+            <p className="mt-1 max-w-2xl text-xs text-white/70 md:text-sm">{projeto.descricao}</p>
           )}
 
-          {/* KPIs */}
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <KpiCard
-              label="Total de itens"
-              value={String(stats.total)}
-              icon={<BarChart3 className="h-4 w-4" />}
-            />
-            <KpiCard
-              label="Concluídos"
-              value={String(stats.concluidos)}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              accent="#4ade80"
-            />
-            <KpiCard
-              label="Em andamento"
-              value={String(stats.emAndamento)}
-              icon={<PlayCircle className="h-4 w-4" />}
-              accent="#60a5fa"
-            />
-            <KpiCard
-              label="Atrasados"
-              value={String(stats.atrasados)}
-              icon={<AlertCircle className="h-4 w-4" />}
-              accent="#f87171"
-            />
-            <KpiCard
-              label="Total de dias"
-              value={String(stats.totalDias)}
-              icon={<Clock className="h-4 w-4" />}
-            />
-          </div>
-
-          {/* Custo total */}
-          <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 backdrop-blur-sm">
-            <DollarSign className="h-4 w-4 text-green-300" />
-            <span className="text-xs text-white/70">Custo total de material:</span>
-            <span className="text-sm font-bold text-white">{formatCurrency(stats.custoTotal)}</span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="mt-5">
-            <div className="mb-1 flex items-center justify-between text-xs text-white/60">
-              <span>Progresso geral</span>
-              <span className="font-semibold text-white">{stats.progresso}%</span>
-            </div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className="progress-bar h-full rounded-full"
-                style={{
-                  width: `${stats.progresso}%`,
-                  background: "linear-gradient(90deg, #4ade80, #22c55e)",
-                }}
+          {/* KPIs + Custo + Progresso — tudo junto */}
+          <div className="mt-3 flex flex-wrap items-start gap-3">
+            {/* KPIs */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              <KpiCard
+                label="Total"
+                value={String(stats.total)}
+                icon={<BarChart3 className="h-3.5 w-3.5" />}
+              />
+              <KpiCard
+                label="Concluídos"
+                value={String(stats.concluidos)}
+                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                accent="#4ade80"
+              />
+              <KpiCard
+                label="Andamento"
+                value={String(stats.emAndamento)}
+                icon={<PlayCircle className="h-3.5 w-3.5" />}
+                accent="#60a5fa"
+              />
+              <KpiCard
+                label="Atrasados"
+                value={String(stats.atrasados)}
+                icon={<AlertCircle className="h-3.5 w-3.5" />}
+                accent="#f87171"
+              />
+              <KpiCard
+                label="Dias"
+                value={String(stats.totalDias)}
+                icon={<Clock className="h-3.5 w-3.5" />}
               />
             </div>
-            <div className="mt-2 flex items-center gap-4 text-xs text-white/50">
-              <span>Início: {formatDate(stats.dataMin || projeto.data_inicio_base)}</span>
-              <span>Previsão: {formatDate(stats.dataMax)}</span>
+
+            {/* Custo + Progresso na mesma linha */}
+            <div className="flex flex-col gap-1.5">
+              <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+                <DollarSign className="h-3.5 w-3.5 text-green-300" />
+                <span className="text-[10px] text-white/60">Custo:</span>
+                <span className="text-xs font-bold text-white">
+                  {formatCurrency(stats.custoTotal)}
+                </span>
+              </div>
+              <div className="w-48">
+                <div className="mb-0.5 flex items-center justify-between text-[10px] text-white/50">
+                  <span>Progresso</span>
+                  <span className="font-semibold text-white">{stats.progresso}%</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="progress-bar h-full rounded-full"
+                    style={{
+                      width: `${stats.progresso}%`,
+                      background: "linear-gradient(90deg, #4ade80, #22c55e)",
+                    }}
+                  />
+                </div>
+                <div className="mt-0.5 flex items-center gap-3 text-[10px] text-white/40">
+                  <span>{formatDate(stats.dataMin || projeto.data_inicio_base)}</span>
+                  <span>→</span>
+                  <span>{formatDate(stats.dataMax)}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -345,10 +351,10 @@ function PublicoCronogramaPage() {
 
       {/* ─── BARRA DE CONTROLES STICKY ─── */}
       <div
-        className="no-print sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md md:px-8"
+        className="no-print sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-md md:px-8"
         style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
       >
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center">
           {/* Busca */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -429,7 +435,7 @@ function PublicoCronogramaPage() {
       </div>
 
       {/* ─── CONTEÚDO ─── */}
-      <main className="mx-auto max-w-6xl px-4 py-6 md:px-8">
+      <main className="mx-auto max-w-6xl px-4 py-4 md:px-8">
         {itensFiltrados.length === 0 && (
           <div className="py-16 text-center">
             <div className="text-5xl">🔍</div>
@@ -471,18 +477,18 @@ function KpiCard({
 }) {
   return (
     <div
-      className="flex items-center gap-3 rounded-xl px-4 py-3 backdrop-blur-md"
+      className="flex items-center gap-2 rounded-lg px-3 py-2 backdrop-blur-md"
       style={{ background: "rgba(255,255,255,0.1)" }}
     >
       <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
         style={{ background: accent ? `${accent}22` : "rgba(255,255,255,0.15)" }}
       >
         <span style={{ color: accent || "rgba(255,255,255,0.8)" }}>{icon}</span>
       </div>
       <div>
-        <p className="text-[11px] text-white/50">{label}</p>
-        <p className="text-lg font-bold text-white">{value}</p>
+        <p className="text-[10px] text-white/50 leading-tight">{label}</p>
+        <p className="text-sm font-bold text-white leading-tight">{value}</p>
       </div>
     </div>
   );
