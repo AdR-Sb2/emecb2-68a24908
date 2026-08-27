@@ -710,7 +710,7 @@ function CronogramaPage() {
       to: { row: HEADER_ROW, column: columns.length },
     };
 
-    // ── Group items by year ──
+    // ── Group items by year (using data_inicio year) ──
     const itensPorAno = new Map<string, typeof itens>();
     itens.forEach((item) => {
       const ano = item.data_inicio_calculada?.slice(0, 4) ?? "Sem data";
@@ -719,7 +719,6 @@ function CronogramaPage() {
     });
     const anosOrdenados = [...itensPorAno.keys()].sort();
 
-    let currentRow = HEADER_ROW + 1;
     let totalGeralCusto = 0;
     let totalGeralDias = 0;
 
@@ -727,9 +726,10 @@ function CronogramaPage() {
       const anoItens = itensPorAno.get(ano)!;
       const corAno = ANO_CORES[ano] ?? ANO_DEFAULT[anosOrdenados.indexOf(ano) % ANO_DEFAULT.length];
 
-      // Year section header
-      ws.mergeCells(currentRow, 1, currentRow, columns.length);
-      const sectionRow = ws.getRow(currentRow);
+      // Year section header — use ws.rowCount to avoid desync
+      const yearHeaderIdx = ws.rowCount + 1;
+      ws.mergeCells(yearHeaderIdx, 1, yearHeaderIdx, columns.length);
+      const sectionRow = ws.getRow(yearHeaderIdx);
       sectionRow.getCell(1).value = `📅 ${ano}`;
       sectionRow.getCell(1).font = { bold: true, color: { argb: "FFFFFF" }, size: 12 };
       sectionRow.getCell(1).fill = {
@@ -742,7 +742,6 @@ function CronogramaPage() {
       sectionRow.eachCell((cell) => {
         cell.border = thinBorder;
       });
-      currentRow++;
 
       // Items in this year
       const yearCustoTotal = anoItens.reduce((s, i) => s + (i.custo_material ?? 0), 0);
@@ -866,7 +865,6 @@ function CronogramaPage() {
         pattern: "solid",
         fgColor: { argb: "F1F5F9" },
       };
-      currentRow++;
     }
 
     // ── Grand total row ──
@@ -902,9 +900,9 @@ function CronogramaPage() {
       }
     });
 
-    // ── Gantt chart tab ──
+    // ── Gantt chart tab (monthly granularity) ──
     const ganttWs = wb.addWorksheet("Gantt", {
-      views: [{ state: "frozen", ySplit: 1 }],
+      views: [{ state: "frozen", ySplit: 2 }],
     });
 
     // Build sorted items by start date
@@ -921,9 +919,33 @@ function CronogramaPage() {
     if (allDates.length > 0) {
       const minDate = allDates.reduce((a, b) => (a < b ? a : b));
       const maxDate = allDates.reduce((a, b) => (a > b ? a : b));
-      const totalDays = diffDays(minDate, maxDate) + 1;
 
-      // Gantt header: Item | Start | End | Duration | then day columns
+      // Build month list: one entry per calendar month from minDate → maxDate
+      const monthList: { label: string; year: number; month: number; key: string }[] = [];
+      const monthSeen = new Set<string>();
+
+      const scanDate = new Date(minDate + "T12:00:00");
+      const endScan = new Date(maxDate + "T12:00:00");
+      // Include the end month
+      endScan.setMonth(endScan.getMonth() + 1);
+      endScan.setDate(1);
+
+      while (scanDate < endScan) {
+        const y = scanDate.getFullYear();
+        const m = scanDate.getMonth();
+        const key = `${y}-${String(m + 1).padStart(2, "0")}`;
+        if (!monthSeen.has(key)) {
+          monthSeen.add(key);
+          const label = scanDate.toLocaleDateString("pt-BR", {
+            month: "short",
+            year: "2-digit",
+          });
+          monthList.push({ label, year: y, month: m, key });
+        }
+        scanDate.setMonth(scanDate.getMonth() + 1);
+      }
+
+      // Fixed info columns: Item | Início | Término | Dias
       const ganttCols = [
         { header: "Item", key: "nome", width: 30 },
         { header: "Início", key: "inicio", width: 12 },
@@ -932,10 +954,37 @@ function CronogramaPage() {
       ];
       ganttWs.columns = ganttCols;
 
-      const ganttHeaderRow = ganttWs.getRow(1);
-      ganttHeaderRow.height = 22;
-      ganttHeaderRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 10 };
+      const monthColStart = 5;
+
+      // Row 1: Year header (merged across months belonging to same year)
+      const yearRow = ganttWs.getRow(1);
+      yearRow.height = 16;
+      let curYear = -1;
+      let yearStartCol = monthColStart;
+      monthList.forEach((m, i) => {
+        const colIdx = monthColStart + i;
+        ganttWs.getColumn(colIdx).width = 8;
+        if (m.year !== curYear) {
+          if (curYear !== -1 && yearStartCol < colIdx) {
+            ganttWs.mergeCells(1, yearStartCol, 1, colIdx - 1);
+            yearRow.getCell(yearStartCol).value = String(curYear);
+          } else if (curYear !== -1) {
+            yearRow.getCell(yearStartCol).value = String(curYear);
+          }
+          curYear = m.year;
+          yearStartCol = colIdx;
+        }
+      });
+      // Final year group
+      if (curYear !== -1) {
+        const lastCol = monthColStart + monthList.length - 1;
+        if (yearStartCol < lastCol) {
+          ganttWs.mergeCells(1, yearStartCol, 1, lastCol);
+        }
+        yearRow.getCell(yearStartCol).value = String(curYear);
+      }
+      yearRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 9 };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
@@ -945,65 +994,42 @@ function CronogramaPage() {
         cell.border = thinBorder;
       });
 
-      // Add day columns header
-      const dayColStart = 5;
-      for (let d = 0; d < totalDays; d++) {
-        const dayDate = new Date(minDate + "T12:00:00");
-        dayDate.setDate(dayDate.getDate() + d);
-        const dayLabel = dayDate.getDate().toString();
-        const colIdx = dayColStart + d;
-        ganttWs.getColumn(colIdx).width = 3;
-        ganttHeaderRow.getCell(colIdx).value = dayLabel;
-        ganttHeaderRow.getCell(colIdx).font = { size: 7, color: { argb: "FFFFFF" } };
-        ganttHeaderRow.getCell(colIdx).fill = {
+      // Row 2: Month header
+      const monthHeaderRow = ganttWs.getRow(2);
+      monthHeaderRow.height = 18;
+      monthList.forEach((m, i) => {
+        const colIdx = monthColStart + i;
+        const cell = monthHeaderRow.getCell(colIdx);
+        cell.value = m.label;
+        cell.font = { bold: true, size: 8, color: { argb: "FFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "1E40AF" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = thinBorder;
+      });
+      // Also style the fixed info headers in row 2
+      for (let c = 1; c <= 4; c++) {
+        const cell = monthHeaderRow.getCell(c);
+        cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 10 };
+        cell.fill = {
           type: "pattern",
           pattern: "solid",
           fgColor: { argb: "0B3A73" },
         };
-        ganttHeaderRow.getCell(colIdx).alignment = {
-          horizontal: "center",
-          vertical: "middle",
-        };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = thinBorder;
       }
 
-      // Month header row
-      const monthRow = ganttWs.getRow(2);
-      monthRow.height = 16;
-      let currentMonthLabel = "";
-      let monthStartCol = dayColStart;
-      for (let d = 0; d < totalDays; d++) {
-        const dayDate = new Date(minDate + "T12:00:00");
-        dayDate.setDate(dayDate.getDate() + d);
-        const monthLabel = dayDate.toLocaleDateString("pt-BR", {
-          month: "short",
-          year: "2-digit",
-        });
-        if (monthLabel !== currentMonthLabel) {
-          if (currentMonthLabel && monthStartCol < dayColStart + d) {
-            ganttWs.mergeCells(2, monthStartCol, 2, dayColStart + d - 1);
-            monthRow.getCell(monthStartCol).value = currentMonthLabel;
-            monthRow.getCell(monthStartCol).font = { bold: true, size: 8 };
-            monthRow.getCell(monthStartCol).alignment = { horizontal: "center" };
-          }
-          currentMonthLabel = monthLabel;
-          monthStartCol = dayColStart + d;
-        }
-      }
-      if (currentMonthLabel) {
-        ganttWs.mergeCells(2, monthStartCol, 2, dayColStart + totalDays - 1);
-        monthRow.getCell(monthStartCol).value = currentMonthLabel;
-        monthRow.getCell(monthStartCol).font = { bold: true, size: 8 };
-        monthRow.getCell(monthStartCol).alignment = { horizontal: "center" };
-      }
-
-      // Add data rows
+      // Data rows — one per item, colored cells for months the item spans
       itensSorted.forEach((item, idx) => {
         const inicio = item.data_inicio_calculada || minDate;
         const termino =
           item.data_termino_calculada ||
           addDays(inicio, (item.duracao_dias ?? projetoAtivo.duracao_padrao_dias) - 1);
         const duracao = diffDays(inicio, termino) + 1;
-        const offset = diffDays(minDate, inicio);
 
         const ano = inicio.slice(0, 4);
         const barColor = ANO_CORES[ano] ?? "3b82f6";
@@ -1025,7 +1051,7 @@ function CronogramaPage() {
         ganttRow.getCell(4).alignment = { horizontal: "right" };
         ganttRow.getCell(4).border = thinBorder;
 
-        // Zebra
+        // Zebra for info columns
         for (let c = 1; c <= 4; c++) {
           ganttRow.getCell(c).fill = {
             type: "pattern",
@@ -1034,28 +1060,37 @@ function CronogramaPage() {
           };
         }
 
-        // Draw bar
-        for (let d = 0; d < totalDays; d++) {
-          const colIdx = dayColStart + d;
+        // Determine which months this item spans
+        const itemStart = new Date(inicio + "T12:00:00");
+        const itemEnd = new Date(termino + "T12:00:00");
+
+        monthList.forEach((m, i) => {
+          const colIdx = monthColStart + i;
           const cell = ganttRow.getCell(colIdx);
           cell.border = {
             top: { style: "thin", color: { argb: "E2E8F0" } },
             bottom: { style: "thin", color: { argb: "E2E8F0" } },
+            left: { style: "thin", color: { argb: "E2E8F0" } },
+            right: { style: "thin", color: { argb: "E2E8F0" } },
           };
-          if (d >= offset && d < offset + duracao) {
+
+          // Month range: first day of month → last day of month
+          const mStart = new Date(m.year, m.month, 1);
+          const mEnd = new Date(m.year, m.month + 1, 0); // last day of month
+
+          // Item overlaps this month if itemStart <= mEnd AND itemEnd >= mStart
+          if (itemStart <= mEnd && itemEnd >= mStart) {
             cell.fill = {
               type: "pattern",
               pattern: "solid",
               fgColor: { argb: barColor },
             };
           }
-        }
+        });
       });
 
-      // Legend row
-      const legendRowIdx = itensSorted.length + 3;
-      ganttWs.getCell(legendRowIdx, 1).value = "Legenda:";
-      ganttWs.getCell(legendRowIdx, 1).font = { bold: true, size: 9 };
+      // ── Legend (spaced, on its own row) ──
+      const legendRowIdx = ganttWs.rowCount + 2;
       const legendAnos = [
         ...new Set(
           itensSorted
@@ -1063,17 +1098,31 @@ function CronogramaPage() {
             .filter((a): a is string => Boolean(a)),
         ),
       ].sort();
+
+      ganttWs.getCell(legendRowIdx, 1).value = "Legenda:";
+      ganttWs.getCell(legendRowIdx, 1).font = { bold: true, size: 9 };
+
       legendAnos.forEach((ano, li) => {
-        const col = 2 + li * 2;
+        const colorCol = 2 + li * 4; // 4-col spacing: [color][label][spacer][spacer]
+        const labelCol = colorCol + 1;
         const c = ANO_CORES[ano] ?? "3b82f6";
-        ganttWs.getCell(legendRowIdx, col).fill = {
+
+        // Color swatch (2 cols wide)
+        ganttWs.mergeCells(legendRowIdx, colorCol, legendRowIdx, colorCol + 1);
+        const swatchCell = ganttWs.getCell(legendRowIdx, colorCol);
+        swatchCell.fill = {
           type: "pattern",
           pattern: "solid",
           fgColor: { argb: c },
         };
-        ganttWs.getCell(legendRowIdx, col).value = "  ";
-        ganttWs.getCell(legendRowIdx, col + 1).value = ano;
-        ganttWs.getCell(legendRowIdx, col + 1).font = { size: 9 };
+        swatchCell.value = "";
+        swatchCell.border = thinBorder;
+
+        // Year label
+        const labelCell = ganttWs.getCell(legendRowIdx, labelCol + 1);
+        labelCell.value = ano;
+        labelCell.font = { bold: true, size: 9, color: { argb: "334155" } };
+        labelCell.alignment = { vertical: "middle" };
       });
     }
 
