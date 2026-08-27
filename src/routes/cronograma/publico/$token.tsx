@@ -17,6 +17,12 @@ import {
   AlertCircle,
   Circle,
   PlayCircle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
+  SlidersHorizontal,
+  Inbox,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { CronogramaProjeto, CronogramaItem } from "@/lib/cronograma-types";
@@ -68,6 +74,9 @@ const STATUS_CONFIG = {
 
 type StatusKey = keyof typeof STATUS_CONFIG;
 
+type SortField = "nome" | "status" | "inicio" | "fim" | "duracao" | "custo";
+type SortDir = "asc" | "desc";
+
 function formatDate(d: string | null): string {
   if (!d) return "--";
   return new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
@@ -100,6 +109,9 @@ function PublicoCronogramaPage() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [viewMode, setViewMode] = useState<"lista" | "gantt">("lista");
   const [filtroAno, setFiltroAno] = useState<string>("todos");
+  const [sortField, setSortField] = useState<SortField>("inicio");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -144,8 +156,37 @@ function PublicoCronogramaPage() {
         return d && d.startsWith(filtroAno);
       });
     }
+    // Sort
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "nome":
+          cmp = a.nome.localeCompare(b.nome);
+          break;
+        case "status": {
+          const order = { atrasado: 0, em_andamento: 1, nao_iniciado: 2, concluido: 3 };
+          cmp = (order[a.status] ?? 4) - (order[b.status] ?? 4);
+          break;
+        }
+        case "inicio":
+          cmp = (a.data_inicio_calculada ?? "").localeCompare(b.data_inicio_calculada ?? "");
+          break;
+        case "fim":
+          cmp = (a.data_termino_calculada ?? "").localeCompare(b.data_termino_calculada ?? "");
+          break;
+        case "duracao":
+          cmp =
+            (a.duracao_dias ?? projeto?.duracao_padrao_dias ?? 0) -
+            (b.duracao_dias ?? projeto?.duracao_padrao_dias ?? 0);
+          break;
+        case "custo":
+          cmp = (a.custo_material ?? 0) - (b.custo_material ?? 0);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
     return result;
-  }, [itens, busca, filtroStatus, filtroAno]);
+  }, [itens, busca, filtroStatus, filtroAno, sortField, sortDir, projeto]);
 
   const anosDisponiveis = useMemo(() => {
     const anos = new Set<string>();
@@ -201,6 +242,23 @@ function PublicoCronogramaPage() {
     };
   }, [itens, projeto]);
 
+  const hasActiveFilters = busca.trim() !== "" || filtroStatus !== "todos" || filtroAno !== "todos";
+
+  function clearFilters() {
+    setBusca("");
+    setFiltroStatus("todos");
+    setFiltroAno("todos");
+  }
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
   function exportarPDF() {
     window.print();
   }
@@ -237,14 +295,19 @@ function PublicoCronogramaPage() {
     <div className="min-h-screen bg-slate-50 text-slate-800 print:bg-white">
       <style>{`
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
+          from { opacity: 0; transform: translateY(12px); }
           to { opacity: 1; transform: translateY(0); }
         }
         @keyframes progressFill {
           from { width: 0%; }
         }
-        .fade-up { animation: fadeUp 0.5s ease-out both; }
-        .progress-bar { animation: progressFill 1.2s ease-out both; }
+        @keyframes pulseAlert {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+          50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+        }
+        .fade-up { animation: fadeUp 0.4s ease-out both; }
+        .progress-bar { animation: progressFill 1s ease-out both; }
+        .pulse-alert { animation: pulseAlert 2s ease-in-out infinite; }
         .hero-geo {
           position: absolute;
           border-radius: 50%;
@@ -258,32 +321,36 @@ function PublicoCronogramaPage() {
 
       {/* ─── HERO HEADER ─── */}
       <header
-        className="relative overflow-hidden px-4 pt-4 pb-4 md:px-8 md:pt-6 md:pb-5"
+        className="relative overflow-hidden px-4 pt-5 pb-4 md:px-8 md:pt-7 md:pb-5"
         style={{
           background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)",
         }}
       >
         <div className="hero-geo" style={{ width: 320, height: 320, top: -80, right: -60 }} />
         <div className="hero-geo" style={{ width: 200, height: 200, bottom: -40, left: -30 }} />
-        <div className="hero-geo" style={{ width: 120, height: 120, top: 20, left: "40%" }} />
         <div className="relative mx-auto max-w-6xl">
-          <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
-            <CalendarRange className="h-3 w-3" />
-            Cronograma · Águas do Rio
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm">
+                <CalendarRange className="h-3 w-3" />
+                CRONOGRAMA · ÁGUAS DO RIO
+              </div>
+              <h1
+                className="text-xl font-extrabold tracking-tight text-white md:text-3xl"
+                style={{ fontWeight: 800, letterSpacing: "-0.02em" }}
+              >
+                {projeto.nome}
+              </h1>
+              {projeto.descricao && (
+                <p className="mt-1 max-w-2xl text-xs text-white/60 md:text-sm">
+                  {projeto.descricao}
+                </p>
+              )}
+            </div>
           </div>
-          <h1
-            className="text-xl font-extrabold tracking-tight text-white md:text-3xl"
-            style={{ fontWeight: 800, letterSpacing: "-0.02em" }}
-          >
-            {projeto.nome}
-          </h1>
-          {projeto.descricao && (
-            <p className="mt-1 max-w-2xl text-xs text-white/70 md:text-sm">{projeto.descricao}</p>
-          )}
 
-          {/* KPIs + Custo + Progresso — tudo junto */}
-          <div className="mt-3 flex flex-wrap items-start gap-3">
-            {/* KPIs */}
+          {/* KPIs + Custo + Progresso */}
+          <div className="mt-4 flex flex-wrap items-start gap-3">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <KpiCard
                 label="Total"
@@ -307,6 +374,7 @@ function PublicoCronogramaPage() {
                 value={String(stats.atrasados)}
                 icon={<AlertCircle className="h-3.5 w-3.5" />}
                 accent="#f87171"
+                pulse={stats.atrasados > 0}
               />
               <KpiCard
                 label="Dias"
@@ -315,9 +383,8 @@ function PublicoCronogramaPage() {
               />
             </div>
 
-            {/* Custo + Progresso na mesma linha */}
             <div className="flex flex-col gap-1.5">
-              <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 backdrop-blur-sm">
                 <DollarSign className="h-3.5 w-3.5 text-green-300" />
                 <span className="text-[10px] text-white/60">Custo:</span>
                 <span className="text-xs font-bold text-white">
@@ -329,7 +396,7 @@ function PublicoCronogramaPage() {
                   <span>Progresso</span>
                   <span className="font-semibold text-white">{stats.progresso}%</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
                   <div
                     className="progress-bar h-full rounded-full"
                     style={{
@@ -351,109 +418,222 @@ function PublicoCronogramaPage() {
 
       {/* ─── BARRA DE CONTROLES STICKY ─── */}
       <div
-        className="no-print sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-md md:px-8"
+        className="no-print sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md"
         style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
       >
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center">
-          {/* Busca */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar item..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
-            />
-          </div>
-
-          {/* Filtro de ano */}
-          <select
-            value={filtroAno}
-            onChange={(e) => setFiltroAno(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 focus:border-blue-400 focus:outline-none"
-          >
-            <option value="todos">Todos os anos</option>
-            {anosDisponiveis.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-
-          {/* Chips de status */}
-          <div className="flex flex-wrap gap-1.5">
-            {(["todos", "nao_iniciado", "em_andamento", "concluido", "atrasado"] as const).map(
-              (s) => (
-                <button
-                  key={s}
-                  onClick={() => setFiltroStatus(s)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                    filtroStatus === s
-                      ? "bg-[#0b3a73] text-white shadow-sm"
-                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                  }`}
-                >
-                  {s === "todos" ? "Todos" : STATUS_CONFIG[s].label}
-                </button>
-              ),
-            )}
-          </div>
-
-          {/* Toggle view */}
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+        <div className="mx-auto max-w-6xl px-4 py-2 md:px-8">
+          {/* Desktop controls */}
+          <div className="hidden items-center gap-2 sm:flex">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar item..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+              />
+            </div>
+            <select
+              value={filtroAno}
+              onChange={(e) => setFiltroAno(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-600 focus:border-blue-400 focus:outline-none"
+            >
+              <option value="todos">Anos</option>
+              {anosDisponiveis.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-1">
+              {(["todos", "nao_iniciado", "em_andamento", "concluido", "atrasado"] as const).map(
+                (s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFiltroStatus(s)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
+                      filtroStatus === s
+                        ? "bg-[#0b3a73] text-white shadow-sm"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    {s === "todos" ? "Todos" : STATUS_CONFIG[s].label}
+                  </button>
+                ),
+              )}
+            </div>
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              <button
+                onClick={() => setViewMode("lista")}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  viewMode === "lista"
+                    ? "bg-white text-[#0b3a73] shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" /> Lista
+              </button>
+              <button
+                onClick={() => setViewMode("gantt")}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  viewMode === "gantt"
+                    ? "bg-white text-[#0b3a73] shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <GanttChart className="h-3.5 w-3.5" /> Gantt
+              </button>
+            </div>
             <button
-              onClick={() => setViewMode("lista")}
-              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                viewMode === "lista"
-                  ? "bg-white text-[#0b3a73] shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+              onClick={exportarPDF}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+            >
+              <Download className="h-3.5 w-3.5" /> PDF
+            </button>
+          </div>
+
+          {/* Mobile controls */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+              />
+            </div>
+            <button
+              onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+              className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                mobileFiltersOpen || hasActiveFilters
+                  ? "border-[#0b3a73] bg-[#0b3a73] text-white"
+                  : "border-slate-200 bg-slate-50 text-slate-600"
               }`}
             >
-              <List className="h-3.5 w-3.5" /> Lista
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros
+              {hasActiveFilters && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white" />}
             </button>
-            <button
-              onClick={() => setViewMode("gantt")}
-              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                viewMode === "gantt"
-                  ? "bg-white text-[#0b3a73] shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <GanttChart className="h-3.5 w-3.5" /> Gantt
-            </button>
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              <button
+                onClick={() => setViewMode("lista")}
+                className={`rounded-md px-2 py-1 text-xs transition ${
+                  viewMode === "lista" ? "bg-white text-[#0b3a73] shadow-sm" : "text-slate-500"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode("gantt")}
+                className={`rounded-md px-2 py-1 text-xs transition ${
+                  viewMode === "gantt" ? "bg-white text-[#0b3a73] shadow-sm" : "text-slate-500"
+                }`}
+              >
+                <GanttChart className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* PDF */}
-          <button
-            onClick={exportarPDF}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
-          >
-            <Download className="h-3.5 w-3.5" /> PDF
-          </button>
+          {/* Mobile expanded filters */}
+          {mobileFiltersOpen && (
+            <div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2 sm:hidden">
+              <select
+                value={filtroAno}
+                onChange={(e) => setFiltroAno(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600"
+              >
+                <option value="todos">Todos os anos</option>
+                {anosDisponiveis.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+              {(["todos", "nao_iniciado", "em_andamento", "concluido", "atrasado"] as const).map(
+                (s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFiltroStatus(s)}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition-all ${
+                      filtroStatus === s
+                        ? "bg-[#0b3a73] text-white shadow-sm"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {s === "todos" ? "Todos" : STATUS_CONFIG[s].label}
+                  </button>
+                ),
+              )}
+              <button
+                onClick={exportarPDF}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-medium text-slate-600"
+              >
+                <Download className="h-3 w-3" /> PDF
+              </button>
+            </div>
+          )}
+
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-slate-400">Filtros:</span>
+              {busca.trim() && <Chip label={`"${busca}"`} onRemove={() => setBusca("")} />}
+              {filtroAno !== "todos" && (
+                <Chip label={filtroAno} onRemove={() => setFiltroAno("todos")} />
+              )}
+              {filtroStatus !== "todos" && (
+                <Chip
+                  label={STATUS_CONFIG[filtroStatus as StatusKey].label}
+                  onRemove={() => setFiltroStatus("todos")}
+                />
+              )}
+              <button
+                onClick={clearFilters}
+                className="text-[10px] font-medium text-slate-400 hover:text-slate-600"
+              >
+                Limpar tudo
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ─── CONTEÚDO ─── */}
       <main className="mx-auto max-w-6xl px-4 py-4 md:px-8">
-        {itensFiltrados.length === 0 && (
-          <div className="py-16 text-center">
-            <div className="text-5xl">🔍</div>
-            <p className="mt-3 text-sm text-slate-500">
-              Nenhum item encontrado para os filtros selecionados.
-            </p>
+        {itensFiltrados.length === 0 ? (
+          <div className="py-20 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+              <Inbox className="h-8 w-8 text-slate-300" />
+            </div>
+            <p className="text-sm font-medium text-slate-500">Nenhum item encontrado</p>
+            <p className="mt-1 text-xs text-slate-400">Tente ajustar os filtros ou a busca</p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="mt-3 inline-flex items-center gap-1 rounded-lg bg-[#0b3a73] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#0d4a8f]"
+              >
+                <X className="h-3 w-3" /> Limpar filtros
+              </button>
+            )}
           </div>
-        )}
-
-        {viewMode === "lista" ? (
-          <ViewLista itens={itensFiltrados} projeto={projeto} />
+        ) : viewMode === "lista" ? (
+          <ViewLista
+            itens={itensFiltrados}
+            projeto={projeto}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
         ) : (
           <ViewGantt itens={itensFiltrados} projeto={projeto} stats={stats} />
         )}
       </main>
 
       {/* ─── RODAPÉ ─── */}
-      <footer className="border-t border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-400 md:px-8">
+      <footer className="border-t border-slate-200 bg-white px-4 py-4 text-center text-[10px] text-slate-400 md:px-8">
         Águas do Rio · Eletromecânica Baixada 2 · Gerado em {new Date().toLocaleDateString("pt-BR")}
       </footer>
     </div>
@@ -464,37 +644,64 @@ function PublicoCronogramaPage() {
    COMPONENTES AUXILIARES
    ═══════════════════════════════════════════════ */
 
+function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+      {label}
+      <button onClick={onRemove} className="hover:text-blue-900">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
 function KpiCard({
   label,
   value,
   icon,
   accent,
+  pulse,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   accent?: string;
+  pulse?: boolean;
 }) {
   return (
     <div
-      className="flex items-center gap-2 rounded-lg px-3 py-2 backdrop-blur-md"
-      style={{ background: "rgba(255,255,255,0.1)" }}
+      className={`flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 backdrop-blur-md transition ${
+        pulse ? "pulse-alert" : ""
+      }`}
+      style={{ background: "rgba(255,255,255,0.12)" }}
     >
       <div
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
-        style={{ background: accent ? `${accent}22` : "rgba(255,255,255,0.15)" }}
+        style={{ background: accent ? `${accent}30` : "rgba(255,255,255,0.18)" }}
       >
-        <span style={{ color: accent || "rgba(255,255,255,0.8)" }}>{icon}</span>
+        <span style={{ color: accent || "rgba(255,255,255,0.9)" }}>{icon}</span>
       </div>
       <div>
-        <p className="text-[10px] text-white/50 leading-tight">{label}</p>
+        <p className="text-[10px] font-medium text-white/50 leading-tight">{label}</p>
         <p className="text-sm font-bold text-white leading-tight">{value}</p>
       </div>
     </div>
   );
 }
 
-function ViewLista({ itens, projeto }: { itens: CronogramaItem[]; projeto: CronogramaProjeto }) {
+function ViewLista({
+  itens,
+  projeto,
+  sortField,
+  sortDir,
+  onSort,
+}: {
+  itens: CronogramaItem[];
+  projeto: CronogramaProjeto;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (f: SortField) => void;
+}) {
   const grupos = useMemo(() => {
     const map = new Map<string, CronogramaItem[]>();
     itens.forEach((item) => {
@@ -505,85 +712,232 @@ function ViewLista({ itens, projeto }: { itens: CronogramaItem[]; projeto: Crono
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [itens]);
 
+  function SortIcon({ field }: { field: SortField }) {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-slate-300" />;
+    return sortDir === "asc" ? (
+      <ArrowUp className="h-3 w-3 text-[#0b3a73]" />
+    ) : (
+      <ArrowDown className="h-3 w-3 text-[#0b3a73]" />
+    );
+  }
+
+  function ItemProgress({ item }: { item: CronogramaItem }) {
+    const pct =
+      item.status === "concluido"
+        ? 100
+        : item.status === "em_andamento"
+          ? 55
+          : item.status === "atrasado"
+            ? 75
+            : 0;
+    const st = STATUS_CONFIG[item.status as StatusKey];
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${pct}%`, backgroundColor: st.color }}
+          />
+        </div>
+        <span className="text-[10px] text-slate-400">{pct}%</span>
+      </div>
+    );
+  }
+
   let seq = 0;
 
   return (
-    <div className="space-y-6">
-      {grupos.map(([grupo, items]) => (
-        <div key={grupo}>
-          <div className="mb-3 flex items-center gap-2">
-            <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{grupo}</h3>
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-[10px] text-slate-400">{items.length} itens</span>
-          </div>
-          <div className="space-y-2">
-            {items.map((item) => {
-              seq++;
-              const st = STATUS_CONFIG[item.status as StatusKey];
-              const duracao = item.duracao_dias ?? projeto.duracao_padrao_dias;
-              return (
-                <div
-                  key={item.id}
-                  className="fade-up rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition hover:shadow-md"
-                  style={{ animationDelay: `${Math.min(seq * 40, 600)}ms` }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500">
-                      {String(seq).padStart(2, "0")}
+    <div className="space-y-5">
+      {/* ── TABLE VIEW (desktop lg+) ── */}
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50">
+              <th className="px-3 py-2 font-semibold text-slate-500">#</th>
+              <th className="px-3 py-2 font-semibold text-slate-500">Item</th>
+              <th className="px-3 py-2 font-semibold text-slate-500">Status</th>
+              <th
+                className="cursor-pointer px-3 py-2 font-semibold text-slate-500 select-none"
+                onClick={() => onSort("inicio")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Início <SortIcon field="inicio" />
+                </span>
+              </th>
+              <th
+                className="cursor-pointer px-3 py-2 font-semibold text-slate-500 select-none"
+                onClick={() => onSort("fim")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Fim <SortIcon field="fim" />
+                </span>
+              </th>
+              <th
+                className="cursor-pointer px-3 py-2 font-semibold text-slate-500 select-none"
+                onClick={() => onSort("duracao")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Duração <SortIcon field="duracao" />
+                </span>
+              </th>
+              <th
+                className="cursor-pointer px-3 py-2 font-semibold text-slate-500 select-none"
+                onClick={() => onSort("custo")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Custo <SortIcon field="custo" />
+                </span>
+              </th>
+              <th className="px-3 py-2 font-semibold text-slate-500">Progresso</th>
+            </tr>
+          </thead>
+          <tbody>
+            {grupos.map(([grupo, items]) => (
+              <>
+                <tr key={`g-${grupo}`}>
+                  <td colSpan={8} className="border-b border-slate-100 bg-slate-50/80 px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500" />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        {grupo}
+                      </span>
+                      <span className="text-[10px] text-slate-400">{items.length} itens</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-800">{item.nome}</p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  </td>
+                </tr>
+                {items.map((item) => {
+                  seq++;
+                  const st = STATUS_CONFIG[item.status as StatusKey];
+                  const duracao = item.duracao_dias ?? projeto.duracao_padrao_dias;
+                  return (
+                    <tr
+                      key={item.id}
+                      className="fade-up border-b border-slate-50 transition-colors hover:bg-blue-50/30"
+                      style={{ animationDelay: `${Math.min(seq * 30, 400)}ms` }}
+                    >
+                      <td className="px-3 py-2 text-[11px] text-slate-400">
+                        {String(seq).padStart(2, "0")}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-slate-700">{item.nome}</span>
+                      </td>
+                      <td className="px-3 py-2">
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${st.bgColor} ${st.textColor}`}
                         >
                           <span className={`h-1.5 w-1.5 rounded-full ${st.dotColor}`} />
                           {st.label}
                         </span>
-                        <span className="text-[10px] text-slate-400">{duracao}d</span>
+                      </td>
+                      <td className="px-3 py-2 text-[11px] text-slate-500">
+                        {formatDate(item.data_inicio_calculada)}
+                      </td>
+                      <td className="px-3 py-2 text-[11px] text-slate-500">
+                        {formatDate(item.data_termino_calculada)}
+                      </td>
+                      <td className="px-3 py-2 text-[11px] text-slate-500">{duracao}d</td>
+                      <td className="px-3 py-2 text-[11px] text-green-600">
+                        {item.custo_material ? formatCurrency(item.custo_material) : "--"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <ItemProgress item={item} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── CARD VIEW (mobile/tablet) ── */}
+      <div className="space-y-2 lg:hidden">
+        {grupos.map(([grupo, items]) => (
+          <div key={grupo}>
+            <div className="mb-2 flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-blue-500" />
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                {grupo}
+              </h3>
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[10px] text-slate-400">{items.length}</span>
+            </div>
+            <div className="space-y-1.5">
+              {items.map((item) => {
+                seq++;
+                const st = STATUS_CONFIG[item.status as StatusKey];
+                const duracao = item.duracao_dias ?? projeto.duracao_padrao_dias;
+                const pct =
+                  item.status === "concluido"
+                    ? 100
+                    : item.status === "em_andamento"
+                      ? 55
+                      : item.status === "atrasado"
+                        ? 75
+                        : 0;
+                return (
+                  <div
+                    key={item.id}
+                    className="fade-up rounded-lg border border-slate-100 bg-white p-3 shadow-sm transition hover:shadow-md"
+                    style={{ animationDelay: `${Math.min(seq * 30, 400)}ms` }}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[10px] font-bold text-slate-500">
+                        {String(seq).padStart(2, "0")}
                       </div>
-                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width:
-                              item.status === "concluido"
-                                ? "100%"
-                                : item.status === "em_andamento"
-                                  ? "55%"
-                                  : item.status === "atrasado"
-                                    ? "75%"
-                                    : "0%",
-                            backgroundColor: st.color,
-                          }}
-                        />
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-                        <span className="inline-flex items-center gap-1">
-                          <Tag className="h-3 w-3" /> {item.grupo || "--"}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar className="h-3 w-3" /> {formatDate(item.data_inicio_calculada)}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <TrendingUp className="h-3 w-3" />{" "}
-                          {formatDate(item.data_termino_calculada)}
-                        </span>
-                        {item.custo_material ? (
-                          <span className="inline-flex items-center gap-1 text-green-600">
-                            <DollarSign className="h-3 w-3" /> {formatCurrency(item.custo_material)}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {item.nome}
+                          </p>
+                          <span
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${st.bgColor} ${st.textColor}`}
+                          >
+                            <span className={`h-1 w-1 rounded-full ${st.dotColor}`} />
+                            {st.label}
                           </span>
-                        ) : null}
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: st.color,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+                          <span className="inline-flex items-center gap-0.5">
+                            <Calendar className="h-2.5 w-2.5" />{" "}
+                            {formatDate(item.data_inicio_calculada)}
+                          </span>
+                          <span>→</span>
+                          <span className="inline-flex items-center gap-0.5">
+                            <TrendingUp className="h-2.5 w-2.5" />{" "}
+                            {formatDate(item.data_termino_calculada)}
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span>{duracao}d</span>
+                          {item.custo_material ? (
+                            <>
+                              <span className="text-slate-300">|</span>
+                              <span className="inline-flex items-center gap-0.5 text-green-600">
+                                <DollarSign className="h-2.5 w-2.5" />{" "}
+                                {formatCurrency(item.custo_material)}
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -615,7 +969,10 @@ function ViewGantt({
     while (current <= fim) {
       const year = current.getFullYear();
       const month = current.getMonth();
-      const label = current.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+      const label = current.toLocaleDateString("pt-BR", {
+        month: "short",
+        year: "2-digit",
+      });
       let count = 0;
       const temp = new Date(current);
       while (temp.getMonth() === month && temp <= fim) {
@@ -720,5 +1077,3 @@ function ViewGantt({
     </div>
   );
 }
-
-export default PublicoCronogramaPage;
