@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { CronogramaProjeto, CronogramaItem } from "@/lib/cronograma-types";
 
-export const Route = createFileRoute("/publico/$token")({
+export const Route = createFileRoute("/cronograma/publico/$token")({
   component: PublicoCronogramaPage,
   head: () => ({
     meta: [
@@ -209,11 +209,13 @@ function PublicoCronogramaPage() {
     return (
       <div
         className="flex min-h-screen items-center justify-center"
-        style={{ background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)" }}
+        style={{
+          background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)",
+        }}
       >
         <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-white mx-auto" />
-          <p className="mt-4 text-white/80 text-sm">Carregando cronograma…</p>
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-white" />
+          <p className="mt-4 text-sm text-white/80">Carregando cronograma…</p>
         </div>
       </div>
     );
@@ -223,7 +225,7 @@ function PublicoCronogramaPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
         <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
+          <div className="mb-4 text-6xl">🔒</div>
           <h2 className="text-xl font-semibold text-slate-700">Cronograma não encontrado</h2>
           <p className="mt-2 text-sm text-slate-500">{erro || "O link pode ter sido revogado."}</p>
         </div>
@@ -241,10 +243,6 @@ function PublicoCronogramaPage() {
         @keyframes progressFill {
           from { width: 0%; }
         }
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
         .fade-up { animation: fadeUp 0.5s ease-out both; }
         .progress-bar { animation: progressFill 1.2s ease-out both; }
         .hero-geo {
@@ -255,14 +253,15 @@ function PublicoCronogramaPage() {
         }
         @media print {
           .no-print { display: none !important; }
-          .print-break { page-break-before: always; }
         }
       `}</style>
 
       {/* ─── HERO HEADER ─── */}
       <header
         className="relative overflow-hidden px-4 pt-8 pb-6 md:px-8 md:pt-12 md:pb-8"
-        style={{ background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)" }}
+        style={{
+          background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)",
+        }}
       >
         <div className="hero-geo" style={{ width: 320, height: 320, top: -80, right: -60 }} />
         <div className="hero-geo" style={{ width: 200, height: 200, bottom: -40, left: -30 }} />
@@ -538,7 +537,6 @@ function ViewLista({ itens, projeto }: { itens: CronogramaItem[]; projeto: Crono
                         </span>
                         <span className="text-[10px] text-slate-400">{duracao}d</span>
                       </div>
-                      {/* Barra de progresso fina */}
                       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
                           className="h-full rounded-full transition-all"
@@ -627,7 +625,6 @@ function ViewGantt({
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <div style={{ minWidth: 240 + ganttWidth }}>
-        {/* Header meses */}
         <div className="flex border-b border-slate-200 bg-slate-50">
           <div className="flex w-[240px] shrink-0 items-center border-r border-slate-200 px-3 py-2">
             <span className="text-xs font-semibold text-slate-500 uppercase">Item</span>
@@ -645,7 +642,6 @@ function ViewGantt({
           </div>
         </div>
 
-        {/* Linhas */}
         {itens.map((item, idx) => {
           const inicio = item.data_inicio_calculada || projeto.data_inicio_base;
           const termino =
@@ -667,7 +663,9 @@ function ViewGantt({
           return (
             <div
               key={item.id}
-              className={`flex border-b border-slate-100 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"} hover:bg-blue-50/30 transition-colors`}
+              className={`flex border-b border-slate-100 transition-colors ${
+                idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+              } hover:bg-blue-50/30`}
             >
               <div className="flex w-[240px] shrink-0 items-center gap-2 border-r border-slate-200 px-3 py-2.5">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${st.dotColor}`} />
@@ -678,7 +676,7 @@ function ViewGantt({
                 style={{ minWidth: ganttWidth, height: 40 }}
               >
                 <div
-                  className="absolute top-2 rounded-md overflow-hidden"
+                  className="absolute top-2 overflow-hidden rounded-md"
                   style={{
                     left: offset * colWidth,
                     width: barWidth,
@@ -705,7 +703,6 @@ function ViewGantt({
         })}
       </div>
 
-      {/* Legenda */}
       <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 bg-slate-50 px-4 py-2.5">
         {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
           <div key={key} className="flex items-center gap-1.5">

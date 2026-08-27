@@ -250,7 +250,7 @@ Foi criada manualmente a tabela **`backup_saldo_pre_migration`** para preservar 
 - **Migration `00039_cronograma_instalacao.sql`**: tabelas `cronograma_projetos`, `cronograma_itens`, `cronograma_comentarios`, `cronograma_auditoria`, `notificacoes` com triggers de recálculo de datas, auditoria e desabilitação de RLS
 - **Painel `cronograma`** com permissões: `ver`, `criar_projeto`, `editar`, `excluir`, `exportar`, `comentar`, `gerar_link_publico`
 - Rota `/cronograma` com Gantt interativo, drag-and-drop, edição inline, autosave, zoom semana/mês, legenda de grupos por cor, metric cards, excluir com confirmação, exportação XLSX/CSV/PDF e importação de planilha
-- Rota `/publico/$token` para modo apresentação (link público externo, somente leitura, sem login)
+- Rota `/cronograma/publico/$token` para modo apresentação (link público externo, somente leitura, sem login)
 - Drawer lateral com abas Detalhes, Comentários (com @menção e autocomplete) e Histórico (audit log)
 - Modelo genérico com `campo_agrupamento_label` configurável por projeto, permitindo reuso para qualquer tipo de cronograma
 - Sistema de notificações (`notificacoes`) com menções e responsável

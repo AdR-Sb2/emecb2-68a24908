@@ -51,7 +51,7 @@ src/
     cronograma.tsx # /cronograma - Cronograma de Instalacao
     cronograma/
       publico/
-        $token.tsx # /publico/:token - Modo apresentacao (rota publica, sem login)
+        $token.tsx # /cronograma/publico/:token - Modo apresentacao
     estoque.tsx    # /estoque - Estoque e Compras
     escala.tsx     # /escala - Escala de Trabalho
     oi.tsx         # /oi - Gerador de OI

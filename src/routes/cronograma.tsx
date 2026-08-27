@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useLocation, Link, Outlet } from "@tanstack/react-router";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   CalendarRange,
@@ -60,7 +60,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/cronograma")({
-  component: CronogramaPage,
+  component: CronogramaLayout,
   head: () => ({
     meta: [
       { title: "Cronograma de Instalação · Eletromecânica" },
@@ -68,6 +68,14 @@ export const Route = createFileRoute("/cronograma")({
     ],
   }),
 });
+
+function CronogramaLayout() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/cronograma/publico/")) {
+    return <Outlet />;
+  }
+  return <CronogramaPage />;
+}
 
 const inputCls =
   "min-h-11 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20";
@@ -348,7 +356,7 @@ function CronogramaPage() {
       return;
     }
     setProjetoAtivo((prev) => (prev ? { ...prev, link_publico_token: token } : null));
-    const url = `${window.location.origin}/publico/${token}`;
+    const url = `${window.location.origin}/cronograma/publico/${token}`;
     await navigator.clipboard.writeText(url);
     toast.success("Link copiado para área de transferência");
   }
