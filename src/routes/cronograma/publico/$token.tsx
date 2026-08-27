@@ -268,7 +268,7 @@ function PublicoCronogramaPage() {
       <div
         className="flex min-h-screen items-center justify-center"
         style={{
-          background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)",
+          background: "linear-gradient(135deg, #0b2d5e 0%, #0f4c8a 40%, #1a7bc4 80%, #38a3d9 100%)",
         }}
       >
         <div className="text-center">
@@ -321,93 +321,108 @@ function PublicoCronogramaPage() {
 
       {/* ─── HERO HEADER ─── */}
       <header
-        className="relative overflow-hidden px-4 pt-5 pb-4 md:px-8 md:pt-7 md:pb-5"
+        className="relative overflow-hidden px-4 pt-5 pb-5 md:px-8 md:pt-7 md:pb-6"
         style={{
-          background: "linear-gradient(135deg, #0b3a73 0%, #1e5fa8 50%, #0ea5e9 100%)",
+          background: "linear-gradient(135deg, #0b2d5e 0%, #0f4c8a 40%, #1a7bc4 80%, #38a3d9 100%)",
         }}
       >
-        <div className="hero-geo" style={{ width: 320, height: 320, top: -80, right: -60 }} />
-        <div className="hero-geo" style={{ width: 200, height: 200, bottom: -40, left: -30 }} />
+        {/* Decorative shapes */}
+        <div className="hero-geo" style={{ width: 400, height: 400, top: -120, right: -80 }} />
+        <div className="hero-geo" style={{ width: 240, height: 240, bottom: -60, left: -40 }} />
+        <div className="hero-geo" style={{ width: 140, height: 140, top: 10, right: "30%" }} />
+        <div className="hero-geo" style={{ width: 80, height: 80, bottom: "20%", left: "50%" }} />
+
         <div className="relative mx-auto max-w-6xl">
-          <div className="flex items-start justify-between gap-4">
+          {/* Top row: title + cost/progress side by side */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            {/* Left: breadcrumb + title */}
             <div className="min-w-0 flex-1">
-              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm">
-                <CalendarRange className="h-3 w-3" />
-                CRONOGRAMA · ÁGUAS DO RIO
+              <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-medium tracking-widest text-white/60 uppercase backdrop-blur-sm">
+                <CalendarRange className="h-2.5 w-2.5" />
+                Cronograma
               </div>
               <h1
-                className="text-xl font-extrabold tracking-tight text-white md:text-3xl"
-                style={{ fontWeight: 800, letterSpacing: "-0.02em" }}
+                className="text-2xl font-extrabold leading-tight text-white md:text-4xl"
+                style={{ fontWeight: 800, letterSpacing: "-0.03em" }}
               >
                 {projeto.nome}
               </h1>
               {projeto.descricao && (
-                <p className="mt-1 max-w-2xl text-xs text-white/60 md:text-sm">
+                <p className="mt-1.5 max-w-xl text-xs text-white/50 md:text-sm">
                   {projeto.descricao}
                 </p>
               )}
-            </div>
-          </div>
 
-          {/* KPIs + Custo + Progresso */}
-          <div className="mt-4 flex flex-wrap items-start gap-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              <KpiCard
-                label="Total"
-                value={String(stats.total)}
-                icon={<BarChart3 className="h-3.5 w-3.5" />}
-              />
-              <KpiCard
-                label="Concluídos"
-                value={String(stats.concluidos)}
-                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                accent="#4ade80"
-              />
-              <KpiCard
-                label="Andamento"
-                value={String(stats.emAndamento)}
-                icon={<PlayCircle className="h-3.5 w-3.5" />}
-                accent="#60a5fa"
-              />
-              <KpiCard
-                label="Atrasados"
-                value={String(stats.atrasados)}
-                icon={<AlertCircle className="h-3.5 w-3.5" />}
-                accent="#f87171"
-                pulse={stats.atrasados > 0}
-              />
-              <KpiCard
-                label="Dias"
-                value={String(stats.totalDias)}
-                icon={<Clock className="h-3.5 w-3.5" />}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 backdrop-blur-sm">
-                <DollarSign className="h-3.5 w-3.5 text-green-300" />
-                <span className="text-[10px] text-white/60">Custo:</span>
-                <span className="text-xs font-bold text-white">
-                  {formatCurrency(stats.custoTotal)}
-                </span>
+              {/* KPIs row */}
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <KpiCard
+                  label="Total"
+                  value={String(stats.total)}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                />
+                <KpiCard
+                  label="Concluídos"
+                  value={String(stats.concluidos)}
+                  icon={<CheckCircle2 className="h-4 w-4" />}
+                  accent="#4ade80"
+                />
+                <KpiCard
+                  label="Andamento"
+                  value={String(stats.emAndamento)}
+                  icon={<PlayCircle className="h-4 w-4" />}
+                  accent="#60a5fa"
+                />
+                <KpiCard
+                  label="Atrasados"
+                  value={String(stats.atrasados)}
+                  icon={<AlertCircle className="h-4 w-4" />}
+                  accent="#f87171"
+                  pulse={stats.atrasados > 0}
+                />
+                <KpiCard
+                  label="Dias"
+                  value={String(stats.totalDias)}
+                  icon={<Clock className="h-4 w-4" />}
+                />
               </div>
-              <div className="w-48">
-                <div className="mb-0.5 flex items-center justify-between text-[10px] text-white/50">
-                  <span>Progresso</span>
-                  <span className="font-semibold text-white">{stats.progresso}%</span>
+            </div>
+
+            {/* Right: cost + progress panel */}
+            <div className="flex w-full flex-col gap-2.5 lg:w-56 lg:flex-shrink-0">
+              {/* Cost card */}
+              <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-md">
+                <div className="mb-1 flex items-center gap-1.5">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/20">
+                    <DollarSign className="h-3.5 w-3.5 text-green-300" />
+                  </div>
+                  <span className="text-[10px] font-medium text-white/50">Custo total</span>
                 </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                <p
+                  className="text-lg font-extrabold text-white"
+                  style={{ letterSpacing: "-0.02em" }}
+                >
+                  {formatCurrency(stats.custoTotal)}
+                </p>
+              </div>
+
+              {/* Progress card */}
+              <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-md">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-white/50">Progresso</span>
+                  <span className="text-sm font-bold text-white">{stats.progresso}%</span>
+                </div>
+                <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
                   <div
                     className="progress-bar h-full rounded-full"
                     style={{
-                      width: `${stats.progresso}%`,
+                      width: `${Math.max(stats.progresso, 2)}%`,
                       background: "linear-gradient(90deg, #4ade80, #22c55e)",
                     }}
                   />
                 </div>
-                <div className="mt-0.5 flex items-center gap-3 text-[10px] text-white/40">
+                <div className="mt-2 flex items-center gap-2 text-[10px] text-white/40">
                   <span>{formatDate(stats.dataMin || projeto.data_inicio_base)}</span>
-                  <span>→</span>
+                  <span className="text-white/20">→</span>
                   <span>{formatDate(stats.dataMax)}</span>
                 </div>
               </div>
@@ -670,20 +685,24 @@ function KpiCard({
 }) {
   return (
     <div
-      className={`flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 backdrop-blur-md transition ${
-        pulse ? "pulse-alert" : ""
+      className={`flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 backdrop-blur-md transition hover:bg-white/15 ${
+        pulse ? "pulse-alert border-red-400/30" : ""
       }`}
-      style={{ background: "rgba(255,255,255,0.12)" }}
     >
       <div
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
-        style={{ background: accent ? `${accent}30` : "rgba(255,255,255,0.18)" }}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        style={{ background: accent ? `${accent}25` : "rgba(255,255,255,0.12)" }}
       >
-        <span style={{ color: accent || "rgba(255,255,255,0.9)" }}>{icon}</span>
+        <span style={{ color: accent || "rgba(255,255,255,0.85)" }}>{icon}</span>
       </div>
-      <div>
-        <p className="text-[10px] font-medium text-white/50 leading-tight">{label}</p>
-        <p className="text-sm font-bold text-white leading-tight">{value}</p>
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium text-white/45 leading-tight truncate">{label}</p>
+        <p
+          className="text-base font-extrabold text-white leading-tight"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {value}
+        </p>
       </div>
     </div>
   );
