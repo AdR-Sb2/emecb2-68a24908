@@ -970,15 +970,21 @@ function ElevatoriasPage() {
     }
   };
 
-  // Gerar link público
+  // Gerar link público (upsert: cria a linha de config se ainda não existir)
   const gerarLinkPublico = async () => {
     const token = crypto.randomUUID();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("elevatorias_config")
-      .update({ link_publico_token: token })
-      .eq("id", 1);
+      .upsert({ id: 1, link_publico_token: token }, { onConflict: "id" })
+      .select("link_publico_token");
     if (error) {
-      toast.error(error.message);
+      toast.error("Não foi possível gerar o link: " + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      toast.error(
+        "O link não foi salvo no banco (nenhuma linha gravada em elevatorias_config). Verifique as permissões da tabela.",
+      );
       return;
     }
     setLinkToken(token);
@@ -989,17 +995,22 @@ function ElevatoriasPage() {
 
   // Revogar link público
   const revogarLinkPublico = async () => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("elevatorias_config")
-      .update({ link_publico_token: null })
-      .eq("id", 1);
+      .upsert({ id: 1, link_publico_token: null }, { onConflict: "id" })
+      .select("id");
     if (error) {
-      toast.error(error.message);
+      toast.error("Não foi possível revogar o link: " + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      toast.error("Nada foi alterado no banco. Verifique as permissões da tabela.");
       return;
     }
     setLinkToken(null);
     toast.success("Link revogado");
   };
+
 
   const exportarPlanilha = async () => {
     try {
