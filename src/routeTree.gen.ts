@@ -157,7 +157,7 @@ export interface FileRoutesByFullPath {
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/elevatorias': typeof ElevatoriasRoute
+  '/elevatorias': typeof ElevatoriasRouteWithChildren
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
@@ -182,7 +182,7 @@ export interface FileRoutesByTo {
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/elevatorias': typeof ElevatoriasRoute
+  '/elevatorias': typeof ElevatoriasRouteWithChildren
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
@@ -208,7 +208,7 @@ export interface FileRoutesById {
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/elevatorias': typeof ElevatoriasRoute
+  '/elevatorias': typeof ElevatoriasRouteWithChildren
   '/escala': typeof EscalaRoute
   '/estoque': typeof EstoqueRoute
   '/login': typeof LoginRoute
@@ -223,6 +223,7 @@ export interface FileRoutesById {
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
   '/elevatorias_/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
+  '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -249,6 +250,7 @@ export interface FileRouteTypes {
     | '/api/equipe-override'
     | '/elevatorias/$id'
     | '/cronograma/publico/$token'
+    | '/elevatorias/publico/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -273,6 +275,7 @@ export interface FileRouteTypes {
     | '/api/equipe-override'
     | '/elevatorias/$id'
     | '/cronograma/publico/$token'
+    | '/elevatorias/publico/$token'
   id:
     | '__root__'
     | '/'
@@ -308,7 +311,7 @@ export interface RootRouteChildren {
   BloqueadoRoute: typeof BloqueadoRoute
   CronogramaRoute: typeof CronogramaRouteWithChildren
   DashboardRoute: typeof DashboardRoute
-  ElevatoriasRoute: typeof ElevatoriasRoute
+  ElevatoriasRoute: typeof ElevatoriasRouteWithChildren
   EscalaRoute: typeof EscalaRoute
   EstoqueRoute: typeof EstoqueRoute
   LoginRoute: typeof LoginRoute
