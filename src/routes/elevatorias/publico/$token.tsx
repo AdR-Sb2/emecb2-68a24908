@@ -6,8 +6,6 @@ import {
   Search,
   History,
   Calendar,
-  CheckCircle2,
-  AlertTriangle,
   HardHat,
   Eye,
 } from "lucide-react";
@@ -19,7 +17,6 @@ import type {
   Elevatoria,
   ElevatoriaEquipamento,
   ElevatoriaEletricaGeral,
-  ElevatoriaCompletude,
   ElevatoriaImplantacao,
   StatusImplantacao,
 } from "@/lib/elevatoria-types";
@@ -45,7 +42,6 @@ function PublicoElevatoriasPage() {
   const [implantacoes, setImplantacoes] = useState<ElevatoriaImplantacao[]>([]);
   const [equipamentos, setEquipamentos] = useState<ElevatoriaEquipamento[]>([]);
   const [eletricaGeral, setEletricaGeral] = useState<ElevatoriaEletricaGeral[]>([]);
-  const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -79,43 +75,8 @@ function PublicoElevatoriasPage() {
       if (equipRes.data) setEquipamentos(equipRes.data as ElevatoriaEquipamento[]);
       if (egRes.data) setEletricaGeral(egRes.data as ElevatoriaEletricaGeral[]);
 
-      // Calculate completude
-      if (elevRes.data) {
-        const calcMap = new Map<string, ElevatoriaCompletude>();
-        for (const elev of elevRes.data) {
-          let total = 0;
-          let preenchidos = 0;
-          const fields = [
-            "nome",
-            "planta",
-            "tipo",
-            "municipio",
-            "endereco",
-            "bairro",
-            "cep",
-            "inicio_operacao",
-            "funcao",
-            "caracteristicas_area",
-          ];
-          for (const f of fields) {
-            total++;
-            if (elev[f as keyof Elevatoria] !== null && elev[f as keyof Elevatoria] !== "") {
-              preenchidos++;
-            }
-          }
-          const pct = total > 0 ? Math.round((preenchidos / total) * 100) : 100;
-          const nivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
-          calcMap.set(`${elev.id}:geral`, {
-            elevatoria_id: elev.id,
-            total_campos: total,
-            preenchidos,
-            na_aplicaveis: 0,
-            percentual: pct,
-            nivel,
-          });
-        }
-        setCompletudes(calcMap);
-      }
+
+
       setLoading(false);
     })();
   }, [token]);
@@ -152,23 +113,13 @@ function PublicoElevatoriasPage() {
 
   const kpis = useMemo(() => {
     const total = elevatorias.length;
-    let completudeMedia = 0;
-    let criticas = 0;
     let operacionais = 0;
     for (const e of elevatorias) {
-      const c = completudes.get(`${e.id}:geral`);
-      if (c) completudeMedia += c.percentual;
-      if (c?.nivel === "critico") criticas++;
       const imp = implantacoes.find((i) => i.elevatoria_id === e.id);
       if (imp?.status === "operacional") operacionais++;
     }
-    return {
-      total,
-      completudeMedia: total > 0 ? Math.round(completudeMedia / total) : 0,
-      criticas,
-      operacionais,
-    };
-  }, [elevatorias, completudes, implantacoes]);
+    return { total, operacionais };
+  }, [elevatorias, implantacoes]);
 
   function toggleSort(field: string) {
     if (sortField === field) {
@@ -226,21 +177,9 @@ function PublicoElevatoriasPage() {
           <p className="mt-1 text-xs text-white/50">Águas do Rio · Eletromecânica Baixada 2</p>
 
           {/* KPIs */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-2">
             {[
               { label: "Total", value: kpis.total, icon: <Building2 className="h-4 w-4" /> },
-              {
-                label: "Completude",
-                value: `${kpis.completudeMedia}%`,
-                icon: <CheckCircle2 className="h-4 w-4" />,
-                accent: "#4ade80",
-              },
-              {
-                label: "Críticas",
-                value: kpis.criticas,
-                icon: <AlertTriangle className="h-4 w-4" />,
-                accent: "#f87171",
-              },
               {
                 label: "Operacionais",
                 value: kpis.operacionais,
@@ -346,14 +285,21 @@ function PublicoElevatoriasPage() {
                       </th>
                     ))}
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Implantação</th>
-                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Completude</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                      Tipo Construtivo
+                    </th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Potência Motor</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">UC</th>
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Obs</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Ações</th>
+
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((elev) => {
                     const imp = implantacoes.find((i) => i.elevatoria_id === elev.id);
-                    const comp = completudes.get(`${elev.id}:geral`);
+                    const equip = equipamentos.find((q) => q.elevatoria_id === elev.id);
+                    const eg = eletricaGeral.find((g) => g.elevatoria_id === elev.id);
                     const stImp = imp?.status as StatusImplantacao | undefined;
 
                     return (
@@ -385,29 +331,22 @@ function PublicoElevatoriasPage() {
                             <span className="text-slate-400">—</span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          {comp ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    width: `${comp.percentual}%`,
-                                    backgroundColor:
-                                      comp.nivel === "bom"
-                                        ? "#22c55e"
-                                        : comp.nivel === "atencao"
-                                          ? "#f59e0b"
-                                          : "#ef4444",
-                                  }}
-                                />
-                              </div>
-                              <span className="text-[10px] text-slate-500">{comp.percentual}%</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                          {equip?.tipo_construtivo_elevatoria || "—"}
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                          {equip?.potencia_motor_cv || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                          {eg?.unidade_consumo || "—"}
+                        </td>
+                        <td
+                          className="max-w-[240px] truncate px-3 py-2.5 text-slate-600"
+                          title={elev.obs || ""}
+                        >
+                          {elev.obs || "—"}
+                        </td>
+
                         <td className="whitespace-nowrap px-3 py-2.5">
                           <button
                             onClick={() => setRegistrosDialog(elev.id)}
