@@ -2141,6 +2141,21 @@ function CronogramaPage() {
                                     title="Duração (dias)"
                                     onClick={(e) => e.stopPropagation()}
                                   />
+                                  <input
+                                    type="number"
+                                    value={item.custo_material ?? 0}
+                                    onChange={(e) => {
+                                      const v = Number(e.target.value);
+                                      atualizarItemLocal(item.id, { custo_material: v });
+                                      salvarItem(item.id, { custo_material: v });
+                                    }}
+                                    disabled={isReadonly}
+                                    min={0}
+                                    step={0.01}
+                                    className="w-20 text-[10px] bg-transparent border border-slate-200 dark:border-slate-600 rounded px-1 py-0.5 focus:border-[#1f7ad6] focus:outline-none text-right"
+                                    title="Custo Material (R$)"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
                                   <span className="text-[10px] text-slate-400">
                                     {formatDate(inicio)} → {formatDate(termino)}
                                   </span>
@@ -2201,6 +2216,14 @@ function CronogramaPage() {
                                               ?.label
                                           }
                                         </p>
+                                        {(item.custo_material ?? 0) > 0 && (
+                                          <p className="text-xs">
+                                            Custo Material: R${" "}
+                                            {item.custo_material!.toLocaleString("pt-BR", {
+                                              minimumFractionDigits: 2,
+                                            })}
+                                          </p>
+                                        )}
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
