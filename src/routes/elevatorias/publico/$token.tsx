@@ -359,7 +359,8 @@ function PublicoElevatoriasPage() {
                 <tbody>
                   {filtered.map((elev) => {
                     const imp = implantacoes.find((i) => i.elevatoria_id === elev.id);
-                    const comp = completudes.get(`${elev.id}:geral`);
+                    const equip = equipamentos.find((q) => q.elevatoria_id === elev.id);
+                    const eg = eletricaGeral.find((g) => g.elevatoria_id === elev.id);
                     const stImp = imp?.status as StatusImplantacao | undefined;
 
                     return (
