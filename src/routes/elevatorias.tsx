@@ -104,6 +104,7 @@ function ElevatoriasPage() {
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
   const [filtroTipoConstrutivo, setFiltroTipoConstrutivo] = useState("TODAS");
   const [filtroPotenciaMotor, setFiltroPotenciaMotor] = useState("TODAS");
+  const [filtroEndereco, setFiltroEndereco] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
   const [editandoTipo, setEditandoTipo] = useState<number | null>(null);
   const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
@@ -396,6 +397,11 @@ function ElevatoriasPage() {
     return Array.from(s).sort();
   }, [elevatorias]);
 
+  const enderecos = useMemo(() => {
+    const s = new Set(elevatorias.map((e) => e.endereco).filter(Boolean));
+    return Array.from(s).sort();
+  }, [elevatorias]);
+
   const equipPorElev = useMemo(() => {
     const map = new Map<number, ElevatoriaEquipamento[]>();
     for (const eq of equipamentos) {
@@ -446,15 +452,25 @@ function ElevatoriasPage() {
     let list = elevatorias;
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(
-        (e) =>
-          e.nome.toLowerCase().includes(q) ||
-          e.planta?.toLowerCase().includes(q) ||
-          e.municipio?.toLowerCase().includes(q),
-      );
+      list = list.filter((e) => {
+        const eq = equipPorElev.get(e.id)?.[0];
+        const eg = egPorElev.get(e.id);
+        return (
+          (e.nome ?? "").toLowerCase().includes(q) ||
+          (e.planta ?? "").toLowerCase().includes(q) ||
+          (e.municipio ?? "").toLowerCase().includes(q) ||
+          (e.tipo ?? "").toLowerCase().includes(q) ||
+          (e.endereco ?? "").toLowerCase().includes(q) ||
+          (e.obs ?? "").toLowerCase().includes(q) ||
+          (eg?.num_cliente ?? "").toLowerCase().includes(q) ||
+          (eq?.tipo_construtivo_elevatoria ?? "").toLowerCase().includes(q) ||
+          (eq?.potencia_motor_cv ?? "").toLowerCase().includes(q)
+        );
+      });
     }
     if (filtroMunicipio !== "TODAS") list = list.filter((e) => e.municipio === filtroMunicipio);
     if (filtroTipo !== "TODAS") list = list.filter((e) => e.tipo === filtroTipo);
+    if (filtroEndereco !== "TODAS") list = list.filter((e) => e.endereco === filtroEndereco);
     if (filtroCompletude !== "TODAS")
       list = list.filter(
         (e) => completudes.get(`${e.id}:${filtroSecaoCompletude}`)?.nivel === filtroCompletude,
@@ -531,6 +547,7 @@ function ElevatoriasPage() {
     search,
     filtroMunicipio,
     filtroTipo,
+    filtroEndereco,
     filtroCompletude,
     filtroSecaoCompletude,
     filtroImplantacao,
@@ -540,6 +557,7 @@ function ElevatoriasPage() {
     completudes,
     implantacoes,
     equipPorElev,
+    egPorElev,
     sortField,
     sortDir,
   ]);
@@ -574,6 +592,17 @@ function ElevatoriasPage() {
     if (error) {
       toast.error("Erro ao salvar OBS");
       setElevatorias((prev) => prev.map((e) => (e.id === elev.id ? { ...e, obs: elev.obs } : e)));
+    }
+  };
+
+  const salvarEndereco = async (elev: Elevatoria, endereco: string | null) => {
+    setElevatorias((prev) => prev.map((e) => (e.id === elev.id ? { ...e, endereco } : e)));
+    const { error } = await supabase.from("elevatorias").update({ endereco }).eq("id", elev.id);
+    if (error) {
+      toast.error("Erro ao salvar endereço");
+      setElevatorias((prev) =>
+        prev.map((e) => (e.id === elev.id ? { ...e, endereco: elev.endereco } : e)),
+      );
     }
   };
 
@@ -1011,7 +1040,6 @@ function ElevatoriasPage() {
     toast.success("Link revogado");
   };
 
-
   const exportarPlanilha = async () => {
     try {
       toast.info("Gerando exportação...");
@@ -1283,7 +1311,7 @@ function ElevatoriasPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nome, planta ou município..."
+                placeholder="Buscar por nome, planta, município, UC, endereço..."
                 className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-700 placeholder-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               />
               {search && (
@@ -1318,6 +1346,19 @@ function ElevatoriasPage() {
               {tipos.map((t) => (
                 <option key={t} value={t!}>
                   {t}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filtroEndereco}
+              onChange={(e) => setFiltroEndereco(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <option value="TODAS">Todos os endereços</option>
+              {enderecos.map((en) => (
+                <option key={en} value={en!}>
+                  {en}
                 </option>
               ))}
             </select>
@@ -1418,6 +1459,15 @@ function ElevatoriasPage() {
                         </span>
                       </th>
                     ))}
+                    <th
+                      className="whitespace-nowrap px-3 py-2.5 font-semibold cursor-pointer hover:text-[#1f7ad6]"
+                      onClick={() => handleSort("endereco")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Endereço
+                        {sortField === "endereco" && <ArrowUpDown className="h-3 w-3" />}
+                      </span>
+                    </th>
                     {permissoes.podeVerMestres && (
                       <>
                         <th
@@ -1540,6 +1590,28 @@ function ElevatoriasPage() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
                           {elev.municipio || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 max-w-[180px]">
+                          {permissoes.podeEditar ? (
+                            <input
+                              value={elev.endereco || ""}
+                              onChange={(e) => {
+                                const novoEnd = e.target.value;
+                                setElevatorias((prev) =>
+                                  prev.map((el) =>
+                                    el.id === elev.id ? { ...el, endereco: novoEnd || null } : el,
+                                  ),
+                                );
+                              }}
+                              onBlur={(e) => salvarEndereco(elev, e.target.value || null)}
+                              placeholder="Clique para editar..."
+                              className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-slate-600 placeholder-slate-300 hover:border-slate-200 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-300 dark:placeholder-slate-500"
+                            />
+                          ) : (
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {elev.endereco || "—"}
+                            </span>
+                          )}
                         </td>
                         {permissoes.podeVerMestres && (
                           <>
@@ -1792,7 +1864,7 @@ function ElevatoriasPage() {
                   {filtered.length === 0 && (
                     <tr>
                       <td
-                        colSpan={permissoes.podeVerMestres ? 9 : 8}
+                        colSpan={permissoes.podeVerMestres ? 12 : 8}
                         className="px-3 py-8 text-center text-sm text-slate-400"
                       >
                         Nenhuma elevatória encontrada com os filtros atuais.

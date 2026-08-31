@@ -1,14 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Building2,
-  Loader2,
-  Search,
-  History,
-  Calendar,
-  HardHat,
-  Eye,
-} from "lucide-react";
+import { Building2, Loader2, Search, History, Calendar, HardHat, Eye } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ListaRegistros } from "@/components/registros/ListaRegistros";
@@ -49,6 +41,7 @@ function PublicoElevatoriasPage() {
   const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroTipoConstrutivo, setFiltroTipoConstrutivo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
+  const [filtroEndereco, setFiltroEndereco] = useState("TODAS");
   const [sortField, setSortField] = useState("nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
@@ -77,8 +70,6 @@ function PublicoElevatoriasPage() {
       if (equipRes.data) setEquipamentos(equipRes.data as ElevatoriaEquipamento[]);
       if (egRes.data) setEletricaGeral(egRes.data as ElevatoriaEletricaGeral[]);
 
-
-
       setLoading(false);
     })();
   }, [token]);
@@ -93,6 +84,11 @@ function PublicoElevatoriasPage() {
     return Array.from(s).sort() as string[];
   }, [elevatorias]);
 
+  const enderecos = useMemo(() => {
+    const s = new Set(elevatorias.map((e) => e.endereco).filter(Boolean));
+    return Array.from(s).sort() as string[];
+  }, [elevatorias]);
+
   const tiposConstrutivos = useMemo(() => {
     const s = new Set(equipamentos.map((e) => e.tipo_construtivo_elevatoria).filter(Boolean));
     return Array.from(s).sort() as string[];
@@ -102,15 +98,30 @@ function PublicoElevatoriasPage() {
     let result = elevatorias;
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (e) => e.nome.toLowerCase().includes(q) || (e.planta && e.planta.toLowerCase().includes(q)),
-      );
+      result = result.filter((e) => {
+        const eq = equipamentos.find((x) => x.elevatoria_id === e.id);
+        const eg = eletricaGeral.find((x) => x.elevatoria_id === e.id);
+        return (
+          (e.nome ?? "").toLowerCase().includes(q) ||
+          (e.planta ?? "").toLowerCase().includes(q) ||
+          (e.municipio ?? "").toLowerCase().includes(q) ||
+          (e.tipo ?? "").toLowerCase().includes(q) ||
+          (e.endereco ?? "").toLowerCase().includes(q) ||
+          (e.obs ?? "").toLowerCase().includes(q) ||
+          (eg?.num_cliente ?? "").toLowerCase().includes(q) ||
+          (eq?.tipo_construtivo_elevatoria ?? "").toLowerCase().includes(q) ||
+          (eq?.potencia_motor_cv ?? "").toLowerCase().includes(q)
+        );
+      });
     }
     if (filtroMunicipio !== "TODAS") {
       result = result.filter((e) => e.municipio === filtroMunicipio);
     }
     if (filtroTipo !== "TODAS") {
       result = result.filter((e) => e.tipo === filtroTipo);
+    }
+    if (filtroEndereco !== "TODAS") {
+      result = result.filter((e) => e.endereco === filtroEndereco);
     }
     if (filtroTipoConstrutivo !== "TODAS") {
       result = result.filter(
@@ -131,7 +142,20 @@ function PublicoElevatoriasPage() {
       return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
     });
     return result;
-  }, [elevatorias, search, filtroMunicipio, filtroImplantacao, sortField, sortDir, implantacoes]);
+  }, [
+    elevatorias,
+    search,
+    filtroMunicipio,
+    filtroTipo,
+    filtroEndereco,
+    filtroTipoConstrutivo,
+    filtroImplantacao,
+    sortField,
+    sortDir,
+    implantacoes,
+    equipamentos,
+    eletricaGeral,
+  ]);
 
   const kpis = useMemo(() => {
     const total = elevatorias.length;
@@ -241,7 +265,7 @@ function PublicoElevatoriasPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por nome ou planta..."
+              placeholder="Buscar por nome, planta, município, UC, endereço..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
@@ -256,6 +280,18 @@ function PublicoElevatoriasPage() {
             {municipios.map((m) => (
               <option key={m} value={m}>
                 {m}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroEndereco}
+            onChange={(e) => setFiltroEndereco(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-600 focus:border-blue-400 focus:outline-none"
+          >
+            <option value="TODAS">Endereços</option>
+            {enderecos.map((en) => (
+              <option key={en} value={en}>
+                {en}
               </option>
             ))}
           </select>
@@ -284,7 +320,7 @@ function PublicoElevatoriasPage() {
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="max-h-[70vh] overflow-auto">
-              <table className="min-w-[900px] w-full text-left text-[13px]">
+              <table className="min-w-[1080px] w-full text-left text-[13px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-200 bg-[#eaf3fb] text-[12px] text-[#0b3a73]">
                   <tr>
                     {[
@@ -306,6 +342,7 @@ function PublicoElevatoriasPage() {
                         </span>
                       </th>
                     ))}
+                    <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Endereço</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Implantação</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
                       Tipo Construtivo
@@ -314,7 +351,6 @@ function PublicoElevatoriasPage() {
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">UC</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Obs</th>
                     <th className="whitespace-nowrap px-3 py-2.5 font-semibold">Ações</th>
-
                   </tr>
                 </thead>
                 <tbody>
@@ -341,6 +377,12 @@ function PublicoElevatoriasPage() {
                         <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
                           {elev.municipio || "—"}
                         </td>
+                        <td
+                          className="max-w-[220px] truncate px-3 py-2.5 text-slate-600"
+                          title={elev.endereco || ""}
+                        >
+                          {elev.endereco || "—"}
+                        </td>
                         <td className="whitespace-nowrap px-3 py-2.5">
                           {stImp ? (
                             <span
@@ -360,7 +402,7 @@ function PublicoElevatoriasPage() {
                           {equip?.potencia_motor_cv || "—"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
-                          {eg?.unidade_consumo || "—"}
+                          {eg?.num_cliente || "—"}
                         </td>
                         <td
                           className="max-w-[240px] truncate px-3 py-2.5 text-slate-600"
