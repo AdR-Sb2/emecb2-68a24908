@@ -58,10 +58,13 @@ function CaopEmecPage() {
   const { profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [podeVer, setPodeVer] = useState(false);
+  const [podeEditar, setPodeEditar] = useState(false);
   const [dados, setDados] = useState<CaopEmec[]>([]);
   const [filtroAno, setFiltroAno] = useState<number | "TODOS">("TODOS");
   const [mesesSelecionados, setMesesSelecionados] = useState<Set<number>>(new Set());
   const [categorias, setCategorias] = useState<string[]>([...DETALHAMENTO_PADRAO]);
+  const [novoAno, setNovoAno] = useState<number>(new Date().getFullYear());
+  const [novoMes, setNovoMes] = useState<number>(new Date().getMonth() + 1);
 
   useEffect(() => {
     if (authLoading) return;
@@ -84,6 +87,7 @@ function CaopEmecPage() {
         }
         const perms = await getPermissoesCargo(profile.cargo_id);
         setPodeVer(temPermissao(perms, "caop_emec", "ver"));
+        setPodeEditar(temPermissao(perms, "caop_emec", "editar"));
 
         const { data } = await supabase
           .from("caop_emec")
@@ -189,6 +193,54 @@ function CaopEmecPage() {
       return [...prev, cat];
     });
   }
+
+  const salvarCampo = async (
+    id: number,
+    campo: "orcamento" | "custo_realizado" | "total_os",
+    valor: number,
+  ) => {
+    const anterior = dados.find((d) => d.id === id);
+    const patch = { [campo]: campo === "total_os" ? Math.round(valor) : valor };
+    setDados((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    const { error } = await supabase.from("caop_emec").update(patch).eq("id", id);
+    if (error) {
+      toast.error("Erro ao salvar " + campo);
+      if (anterior) setDados((prev) => prev.map((d) => (d.id === id ? anterior : d)));
+    }
+  };
+
+  const salvarTipoOs = async (id: number, tipo: string, valor: number) => {
+    const reg = dados.find((d) => d.id === id);
+    const tipos = { ...(reg?.tipos_os ?? {}) };
+    tipos[tipo] = Math.round(valor);
+    setDados((prev) => prev.map((d) => (d.id === id ? { ...d, tipos_os: tipos } : d)));
+    const { error } = await supabase.from("caop_emec").update({ tipos_os: tipos }).eq("id", id);
+    if (error) {
+      toast.error("Erro ao salvar tipo de OS");
+      if (reg) setDados((prev) => prev.map((d) => (d.id === id ? reg : d)));
+    }
+  };
+
+  const tabelaEdicao = useMemo(() => {
+    return [...filtrados].sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  }, [filtrados]);
+
+  const adicionarRegistro = async () => {
+    if (!podeEditar) return;
+    const { data, error } = await supabase
+      .from("caop_emec")
+      .insert({ ano: novoAno, mes: novoMes })
+      .select("*")
+      .single();
+    if (error) {
+      toast.error("Erro ao adicionar mês (verifique se já existe): " + error.message);
+      return;
+    }
+    if (data) {
+      setDados((prev) => [...prev, data as CaopEmec]);
+      toast.success("Mês adicionado");
+    }
+  };
 
   const todasCategorias = useMemo(() => {
     const s = new Set<string>(DETALHAMENTO_PADRAO);
@@ -372,6 +424,151 @@ function CaopEmecPage() {
                   {tabelaCustoEvento.length === 0 && (
                     <tr>
                       <td colSpan={3} className="px-3 py-6 text-center text-slate-400">
+                        Nenhum dado para os filtros selecionados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Edição de Dados */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
+              <Table2 className="h-4 w-4" /> Edição de Dados
+              {!podeEditar && (
+                <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                  Somente leitura
+                </span>
+              )}
+              {podeEditar && (
+                <div className="ml-auto flex flex-wrap items-center gap-2 font-normal text-slate-600 dark:text-slate-300">
+                  <input
+                    type="number"
+                    value={novoAno}
+                    min={2000}
+                    max={2100}
+                    onChange={(e) => setNovoAno(Number(e.target.value))}
+                    className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+                    placeholder="Ano"
+                  />
+                  <select
+                    value={novoMes}
+                    onChange={(e) => setNovoMes(Number(e.target.value))}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+                  >
+                    {MESES.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={adicionarRegistro}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#1f7ad6] bg-[#1f7ad6] px-3 py-1 text-sm text-white hover:bg-[#1a6fc2]"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Adicionar Mês
+                  </button>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    Dica: clique num valor para editar e pressione Enter ou clique fora para salvar.
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[12px] text-slate-500 dark:border-slate-700">
+                    <th className="px-3 py-2 font-semibold">Ano</th>
+                    <th className="px-3 py-2 font-semibold">Mês</th>
+                    <th className="px-3 py-2 font-semibold">Orçamento</th>
+                    <th className="px-3 py-2 font-semibold">Custo Realizado</th>
+                    <th className="px-3 py-2 font-semibold">Total O.S.</th>
+                    <th className="px-3 py-2 font-semibold">Preventiva</th>
+                    <th className="px-3 py-2 font-semibold">Corretiva</th>
+                    <th className="px-3 py-2 font-semibold">Emergencial</th>
+                    <th className="px-3 py-2 font-semibold">Produtividade</th>
+                    <th className="px-3 py-2 font-semibold">Custo/O.S.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tabelaEdicao.map((d) => {
+                    const tipos = d.tipos_os ?? {};
+                    const totalOs = d.total_os ?? 0;
+                    const custoOs = totalOs > 0 ? (d.custo_realizado ?? 0) / totalOs : 0;
+                    return (
+                      <tr
+                        key={d.id}
+                        className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                      >
+                        <td className="px-3 py-1.5 text-slate-700 dark:text-slate-200">{d.ano}</td>
+                        <td className="px-3 py-1.5 text-slate-700 dark:text-slate-200">
+                          {nomeMes(d.mes)}
+                        </td>
+                        {podeEditar ? (
+                          <>
+                            <td className="px-3 py-1.5">
+                              <NumInput
+                                valor={d.orcamento}
+                                onSave={(v) => salvarCampo(d.id, "orcamento", v)}
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <NumInput
+                                valor={d.custo_realizado}
+                                onSave={(v) => salvarCampo(d.id, "custo_realizado", v)}
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <NumInput
+                                valor={d.total_os}
+                                onSave={(v) => salvarCampo(d.id, "total_os", v)}
+                              />
+                            </td>
+                            {TIPOS_OS_PADRAO.map((t) => (
+                              <td key={t} className="px-3 py-1.5">
+                                <NumInput
+                                  valor={typeof tipos[t] === "number" ? tipos[t] : 0}
+                                  onSave={(v) => salvarTipoOs(d.id, t, v)}
+                                />
+                              </td>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                              {formatBRL(d.orcamento)}
+                            </td>
+                            <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                              {formatBRL(d.custo_realizado)}
+                            </td>
+                            <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                              {totalOs}
+                            </td>
+                            {TIPOS_OS_PADRAO.map((t) => (
+                              <td
+                                key={t}
+                                className="px-3 py-1.5 text-slate-600 dark:text-slate-300"
+                              >
+                                {typeof tipos[t] === "number" ? tipos[t] : 0}
+                              </td>
+                            ))}
+                          </>
+                        )}
+                        <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                          {totalOs}
+                        </td>
+                        <td className="px-3 py-1.5 font-semibold text-slate-700 dark:text-slate-200">
+                          {formatBRL(custoOs)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {tabelaEdicao.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="px-3 py-6 text-center text-slate-400">
                         Nenhum dado para os filtros selecionados.
                       </td>
                     </tr>
@@ -570,3 +767,46 @@ function CaopEmecPage() {
 }
 
 export default CaopEmecPage;
+
+function NumInput({
+  valor,
+  onSave,
+}: {
+  valor: number | null | undefined;
+  onSave: (v: number) => void;
+}) {
+  const [texto, setTexto] = useState(formatBRL(valor));
+  const [focado, setFocado] = useState(false);
+
+  const aoFocar = () => {
+    setFocado(true);
+    setTexto(valor != null ? String(valor) : "");
+  };
+
+  const aoSalvar = () => {
+    setFocado(false);
+    const num = Number(
+      String(texto)
+        .replace(/[^\d.,-]/g, "")
+        .replace(/\./g, "")
+        .replace(",", "."),
+    );
+    const final = Number.isFinite(num) ? num : 0;
+    if (final !== (valor ?? 0)) onSave(final);
+    else setTexto(formatBRL(valor));
+  };
+
+  return (
+    <input
+      value={focado ? texto : formatBRL(valor)}
+      onFocus={aoFocar}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={aoSalvar}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      inputMode="decimal"
+      className="w-full min-w-[92px] rounded border border-transparent bg-transparent px-1.5 py-1 text-right text-[13px] text-slate-700 hover:border-slate-200 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
+    />
+  );
+}
