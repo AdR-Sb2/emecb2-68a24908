@@ -17,7 +17,6 @@ import {
   FileImage,
   CalendarRange,
   Building2,
-  BarChart3,
 } from "lucide-react";
 import {
   Dialog,
@@ -62,7 +61,6 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   oi: { bg: "bg-indigo-100", icon: "text-indigo-600", ring: "hover:ring-indigo-300" },
   cronograma: { bg: "bg-teal-100", icon: "text-teal-600", ring: "hover:ring-teal-300" },
   ficha_elevatoria: { bg: "bg-sky-100", icon: "text-sky-600", ring: "hover:ring-sky-300" },
-  caop_emec: { bg: "bg-fuchsia-100", icon: "text-fuchsia-600", ring: "hover:ring-fuchsia-300" },
 };
 
 function getCardColor(chave: string) {
@@ -76,7 +74,6 @@ function getCardColor(chave: string) {
   if (chave === "oi" || chave === "gerador_oi") return CARD_COLORS.oi;
   if (chave === "cronograma") return CARD_COLORS.cronograma;
   if (chave === "ficha_elevatoria") return CARD_COLORS.ficha_elevatoria;
-  if (chave === "caop_emec") return CARD_COLORS.caop_emec;
   return CARD_COLORS.dashboard;
 }
 
@@ -152,7 +149,6 @@ function Index() {
   const shouldShowOI = hasPanel("gerador_oi") || hasFallbackPanels;
   const shouldShowCronograma = hasPanel("cronograma") || hasFallbackPanels;
   const shouldShowFichaElevatoria = hasPanel("ficha_elevatoria");
-  const shouldShowCaopEmec = hasPanel("caop_emec");
   const canAdmin = hasPanel("admin");
 
   return (
@@ -312,18 +308,6 @@ function Index() {
                   Ficha técnica completa de elevatórias, equipamentos, elétrica e hidráulica.
                 </CardDesc>
                 <CardCta>Abrir fichas</CardCta>
-              </CardLink>
-            )}
-
-            {/* Caop EMEC */}
-            {shouldShowCaopEmec && (
-              <CardLink to="/caop-emec" chave="caop_emec" delay={10}>
-                <CardIcon chave="caop_emec" icon={BarChart3} />
-                <CardTitle>Caop EMEC</CardTitle>
-                <CardDesc>
-                  Centro de Apoio Operacional — orçamento, custos e execução de O.S.
-                </CardDesc>
-                <CardCta>Abrir Caop</CardCta>
               </CardLink>
             )}
           </div>

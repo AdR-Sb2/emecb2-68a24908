@@ -14,7 +14,6 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AnaliticoRouteImport } from './routes/analitico'
 import { Route as BacklogRouteImport } from './routes/backlog'
 import { Route as BloqueadoRouteImport } from './routes/bloqueado'
-import { Route as CaopEmecRouteImport } from './routes/caop-emec'
 import { Route as CronogramaRouteImport } from './routes/cronograma'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ElevatoriasRouteImport } from './routes/elevatorias'
@@ -57,11 +56,6 @@ const BacklogRoute = BacklogRouteImport.update({
 const BloqueadoRoute = BloqueadoRouteImport.update({
   id: '/bloqueado',
   path: '/bloqueado',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CaopEmecRoute = CaopEmecRouteImport.update({
-  id: '/caop-emec',
-  path: '/caop-emec',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CronogramaRoute = CronogramaRouteImport.update({
@@ -161,7 +155,6 @@ export interface FileRoutesByFullPath {
   '/analitico': typeof AnaliticoRoute
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
-  '/caop-emec': typeof CaopEmecRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/elevatorias': typeof ElevatoriasRouteWithChildren
@@ -187,7 +180,6 @@ export interface FileRoutesByTo {
   '/analitico': typeof AnaliticoRoute
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
-  '/caop-emec': typeof CaopEmecRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/elevatorias': typeof ElevatoriasRouteWithChildren
@@ -214,7 +206,6 @@ export interface FileRoutesById {
   '/analitico': typeof AnaliticoRoute
   '/backlog': typeof BacklogRoute
   '/bloqueado': typeof BloqueadoRoute
-  '/caop-emec': typeof CaopEmecRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/elevatorias': typeof ElevatoriasRouteWithChildren
@@ -242,7 +233,6 @@ export interface FileRouteTypes {
     | '/analitico'
     | '/backlog'
     | '/bloqueado'
-    | '/caop-emec'
     | '/cronograma'
     | '/dashboard'
     | '/elevatorias'
@@ -268,7 +258,6 @@ export interface FileRouteTypes {
     | '/analitico'
     | '/backlog'
     | '/bloqueado'
-    | '/caop-emec'
     | '/cronograma'
     | '/dashboard'
     | '/elevatorias'
@@ -294,7 +283,6 @@ export interface FileRouteTypes {
     | '/analitico'
     | '/backlog'
     | '/bloqueado'
-    | '/caop-emec'
     | '/cronograma'
     | '/dashboard'
     | '/elevatorias'
@@ -321,7 +309,6 @@ export interface RootRouteChildren {
   AnaliticoRoute: typeof AnaliticoRoute
   BacklogRoute: typeof BacklogRoute
   BloqueadoRoute: typeof BloqueadoRoute
-  CaopEmecRoute: typeof CaopEmecRoute
   CronogramaRoute: typeof CronogramaRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   ElevatoriasRoute: typeof ElevatoriasRouteWithChildren
@@ -375,13 +362,6 @@ declare module '@tanstack/react-router' {
       path: '/bloqueado'
       fullPath: '/bloqueado'
       preLoaderRoute: typeof BloqueadoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/caop-emec': {
-      id: '/caop-emec'
-      path: '/caop-emec'
-      fullPath: '/caop-emec'
-      preLoaderRoute: typeof CaopEmecRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cronograma': {
@@ -543,7 +523,6 @@ const rootRouteChildren: RootRouteChildren = {
   AnaliticoRoute: AnaliticoRoute,
   BacklogRoute: BacklogRoute,
   BloqueadoRoute: BloqueadoRoute,
-  CaopEmecRoute: CaopEmecRoute,
   CronogramaRoute: CronogramaRouteWithChildren,
   DashboardRoute: DashboardRoute,
   ElevatoriasRoute: ElevatoriasRouteWithChildren,
