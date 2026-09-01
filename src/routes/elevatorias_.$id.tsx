@@ -795,7 +795,7 @@ function ElevatoriaFichaPage() {
                     campo="tipo"
                     label="Tipo"
                     valor={elevatoria.tipo}
-                    opcoes={["EAT", "Booster", "Container", "Condomínio"]}
+                    opcoes={["EAT", "EEE", "Booster", "Container", "Condomínio"]}
                     tipo="select"
                     editOnly
                   />
@@ -1762,7 +1762,7 @@ function ElevatoriaFichaPage() {
                       campo="tipo"
                       label="Tipo"
                       valor={implantacao?.tipo}
-                      opcoes={["EEAT", "Elevatória", "Booster", "Container"]}
+                      opcoes={["EEAT", "EEE", "Elevatória", "Booster", "Container"]}
                       tipo="select"
                       editOnly
                     />

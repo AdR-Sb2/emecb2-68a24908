@@ -1569,6 +1569,7 @@ function ElevatoriasPage() {
                             >
                               <option value="">—</option>
                               <option value="EAT">EAT</option>
+                              <option value="EEE">EEE</option>
                               <option value="Booster">Booster</option>
                               <option value="Container">Container</option>
                               <option value="Condomínio">Condomínio</option>

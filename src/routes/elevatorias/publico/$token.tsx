@@ -41,7 +41,6 @@ function PublicoElevatoriasPage() {
   const [filtroTipo, setFiltroTipo] = useState("TODAS");
   const [filtroTipoConstrutivo, setFiltroTipoConstrutivo] = useState("TODAS");
   const [filtroImplantacao, setFiltroImplantacao] = useState("TODAS");
-  const [filtroEndereco, setFiltroEndereco] = useState("TODAS");
   const [sortField, setSortField] = useState("nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
@@ -84,11 +83,6 @@ function PublicoElevatoriasPage() {
     return Array.from(s).sort() as string[];
   }, [elevatorias]);
 
-  const enderecos = useMemo(() => {
-    const s = new Set(elevatorias.map((e) => e.endereco).filter(Boolean));
-    return Array.from(s).sort() as string[];
-  }, [elevatorias]);
-
   const tiposConstrutivos = useMemo(() => {
     const s = new Set(equipamentos.map((e) => e.tipo_construtivo_elevatoria).filter(Boolean));
     return Array.from(s).sort() as string[];
@@ -120,9 +114,6 @@ function PublicoElevatoriasPage() {
     if (filtroTipo !== "TODAS") {
       result = result.filter((e) => e.tipo === filtroTipo);
     }
-    if (filtroEndereco !== "TODAS") {
-      result = result.filter((e) => e.endereco === filtroEndereco);
-    }
     if (filtroTipoConstrutivo !== "TODAS") {
       result = result.filter(
         (e) =>
@@ -147,7 +138,6 @@ function PublicoElevatoriasPage() {
     search,
     filtroMunicipio,
     filtroTipo,
-    filtroEndereco,
     filtroTipoConstrutivo,
     filtroImplantacao,
     sortField,
@@ -284,14 +274,26 @@ function PublicoElevatoriasPage() {
             ))}
           </select>
           <select
-            value={filtroEndereco}
-            onChange={(e) => setFiltroEndereco(e.target.value)}
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
             className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-600 focus:border-blue-400 focus:outline-none"
           >
-            <option value="TODAS">Endereços</option>
-            {enderecos.map((en) => (
-              <option key={en} value={en}>
-                {en}
+            <option value="TODAS">Tipos</option>
+            {tipos.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroTipoConstrutivo}
+            onChange={(e) => setFiltroTipoConstrutivo(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-600 focus:border-blue-400 focus:outline-none"
+          >
+            <option value="TODAS">Tipo Construtivo</option>
+            {tiposConstrutivos.map((tc) => (
+              <option key={tc} value={tc}>
+                {tc}
               </option>
             ))}
           </select>
