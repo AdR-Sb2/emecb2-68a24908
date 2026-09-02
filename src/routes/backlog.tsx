@@ -1875,20 +1875,17 @@ function BacklogPage() {
 
   const copyRouteResumo = async () => {
     if (!generatedRoutes.length) return;
-    const lines = [
-      `🗺️ *Programação de Rotas* — ${generatedRoutes.reduce((acc, r) => acc + r.totalOs, 0)} O.S. no total`,
-      "",
-    ];
+    const lines: string[] = [];
 
-    generatedRoutes.forEach((route, rIdx) => {
+    generatedRoutes.forEach((route) => {
       lines.push(
-        `📍 *Rota ${rIdx + 1}* — ${route.totalOs} O.S. em ${route.stops.length} paradas`,
-        `📏 ${route.totalKm.toFixed(1)} km · ⏱️ ~${route.etaMin} min de deslocamento`,
-        `🚩 Partida: ${route.start.label.split(" - ")[0]}`,
-        ...route.details.map(
-          (d) =>
-            `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S., +${d.distKm.toFixed(1)} km)`,
-        ),
+        ...route.details.flatMap((d) => [
+          `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S.)`,
+          ...d.oss.map((os) => {
+            const nomePlanta = d.planta.split(" - ")[1] || "";
+            return `  · ${os.om} · ${d.plantaShort} · ${nomePlanta}`;
+          }),
+        ]),
         "",
       );
     });
