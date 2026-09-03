@@ -17,6 +17,7 @@ import {
   FileImage,
   CalendarRange,
   Building2,
+  Activity,
 } from "lucide-react";
 import {
   Dialog,
@@ -61,6 +62,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   oi: { bg: "bg-indigo-100", icon: "text-indigo-600", ring: "hover:ring-indigo-300" },
   cronograma: { bg: "bg-teal-100", icon: "text-teal-600", ring: "hover:ring-teal-300" },
   ficha_elevatoria: { bg: "bg-sky-100", icon: "text-sky-600", ring: "hover:ring-sky-300" },
+  produtividade: { bg: "bg-fuchsia-100", icon: "text-fuchsia-600", ring: "hover:ring-fuchsia-300" },
 };
 
 function getCardColor(chave: string) {
@@ -74,6 +76,7 @@ function getCardColor(chave: string) {
   if (chave === "oi" || chave === "gerador_oi") return CARD_COLORS.oi;
   if (chave === "cronograma") return CARD_COLORS.cronograma;
   if (chave === "ficha_elevatoria") return CARD_COLORS.ficha_elevatoria;
+  if (chave === "produtividade") return CARD_COLORS.produtividade;
   return CARD_COLORS.dashboard;
 }
 
@@ -248,6 +251,14 @@ function Index() {
                 <CardCta>Abrir backlog</CardCta>
               </CardLink>
             )}
+
+            {/* Produtividade de Campo */}
+            <CardLink to="/produtividade" chave="produtividade" delay={4}>
+              <CardIcon chave="produtividade" icon={Activity} />
+              <CardTitle>Produtividade</CardTitle>
+              <CardDesc>Acompanhamento diário da equipe de manutenção.</CardDesc>
+              <CardCta>Abrir produtividade</CardCta>
+            </CardLink>
 
             {/* Escala de Trabalho */}
             {shouldShowEscala && (

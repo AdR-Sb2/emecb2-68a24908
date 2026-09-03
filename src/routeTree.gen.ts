@@ -24,6 +24,7 @@ import { Route as ManuaisRouteImport } from './routes/manuais'
 import { Route as ManuaisAvaliacaoRouteImport } from './routes/manuais-avaliacao'
 import { Route as OiRouteImport } from './routes/oi'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as ProdutividadeRouteImport } from './routes/produtividade'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RegistrosRouteImport } from './routes/registros'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
@@ -108,6 +109,11 @@ const PendingRoute = PendingRouteImport.update({
   path: '/pending',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProdutividadeRoute = ProdutividadeRouteImport.update({
+  id: '/produtividade',
+  path: '/produtividade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
+  '/produtividade': typeof ProdutividadeRoute
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
+  '/produtividade': typeof ProdutividadeRoute
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
+  '/produtividade': typeof ProdutividadeRoute
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/manuais-avaliacao'
     | '/oi'
     | '/pending'
+    | '/produtividade'
     | '/register'
     | '/registros'
     | '/relatorio'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/manuais-avaliacao'
     | '/oi'
     | '/pending'
+    | '/produtividade'
     | '/register'
     | '/registros'
     | '/relatorio'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/manuais-avaliacao'
     | '/oi'
     | '/pending'
+    | '/produtividade'
     | '/register'
     | '/registros'
     | '/relatorio'
@@ -319,6 +331,7 @@ export interface RootRouteChildren {
   ManuaisAvaliacaoRoute: typeof ManuaisAvaliacaoRoute
   OiRoute: typeof OiRoute
   PendingRoute: typeof PendingRoute
+  ProdutividadeRoute: typeof ProdutividadeRoute
   RegisterRoute: typeof RegisterRoute
   RegistrosRoute: typeof RegistrosRoute
   RelatorioRoute: typeof RelatorioRoute
@@ -434,6 +447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PendingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/produtividade': {
+      id: '/produtividade'
+      path: '/produtividade'
+      fullPath: '/produtividade'
+      preLoaderRoute: typeof ProdutividadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -533,6 +553,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManuaisAvaliacaoRoute: ManuaisAvaliacaoRoute,
   OiRoute: OiRoute,
   PendingRoute: PendingRoute,
+  ProdutividadeRoute: ProdutividadeRoute,
   RegisterRoute: RegisterRoute,
   RegistrosRoute: RegistrosRoute,
   RelatorioRoute: RelatorioRoute,
