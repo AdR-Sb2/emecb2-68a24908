@@ -37,7 +37,24 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -807,10 +824,12 @@ function DayDetail({
   dia,
   onBack,
   recursosMap,
+  onExcluir,
 }: {
   dia: FieldDia;
   onBack: () => void;
   recursosMap: Map<number, string>;
+  onExcluir: () => void;
 }) {
   const [atividades, setAtividades] = useState<FieldAtividade[]>([]);
   const [equipes, setEquipes] = useState<FieldEquipe[]>([]);
@@ -914,10 +933,18 @@ function DayDetail({
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-lg font-bold capitalize">{dateStr}</h2>
           <p className="text-xs text-slate-500">{atividades.length} atividades carregadas</p>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+          onClick={onExcluir}
+        >
+          <Trash2 className="h-4 w-4 mr-1" /> Excluir dia
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -1172,6 +1199,53 @@ function ProdutividadePage() {
     return m;
   }, [recursos]);
 
+  const [editingDia, setEditingDia] = useState<FieldDia | null>(null);
+  const [novaData, setNovaData] = useState<string>("");
+  const [deletingDia, setDeletingDia] = useState<FieldDia | null>(null);
+
+  const openEditDia = (d: FieldDia) => {
+    setNovaData(d.data);
+    setEditingDia(d);
+  };
+
+  const handleSalvarData = async () => {
+    if (!editingDia || !novaData) return;
+    if (novaData === editingDia.data) {
+      setEditingDia(null);
+      return;
+    }
+    if (existingDates.has(novaData)) {
+      toast.error("Já existe um dia cadastrado com essa data.");
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from("field_dias")
+        .update({ data: novaData })
+        .eq("id", editingDia.id);
+      if (error) throw new Error(error.message);
+      toast.success("Data atualizada!");
+      setEditingDia(null);
+      await loadDias();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  const handleExcluirDia = async () => {
+    if (!deletingDia) return;
+    try {
+      const { error } = await supabase.from("field_dias").delete().eq("id", deletingDia.id);
+      if (error) throw new Error(error.message);
+      toast.success("Dia excluído com sucesso!");
+      setDeletingDia(null);
+      if (selectedDia?.id === deletingDia.id) setSelectedDia(null);
+      await loadDias();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
   const handleSalvarRecursos = async () => {
     const entries = Object.entries(recursosToSave).filter(([, nome]) => nome.trim());
     if (entries.length === 0) return;
@@ -1195,13 +1269,38 @@ function ProdutividadePage() {
 
   if (selectedDia) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
-        <DayDetail
-          dia={selectedDia}
-          onBack={() => setSelectedDia(null)}
-          recursosMap={recursosMap}
-        />
-      </div>
+      <>
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
+          <DayDetail
+            dia={selectedDia}
+            onBack={() => setSelectedDia(null)}
+            recursosMap={recursosMap}
+            onExcluir={() => setDeletingDia(selectedDia)}
+          />
+        </div>
+
+        {/* Confirmar exclusão (na view do dia) */}
+        <AlertDialog open={!!deletingDia} onOpenChange={(v) => !v && setDeletingDia(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir dia?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação excluirá todas as atividades, equipes e justificativas deste dia. Esta
+                ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={handleExcluirDia}
+              >
+                <Trash2 className="mr-1 h-4 w-4" /> Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 
@@ -1299,7 +1398,33 @@ function ProdutividadePage() {
                             {d.observacao_geral || "Sem observação"}
                           </div>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-[#0b3a73]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDia(d);
+                            }}
+                            title="Editar data"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingDia(d);
+                            }}
+                            title="Excluir dia"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1428,6 +1553,52 @@ function ProdutividadePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Editar data do dia */}
+      <Dialog open={!!editingDia} onOpenChange={(v) => !v && setEditingDia(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Editar dia</DialogTitle>
+            <DialogDescription>
+              Altere a data deste dia. As atividades e equipes vinculadas são mantidas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-500">Data</label>
+            <Input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingDia(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSalvarData} className="bg-[#0b3a73] hover:bg-[#002d74]">
+              <Save className="mr-1 h-4 w-4" /> Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar exclusão */}
+      <AlertDialog open={!!deletingDia} onOpenChange={(v) => !v && setDeletingDia(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir dia?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação excluirá todas as atividades, equipes e justificativas deste dia. Esta ação
+              não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={handleExcluirDia}
+            >
+              <Trash2 className="mr-1 h-4 w-4" /> Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
