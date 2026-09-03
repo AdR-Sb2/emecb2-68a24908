@@ -32,6 +32,8 @@ import {
   Loader2,
   Plus,
   Trash2,
+  Users,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,6 +103,12 @@ type PlantaCoord = {
   nome: string;
   lat: number;
   lon: number;
+};
+
+type FieldRecurso = {
+  id: number;
+  id_recurso: number;
+  nome: string;
 };
 
 // ─── Constants ────────────────────────────────────────────────
@@ -350,12 +358,14 @@ function EquipeSection({
   equipeIdx,
   justificativas,
   onSalvar,
+  recursosMap,
 }: {
   equipe: FieldEquipe;
   atividades: FieldAtividade[];
   equipeIdx: number;
   justificativas: FieldJustificativa[];
   onSalvar: (equipeId: number, tipo: string, idAtividade: number | null, texto: string) => void;
+  recursosMap: Map<number, string>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getEquipeColor(equipeIdx);
@@ -418,7 +428,8 @@ function EquipeSection({
       {expanded && (
         <div className="border-t border-slate-100 dark:border-slate-700 p-3 space-y-3">
           <div className="text-xs text-slate-600 dark:text-slate-400">
-            <strong>Técnicos:</strong> {equipe.tecnicos.join(", ")}
+            <strong>Técnicos:</strong>{" "}
+            {equipe.tecnicos.map((t) => recursosMap.get(t) || String(t)).join(", ")}
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="outline">Áreas: {stats.areas.join(", ") || "—"}</Badge>
@@ -494,11 +505,13 @@ function UploadModal({
   onClose,
   onSaved,
   existingDates,
+  recursosMap,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   existingDates: Set<string>;
+  recursosMap: Map<number, string>;
 }) {
   const [step, setStep] = useState<"upload" | "equipes">("upload");
   const [isSaving, setIsSaving] = useState(false);
@@ -597,6 +610,15 @@ function UploadModal({
         if (error) throw new Error(error.message);
       }
 
+      // Registrar IDs de recurso novos com o próprio ID como nome provisório
+      for (const r of recursos) {
+        if (!recursosMap.has(r)) {
+          await supabase
+            .from("field_recursos")
+            .upsert({ id_recurso: r, nome: String(r) }, { onConflict: "id_recurso" });
+        }
+      }
+
       toast.success("Dia salvo com sucesso!");
       onSaved();
       onClose();
@@ -669,7 +691,7 @@ function UploadModal({
                   {unassigned.map((r) => (
                     <div key={r} className="flex items-center gap-1">
                       <Badge variant="outline" className="text-[10px]">
-                        {r}
+                        {recursosMap.get(r) || r}
                       </Badge>
                       <select
                         className="rounded border border-slate-200 px-1 py-0.5 text-[10px]"
@@ -728,7 +750,7 @@ function UploadModal({
                         <Badge
                           className={`${getEquipeColor(eqIdx).bg} ${getEquipeColor(eqIdx).text} text-[10px]`}
                         >
-                          {r}
+                          {recursosMap.get(r) || r}
                         </Badge>
                         <select
                           className="rounded border border-slate-200 px-1 py-0.5 text-[10px]"
@@ -781,7 +803,15 @@ function UploadModal({
 
 // ─── Day Detail ───────────────────────────────────────────────
 
-function DayDetail({ dia, onBack }: { dia: FieldDia; onBack: () => void }) {
+function DayDetail({
+  dia,
+  onBack,
+  recursosMap,
+}: {
+  dia: FieldDia;
+  onBack: () => void;
+  recursosMap: Map<number, string>;
+}) {
   const [atividades, setAtividades] = useState<FieldAtividade[]>([]);
   const [equipes, setEquipes] = useState<FieldEquipe[]>([]);
   const [justificativas, setJustificativas] = useState<FieldJustificativa[]>([]);
@@ -898,6 +928,7 @@ function DayDetail({ dia, onBack }: { dia: FieldDia; onBack: () => void }) {
         atividades={atividades}
         plantaMap={plantaMap}
         equipes={equipes}
+        recursosMap={recursosMap}
         filtroEquipes={filtroEquipes}
         setFiltroEquipes={setFiltroEquipes}
         filtroStatus={filtroStatus}
@@ -926,6 +957,7 @@ function DayDetail({ dia, onBack }: { dia: FieldDia; onBack: () => void }) {
                 equipeIdx={i}
                 justificativas={justificativas}
                 onSalvar={handleSalvarJust}
+                recursosMap={recursosMap}
               />
             ))
           )}
@@ -1109,18 +1141,22 @@ function DashboardComparacao() {
 
 function ProdutividadePage() {
   const [dias, setDias] = useState<FieldDia[]>([]);
+  const [recursos, setRecursos] = useState<FieldRecurso[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedDia, setSelectedDia] = useState<FieldDia | null>(null);
   const [tab, setTab] = useState<"dias" | "dashboard">("dias");
+  const [gerenciarOpen, setGerenciarOpen] = useState(false);
+  const [recursosToSave, setRecursosToSave] = useState<Record<string, string>>({});
 
   const loadDias = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("field_dias")
-      .select("*")
-      .order("data", { ascending: false });
-    if (data) setDias(data as FieldDia[]);
+    const [diasRes, recRes] = await Promise.all([
+      supabase.from("field_dias").select("*").order("data", { ascending: false }),
+      supabase.from("field_recursos").select("*").order("id_recurso"),
+    ]);
+    if (diasRes.data) setDias(diasRes.data as FieldDia[]);
+    if (recRes.data) setRecursos(recRes.data as FieldRecurso[]);
     setLoading(false);
   }, []);
 
@@ -1130,10 +1166,41 @@ function ProdutividadePage() {
 
   const existingDates = useMemo(() => new Set(dias.map((d) => d.data)), [dias]);
 
+  const recursosMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const r of recursos) m.set(r.id_recurso, r.nome);
+    return m;
+  }, [recursos]);
+
+  const handleSalvarRecursos = async () => {
+    const entries = Object.entries(recursosToSave).filter(([, nome]) => nome.trim());
+    if (entries.length === 0) return;
+    try {
+      for (const [idRecurso, nome] of entries) {
+        await supabase
+          .from("field_recursos")
+          .upsert(
+            { id_recurso: Number(idRecurso), nome: nome.trim() },
+            { onConflict: "id_recurso" },
+          );
+      }
+      setRecursosToSave({});
+      setGerenciarOpen(false);
+      await loadDias();
+      toast.success("Nomes salvos! Eles serão aplicados nas próximas importações.");
+    } catch {
+      toast.error("Erro ao salvar nomes.");
+    }
+  };
+
   if (selectedDia) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
-        <DayDetail dia={selectedDia} onBack={() => setSelectedDia(null)} />
+        <DayDetail
+          dia={selectedDia}
+          onBack={() => setSelectedDia(null)}
+          recursosMap={recursosMap}
+        />
       </div>
     );
   }
@@ -1172,9 +1239,21 @@ function ProdutividadePage() {
             </TabsTrigger>
           </TabsList>
           {tab === "dias" && (
-            <Button onClick={() => setUploadOpen(true)} className="bg-[#0b3a73] hover:bg-[#002d74]">
-              <Upload className="mr-1 h-4 w-4" /> Adicionar Dia
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setGerenciarOpen(true)}
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200"
+              >
+                <Users className="mr-1 h-4 w-4" /> Gerenciar IDs
+              </Button>
+              <Button
+                onClick={() => setUploadOpen(true)}
+                className="bg-[#0b3a73] hover:bg-[#002d74]"
+              >
+                <Upload className="mr-1 h-4 w-4" /> Adicionar Dia
+              </Button>
+            </div>
           )}
         </div>
 
@@ -1240,7 +1319,115 @@ function ProdutividadePage() {
         onClose={() => setUploadOpen(false)}
         onSaved={loadDias}
         existingDates={existingDates}
+        recursosMap={recursosMap}
       />
+
+      <Dialog
+        open={gerenciarOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setRecursosToSave({});
+            setGerenciarOpen(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gerenciar IDs de Recurso</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-slate-500">
+            Atribua um nome a cada ID. Esses nomes aparecerão automaticamente nas próximas
+            importações e nos detalhes do dia.
+          </p>
+          <div className="space-y-2">
+            {recursos.map((r) => (
+              <div key={r.id_recurso} className="flex items-center gap-2">
+                <span className="w-16 shrink-0 font-mono text-xs text-slate-500">
+                  {r.id_recurso}
+                </span>
+                <Input
+                  value={recursosToSave[r.id_recurso] ?? r.nome}
+                  onChange={(e) =>
+                    setRecursosToSave((prev) => ({
+                      ...prev,
+                      [r.id_recurso]: e.target.value,
+                    }))
+                  }
+                  className="h-8 text-xs"
+                  placeholder="Nome do técnico"
+                />
+              </div>
+            ))}
+            {recursos.length === 0 && (
+              <p className="text-xs text-slate-400">
+                Nenhum ID cadastrado ainda. Importe um dia primeiro ou cadastre manualmente abaixo.
+              </p>
+            )}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="w-16 shrink-0 font-mono text-xs text-slate-500">Novo</span>
+              <Input
+                value={recursosToSave["novo_id"] ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setRecursosToSave((prev) => ({ ...prev, novo_id: v }));
+                }}
+                className="h-8 w-20 text-xs"
+                placeholder="ID"
+              />
+              <Input
+                value={recursosToSave["novo_nome"] ?? ""}
+                onChange={(e) =>
+                  setRecursosToSave((prev) => ({ ...prev, novo_nome: e.target.value }))
+                }
+                className="h-8 flex-1 text-xs"
+                placeholder="Nome do técnico"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRecursosToSave({});
+                setGerenciarOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                const novosNomes: string[] = [];
+                for (const [k, v] of Object.entries(recursosToSave)) {
+                  if (k === "novo_id" || k === "novo_nome") continue;
+                  if (v.trim()) novosNomes.push(`${k}=${v.trim()}`);
+                }
+                const novoId = recursosToSave["novo_id"];
+                const novoNome = recursosToSave["novo_nome"];
+                if (novoId && novoNome) novosNomes.push(`${novoId}=${novoNome}`);
+                if (novosNomes.length > 0) {
+                  try {
+                    for (const pair of novosNomes) {
+                      const [id, nome] = pair.split("=");
+                      await supabase
+                        .from("field_recursos")
+                        .upsert({ id_recurso: Number(id), nome }, { onConflict: "id_recurso" });
+                    }
+                    await loadDias();
+                    setRecursosToSave({});
+                    setGerenciarOpen(false);
+                    toast.success("Nomes salvos!");
+                  } catch {
+                    toast.error("Erro ao salvar nomes.");
+                  }
+                }
+              }}
+              className="bg-[#0b3a73] hover:bg-[#002d74]"
+            >
+              Salvar Nomes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

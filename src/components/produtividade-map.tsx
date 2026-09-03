@@ -189,6 +189,7 @@ export default function ProdutividadeMap({
   atividades,
   plantaMap,
   equipes,
+  recursosMap,
   filtroEquipes,
   setFiltroEquipes,
   filtroStatus,
@@ -199,6 +200,7 @@ export default function ProdutividadeMap({
   atividades: FieldAtividade[];
   plantaMap: Map<string, PlantaCoord>;
   equipes: FieldEquipe[];
+  recursosMap: Map<number, string>;
   filtroEquipes: string[];
   setFiltroEquipes: (v: string[]) => void;
   filtroStatus: string[];
@@ -360,6 +362,10 @@ export default function ProdutividadeMap({
                     </div>
                     <div>
                       <strong>Equipe:</strong> {pin.equipe}
+                    </div>
+                    <div>
+                      <strong>Técnico:</strong>{" "}
+                      {recursosMap.get(pin.at.id_recurso) || pin.at.id_recurso}
                     </div>
                     <div>
                       <strong>Status:</strong>{" "}
