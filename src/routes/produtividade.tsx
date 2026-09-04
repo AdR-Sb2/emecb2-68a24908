@@ -59,6 +59,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -830,6 +831,22 @@ function UploadModal({
   const [dataDia, setDataDia] = useState<string | null>(null);
   const [equipes, setEquipes] = useState<{ nome: string; tecnicos: number[] }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [salvarPadrao, setSalvarPadrao] = useState(false);
+  const [padraoCarregado, setPadraoCarregado] = useState(false);
+
+  const loadEquipesPadrao = useCallback(async () => {
+    const { data } = await supabase
+      .from("field_equipes_padrao")
+      .select("nome_equipe, tecnicos")
+      .order("id");
+    if (data && data.length > 0) {
+      return data.map((d) => ({
+        nome: d.nome_equipe,
+        tecnicos: (d.tecnicos as number[]) || [],
+      }));
+    }
+    return null;
+  }, []);
 
   const handleFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -861,13 +878,27 @@ function UploadModal({
         setAtividades(parsed.atividades);
         setRecursos([...parsed.recursos].sort((a, b) => a - b));
         setDataDia(parsed.data);
-        setEquipes([{ nome: "Equipe 1", tecnicos: [] }]);
+        setPadraoCarregado(false);
+
+        // Tenta pré-preencher com a configuração padrão salva
+        const padrao = await loadEquipesPadrao();
+        if (padrao && padrao.length > 0) {
+          const recursoSet = new Set(parsed.recursos);
+          const novasEquipes = padrao.map((p) => ({
+            nome: p.nome,
+            tecnicos: p.tecnicos.filter((t) => recursoSet.has(t)),
+          }));
+          setEquipes(novasEquipes);
+          setPadraoCarregado(true);
+        } else {
+          setEquipes([{ nome: "Equipe 1", tecnicos: [] }]);
+        }
         setStep("equipes");
       } catch {
         setError("Erro ao processar o arquivo. Verifique o formato.");
       }
     },
-    [existingDates],
+    [existingDates, loadEquipesPadrao],
   );
 
   const moveTecnico = (recurso: number, fromIdx: number | -1, toIdx: number) => {
@@ -911,6 +942,18 @@ function UploadModal({
       const { error: eqErr } = await supabase.from("field_equipes").insert(equipeRows);
       if (eqErr) throw new Error(eqErr.message);
 
+      if (salvarPadrao) {
+        await supabase.from("field_equipes_padrao").delete().neq("id", 0);
+        const padraoRows = equipes.map((e) => ({
+          nome_equipe: e.nome,
+          tecnicos: e.tecnicos,
+        }));
+        if (padraoRows.length > 0) {
+          await supabase.from("field_equipes_padrao").insert(padraoRows);
+        }
+        toast.success("Configuração de equipes salva como padrão!");
+      }
+
       const ativRows = atividades.map((a) => ({ ...a, dia_id: diaData.id }));
       const CHUNK = 500;
       for (let i = 0; i < ativRows.length; i += CHUNK) {
@@ -946,6 +989,8 @@ function UploadModal({
     setDataDia(null);
     setEquipes([]);
     setError(null);
+    setSalvarPadrao(false);
+    setPadraoCarregado(false);
   };
 
   return (
@@ -973,6 +1018,14 @@ function UploadModal({
 
         {step === "equipes" && (
           <div className="space-y-4">
+            {padraoCarregado && (
+              <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Configuração de equipes carregada automaticamente. Ajuste se necessário.
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-semibold">Data: {dataDia}</div>
@@ -1091,18 +1144,39 @@ function UploadModal({
               ))}
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setStep("upload")}>
-                Voltar
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                ) : (
-                  <Save className="h-4 w-4 mr-1" />
-                )}
-                Salvar
-              </Button>
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="flex cursor-pointer items-center gap-2 text-[11px] text-slate-600">
+                  <Checkbox checked={salvarPadrao} onCheckedChange={(v) => setSalvarPadrao(!!v)} />
+                  Salvar esta configuração de equipes como padrão
+                </label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await supabase.from("field_equipes_padrao").delete().neq("id", 0);
+                    setPadraoCarregado(false);
+                    setSalvarPadrao(false);
+                    setEquipes([{ nome: "Equipe 1", tecnicos: [] }]);
+                    toast.info("Configuração padrão redefinida. Monte as equipes do zero.");
+                  }}
+                  className="text-left text-[10px] text-red-500 hover:text-red-700 sm:text-center"
+                >
+                  Redefinir equipes padrão
+                </button>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setStep("upload")}>
+                  Voltar
+                </Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-1" />
+                  )}
+                  Salvar
+                </Button>
+              </div>
             </div>
           </div>
         )}
