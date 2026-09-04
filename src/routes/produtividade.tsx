@@ -24,11 +24,8 @@ import {
   CheckCircle2,
   PauseCircle,
   XCircle,
-  AlertTriangle,
-  MapPin,
-  Filter,
-  Save,
   BarChart3,
+  Save,
   Loader2,
   Plus,
   Trash2,
@@ -143,13 +140,6 @@ const ATIVIDADES_ADMINISTRATIVAS = [
   "PROBLEMAS COM VEICULO",
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  concluído: "#22c55e",
-  concluido: "#22c55e",
-  suspenso: "#eab308",
-  cancelado: "#ef4444",
-};
-
 const EQUIPE_COLORS = [
   { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", hex: "#3b82f6" },
   { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", hex: "#10b981" },
@@ -200,6 +190,45 @@ function diffMinutes(inicio: string | null, fim: string | null): number {
   const [h1, m1] = inicio.split(":").map(Number);
   const [h2, m2] = fim.split(":").map(Number);
   return Math.max(0, h2 * 60 + m2 - (h1 * 60 + m1));
+}
+
+function formatDuracao(min: number): string {
+  if (min <= 0) return "0min";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, "0")}min`;
+}
+
+function calcAlmocoMin(atividades: FieldAtividade[]): number {
+  let total = 0;
+  for (const a of atividades) {
+    if ((a.tipo_atividade || "").toUpperCase().trim() === "ALMOÇO") {
+      total += diffMinutes(a.inicio, a.fim);
+    }
+  }
+  return total;
+}
+
+function dedupOS(atividades: FieldAtividade[]) {
+  const groups = new Map<number, string[]>();
+  for (const a of atividades) {
+    const om = a.ordem_manutencao;
+    if (!om) continue;
+    const arr = groups.get(om);
+    if (arr) arr.push(normalizeStatus(a.status));
+    else groups.set(om, [normalizeStatus(a.status)]);
+  }
+  let exec = 0;
+  let susp = 0;
+  let canc = 0;
+  for (const statuses of groups.values()) {
+    if (statuses.includes("concluido")) exec++;
+    else if (statuses.every((s) => s === "suspenso")) susp++;
+    else if (statuses.every((s) => s === "cancelado")) canc++;
+  }
+  return { total: exec + susp + canc, exec, susp, canc, osIds: [...groups.keys()] };
 }
 
 // ─── CSV Parsing ──────────────────────────────────────────────
@@ -291,19 +320,33 @@ function normalizeTime(raw: string): string | null {
 
 // ─── Summary Cards ────────────────────────────────────────────
 
-function SummaryCards({ atividades }: { atividades: FieldAtividade[] }) {
-  const total = atividades.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade)).length;
-  const executadas = atividades.filter((a) => normalizeStatus(a.status) === "concluido").length;
-  const suspensas = atividades.filter((a) => normalizeStatus(a.status) === "suspenso").length;
-  const canceladas = atividades.filter((a) => normalizeStatus(a.status) === "cancelado").length;
-  const paradas = atividades.filter((a) => a.parada).length;
+function SummaryCards({
+  atividades,
+  numEquipes,
+}: {
+  atividades: FieldAtividade[];
+  numEquipes: number;
+}) {
+  const tecnicas = atividades.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
+  const { exec, susp, canc } = dedupOS(tecnicas);
+  const mediaOS = numEquipes > 0 ? (exec / numEquipes).toFixed(1) : "0";
 
   const cards = [
-    { label: "Total O.S.", value: total, icon: ClipboardList, color: "text-[#0b3a73]" },
-    { label: "Executadas", value: executadas, icon: CheckCircle2, color: "text-emerald-600" },
-    { label: "Suspensas", value: suspensas, icon: PauseCircle, color: "text-amber-600" },
-    { label: "Canceladas", value: canceladas, icon: XCircle, color: "text-red-600" },
-    { label: "Equip. Parado", value: paradas, icon: AlertTriangle, color: "text-orange-600" },
+    {
+      label: "Total O.S.",
+      value: exec + susp + canc,
+      icon: ClipboardList,
+      color: "text-[#0b3a73]",
+    },
+    { label: "Executadas", value: exec, icon: CheckCircle2, color: "text-emerald-600" },
+    { label: "Suspensas", value: susp, icon: PauseCircle, color: "text-amber-600" },
+    { label: "Canceladas", value: canc, icon: XCircle, color: "text-red-600" },
+    {
+      label: "Média OS/Equipe",
+      value: mediaOS,
+      icon: BarChart3,
+      color: "text-violet-600",
+    },
   ];
 
   return (
@@ -325,7 +368,17 @@ function SummaryCards({ atividades }: { atividades: FieldAtividade[] }) {
 
 // ─── Tipo de Serviço Chart ────────────────────────────────────
 
-function TipoServicoChart({ atividades }: { atividades: FieldAtividade[] }) {
+function TipoServicoChart({
+  atividades,
+  equipes,
+  onFilterByTipo,
+  filtroTipoAtivo,
+}: {
+  atividades: FieldAtividade[];
+  equipes: FieldEquipe[];
+  onFilterByTipo: (tipo: string | null) => void;
+  filtroTipoAtivo: string | null;
+}) {
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const k of TIPO_SERVICO_KEYS) map[k] = 0;
@@ -334,13 +387,73 @@ function TipoServicoChart({ atividades }: { atividades: FieldAtividade[] }) {
       if (map[norm] !== undefined) map[norm]++;
     }
     return TIPO_SERVICO_KEYS.map((k, i) => ({
+      key: k,
       name: TIPO_SERVICO_MAP[k],
       value: map[k],
       color: TIPO_SERVICO_COLORS[i],
     }));
   }, [atividades]);
 
+  const tipoEquipes = useMemo(() => {
+    const m: Record<string, Record<string, number>> = {};
+    for (const k of TIPO_SERVICO_KEYS) m[k] = {};
+    for (const a of atividades) {
+      const norm = (a.tipo_atividade || "").toUpperCase().trim();
+      if (!(norm in m)) continue;
+      for (const eq of equipes) {
+        if (eq.tecnicos.includes(a.id_recurso)) {
+          m[norm][eq.nome_equipe] = (m[norm][eq.nome_equipe] || 0) + 1;
+        }
+      }
+    }
+    return m;
+  }, [atividades, equipes]);
+
   const maxVal = Math.max(...counts.map((c) => c.value), 1);
+
+  const CustomTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: Array<{ payload: (typeof counts)[number] }>;
+  }) => {
+    if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
+    const eqBreak = tipoEquipes[d.key] || {};
+    const sorted = Object.entries(eqBreak)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 6);
+    return (
+      <div className="min-w-[200px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
+        <div className="mb-1 font-bold" style={{ color: d.color }}>
+          {d.name}
+        </div>
+        <div className="mb-2 text-slate-600 dark:text-slate-300">{d.value} OS</div>
+        {sorted.length > 0 && (
+          <div className="space-y-1">
+            {sorted.map(([eqNome, cnt]) => {
+              const pct = d.value > 0 ? (cnt / d.value) * 100 : 0;
+              return (
+                <div key={eqNome} className="space-y-0.5">
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-slate-600 dark:text-slate-400">{eqNome}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-200">{cnt}</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, background: d.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Card className="shadow-sm">
@@ -354,10 +467,21 @@ function TipoServicoChart({ atividades }: { atividades: FieldAtividade[] }) {
           <BarChart data={counts} layout="vertical" margin={{ left: 10, right: 30 }}>
             <XAxis type="number" domain={[0, maxVal]} tick={{ fontSize: 11 }} />
             <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
-            <RechartsTooltip />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+            <RechartsTooltip content={<CustomTooltip />} />
+            <Bar
+              dataKey="value"
+              radius={[0, 4, 4, 0]}
+              cursor="pointer"
+              onClick={(data) => {
+                const clickedKey = data?.key;
+                if (clickedKey) {
+                  const tipo = TIPO_SERVICO_MAP[clickedKey] || clickedKey;
+                  onFilterByTipo(filtroTipoAtivo === tipo ? null : tipo);
+                }
+              }}
+            >
               {counts.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
+                <Cell key={i} fill={entry.color} opacity={1} />
               ))}
             </Bar>
           </BarChart>
@@ -376,6 +500,8 @@ function EquipeSection({
   justificativas,
   onSalvar,
   recursosMap,
+  metaOS,
+  filtroTipoAtivo,
 }: {
   equipe: FieldEquipe;
   atividades: FieldAtividade[];
@@ -383,6 +509,8 @@ function EquipeSection({
   justificativas: FieldJustificativa[];
   onSalvar: (equipeId: number, tipo: string, idAtividade: number | null, texto: string) => void;
   recursosMap: Map<number, string>;
+  metaOS: number;
+  filtroTipoAtivo: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getEquipeColor(equipeIdx);
@@ -392,36 +520,101 @@ function EquipeSection({
     return atividades.filter((a) => techSet.has(a.id_recurso));
   }, [atividades, equipe.tecnicos]);
 
-  const stats = useMemo(() => {
-    const exec = equipeAtividades.filter((a) => normalizeStatus(a.status) === "concluido").length;
-    const susp = equipeAtividades.filter((a) => normalizeStatus(a.status) === "suspenso").length;
-    const canc = equipeAtividades.filter((a) => normalizeStatus(a.status) === "cancelado").length;
-    const tipos: Record<string, number> = {};
+  const equipeDedup = useMemo(() => dedupOS(equipeAtividades), [equipeAtividades]);
+
+  const tiposEquipe = useMemo(() => {
+    const map: Record<string, number> = {};
     for (const a of equipeAtividades) {
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
       const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
-      tipos[label] = (tipos[label] || 0) + 1;
+      map[label] = (map[label] || 0) + 1;
     }
-    const areas = new Set(equipeAtividades.map((a) => a.area_trabalho).filter(Boolean));
-    let almocoMin = 0;
-    for (const a of equipeAtividades) {
-      if (
-        isAtividadeAdministrativa(a.tipo_atividade) &&
-        (a.tipo_atividade || "").toUpperCase().includes("ALMOÇO")
-      ) {
-        almocoMin += diffMinutes(a.inicio, a.fim);
-      }
-    }
-    return { exec, susp, canc, tipos, areas: [...areas], almocoMin };
+    return map;
   }, [equipeAtividades]);
 
-  const suspensas = equipeAtividades.filter((a) => normalizeStatus(a.status) === "suspenso");
-  const canceladas = equipeAtividades.filter((a) => normalizeStatus(a.status) === "cancelado");
+  const tempoCorretivaEquipe = useMemo(() => {
+    let total = 0;
+    for (const a of equipeAtividades) {
+      if ((a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL") {
+        total += diffMinutes(a.inicio, a.fim);
+      }
+    }
+    return total;
+  }, [equipeAtividades]);
+
+  const almocoEquipe = useMemo(() => calcAlmocoMin(equipeAtividades), [equipeAtividades]);
+
+  const techData = useMemo(() => {
+    return equipe.tecnicos.map((tecId) => {
+      const techAtividades = equipeAtividades.filter((a) => a.id_recurso === tecId);
+      const techDedup = dedupOS(techAtividades);
+      const techAlmoco = calcAlmocoMin(techAtividades);
+      const techAreas = [...new Set(techAtividades.map((a) => a.area_trabalho).filter(Boolean))];
+      const tempoCorretiva = techAtividades
+        .filter(
+          (a) =>
+            (a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL",
+        )
+        .reduce((acc, a) => acc + diffMinutes(a.inicio, a.fim), 0);
+      const tipos: Record<string, { count: number; minutos: number }> = {};
+      for (const a of techAtividades) {
+        const norm = (a.tipo_atividade || "").toUpperCase().trim();
+        if (norm === "ALMOÇO" || norm === "DDS" || isAtividadeAdministrativa(a.tipo_atividade))
+          continue;
+        const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
+        if (!tipos[label]) tipos[label] = { count: 0, minutos: 0 };
+        tipos[label].count++;
+        tipos[label].minutos += diffMinutes(a.inicio, a.fim);
+      }
+      let status: "verde" | "amarelo" | "cinza" = "cinza";
+      if (techDedup.total > 0) {
+        status = techDedup.exec >= metaOS ? "verde" : "amarelo";
+      }
+      return {
+        tecId,
+        nome: recursosMap.get(tecId) || String(tecId),
+        ...techDedup,
+        almocoMin: techAlmoco,
+        areas: techAreas,
+        tempoCorretiva,
+        tipos,
+        status,
+      };
+    });
+  }, [equipe.tecnicos, equipeAtividades, recursosMap, metaOS]);
+
+  const suspensas = equipeDedup.osIds.filter((om) => {
+    const statuses = equipeAtividades
+      .filter((a) => a.ordem_manutencao === om)
+      .map((a) => normalizeStatus(a.status));
+    return statuses.every((s) => s === "suspenso");
+  });
+
+  const canceladas = equipeDedup.osIds.filter((om) => {
+    const statuses = equipeAtividades
+      .filter((a) => a.ordem_manutencao === om)
+      .map((a) => normalizeStatus(a.status));
+    return statuses.every((s) => s === "cancelado");
+  });
+
+  const suspAtividades = equipeAtividades.filter(
+    (a) => suspensas.includes(a.ordem_manutencao) && !isAtividadeAdministrativa(a.tipo_atividade),
+  );
+
+  const cancAtividades = equipeAtividades.filter(
+    (a) => canceladas.includes(a.ordem_manutencao) && !isAtividadeAdministrativa(a.tipo_atividade),
+  );
 
   const getJustText = (tipo: string, idAtividade: number | null) =>
     justificativas.find(
       (j) => j.equipe_id === equipe.id && j.tipo === tipo && j.id_atividade === idAtividade,
     )?.texto || "";
+
+  const statusColorMap: Record<string, string> = {
+    verde: "bg-emerald-100 text-emerald-700",
+    amarelo: "bg-amber-100 text-amber-700",
+    cinza: "bg-slate-100 text-slate-500",
+  };
 
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700">
@@ -438,35 +631,131 @@ function EquipeSection({
           {equipe.nome_equipe}
         </Badge>
         <span className="text-xs text-slate-500">
-          {equipe.tecnicos.length} técnico(s) · {stats.exec} exec · {stats.susp} susp · {stats.canc}{" "}
-          canc
+          {equipe.tecnicos.length} técnico(s) · {equipeDedup.exec} exec · {equipeDedup.susp} susp ·{" "}
+          {equipeDedup.canc} canc
         </span>
       </button>
       {expanded && (
-        <div className="border-t border-slate-100 dark:border-slate-700 p-3 space-y-3">
-          <div className="text-xs text-slate-600 dark:text-slate-400">
-            <strong>Técnicos:</strong>{" "}
-            {equipe.tecnicos.map((t) => recursosMap.get(t) || String(t)).join(", ")}
+        <div className="border-t border-slate-100 dark:border-slate-700 p-3 space-y-4">
+          {/* Tabela individual por técnico */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-600 text-left">
+                  <th className="pb-1 pr-2 font-semibold text-slate-500" />
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Técnico</th>
+                  <th className="pb-1 pr-2 text-center font-semibold text-slate-500">Exec</th>
+                  <th className="pb-1 pr-2 text-center font-semibold text-slate-500">Susp</th>
+                  <th className="pb-1 pr-2 text-center font-semibold text-slate-500">Canc</th>
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Almoço</th>
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Corretiva</th>
+                  <th className="pb-1 font-semibold text-slate-500">Áreas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {techData.map((td) => (
+                  <tr key={td.tecId} className="border-b border-slate-50 dark:border-slate-700/50">
+                    <td className="py-1.5 pr-2">
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-full ${statusColorMap[td.status]}`}
+                        title={
+                          td.status === "verde"
+                            ? `Meta atingida (${td.exec} ≥ ${metaOS})`
+                            : td.status === "amarelo"
+                              ? `Abaixo da meta (${td.exec} < ${metaOS})`
+                              : "Sem OS técnicas"
+                        }
+                      />
+                    </td>
+                    <td className="py-1.5 pr-2 font-medium text-slate-700 dark:text-slate-200">
+                      {td.nome}
+                    </td>
+                    <td className="py-1.5 pr-2 text-center text-emerald-700 font-medium">
+                      {td.exec}
+                    </td>
+                    <td className="py-1.5 pr-2 text-center text-amber-700 font-medium">
+                      {td.susp}
+                    </td>
+                    <td className="py-1.5 pr-2 text-center text-red-600 font-medium">{td.canc}</td>
+                    <td className="py-1.5 pr-2 text-slate-600">
+                      {td.almocoMin > 0 ? formatDuracao(td.almocoMin) : "Sem almoço"}
+                    </td>
+                    <td className="py-1.5 pr-2 text-slate-600">
+                      {td.tempoCorretiva > 0 ? formatDuracao(td.tempoCorretiva) : "—"}
+                    </td>
+                    <td className="py-1.5 text-slate-500">
+                      {td.areas.length > 0 ? td.areas.join(", ") : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <Badge variant="outline">Áreas: {stats.areas.join(", ") || "—"}</Badge>
-            <Badge variant="outline">Almoço: {stats.almocoMin} min</Badge>
+
+          {/* Tempo por tipo de serviço por técnico */}
+          {techData.some((td) => Object.keys(td.tipos).length > 0) && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-slate-600">Tempo por Tipo de Serviço</div>
+              {techData.map(
+                (td) =>
+                  Object.keys(td.tipos).length > 0 && (
+                    <div key={td.tecId} className="flex flex-wrap gap-1 items-center">
+                      <span className="text-[10px] text-slate-500 mr-1 w-24 shrink-0 truncate">
+                        {td.nome}
+                      </span>
+                      {Object.entries(td.tipos)
+                        .sort(([, a], [, b]) => b.count - a.count)
+                        .map(([tipo, info]) => (
+                          <Badge key={tipo} variant="secondary" className="text-[10px]">
+                            {tipo}: {info.count} OS · {formatDuracao(info.minutos)}
+                          </Badge>
+                        ))}
+                    </div>
+                  ),
+              )}
+            </div>
+          )}
+
+          {/* Totais da equipe */}
+          <div className="space-y-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 p-3">
+            <div className="flex flex-wrap gap-3 text-[11px]">
+              <span className="font-semibold text-slate-600">
+                Total: {equipeDedup.exec} exec · {equipeDedup.susp} susp · {equipeDedup.canc} canc
+              </span>
+              <span className="text-slate-500">
+                Corretiva: {formatDuracao(tempoCorretivaEquipe)}
+              </span>
+              <span className="text-slate-500">
+                Almoço: {almocoEquipe > 0 ? formatDuracao(almocoEquipe) : "Sem almoço"}
+              </span>
+            </div>
+            {Object.keys(tiposEquipe).length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(tiposEquipe)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([k, v]) => (
+                    <Badge key={k} variant="secondary" className="text-[10px]">
+                      {k}: {v}
+                    </Badge>
+                  ))}
+              </div>
+            )}
           </div>
-          {Object.keys(stats.tipos).length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(stats.tipos).map(([k, v]) => (
-                <Badge key={k} variant="secondary" className="text-[10px]">
-                  {k}: {v}
-                </Badge>
-              ))}
+
+          {/* Filtro por tipo ativo */}
+          {filtroTipoAtivo && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-500">
+                Filtrando por: <strong>{filtroTipoAtivo}</strong>
+              </span>
             </div>
           )}
 
           {/* Justificativas */}
-          {suspensas.length > 0 && (
+          {suspAtividades.length > 0 && (
             <div className="space-y-1">
               <div className="text-xs font-semibold text-amber-700">OS Suspensas</div>
-              {suspensas.map((a) => (
+              {suspAtividades.map((a) => (
                 <div key={a.id} className="flex items-center gap-2">
                   <span className="w-28 shrink-0 font-mono text-[11px] text-slate-600">
                     {a.ordem_manutencao}
@@ -481,10 +770,10 @@ function EquipeSection({
               ))}
             </div>
           )}
-          {canceladas.length > 0 && (
+          {cancAtividades.length > 0 && (
             <div className="space-y-1">
               <div className="text-xs font-semibold text-red-700">OS Canceladas</div>
-              {canceladas.map((a) => (
+              {cancAtividades.map((a) => (
                 <div key={a.id} className="flex items-center gap-2">
                   <span className="w-28 shrink-0 font-mono text-[11px] text-slate-600">
                     {a.ordem_manutencao}
@@ -818,6 +1107,13 @@ function UploadModal({
   );
 }
 
+function equipeTemTipo(eq: FieldEquipe, atividades: FieldAtividade[], tipoNorm: string): boolean {
+  const techSet = new Set(eq.tecnicos);
+  return atividades.some(
+    (a) => techSet.has(a.id_recurso) && (a.tipo_atividade || "").toUpperCase().trim() === tipoNorm,
+  );
+}
+
 // ─── Day Detail ───────────────────────────────────────────────
 
 function DayDetail({
@@ -839,6 +1135,8 @@ function DayDetail({
   const [filtroEquipes, setFiltroEquipes] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<string[]>([]);
+  const [metaOS, setMetaOS] = useState(8);
+  const [filtroTipoAtivo, setFiltroTipoAtivo] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -948,7 +1246,7 @@ function DayDetail({
       </div>
 
       {/* Summary Cards */}
-      <SummaryCards atividades={atividades} />
+      <SummaryCards atividades={atividades} numEquipes={equipes.length} />
 
       {/* Map */}
       <ProdutividadeMap
@@ -965,28 +1263,66 @@ function DayDetail({
       />
 
       {/* Tipo de Serviço Chart */}
-      <TipoServicoChart atividades={atividades} />
+      <TipoServicoChart
+        atividades={atividades}
+        equipes={equipes}
+        onFilterByTipo={setFiltroTipoAtivo}
+        filtroTipoAtivo={filtroTipoAtivo}
+      />
 
       {/* Equipes */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Distribuição por Equipe</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-sm font-semibold">Distribuição por Equipe</CardTitle>
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-slate-500">Meta OS:</label>
+              <Input
+                type="number"
+                min={0}
+                value={metaOS}
+                onChange={(e) => setMetaOS(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                className="h-6 w-14 text-[10px] text-center"
+              />
+            </div>
+          </div>
+          {filtroTipoAtivo && (
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className="text-slate-500">
+                Filtrando por: <strong className="text-[#0b3a73]">{filtroTipoAtivo}</strong>
+              </span>
+              <button
+                onClick={() => setFiltroTipoAtivo(null)}
+                className="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-200"
+              >
+                ✕ Limpar
+              </button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {equipes.length === 0 ? (
             <p className="text-xs text-slate-400">Nenhuma equipe configurada para este dia.</p>
           ) : (
-            equipes.map((eq, i) => (
-              <EquipeSection
-                key={eq.id}
-                equipe={eq}
-                atividades={atividades}
-                equipeIdx={i}
-                justificativas={justificativas}
-                onSalvar={handleSalvarJust}
-                recursosMap={recursosMap}
-              />
-            ))
+            equipes
+              .filter((eq) => {
+                if (!filtroTipoAtivo) return true;
+                const norm = filtroTipoAtivo.toUpperCase().trim();
+                return equipeTemTipo(eq, atividades, norm);
+              })
+              .map((eq, i) => (
+                <EquipeSection
+                  key={eq.id}
+                  equipe={eq}
+                  atividades={atividades}
+                  equipeIdx={i}
+                  justificativas={justificativas}
+                  onSalvar={handleSalvarJust}
+                  recursosMap={recursosMap}
+                  metaOS={metaOS}
+                  filtroTipoAtivo={filtroTipoAtivo}
+                />
+              ))
           )}
         </CardContent>
       </Card>
@@ -1047,7 +1383,7 @@ function DashboardComparacao() {
         const dayAtiv = atividades.filter(
           (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
         );
-        const exec = dayAtiv.filter((a) => normalizeStatus(a.status) === "concluido").length;
+        const exec = dedupOS(dayAtiv).exec;
         return { data: d.data.slice(5), exec };
       })
       .reverse();
@@ -1056,14 +1392,12 @@ function DashboardComparacao() {
   const osPorEquipe = useMemo(() => {
     const map = new Map<number, { nome: string; exec: number }>();
     for (const eq of equipes) map.set(eq.id, { nome: eq.nome_equipe, exec: 0 });
-    for (const a of atividades) {
-      if (normalizeStatus(a.status) !== "concluido") continue;
-      for (const eq of equipes) {
-        if (eq.dia_id === a.dia_id && eq.tecnicos.includes(a.id_recurso)) {
-          const entry = map.get(eq.id);
-          if (entry) entry.exec++;
-        }
-      }
+    for (const eq of equipes) {
+      const techSet = new Set(eq.tecnicos);
+      const teamAtiv = atividades.filter(
+        (a) => a.dia_id === eq.dia_id && techSet.has(a.id_recurso),
+      );
+      map.set(eq.id, { nome: eq.nome_equipe, exec: dedupOS(teamAtiv).exec });
     }
     return [...map.values()].filter((e) => e.exec > 0).sort((a, b) => b.exec - a.exec);
   }, [atividades, equipes]);

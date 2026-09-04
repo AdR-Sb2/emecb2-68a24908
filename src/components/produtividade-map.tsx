@@ -209,6 +209,7 @@ export default function ProdutividadeMap({
   setFiltroTipo: (v: string[]) => void;
 }) {
   const [fitSignal, setFitSignal] = useState(0);
+  const [debugInfo, setDebugInfo] = useState({ tentadas: 0, comPlanta: 0, semPlanta: 0 });
 
   // Build resource → team map
   const resourceToEquipe = useMemo(() => {
@@ -257,12 +258,22 @@ export default function ProdutividadeMap({
       at: FieldAtividade;
     }> = [];
 
+    let tentadas = 0;
+    let comPlanta = 0;
+    let semPlanta = 0;
+
     for (const at of atividades) {
       if (isAtividadeAdministrativa(at.tipo_atividade)) continue;
       if (!at.planta) continue;
+      tentadas++;
 
-      const coord = plantaMap.get(at.planta.trim().toUpperCase());
-      if (!coord) continue;
+      const normalizedPlanta = at.planta.trim().toUpperCase();
+      const coord = plantaMap.get(normalizedPlanta);
+      if (!coord) {
+        semPlanta++;
+        continue;
+      }
+      comPlanta++;
 
       const normSt = normalizeStatus(at.status);
       const eqInfo = resourceToEquipe.get(at.id_recurso);
@@ -282,6 +293,9 @@ export default function ProdutividadeMap({
         at,
       });
     }
+
+    setDebugInfo({ tentadas, comPlanta, semPlanta });
+
     return result;
   }, [atividades, plantaMap, resourceToEquipe, filtroEquipes, filtroStatus, filtroTipo]);
 
@@ -397,6 +411,18 @@ export default function ProdutividadeMap({
           </span>
         ))}
         <span className="ml-2 text-slate-400">| Borda = equipe</span>
+      </div>
+
+      {/* Debug log temporário — remover após confirmar mapa */}
+      <div className="border-t border-slate-100 px-3 py-2 text-[10px] text-slate-400 dark:border-slate-700">
+        <strong>DEBUG Mapa:</strong> {debugInfo.tentadas} OS tentadas ·{" "}
+        <span className="text-emerald-600">{debugInfo.comPlanta} plotadas</span> ·{" "}
+        <span className="text-red-500">{debugInfo.semPlanta} sem planta</span>
+        {debugInfo.semPlanta > 0 && (
+          <span className="ml-2 text-amber-600">
+            (verifique se PLANTA no CSV confere com o campo "planta" na tabela elevatorias)
+          </span>
+        )}
       </div>
     </div>
   );
