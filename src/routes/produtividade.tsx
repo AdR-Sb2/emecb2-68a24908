@@ -1448,7 +1448,7 @@ function DashboardComparacao() {
         for (const a of dayAtiv) {
           const norm = (a.tipo_atividade || "").toUpperCase().trim();
           const label = TIPO_SERVICO_MAP[norm];
-          if (label && typeof row[label] === "number") (row[label] as number)++;
+          if (label && typeof row[label] === "number") row[label] = (row[label] as number) + 1;
         }
         return row;
       })
