@@ -354,7 +354,7 @@ export default function ProdutividadeMap({
       </div>
 
       {/* Map */}
-      <div className="h-[400px] w-full">
+      <div className="relative z-0 h-[400px] w-full">
         <MapContainer center={[-22.85, -43.5]} zoom={10} style={{ height: "100%", width: "100%" }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

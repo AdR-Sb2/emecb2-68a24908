@@ -219,8 +219,9 @@ function calcAlmocoMin(atividades: FieldAtividade[]): number {
 function dedupOS(atividades: FieldAtividade[]) {
   const groups = new Map<number, string[]>();
   for (const a of atividades) {
+    if (isAtividadeAdministrativa(a.tipo_atividade)) continue;
+    if (!a.ordem_manutencao) continue;
     const om = a.ordem_manutencao;
-    if (!om) continue;
     const arr = groups.get(om);
     if (arr) arr.push(normalizeStatus(a.status));
     else groups.set(om, [normalizeStatus(a.status)]);
