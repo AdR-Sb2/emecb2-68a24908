@@ -31,6 +31,10 @@ import {
   Trash2,
   Users,
   Pencil,
+  Trophy,
+  Activity,
+  Wrench,
+  Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1390,19 +1394,93 @@ function DashboardComparacao() {
   }, [dias, atividades]);
 
   const osPorEquipe = useMemo(() => {
-    const map = new Map<number, { nome: string; exec: number }>();
-    for (const eq of equipes) map.set(eq.id, { nome: eq.nome_equipe, exec: 0 });
+    const rows: Array<{
+      nome: string;
+      exec: number;
+      susp: number;
+      canc: number;
+      total: number;
+      tecnicos: number;
+      topTipo: string;
+      corretivas: number;
+    }> = [];
     for (const eq of equipes) {
       const techSet = new Set(eq.tecnicos);
       const teamAtiv = atividades.filter(
         (a) => a.dia_id === eq.dia_id && techSet.has(a.id_recurso),
       );
-      map.set(eq.id, { nome: eq.nome_equipe, exec: dedupOS(teamAtiv).exec });
+      const dedup = dedupOS(teamAtiv);
+      const tipos: Record<string, number> = {};
+      let corretivas = 0;
+      for (const a of teamAtiv) {
+        const norm = (a.tipo_atividade || "").toUpperCase().trim();
+        if (normalizeStatus(a.status) !== "concluido") continue;
+        const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
+        tipos[label] = (tipos[label] || 0) + 1;
+        if (norm === "MANUTENÇÃO CORRETIVA EMERGENCIAL") corretivas++;
+      }
+      const topTipo =
+        (Object.entries(tipos).sort(([, a], [, b]) => b - a)[0]?.[0] as string) || "—";
+      rows.push({
+        nome: eq.nome_equipe,
+        exec: dedup.exec,
+        susp: dedup.susp,
+        canc: dedup.canc,
+        total: dedup.total,
+        tecnicos: eq.tecnicos.length,
+        topTipo,
+        corretivas,
+      });
     }
-    return [...map.values()].filter((e) => e.exec > 0).sort((a, b) => b.exec - a.exec);
+    return rows.filter((r) => r.total > 0).sort((a, b) => b.exec - a.exec);
   }, [atividades, equipes]);
 
-  const ranking = osPorEquipe.length > 0 ? osPorEquipe[0] : null;
+  const composicaoPorDia = useMemo(() => {
+    return dias
+      .map((d) => {
+        const dayAtiv = atividades.filter(
+          (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
+        );
+        const row: Record<string, number | string> = { data: d.data.slice(5) };
+        for (const k of TIPO_SERVICO_KEYS) {
+          row[TIPO_SERVICO_MAP[k]] = 0;
+        }
+        for (const a of dayAtiv) {
+          const norm = (a.tipo_atividade || "").toUpperCase().trim();
+          const label = TIPO_SERVICO_MAP[norm];
+          if (label && typeof row[label] === "number") (row[label] as number)++;
+        }
+        return row;
+      })
+      .reverse();
+  }, [dias, atividades]);
+
+  const kpis = useMemo(() => {
+    const todasOs = atividades.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
+    const totalExec = dedupOS(todasOs).exec;
+    const numDias = dias.length;
+    const mediaDiaria = numDias > 0 ? totalExec / numDias : 0;
+    let corretivas = 0;
+    for (const a of todasOs) {
+      if ((a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL") {
+        corretivas++;
+      }
+    }
+    const total =
+      todasOs.length > 0 ? totalExec + dedupOS(todasOs).susp + dedupOS(todasOs).canc : 0;
+    const taxa = total > 0 ? Math.round((totalExec / total) * 100) : 0;
+    return { totalExec, mediaDiaria, corretivas, taxa };
+  }, [atividades, dias]);
+
+  const destaques = useMemo(() => {
+    if (osPorEquipe.length === 0) return null;
+    const maisProdutiva = osPorEquipe[0];
+    const maisConclusao = [...osPorEquipe].sort(
+      (a, b) => (a.total > 0 ? a.exec / a.total : 0) - (b.total > 0 ? b.exec / b.total : 0),
+    )[osPorEquipe.length - 1];
+    const maisCorretivas = [...osPorEquipe].sort((a, b) => b.corretivas - a.corretivas)[0];
+    return { maisProdutiva, maisConclusao, maisCorretivas };
+  }, [osPorEquipe]);
 
   if (loading) {
     return (
@@ -1435,6 +1513,46 @@ function DashboardComparacao() {
         </p>
       ) : (
         <>
+          {/* KPIs do período */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-3">
+                <ClipboardList className="h-8 w-8 shrink-0 text-[#0b3a73]" />
+                <div>
+                  <div className="text-2xl font-bold">{kpis.totalExec}</div>
+                  <div className="text-[11px] text-slate-500">OS Executadas</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-3">
+                <Activity className="h-8 w-8 shrink-0 text-violet-600" />
+                <div>
+                  <div className="text-2xl font-bold">{kpis.mediaDiaria.toFixed(1)}</div>
+                  <div className="text-[11px] text-slate-500">Média diária</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-3">
+                <Wrench className="h-8 w-8 shrink-0 text-red-500" />
+                <div>
+                  <div className="text-2xl font-bold">{kpis.corretivas}</div>
+                  <div className="text-[11px] text-slate-500">Corretivas emerg.</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-3">
+                <Percent className="h-8 w-8 shrink-0 text-emerald-600" />
+                <div>
+                  <div className="text-2xl font-bold">{kpis.taxa}%</div>
+                  <div className="text-[11px] text-slate-500">Taxa de conclusão</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">OS Executadas por Dia</CardTitle>
@@ -1467,7 +1585,39 @@ function DashboardComparacao() {
                 <BarChart data={osPorEquipe} layout="vertical" margin={{ left: 10, right: 30 }}>
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nome" width={120} tick={{ fontSize: 11 }} />
-                  <RechartsTooltip />
+                  <RechartsTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload as (typeof osPorEquipe)[number];
+                      return (
+                        <div className="min-w-[190px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
+                          <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">
+                            {d.nome}
+                          </div>
+                          <div className="space-y-0.5 text-slate-600 dark:text-slate-300">
+                            <div>
+                              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 mr-1" />
+                              Executadas: <strong>{d.exec}</strong>
+                            </div>
+                            <div>
+                              <span className="inline-block h-2 w-2 rounded-full bg-amber-500 mr-1" />
+                              Suspensas: <strong>{d.susp}</strong>
+                            </div>
+                            <div>
+                              <span className="inline-block h-2 w-2 rounded-full bg-red-500 mr-1" />
+                              Canceladas: <strong>{d.canc}</strong>
+                            </div>
+                            <div className="pt-1 text-slate-500">
+                              Tipo mais executado: <strong>{d.topTipo}</strong>
+                            </div>
+                            <div className="text-slate-500">
+                              Técnicos: <strong>{d.tecnicos}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
                   <Bar dataKey="exec" radius={[0, 4, 4, 0]}>
                     {osPorEquipe.map((_, i) => (
                       <Cell key={i} fill={getEquipeColor(i).hex} />
@@ -1478,19 +1628,93 @@ function DashboardComparacao() {
             </CardContent>
           </Card>
 
-          {ranking && (
-            <Card className="shadow-sm border-emerald-200 bg-emerald-50">
-              <CardContent className="flex items-center gap-4 p-4">
-                <CheckCircle2 className="h-10 w-10 text-emerald-600" />
-                <div>
-                  <div className="text-sm font-bold text-emerald-800">Equipe mais produtiva</div>
-                  <div className="text-2xl font-bold text-emerald-700">{ranking.nome}</div>
-                  <div className="text-xs text-emerald-600">
-                    {ranking.exec} OS executadas no período
+          {/* Composição por tipo no período */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">
+                Composição de OS por Tipo de Serviço
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={composicaoPorDia}
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="data" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <RechartsTooltip />
+                  <Legend />
+                  {TIPO_SERVICO_KEYS.map((k, i) => (
+                    <Bar
+                      key={k}
+                      dataKey={TIPO_SERVICO_MAP[k]}
+                      stackId="tipo"
+                      fill={TIPO_SERVICO_COLORS[i]}
+                      radius={i === TIPO_SERVICO_KEYS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Destaques */}
+          {destaques && (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Card className="shadow-sm border-amber-200 bg-amber-50">
+                <CardContent className="flex items-start gap-3 p-4">
+                  <Trophy className="mt-0.5 h-8 w-8 shrink-0 text-amber-600" />
+                  <div>
+                    <div className="text-xs font-semibold text-amber-800">
+                      Mais corretivas emergenciais
+                    </div>
+                    <div className="text-lg font-bold text-amber-700">
+                      {destaques.maisCorretivas.nome}
+                    </div>
+                    <div className="text-xs text-amber-600">
+                      {destaques.maisCorretivas.corretivas} corretivas
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border-emerald-200 bg-emerald-50">
+                <CardContent className="flex items-start gap-3 p-4">
+                  <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-emerald-600" />
+                  <div>
+                    <div className="text-xs font-semibold text-emerald-800">
+                      Maior taxa de conclusão
+                    </div>
+                    <div className="text-lg font-bold text-emerald-700">
+                      {destaques.maisConclusao.nome}
+                    </div>
+                    <div className="text-xs text-emerald-600">
+                      {destaques.maisConclusao.total > 0
+                        ? Math.round(
+                            (destaques.maisConclusao.exec / destaques.maisConclusao.total) * 100,
+                          )
+                        : 0}
+                      % concluídas
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border-blue-200 bg-blue-50">
+                <CardContent className="flex items-start gap-3 p-4">
+                  <Activity className="mt-0.5 h-8 w-8 shrink-0 text-blue-600" />
+                  <div>
+                    <div className="text-xs font-semibold text-blue-800">Equipe mais produtiva</div>
+                    <div className="text-lg font-bold text-blue-700">
+                      {destaques.maisProdutiva.nome}
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      {destaques.maisProdutiva.exec} OS executadas no período
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </>
       )}
