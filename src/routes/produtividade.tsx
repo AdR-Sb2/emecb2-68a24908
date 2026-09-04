@@ -103,6 +103,7 @@ type FieldAtividade = {
   parada: boolean;
   inicio: string | null;
   fim: string | null;
+  duracao_min: number | null;
   motivo_paralisacao: string;
   planta: string;
   cidade: string;
@@ -143,6 +144,10 @@ const ATIVIDADES_ADMINISTRATIVAS = [
   "FEEDBACK",
   "PROBLEMAS COM VEÍCULO",
   "PROBLEMAS COM VEICULO",
+  "REUNIÃO",
+  "REUNIÕES",
+  "REUNIAO",
+  "TREINAMENTO",
 ];
 
 const EQUIPE_COLORS = [
@@ -197,6 +202,11 @@ function diffMinutes(inicio: string | null, fim: string | null): number {
   return Math.max(0, h2 * 60 + m2 - (h1 * 60 + m1));
 }
 
+function durMin(a: FieldAtividade): number {
+  if (a.duracao_min != null) return a.duracao_min;
+  return diffMinutes(a.inicio, a.fim);
+}
+
 function formatDuracao(min: number): string {
   if (min <= 0) return "0min";
   const h = Math.floor(min / 60);
@@ -209,8 +219,11 @@ function formatDuracao(min: number): string {
 function calcAlmocoMin(atividades: FieldAtividade[]): number {
   let total = 0;
   for (const a of atividades) {
-    if ((a.tipo_atividade || "").toUpperCase().trim() === "ALMOÇO") {
-      total += diffMinutes(a.inicio, a.fim);
+    if (
+      (a.tipo_atividade || "").toUpperCase().trim() === "ALMOÇO" ||
+      (a.tipo_atividade || "").toUpperCase().trim() === "ALMOCO"
+    ) {
+      total += durMin(a);
     }
   }
   return total;
@@ -293,8 +306,9 @@ function parseCsvData(rows: Record<string, unknown>[]): {
       parada,
       inicio: normalizeTime(get("INÍCIO") || get("Inicio") || get("início") || ""),
       fim: normalizeTime(get("FIM") || get("Fim") || ""),
+      duracao_min: parseDuracaoMin(get("DURAÇÃO") || get("Duracao") || get("Duração") || ""),
       motivo_paralisacao: get("Motivo da Paralisação") || get("Motivo da paralisação") || "",
-      planta: get("PLANTA") || get("Planta") || "",
+      planta: cleanPlantaCode(get("PLANTA") || get("Planta") || ""),
       cidade: get("Cidade") || get("CIDADE") || "",
     });
   }
@@ -320,8 +334,38 @@ function parseFieldDate(raw: string): string | null {
 function normalizeTime(raw: string): string | null {
   if (!raw) return null;
   const t = raw.trim();
-  if (/^\d{2}:\d{2}(:\d{2})?$/.test(t)) return t.slice(0, 5);
-  return null;
+  if (!t) return null;
+  const ampm = t.match(/\b(AM|PM)\b/i);
+  const only = t.replace(/\b(AM|PM)\b/i, "").trim();
+  const m = only.match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2];
+  if (ampm) {
+    const isPm = ampm[1].toUpperCase() === "PM";
+    if (isPm && h < 12) h += 12;
+    if (!isPm && h === 12) h = 0;
+  }
+  return `${String(h).padStart(2, "0")}:${min}`;
+}
+
+function parseDuracaoMin(raw: string): number | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function cleanPlantaCode(raw: string): string {
+  if (!raw) return "";
+  const t = raw.trim();
+  if (!t) return "";
+  // Extrai o código antes do primeiro espaço (o código pode conter hífens internos)
+  const idx = t.search(/\s/);
+  const code = idx === -1 ? t : t.slice(0, idx);
+  return code.trim().toUpperCase();
 }
 
 // ─── Summary Cards ────────────────────────────────────────────
@@ -534,7 +578,12 @@ function EquipeSection({
 
   const tiposEquipe = useMemo(() => {
     const map: Record<string, number> = {};
+    const vistos = new Set<string>();
     for (const a of equipeAtividades) {
+      if (isAtividadeAdministrativa(a.tipo_atividade)) continue;
+      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      if (vistos.has(key)) continue;
+      vistos.add(key);
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
       const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
       map[label] = (map[label] || 0) + 1;
@@ -546,7 +595,7 @@ function EquipeSection({
     let total = 0;
     for (const a of equipeAtividades) {
       if ((a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL") {
-        total += diffMinutes(a.inicio, a.fim);
+        total += durMin(a);
       }
     }
     return total;
@@ -565,16 +614,25 @@ function EquipeSection({
           (a) =>
             (a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL",
         )
-        .reduce((acc, a) => acc + diffMinutes(a.inicio, a.fim), 0);
+        .reduce((acc, a) => acc + durMin(a), 0);
       const tipos: Record<string, { count: number; minutos: number }> = {};
+      const vistosTec = new Set<string>();
       for (const a of techAtividades) {
         const norm = (a.tipo_atividade || "").toUpperCase().trim();
-        if (norm === "ALMOÇO" || norm === "DDS" || isAtividadeAdministrativa(a.tipo_atividade))
+        if (
+          norm === "ALMOÇO" ||
+          norm === "ALMOCO" ||
+          norm === "DDS" ||
+          isAtividadeAdministrativa(a.tipo_atividade)
+        )
           continue;
+        const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+        if (vistosTec.has(key)) continue;
+        vistosTec.add(key);
         const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
         if (!tipos[label]) tipos[label] = { count: 0, minutos: 0 };
         tipos[label].count++;
-        tipos[label].minutos += diffMinutes(a.inicio, a.fim);
+        tipos[label].minutos += durMin(a);
       }
       let status: "verde" | "amarelo" | "cinza" = "cinza";
       if (techDedup.total > 0) {
@@ -1544,10 +1602,14 @@ function DashboardComparacao() {
     const numDias = dias.length;
     const mediaDiaria = numDias > 0 ? totalExec / numDias : 0;
     let corretivas = 0;
+    const corretivasVistas = new Set<string>();
     for (const a of todasOs) {
-      if ((a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL") {
-        corretivas++;
-      }
+      if ((a.tipo_atividade || "").toUpperCase().trim() !== "MANUTENÇÃO CORRETIVA EMERGENCIAL")
+        continue;
+      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      if (corretivasVistas.has(key)) continue;
+      corretivasVistas.add(key);
+      corretivas++;
     }
     const total =
       todasOs.length > 0 ? totalExec + dedupOS(todasOs).susp + dedupOS(todasOs).canc : 0;
