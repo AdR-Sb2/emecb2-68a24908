@@ -329,11 +329,15 @@ function normalizeTime(raw: string): string | null {
 function SummaryCards({
   atividades,
   numEquipes,
+  tecnicosEmEquipe,
 }: {
   atividades: FieldAtividade[];
   numEquipes: number;
+  tecnicosEmEquipe: Set<number>;
 }) {
-  const tecnicas = atividades.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
+  const tecnicas = atividades.filter(
+    (a) => !isAtividadeAdministrativa(a.tipo_atividade) && tecnicosEmEquipe.has(a.id_recurso),
+  );
   const { exec, susp, canc } = dedupOS(tecnicas);
   const mediaOS = numEquipes > 0 ? (exec / numEquipes).toFixed(1) : "0";
 
@@ -1325,7 +1329,11 @@ function DayDetail({
       </div>
 
       {/* Summary Cards */}
-      <SummaryCards atividades={atividades} numEquipes={equipes.length} />
+      <SummaryCards
+        atividades={atividades}
+        numEquipes={equipes.length}
+        tecnicosEmEquipe={new Set(equipes.flatMap((eq) => eq.tecnicos))}
+      />
 
       {/* Map */}
       <ProdutividadeMap
