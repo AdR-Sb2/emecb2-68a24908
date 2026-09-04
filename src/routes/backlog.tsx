@@ -1873,26 +1873,39 @@ function BacklogPage() {
     URL.revokeObjectURL(url);
   };
 
+  const routeText = (routeIdx: number): string => {
+    const route = generatedRoutes[routeIdx];
+    if (!route) return "";
+    return [
+      `🚗 *ROTA ${routeIdx + 1}*`,
+      "",
+      ...route.details.flatMap((d) => [
+        `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S.)`,
+        ...d.oss.map((os) => {
+          const nomePlanta = d.planta.split(" - ")[1] || "";
+          return `  · ${os.om} · ${d.plantaShort} · ${nomePlanta}`;
+        }),
+      ]),
+      "",
+    ].join("\n");
+  };
+
   const copyRouteResumo = async () => {
     if (!generatedRoutes.length) return;
     const lines: string[] = [];
-
-    generatedRoutes.forEach((route) => {
-      lines.push(
-        ...route.details.flatMap((d) => [
-          `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S.)`,
-          ...d.oss.map((os) => {
-            const nomePlanta = d.planta.split(" - ")[1] || "";
-            return `  · ${os.om} · ${d.plantaShort} · ${nomePlanta}`;
-          }),
-        ]),
-        "",
-      );
-    });
-
+    generatedRoutes.forEach((_, rIdx) => lines.push(routeText(rIdx)));
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
       alert("Resumo de todas as rotas copiado! Cole no WhatsApp.");
+    } catch {
+      alert("Não foi possível copiar.");
+    }
+  };
+
+  const copyRoute = async (rIdx: number) => {
+    try {
+      await navigator.clipboard.writeText(routeText(rIdx));
+      alert(`Resumo da Rota ${rIdx + 1} copiado! Cole no WhatsApp.`);
     } catch {
       alert("Não foi possível copiar.");
     }
@@ -2917,6 +2930,12 @@ function BacklogPage() {
                       className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
                     >
                       <Download className="h-3 w-3" /> CSV Rota {activeRouteTab + 1}
+                    </button>
+                    <button
+                      onClick={() => copyRoute(activeRouteTab)}
+                      className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
+                    >
+                      <CopyIcon className="h-3 w-3" /> Copiar Rota {activeRouteTab + 1}
                     </button>
                   </div>
                 </div>

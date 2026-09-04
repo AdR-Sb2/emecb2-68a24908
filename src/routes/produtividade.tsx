@@ -61,6 +61,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
@@ -188,6 +189,43 @@ function normalizeStatus(s: string): string {
 function isAtividadeAdministrativa(tipo: string | null | undefined): boolean {
   if (!tipo) return false;
   return ATIVIDADES_ADMINISTRATIVAS.includes(tipo.toUpperCase().trim());
+}
+
+function adminLabel(tipo: string): string {
+  const t = tipo.toUpperCase().trim();
+  const map: Record<string, string> = {
+    DDS: "DDS",
+    ALMOÇO: "Almoço",
+    ALMOCO: "Almoço",
+    "RETORNO PARA BASE": "Retorno para base",
+    "MONTAR EQUIPE": "Montar equipe",
+    "SEPARAR MATERIAL / FERRAMENTA": "Separar material",
+    "SEPARAR MATERIAL / FERRAMENTAS": "Separar material",
+    FEEDBACK: "Feedback",
+    "PROBLEMAS COM VEÍCULO": "Problemas com veículo",
+    "PROBLEMAS COM VEICULO": "Problemas com veículo",
+    REUNIÃO: "Reuniões",
+    REUNIÕES: "Reuniões",
+    REUNIAO: "Reuniões",
+    TREINAMENTO: "Treinamento",
+  };
+  return map[t] || t.charAt(0) + t.slice(1).toLowerCase();
+}
+
+function calcIndisponibilidade(atividades: FieldAtividade[]): {
+  total: number;
+  detalhe: Record<string, number>;
+} {
+  let total = 0;
+  const detalhe: Record<string, number> = {};
+  for (const a of atividades) {
+    if (!isAtividadeAdministrativa(a.tipo_atividade)) continue;
+    const label = adminLabel(a.tipo_atividade || "");
+    const m = durMin(a);
+    total += m;
+    detalhe[label] = (detalhe[label] || 0) + m;
+  }
+  return { total, detalhe };
 }
 
 function formatTime(h: string | null | undefined): string {
@@ -638,6 +676,7 @@ function EquipeSection({
       if (techDedup.total > 0) {
         status = techDedup.exec >= metaOS ? "verde" : "amarelo";
       }
+      const indisp = calcIndisponibilidade(techAtividades);
       return {
         tecId,
         nome: recursosMap.get(tecId) || String(tecId),
@@ -647,9 +686,13 @@ function EquipeSection({
         tempoCorretiva,
         tipos,
         status,
+        indispMin: indisp.total,
+        indispDetalhe: indisp.detalhe,
       };
     });
   }, [equipe.tecnicos, equipeAtividades, recursosMap, metaOS]);
+
+  const indispEquipe = useMemo(() => calcIndisponibilidade(equipeAtividades), [equipeAtividades]);
 
   const suspensas = equipeDedup.osIds.filter((om) => {
     const statuses = equipeAtividades
@@ -717,6 +760,7 @@ function EquipeSection({
                   <th className="pb-1 pr-2 text-center font-semibold text-slate-500">Canc</th>
                   <th className="pb-1 pr-2 font-semibold text-slate-500">Almoço</th>
                   <th className="pb-1 pr-2 font-semibold text-slate-500">Corretiva</th>
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Indisponível</th>
                   <th className="pb-1 font-semibold text-slate-500">Áreas</th>
                 </tr>
               </thead>
@@ -750,6 +794,34 @@ function EquipeSection({
                     </td>
                     <td className="py-1.5 pr-2 text-slate-600">
                       {td.tempoCorretiva > 0 ? formatDuracao(td.tempoCorretiva) : "—"}
+                    </td>
+                    <td className="py-1.5 pr-2 text-slate-600">
+                      {td.indispMin > 0 ? (
+                        <TooltipProvider delayDuration={100}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">
+                              {formatDuracao(td.indispMin)}
+                            </TooltipTrigger>
+                            <TooltipContent className="min-w-[200px]">
+                              <div className="space-y-1">
+                                {Object.entries(td.indispDetalhe)
+                                  .sort(([, a], [, b]) => b - a)
+                                  .map(([k, v]) => (
+                                    <div
+                                      key={k}
+                                      className="flex w-full items-center justify-between gap-4"
+                                    >
+                                      <span>{k}</span>
+                                      <strong>{formatDuracao(v)}</strong>
+                                    </div>
+                                  ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="py-1.5 text-slate-500">
                       {td.areas.length > 0 ? td.areas.join(", ") : "—"}
@@ -795,6 +867,9 @@ function EquipeSection({
               </span>
               <span className="text-slate-500">
                 Almoço: {almocoEquipe > 0 ? formatDuracao(almocoEquipe) : "Sem almoço"}
+              </span>
+              <span className="text-slate-500">
+                Indisponível: {formatDuracao(indispEquipe.total)}
               </span>
             </div>
             {Object.keys(tiposEquipe).length > 0 && (
@@ -1535,45 +1610,67 @@ function DashboardComparacao() {
   }, [dias, atividades]);
 
   const osPorEquipe = useMemo(() => {
-    const rows: Array<{
-      nome: string;
-      exec: number;
-      susp: number;
-      canc: number;
-      total: number;
-      tecnicos: number;
-      topTipo: string;
-      corretivas: number;
-    }> = [];
+    const byNome = new Map<
+      string,
+      {
+        nome: string;
+        exec: number;
+        susp: number;
+        canc: number;
+        total: number;
+        tecSet: Set<number>;
+        tipos: Record<string, number>;
+        corretivas: number;
+      }
+    >();
     for (const eq of equipes) {
       const techSet = new Set(eq.tecnicos);
       const teamAtiv = atividades.filter(
         (a) => a.dia_id === eq.dia_id && techSet.has(a.id_recurso),
       );
       const dedup = dedupOS(teamAtiv);
-      const tipos: Record<string, number> = {};
-      let corretivas = 0;
+      const nome = eq.nome_equipe.trim();
+      const cur = byNome.get(nome) || {
+        nome: eq.nome_equipe,
+        exec: 0,
+        susp: 0,
+        canc: 0,
+        total: 0,
+        tecSet: new Set<number>(),
+        tipos: {},
+        corretivas: 0,
+      };
+      cur.exec += dedup.exec;
+      cur.susp += dedup.susp;
+      cur.canc += dedup.canc;
+      cur.total += dedup.total;
+      eq.tecnicos.forEach((t) => cur.tecSet.add(t));
+      const vistos = new Set<string>();
       for (const a of teamAtiv) {
         const norm = (a.tipo_atividade || "").toUpperCase().trim();
         if (normalizeStatus(a.status) !== "concluido") continue;
+        const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+        if (vistos.has(key)) continue;
+        vistos.add(key);
         const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
-        tipos[label] = (tipos[label] || 0) + 1;
-        if (norm === "MANUTENÇÃO CORRETIVA EMERGENCIAL") corretivas++;
+        cur.tipos[label] = (cur.tipos[label] || 0) + 1;
+        if (norm === "MANUTENÇÃO CORRETIVA EMERGENCIAL") cur.corretivas++;
       }
-      const topTipo =
-        (Object.entries(tipos).sort(([, a], [, b]) => b - a)[0]?.[0] as string) || "—";
-      rows.push({
-        nome: eq.nome_equipe,
-        exec: dedup.exec,
-        susp: dedup.susp,
-        canc: dedup.canc,
-        total: dedup.total,
-        tecnicos: eq.tecnicos.length,
-        topTipo,
-        corretivas,
-      });
+      byNome.set(nome, cur);
     }
-    return rows.filter((r) => r.total > 0).sort((a, b) => b.exec - a.exec);
+    return [...byNome.values()]
+      .map((r) => ({
+        nome: r.nome,
+        exec: r.exec,
+        susp: r.susp,
+        canc: r.canc,
+        total: r.total,
+        tecnicos: r.tecSet.size,
+        topTipo: (Object.entries(r.tipos).sort(([, a], [, b]) => b - a)[0]?.[0] as string) || "—",
+        corretivas: r.corretivas,
+      }))
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.exec - a.exec);
   }, [atividades, equipes]);
 
   const composicaoPorDia = useMemo(() => {
