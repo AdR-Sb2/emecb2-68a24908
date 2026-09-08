@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Loader2, BarChart3, Link2Off } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { DashboardComparacao } from "@/components/produtividade-dashboard";
+import logoHeader from "@/assets/logo-branca.png";
 
 export const Route = createFileRoute("/produtividade/publico/$token")({
   component: PublicoProdutividadePage,
@@ -67,7 +68,7 @@ function PublicoProdutividadePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <img
-                src="/logo-oi.png"
+                src={logoHeader}
                 alt="Águas do Rio"
                 className="h-12 w-auto object-contain"
                 loading="eager"

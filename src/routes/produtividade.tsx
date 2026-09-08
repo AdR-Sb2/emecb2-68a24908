@@ -1,5 +1,14 @@
 import { createFileRoute, Link, useNavigate, useLocation, Outlet } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useState, useCallback } from "react";
+import {
+  lazy,
+  Suspense,
+  Component,
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
 import * as XLSX from "xlsx";
 import {
   BarChart,
@@ -61,6 +70,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { DashboardComparacao } from "@/components/produtividade-dashboard";
+import logoHeader from "@/assets/logo-branca.png";
 
 const ProdutividadeMap = lazy(() => import("@/components/produtividade-map"));
 
@@ -74,6 +84,30 @@ function ProdutividadeLayout() {
     return <Outlet />;
   }
   return <ProdutividadePage />;
+}
+
+// Evita que uma falha ao carregar o mapa derrube a página inteira.
+class MapLoadError extends Component<{ children: ReactNode }, { falhou: boolean }> {
+  state = { falhou: false };
+  static getDerivedStateFromError() {
+    return { falhou: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("Erro ao carregar o mapa de produtividade:", error);
+  }
+  render() {
+    if (this.state.falhou) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+          Não foi possível carregar o mapa.
+          <button className="ml-2 underline" onClick={() => this.setState({ falhou: false })}>
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────
@@ -1607,18 +1641,28 @@ function DayDetail({
       />
 
       {/* Map */}
-      <ProdutividadeMap
-        atividades={atividades}
-        plantaMap={plantaMap}
-        equipes={equipes}
-        recursosMap={recursosMap}
-        filtroEquipes={filtroEquipes}
-        setFiltroEquipes={setFiltroEquipes}
-        filtroStatus={filtroStatus}
-        setFiltroStatus={setFiltroStatus}
-        filtroTipo={filtroTipo}
-        setFiltroTipo={setFiltroTipo}
-      />
+      <Suspense
+        fallback={
+          <div className="flex min-h-[180px] items-center justify-center rounded-lg border border-slate-200 bg-white text-sm text-slate-400">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando mapa...
+          </div>
+        }
+      >
+        <MapLoadError>
+          <ProdutividadeMap
+            atividades={atividades}
+            plantaMap={plantaMap}
+            equipes={equipes}
+            recursosMap={recursosMap}
+            filtroEquipes={filtroEquipes}
+            setFiltroEquipes={setFiltroEquipes}
+            filtroStatus={filtroStatus}
+            setFiltroStatus={setFiltroStatus}
+            filtroTipo={filtroTipo}
+            setFiltroTipo={setFiltroTipo}
+          />
+        </MapLoadError>
+      </Suspense>
 
       {/* Tipo de Serviço Chart */}
       <TipoServicoChart
@@ -1885,7 +1929,7 @@ function ProdutividadePage() {
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
               <img
-                src="/logo-oi.png"
+                src={logoHeader}
                 alt="Águas do Rio"
                 className="h-14 w-auto object-contain"
                 loading="eager"
