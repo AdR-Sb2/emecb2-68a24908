@@ -234,11 +234,30 @@ export function DashboardComparacao() {
         const dayAtiv = atividadesEquipe.filter(
           (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
         );
-        const exec = dedupOS(dayAtiv).exec;
-        return { data: d.data.slice(5), exec, total: dedupOS(dayAtiv).total };
+        const dedup = dedupOS(dayAtiv);
+        const byEqNome = new Map<string, number>();
+        for (const eq of equipes) {
+          if (eq.dia_id !== d.id) continue;
+          const techSet = new Set(eq.tecnicos);
+          const teamAtiv = atividadesEquipe.filter(
+            (a) =>
+              a.dia_id === d.id &&
+              !isAtividadeAdministrativa(a.tipo_atividade) &&
+              techSet.has(a.id_recurso),
+          );
+          const nome = eq.nome_equipe.trim();
+          byEqNome.set(nome, (byEqNome.get(nome) || 0) + dedupOS(teamAtiv).exec);
+        }
+        return {
+          data: d.data.slice(5),
+          dataCompleta: d.data,
+          exec: dedup.exec,
+          total: dedup.total,
+          equipes: [...byEqNome.entries()].map(([nome, exec]) => ({ nome, exec })),
+        };
       })
       .reverse();
-  }, [dias, atividadesEquipe]);
+  }, [dias, atividadesEquipe, equipes]);
 
   const osPorEquipe = useMemo(() => {
     const byNome = new Map<
@@ -454,7 +473,46 @@ export function DashboardComparacao() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="data" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <RechartsTooltip />
+                  <RechartsTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const row = payload[0].payload as (typeof osPorDia)[number];
+                      return (
+                        <div className="min-w-[200px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
+                          <p className="mb-2 font-semibold text-slate-700 dark:text-slate-200">
+                            {formatDataBR(row.dataCompleta)}
+                          </p>
+                          <p className="mb-2 text-slate-600 dark:text-slate-300">
+                            Executadas: <strong>{row.exec}</strong>
+                            <span className="text-slate-400"> · {row.total} O.S. no dia</span>
+                          </p>
+                          <div className="border-t border-slate-100 pt-1 dark:border-slate-700">
+                            {row.equipes.length === 0 ? (
+                              <p className="text-slate-400">Sem equipes cadastradas</p>
+                            ) : (
+                              row.equipes.map((eq, i) => (
+                                <div
+                                  key={`${row.data}-${eq.nome}`}
+                                  className="flex items-center justify-between gap-3 py-0.5"
+                                >
+                                  <span className="flex items-center gap-1.5 text-slate-500">
+                                    <span
+                                      className="h-2 w-2 shrink-0 rounded-full"
+                                      style={{ backgroundColor: getEquipeColor(i).hex }}
+                                    />
+                                    {eq.nome}
+                                  </span>
+                                  <strong className="text-slate-700 dark:text-slate-200">
+                                    {eq.exec}
+                                  </strong>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
                   <Line
                     type="monotone"
                     dataKey="exec"
