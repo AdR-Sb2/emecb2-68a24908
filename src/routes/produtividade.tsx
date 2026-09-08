@@ -1730,8 +1730,11 @@ function ProdutividadePage() {
         description: "Qualquer pessoa com o link pode ver o Dashboard sem login.",
         action: { label: "Abrir", onClick: () => window.open(url, "_blank") },
       });
-    } catch {
-      toast.error("Não foi possível gerar o link.");
+    } catch (err) {
+      console.error("Erro ao gerar link público:", err);
+      toast.error(
+        "Não foi possível gerar o link." + (err instanceof Error ? ` (${err.message})` : ""),
+      );
     }
   };
 
@@ -1740,7 +1743,8 @@ function ProdutividadePage() {
       await supabase.from("field_config").update({ link_publico_token: null }).eq("id", 1);
       setLinkToken(null);
       toast.success("Link público revogado.");
-    } catch {
+    } catch (err) {
+      console.error("Erro ao revogar link público:", err);
       toast.error("Não foi possível revogar o link.");
     }
   };

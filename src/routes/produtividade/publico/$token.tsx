@@ -26,6 +26,9 @@ function PublicoProdutividadePage() {
         .select("link_publico_token")
         .eq("id", 1)
         .maybeSingle();
+      if (error) {
+        console.error("Validação do link público falhou:", error);
+      }
       const ok = !error && data?.link_publico_token === token;
       setValido(ok);
       setLoading(false);
