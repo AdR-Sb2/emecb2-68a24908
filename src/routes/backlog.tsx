@@ -1877,7 +1877,7 @@ function BacklogPage() {
     const route = generatedRoutes[routeIdx];
     if (!route) return "";
     return [
-      `🚗 *ROTA ${routeIdx + 1}*`,
+      `*ROTA ${routeIdx + 1}*`,
       "",
       ...route.details.flatMap((d) => [
         `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S.)`,
