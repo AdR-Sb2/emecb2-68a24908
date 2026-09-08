@@ -213,17 +213,32 @@ export function DashboardComparacao() {
     return [...s].sort().reverse();
   }, [dias]);
 
+  // Só contam atividades de técnicos que estão em alguma equipe no dia.
+  const tecsPorDia = useMemo(() => {
+    const m = new Map<number, Set<number>>();
+    for (const eq of equipes) {
+      const s = m.get(eq.dia_id) || new Set<number>();
+      eq.tecnicos.forEach((t) => s.add(t));
+      m.set(eq.dia_id, s);
+    }
+    return m;
+  }, [equipes]);
+
+  const atividadesEquipe = useMemo(() => {
+    return atividades.filter((a) => tecsPorDia.get(a.dia_id)?.has(a.id_recurso) ?? false);
+  }, [atividades, tecsPorDia]);
+
   const osPorDia = useMemo(() => {
     return dias
       .map((d) => {
-        const dayAtiv = atividades.filter(
+        const dayAtiv = atividadesEquipe.filter(
           (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
         );
         const exec = dedupOS(dayAtiv).exec;
         return { data: d.data.slice(5), exec, total: dedupOS(dayAtiv).total };
       })
       .reverse();
-  }, [dias, atividades]);
+  }, [dias, atividadesEquipe]);
 
   const osPorEquipe = useMemo(() => {
     const byNome = new Map<
@@ -292,7 +307,7 @@ export function DashboardComparacao() {
   const composicaoPorDia = useMemo(() => {
     return dias
       .map((d) => {
-        const dayAtiv = atividades.filter(
+        const dayAtiv = atividadesEquipe.filter(
           (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
         );
         const row: Record<string, number | string> = { data: d.data.slice(5) };
@@ -307,10 +322,10 @@ export function DashboardComparacao() {
         return row;
       })
       .reverse();
-  }, [dias, atividades]);
+  }, [dias, atividadesEquipe]);
 
   const kpis = useMemo(() => {
-    const todasOs = atividades.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
+    const todasOs = atividadesEquipe.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
     const totalExec = dedupOS(todasOs).exec;
     const numDias = dias.length;
     const mediaDiaria = numDias > 0 ? totalExec / numDias : 0;
@@ -328,7 +343,7 @@ export function DashboardComparacao() {
       todasOs.length > 0 ? totalExec + dedupOS(todasOs).susp + dedupOS(todasOs).canc : 0;
     const taxa = total > 0 ? Math.round((totalExec / total) * 100) : 0;
     return { totalExec, mediaDiaria, corretivas, taxa };
-  }, [atividades, dias]);
+  }, [atividadesEquipe, dias]);
 
   const destaques = useMemo(() => {
     if (osPorEquipe.length === 0) return null;

@@ -484,9 +484,12 @@ function TipoServicoChart({
   filtroTipoAtivo: string | null;
 }) {
   const counts = useMemo(() => {
+    const tecSet = new Set<number>();
+    for (const eq of equipes) eq.tecnicos.forEach((t) => tecSet.add(t));
     const map: Record<string, number> = {};
     for (const k of TIPO_SERVICO_KEYS) map[k] = 0;
     for (const a of atividades) {
+      if (!tecSet.has(a.id_recurso)) continue;
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
       if (map[norm] !== undefined) map[norm]++;
     }
@@ -496,7 +499,7 @@ function TipoServicoChart({
       value: map[k],
       color: TIPO_SERVICO_COLORS[i],
     }));
-  }, [atividades]);
+  }, [atividades, equipes]);
 
   const tipoEquipes = useMemo(() => {
     const m: Record<string, Record<string, number>> = {};
