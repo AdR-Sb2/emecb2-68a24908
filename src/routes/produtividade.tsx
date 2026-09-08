@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useLocation, Outlet } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -9,10 +9,6 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Cell,
-  LineChart,
-  Line,
-  CartesianGrid,
-  Legend,
 } from "recharts";
 import {
   Upload,
@@ -31,10 +27,8 @@ import {
   Trash2,
   Users,
   Pencil,
-  Trophy,
-  Activity,
-  Wrench,
-  Percent,
+  Share2,
+  Link2Off,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,12 +59,21 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
+import { DashboardComparacao } from "@/components/produtividade-dashboard";
 
 const ProdutividadeMap = lazy(() => import("@/components/produtividade-map"));
 
 export const Route = createFileRoute("/produtividade")({
-  component: ProdutividadePage,
+  component: ProdutividadeLayout,
 });
+
+function ProdutividadeLayout() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/produtividade/publico/")) {
+    return <Outlet />;
+  }
+  return <ProdutividadePage />;
+}
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -1550,420 +1553,6 @@ function DayDetail({
   );
 }
 
-// ─── Dashboard Comparison ─────────────────────────────────────
-
-function DashboardComparacao() {
-  const [dias, setDias] = useState<FieldDia[]>([]);
-  const [atividades, setAtividades] = useState<FieldAtividade[]>([]);
-  const [equipes, setEquipes] = useState<FieldEquipe[]>([]);
-  const [periodo, setPeriodo] = useState<"7" | "30" | "mes">("7");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const now = new Date();
-      let startDate: string;
-      if (periodo === "7") {
-        startDate = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-      } else if (periodo === "30") {
-        startDate = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
-      } else {
-        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-      }
-
-      const diasRes = await supabase
-        .from("field_dias")
-        .select("*")
-        .gte("data", startDate)
-        .order("data", { ascending: false });
-      const diasData = (diasRes.data || []) as FieldDia[];
-      setDias(diasData);
-
-      if (diasData.length > 0) {
-        const diaIds = diasData.map((d) => d.id);
-        const [ativRes, eqRes] = await Promise.all([
-          supabase.from("field_atividades").select("*").in("dia_id", diaIds),
-          supabase.from("field_equipes").select("*").in("dia_id", diaIds),
-        ]);
-        setAtividades((ativRes.data || []) as FieldAtividade[]);
-        setEquipes((eqRes.data || []) as FieldEquipe[]);
-      } else {
-        setAtividades([]);
-        setEquipes([]);
-      }
-      setLoading(false);
-    };
-    load();
-  }, [periodo]);
-
-  const osPorDia = useMemo(() => {
-    return dias
-      .map((d) => {
-        const dayAtiv = atividades.filter(
-          (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
-        );
-        const exec = dedupOS(dayAtiv).exec;
-        return { data: d.data.slice(5), exec };
-      })
-      .reverse();
-  }, [dias, atividades]);
-
-  const osPorEquipe = useMemo(() => {
-    const byNome = new Map<
-      string,
-      {
-        nome: string;
-        exec: number;
-        susp: number;
-        canc: number;
-        total: number;
-        tecSet: Set<number>;
-        tipos: Record<string, number>;
-        corretivas: number;
-      }
-    >();
-    for (const eq of equipes) {
-      const techSet = new Set(eq.tecnicos);
-      const teamAtiv = atividades.filter(
-        (a) => a.dia_id === eq.dia_id && techSet.has(a.id_recurso),
-      );
-      const dedup = dedupOS(teamAtiv);
-      const nome = eq.nome_equipe.trim();
-      const cur = byNome.get(nome) || {
-        nome: eq.nome_equipe,
-        exec: 0,
-        susp: 0,
-        canc: 0,
-        total: 0,
-        tecSet: new Set<number>(),
-        tipos: {},
-        corretivas: 0,
-      };
-      cur.exec += dedup.exec;
-      cur.susp += dedup.susp;
-      cur.canc += dedup.canc;
-      cur.total += dedup.total;
-      eq.tecnicos.forEach((t) => cur.tecSet.add(t));
-      const vistos = new Set<string>();
-      for (const a of teamAtiv) {
-        const norm = (a.tipo_atividade || "").toUpperCase().trim();
-        if (normalizeStatus(a.status) !== "concluido") continue;
-        const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
-        if (vistos.has(key)) continue;
-        vistos.add(key);
-        const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
-        cur.tipos[label] = (cur.tipos[label] || 0) + 1;
-        if (norm === "MANUTENÇÃO CORRETIVA EMERGENCIAL") cur.corretivas++;
-      }
-      byNome.set(nome, cur);
-    }
-    return [...byNome.values()]
-      .map((r) => ({
-        nome: r.nome,
-        exec: r.exec,
-        susp: r.susp,
-        canc: r.canc,
-        total: r.total,
-        tecnicos: r.tecSet.size,
-        topTipo: (Object.entries(r.tipos).sort(([, a], [, b]) => b - a)[0]?.[0] as string) || "—",
-        corretivas: r.corretivas,
-      }))
-      .filter((r) => r.total > 0)
-      .sort((a, b) => b.exec - a.exec);
-  }, [atividades, equipes]);
-
-  const composicaoPorDia = useMemo(() => {
-    return dias
-      .map((d) => {
-        const dayAtiv = atividades.filter(
-          (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
-        );
-        const row: Record<string, number | string> = { data: d.data.slice(5) };
-        for (const k of TIPO_SERVICO_KEYS) {
-          row[TIPO_SERVICO_MAP[k]] = 0;
-        }
-        for (const a of dayAtiv) {
-          const norm = (a.tipo_atividade || "").toUpperCase().trim();
-          const label = TIPO_SERVICO_MAP[norm];
-          if (label && typeof row[label] === "number") row[label] = (row[label] as number) + 1;
-        }
-        return row;
-      })
-      .reverse();
-  }, [dias, atividades]);
-
-  const kpis = useMemo(() => {
-    const todasOs = atividades.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
-    const totalExec = dedupOS(todasOs).exec;
-    const numDias = dias.length;
-    const mediaDiaria = numDias > 0 ? totalExec / numDias : 0;
-    let corretivas = 0;
-    const corretivasVistas = new Set<string>();
-    for (const a of todasOs) {
-      if ((a.tipo_atividade || "").toUpperCase().trim() !== "MANUTENÇÃO CORRETIVA EMERGENCIAL")
-        continue;
-      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
-      if (corretivasVistas.has(key)) continue;
-      corretivasVistas.add(key);
-      corretivas++;
-    }
-    const total =
-      todasOs.length > 0 ? totalExec + dedupOS(todasOs).susp + dedupOS(todasOs).canc : 0;
-    const taxa = total > 0 ? Math.round((totalExec / total) * 100) : 0;
-    return { totalExec, mediaDiaria, corretivas, taxa };
-  }, [atividades, dias]);
-
-  const destaques = useMemo(() => {
-    if (osPorEquipe.length === 0) return null;
-    const maisProdutiva = osPorEquipe[0];
-    const maisConclusao = [...osPorEquipe].sort(
-      (a, b) => (a.total > 0 ? a.exec / a.total : 0) - (b.total > 0 ? b.exec / b.total : 0),
-    )[osPorEquipe.length - 1];
-    const maisCorretivas = [...osPorEquipe].sort((a, b) => b.corretivas - a.corretivas)[0];
-    return { maisProdutiva, maisConclusao, maisCorretivas };
-  }, [osPorEquipe]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1f7ad6]" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-500">Período:</span>
-        {(["7", "30", "mes"] as const).map((p) => (
-          <Button
-            key={p}
-            variant={periodo === p ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-[11px]"
-            onClick={() => setPeriodo(p)}
-          >
-            {p === "7" ? "Últimos 7 dias" : p === "30" ? "Últimos 30 dias" : "Este mês"}
-          </Button>
-        ))}
-      </div>
-
-      {osPorDia.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-8">
-          Nenhum dado encontrado para o período.
-        </p>
-      ) : (
-        <>
-          {/* KPIs do período */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Card className="shadow-sm">
-              <CardContent className="flex items-center gap-3 p-3">
-                <ClipboardList className="h-8 w-8 shrink-0 text-[#0b3a73]" />
-                <div>
-                  <div className="text-2xl font-bold">{kpis.totalExec}</div>
-                  <div className="text-[11px] text-slate-500">OS Executadas</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="flex items-center gap-3 p-3">
-                <Activity className="h-8 w-8 shrink-0 text-violet-600" />
-                <div>
-                  <div className="text-2xl font-bold">{kpis.mediaDiaria.toFixed(1)}</div>
-                  <div className="text-[11px] text-slate-500">Média diária</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="flex items-center gap-3 p-3">
-                <Wrench className="h-8 w-8 shrink-0 text-red-500" />
-                <div>
-                  <div className="text-2xl font-bold">{kpis.corretivas}</div>
-                  <div className="text-[11px] text-slate-500">Corretivas emerg.</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="flex items-center gap-3 p-3">
-                <Percent className="h-8 w-8 shrink-0 text-emerald-600" />
-                <div>
-                  <div className="text-2xl font-bold">{kpis.taxa}%</div>
-                  <div className="text-[11px] text-slate-500">Taxa de conclusão</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">OS Executadas por Dia</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={osPorDia}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="data" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <RechartsTooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="exec"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    name="Executadas"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">OS Executadas por Equipe</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={Math.max(150, osPorEquipe.length * 35)}>
-                <BarChart data={osPorEquipe} layout="vertical" margin={{ left: 10, right: 30 }}>
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="nome" width={120} tick={{ fontSize: 11 }} />
-                  <RechartsTooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload as (typeof osPorEquipe)[number];
-                      return (
-                        <div className="min-w-[190px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
-                          <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">
-                            {d.nome}
-                          </div>
-                          <div className="space-y-0.5 text-slate-600 dark:text-slate-300">
-                            <div>
-                              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 mr-1" />
-                              Executadas: <strong>{d.exec}</strong>
-                            </div>
-                            <div>
-                              <span className="inline-block h-2 w-2 rounded-full bg-amber-500 mr-1" />
-                              Suspensas: <strong>{d.susp}</strong>
-                            </div>
-                            <div>
-                              <span className="inline-block h-2 w-2 rounded-full bg-red-500 mr-1" />
-                              Canceladas: <strong>{d.canc}</strong>
-                            </div>
-                            <div className="pt-1 text-slate-500">
-                              Tipo mais executado: <strong>{d.topTipo}</strong>
-                            </div>
-                            <div className="text-slate-500">
-                              Técnicos: <strong>{d.tecnicos}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="exec" radius={[0, 4, 4, 0]}>
-                    {osPorEquipe.map((_, i) => (
-                      <Cell key={i} fill={getEquipeColor(i).hex} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Composição por tipo no período */}
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">
-                Composição de OS por Tipo de Serviço
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={composicaoPorDia}
-                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="data" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <RechartsTooltip />
-                  <Legend />
-                  {TIPO_SERVICO_KEYS.map((k, i) => (
-                    <Bar
-                      key={k}
-                      dataKey={TIPO_SERVICO_MAP[k]}
-                      stackId="tipo"
-                      fill={TIPO_SERVICO_COLORS[i]}
-                      radius={i === TIPO_SERVICO_KEYS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Destaques */}
-          {destaques && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Card className="shadow-sm border-amber-200 bg-amber-50">
-                <CardContent className="flex items-start gap-3 p-4">
-                  <Trophy className="mt-0.5 h-8 w-8 shrink-0 text-amber-600" />
-                  <div>
-                    <div className="text-xs font-semibold text-amber-800">
-                      Mais corretivas emergenciais
-                    </div>
-                    <div className="text-lg font-bold text-amber-700">
-                      {destaques.maisCorretivas.nome}
-                    </div>
-                    <div className="text-xs text-amber-600">
-                      {destaques.maisCorretivas.corretivas} corretivas
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="shadow-sm border-emerald-200 bg-emerald-50">
-                <CardContent className="flex items-start gap-3 p-4">
-                  <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-emerald-600" />
-                  <div>
-                    <div className="text-xs font-semibold text-emerald-800">
-                      Maior taxa de conclusão
-                    </div>
-                    <div className="text-lg font-bold text-emerald-700">
-                      {destaques.maisConclusao.nome}
-                    </div>
-                    <div className="text-xs text-emerald-600">
-                      {destaques.maisConclusao.total > 0
-                        ? Math.round(
-                            (destaques.maisConclusao.exec / destaques.maisConclusao.total) * 100,
-                          )
-                        : 0}
-                      % concluídas
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="shadow-sm border-blue-200 bg-blue-50">
-                <CardContent className="flex items-start gap-3 p-4">
-                  <Activity className="mt-0.5 h-8 w-8 shrink-0 text-blue-600" />
-                  <div>
-                    <div className="text-xs font-semibold text-blue-800">Equipe mais produtiva</div>
-                    <div className="text-lg font-bold text-blue-700">
-                      {destaques.maisProdutiva.nome}
-                    </div>
-                    <div className="text-xs text-blue-600">
-                      {destaques.maisProdutiva.exec} OS executadas no período
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────
 
 function ProdutividadePage() {
@@ -1975,6 +1564,50 @@ function ProdutividadePage() {
   const [tab, setTab] = useState<"dias" | "dashboard">("dias");
   const [gerenciarOpen, setGerenciarOpen] = useState(false);
   const [recursosToSave, setRecursosToSave] = useState<Record<string, string>>({});
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("field_config")
+          .select("link_publico_token")
+          .eq("id", 1)
+          .single();
+        setLinkToken(data?.link_publico_token ?? null);
+      } catch {
+        setLinkToken(null);
+      }
+    })();
+  }, []);
+
+  const gerarLinkPublico = async () => {
+    const token = crypto.randomUUID();
+    const url = `${window.location.origin}/produtividade/publico/${token}`;
+    try {
+      await supabase
+        .from("field_config")
+        .upsert({ id: 1, link_publico_token: token }, { onConflict: "id" });
+      setLinkToken(token);
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      toast.success("Link público copiado!", {
+        description: "Qualquer pessoa com o link pode ver o Dashboard sem login.",
+        action: { label: "Abrir", onClick: () => window.open(url, "_blank") },
+      });
+    } catch {
+      toast.error("Não foi possível gerar o link.");
+    }
+  };
+
+  const revogarLinkPublico = async () => {
+    try {
+      await supabase.from("field_config").update({ link_publico_token: null }).eq("id", 1);
+      setLinkToken(null);
+      toast.success("Link público revogado.");
+    } catch {
+      toast.error("Não foi possível revogar o link.");
+    }
+  };
 
   const loadDias = useCallback(async () => {
     setLoading(true);
@@ -2123,7 +1756,27 @@ function ProdutividadePage() {
               <p className="truncate text-sm text-cyan-50/90">Produtividade de Campo</p>
             </div>
           </div>
-          <NavVoltarHome />
+          <div className="flex items-center gap-2">
+            {linkToken ? (
+              <Button
+                variant="outline"
+                onClick={revogarLinkPublico}
+                className="border-white/30 bg-white/10 text-white hover:bg-white/20"
+                title="Este é o link público atual; clique para revogar."
+              >
+                <Link2Off className="mr-1 h-4 w-4" /> Link Ativo
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={gerarLinkPublico}
+                className="border-white/30 bg-white/10 text-white hover:bg-white/20"
+              >
+                <Share2 className="mr-1 h-4 w-4" /> Link
+              </Button>
+            )}
+            <NavVoltarHome />
+          </div>
         </div>
       </div>
 

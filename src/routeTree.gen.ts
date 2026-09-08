@@ -33,6 +33,7 @@ import { Route as ApiEquipeOverrideRouteImport } from './routes/api/equipe-overr
 import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
 import { Route as CronogramaPublicoTokenRouteImport } from './routes/cronograma/publico/$token'
 import { Route as ElevatoriasPublicoTokenRouteImport } from './routes/elevatorias/publico/$token'
+import { Route as ProdutividadePublicoTokenRouteImport } from './routes/produtividade/publico/$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -154,6 +155,12 @@ const ElevatoriasPublicoTokenRoute = ElevatoriasPublicoTokenRouteImport.update({
   path: '/publico/$token',
   getParentRoute: () => ElevatoriasRoute,
 } as any)
+const ProdutividadePublicoTokenRoute =
+  ProdutividadePublicoTokenRouteImport.update({
+    id: '/publico/$token',
+    path: '/publico/$token',
+    getParentRoute: () => ProdutividadeRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -171,7 +178,7 @@ export interface FileRoutesByFullPath {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
-  '/produtividade': typeof ProdutividadeRoute
+  '/produtividade': typeof ProdutividadeRouteWithChildren
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/elevatorias/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
   '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
+  '/produtividade/publico/$token': typeof ProdutividadePublicoTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -197,7 +205,7 @@ export interface FileRoutesByTo {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
-  '/produtividade': typeof ProdutividadeRoute
+  '/produtividade': typeof ProdutividadeRouteWithChildren
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
@@ -206,6 +214,7 @@ export interface FileRoutesByTo {
   '/elevatorias/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
   '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
+  '/produtividade/publico/$token': typeof ProdutividadePublicoTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -224,7 +233,7 @@ export interface FileRoutesById {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
-  '/produtividade': typeof ProdutividadeRoute
+  '/produtividade': typeof ProdutividadeRouteWithChildren
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
   '/relatorio': typeof RelatorioRoute
@@ -233,6 +242,7 @@ export interface FileRoutesById {
   '/elevatorias_/$id': typeof ElevatoriasIdRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
   '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
+  '/produtividade/publico/$token': typeof ProdutividadePublicoTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/elevatorias/$id'
     | '/cronograma/publico/$token'
     | '/elevatorias/publico/$token'
+    | '/produtividade/publico/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/elevatorias/$id'
     | '/cronograma/publico/$token'
     | '/elevatorias/publico/$token'
+    | '/produtividade/publico/$token'
   id:
     | '__root__'
     | '/'
@@ -313,6 +325,7 @@ export interface FileRouteTypes {
     | '/elevatorias_/$id'
     | '/cronograma/publico/$token'
     | '/elevatorias/publico/$token'
+    | '/produtividade/publico/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -331,7 +344,7 @@ export interface RootRouteChildren {
   ManuaisAvaliacaoRoute: typeof ManuaisAvaliacaoRoute
   OiRoute: typeof OiRoute
   PendingRoute: typeof PendingRoute
-  ProdutividadeRoute: typeof ProdutividadeRoute
+  ProdutividadeRoute: typeof ProdutividadeRouteWithChildren
   RegisterRoute: typeof RegisterRoute
   RegistrosRoute: typeof RegistrosRoute
   RelatorioRoute: typeof RelatorioRoute
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ElevatoriasPublicoTokenRouteImport
       parentRoute: typeof ElevatoriasRoute
     }
+    '/produtividade/publico/$token': {
+      id: '/produtividade/publico/$token'
+      path: '/publico/$token'
+      fullPath: '/produtividade/publico/$token'
+      preLoaderRoute: typeof ProdutividadePublicoTokenRouteImport
+      parentRoute: typeof ProdutividadeRoute
+    }
   }
 }
 
@@ -537,6 +557,18 @@ const ElevatoriasRouteWithChildren = ElevatoriasRoute._addFileChildren(
   ElevatoriasRouteChildren,
 )
 
+interface ProdutividadeRouteChildren {
+  ProdutividadePublicoTokenRoute: typeof ProdutividadePublicoTokenRoute
+}
+
+const ProdutividadeRouteChildren: ProdutividadeRouteChildren = {
+  ProdutividadePublicoTokenRoute: ProdutividadePublicoTokenRoute,
+}
+
+const ProdutividadeRouteWithChildren = ProdutividadeRoute._addFileChildren(
+  ProdutividadeRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -553,7 +585,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManuaisAvaliacaoRoute: ManuaisAvaliacaoRoute,
   OiRoute: OiRoute,
   PendingRoute: PendingRoute,
-  ProdutividadeRoute: ProdutividadeRoute,
+  ProdutividadeRoute: ProdutividadeRouteWithChildren,
   RegisterRoute: RegisterRoute,
   RegistrosRoute: RegistrosRoute,
   RelatorioRoute: RelatorioRoute,
