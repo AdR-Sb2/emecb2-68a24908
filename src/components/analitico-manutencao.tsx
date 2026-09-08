@@ -13,6 +13,7 @@ import {
   ChevronUp,
   ChevronsUpDown,
   Clock,
+  ListChecks,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
@@ -241,6 +242,26 @@ function formatDate(d: string | null): string {
   const parts = d.slice(0, 10).split("-");
   if (parts.length !== 3) return d;
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function isoMes(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function mesAnteriorISO(): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return isoMes(d);
+}
+
+function mesAtualISO(): string {
+  return isoMes(new Date());
+}
+
+function ultimoDiaMesCompacto(mes: string): string {
+  const [y, m] = mes.split("-").map(Number);
+  return String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0");
 }
 
 function isoDaysAtras(dias: number): string {
@@ -716,9 +737,7 @@ function TooltipTendencia({
       <p className="mb-1 font-bold text-slate-700 dark:text-slate-200">
         {formatMesLabel(ponto.mes)}
       </p>
-      <p className="text-[#1f7ad6] dark:text-[#60a5fa]">
-        Total executadas: {ponto.total}
-      </p>
+      <p className="text-[#1f7ad6] dark:text-[#60a5fa]">Total executadas: {ponto.total}</p>
       <p className="text-emerald-600 dark:text-emerald-400">
         Preventiva válida: {ponto.preventiva}
       </p>
@@ -755,6 +774,13 @@ export function AnaliticoManutencao() {
   const [exportando, setExportando] = useState(false);
   const [modalExport, setModalExport] = useState<"pdf" | "excel" | null>(null);
   const [escopoExportacao, setEscopoExportacao] = useState<"todas" | "aparecendo">("aparecendo");
+  const [modalExportOS, setModalExportOS] = useState(false);
+  const [periodoTipo, setPeriodoTipo] = useState<"mes" | "periodo" | "ano">("mes");
+  const [periodoMes, setPeriodoMes] = useState<string>(mesAnteriorISO());
+  const [periodoInicio, setPeriodoInicio] = useState<string>(mesAnteriorISO());
+  const [periodoFim, setPeriodoFim] = useState<string>(mesAtualISO());
+  const [periodoAno, setPeriodoAno] = useState<string>(String(new Date().getFullYear()));
+  const [exportandoOS, setExportandoOS] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -1145,6 +1171,201 @@ export function AnaliticoManutencao() {
     }
   };
 
+  const resolverPeriodoOS = (): { inicio: string; fim: string } | null => {
+    if (periodoTipo === "mes") {
+      const mes = periodoMes.trim();
+      if (!/^\d{4}-\d{2}$/.test(mes)) return null;
+      return { inicio: `${mes}-01`, fim: `${mes}-${ultimoDiaMesCompacto(mes)}` };
+    }
+    if (periodoTipo === "periodo") {
+      const ini = periodoInicio.trim();
+      const fim = periodoFim.trim();
+      if (!/^\d{4}-\d{2}$/.test(ini) || !/^\d{4}-\d{2}$/.test(fim)) return null;
+      if (ini > fim) return null;
+      return { inicio: `${ini}-01`, fim: `${fim}-${ultimoDiaMesCompacto(fim)}` };
+    }
+    const ano = periodoAno.trim();
+    if (!/^\d{4}$/.test(ano)) return null;
+    return { inicio: `${ano}-01-01`, fim: `${ano}-12-31` };
+  };
+
+  const exportarListaOS = async () => {
+    const periodo = resolverPeriodoOS();
+    if (!periodo) {
+      toast.error("Informe um período válido antes de exportar.");
+      return;
+    }
+    setExportandoOS(true);
+    try {
+      let res = await supabase.rpc("analitico_os_detalhes", {
+        data_inicio: periodo.inicio,
+        data_fim: periodo.fim,
+      });
+      if (res.error) {
+        const alt = await supabase.rpc("analitico_os_detalhes", { janela_meses: 480 });
+        if (alt.error) throw alt.error;
+        res = alt;
+      }
+      const nomePorId = new Map(
+        dados.map((l) => [l.elevatoria_id, l.nome || l.planta || `#${l.elevatoria_id}`]),
+      );
+      const categorias: Array<{
+        key: keyof DetalhesOSPorElevatoria;
+        label: string;
+      }> = [
+        { key: "preventiva", label: "Preventiva" },
+        { key: "corretiva", label: "Corretiva / Emergencial" },
+        { key: "ztpc", label: "P. Condição (ZTPC)" },
+      ];
+      const linhas: Array<{
+        elevatoria: string;
+        categoria: string;
+        ordem: string;
+        texto: string;
+        entrada: string | null;
+        fechada: string | null;
+        inicioSla: string | null;
+        fimSla: string | null;
+      }> = [];
+      for (const r of (res.data ?? []) as Array<{
+        elevatoria_id: number;
+        preventiva: DetalheOS[] | null;
+        corretiva: DetalheOS[] | null;
+        ztpc: DetalheOS[] | null;
+      }>) {
+        const nome = nomePorId.get(Number(r.elevatoria_id)) ?? `Elevatória #${r.elevatoria_id}`;
+        for (const c of categorias) {
+          for (const d of r[c.key] ?? []) {
+            const entrada = d.data_entrada ? d.data_entrada.slice(0, 10) : "";
+            if (entrada && (entrada < periodo.inicio || entrada > periodo.fim)) continue;
+            linhas.push({
+              elevatoria: nome,
+              categoria: c.label,
+              ordem: d.ordem,
+              texto: d.texto_breve ?? "",
+              entrada: d.data_entrada,
+              fechada: d.data_fechada,
+              inicioSla: d.inicio_sla,
+              fimSla: d.fim_sla,
+            });
+          }
+        }
+      }
+      linhas.sort(
+        (a, b) =>
+          a.elevatoria.localeCompare(b.elevatoria, "pt-BR") ||
+          (a.entrada ?? "").localeCompare(b.entrada ?? "") ||
+          a.ordem.localeCompare(b.ordem),
+      );
+      const { default: ExcelJS } = await import("exceljs");
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "EMEC Baixada 2";
+      const ws = wb.addWorksheet("Lista de O.S.");
+      const AZUL = "002d74";
+      const BRANCO = "FFFFFF";
+      const CINZA = "F1F5F9";
+      const PRETO = "1E293B";
+      const TITULOS = [
+        "Elevatória",
+        "Categoria",
+        "Ordem",
+        "Texto Resumo",
+        "Data Entrada",
+        "Data Fechada",
+        "Início do SLA",
+        "Fim do SLA",
+      ];
+      const numColunas = TITULOS.length;
+      const periodoLabel =
+        periodoTipo === "mes"
+          ? `Mês: ${periodo.inicio.slice(0, 7)}`
+          : periodoTipo === "periodo"
+            ? `Período: ${periodo.inicio.slice(0, 7)} a ${periodo.fim.slice(0, 7)}`
+            : `Ano: ${periodo.inicio.slice(0, 4)}`;
+      ws.mergeCells(1, 1, 1, numColunas);
+      const titulo = ws.getCell("A1");
+      titulo.value = "LISTA DE ORDENS DE SERVIÇO";
+      titulo.font = { name: "Calibri", size: 14, bold: true, color: { argb: BRANCO } };
+      titulo.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+      titulo.alignment = { horizontal: "center", vertical: "middle" };
+      ws.getRow(1).height = 26;
+      ws.mergeCells(2, 1, 2, numColunas);
+      const sub = ws.getCell("A2");
+      sub.value =
+        `EMEC Baixada 2 - Águas do Rio | ${periodoLabel} | ${linhas.length} O.S. | ` +
+        `Gerado em ${new Date().toLocaleString("pt-BR")}`;
+      sub.font = { name: "Calibri", size: 10, italic: true, color: { argb: PRETO } };
+      sub.alignment = { horizontal: "center", vertical: "middle" };
+      ws.getRow(2).height = 20;
+      TITULOS.forEach((col, i) => {
+        const cell = ws.getCell(4, i + 1);
+        cell.value = col;
+        cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: BRANCO } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      });
+      let r = 5;
+      for (const l of linhas) {
+        const vals = [
+          l.elevatoria,
+          l.categoria,
+          l.ordem,
+          l.texto,
+          l.entrada ? formatDate(l.entrada) : "—",
+          l.fechada ? formatDate(l.fechada) : "—",
+          l.inicioSla || "—",
+          l.fimSla || "—",
+        ];
+        vals.forEach((v, i) => {
+          const cell = ws.getCell(r, i + 1);
+          cell.value = v;
+          cell.font = { name: "Calibri", size: 10 };
+          cell.alignment = { vertical: "middle", wrapText: true };
+        });
+        r++;
+      }
+      if (linhas.length === 0) {
+        ws.mergeCells(r, 1, r, numColunas);
+        const vazio = ws.getCell(r, 1);
+        vazio.value = "Nenhuma O.S. encontrada no período selecionado.";
+        vazio.font = { name: "Calibri", size: 10, italic: true, color: { argb: PRETO } };
+        vazio.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CINZA } };
+      }
+      ws.getColumn(1).width = 32;
+      ws.getColumn(2).width = 24;
+      ws.getColumn(3).width = 16;
+      ws.getColumn(4).width = 55;
+      ws.getColumn(5).width = 14;
+      ws.getColumn(6).width = 14;
+      ws.getColumn(7).width = 14;
+      ws.getColumn(8).width = 14;
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lista-os-${periodo.inicio}-${periodo.fim}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setTimeout(() => setModalExportOS(false), 200);
+      if (linhas.length === 0) {
+        toast.warning("Nenhuma O.S. encontrada no período selecionado.");
+      } else {
+        toast.success(`Lista de O.S. exportada (${linhas.length} ordens)!`);
+      }
+    } catch (err) {
+      toast.error(
+        "Erro ao exportar lista de O.S.: " + (err instanceof Error ? err.message : "desconhecido"),
+      );
+    } finally {
+      setExportandoOS(false);
+    }
+  };
+
   if (loading && !dados.length) {
     return (
       <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
@@ -1184,6 +1405,19 @@ export function AnaliticoManutencao() {
               className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] disabled:opacity-60"
             >
               <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
+            </button>
+            <button
+              onClick={() => setModalExportOS(true)}
+              disabled={exportandoOS}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#1f7ad6] px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-[#1870c4] disabled:opacity-60"
+              title="Exportar a lista de ordens de serviço em Excel, escolhendo o período"
+            >
+              {exportandoOS ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ListChecks className="h-4 w-4" />
+              )}
+              Exportar O.S.
             </button>
             <button
               onClick={() => setModalExport("pdf")}
@@ -1725,6 +1959,128 @@ export function AnaliticoManutencao() {
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               Cancelar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ==== MODAL DE EXPORTAÇÃO DA LISTA DE O.S. ==== */}
+      <Dialog open={modalExportOS} onOpenChange={(o) => !o && setModalExportOS(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exportar lista de O.S.</DialogTitle>
+            <DialogDescription>
+              Escolha o período das ordens de serviço e exporte em Excel.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {(
+              [
+                {
+                  key: "mes" as const,
+                  titulo: "Mês específico",
+                  desc: "Todas as O.S. de um único mês, ex.: junho/2026.",
+                },
+                {
+                  key: "periodo" as const,
+                  titulo: "Período personalizado",
+                  desc: "Vários meses, definindo 'De' até 'Até', ex.: jan a jun/2026.",
+                },
+                {
+                  key: "ano" as const,
+                  titulo: "Ano inteiro",
+                  desc: "Todas as O.S. de um ano completo, ex.: 2026.",
+                },
+              ] as const
+            ).map((op) => (
+              <button
+                key={op.key}
+                type="button"
+                onClick={() => setPeriodoTipo(op.key)}
+                className={`rounded-lg border p-3 text-left transition ${
+                  periodoTipo === op.key
+                    ? "border-[#1f7ad6] bg-[#eaf3fb] ring-1 ring-[#1f7ad6]/40 dark:bg-slate-700"
+                    : "border-slate-200 bg-white hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
+                }`}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-[#0b3a73] dark:text-white">
+                    {op.titulo}
+                  </span>
+                  {periodoTipo === op.key && <Check className="h-4 w-4 shrink-0 text-[#1f7ad6]" />}
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                  {op.desc}
+                </span>
+              </button>
+            ))}
+          </div>
+          {periodoTipo === "mes" && (
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Mês específico
+              </label>
+              <Input
+                type="month"
+                value={periodoMes}
+                onChange={(e) => setPeriodoMes(e.target.value)}
+              />
+            </div>
+          )}
+          {periodoTipo === "periodo" && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1.5">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">De</label>
+                <Input
+                  type="month"
+                  value={periodoInicio}
+                  onChange={(e) => setPeriodoInicio(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Até
+                </label>
+                <Input
+                  type="month"
+                  value={periodoFim}
+                  onChange={(e) => setPeriodoFim(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          {periodoTipo === "ano" && (
+            <div className="grid gap-1.5">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Ano</label>
+              <Input
+                type="number"
+                min={2000}
+                max={new Date().getFullYear()}
+                value={periodoAno}
+                onChange={(e) => setPeriodoAno(e.target.value)}
+              />
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:justify-between">
+            <button
+              type="button"
+              onClick={() => setModalExportOS(false)}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void exportarListaOS()}
+              disabled={exportandoOS}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#1f7ad6] px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-[#1870c4] disabled:opacity-60"
+            >
+              {exportandoOS ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
+              Exportar
             </button>
           </DialogFooter>
         </DialogContent>
