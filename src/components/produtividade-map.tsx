@@ -264,6 +264,8 @@ export default function ProdutividadeMap({
 
     for (const at of atividades) {
       if (isAtividadeAdministrativa(at.tipo_atividade)) continue;
+      // Só considera atividades de técnicos que estão em equipe
+      if (!resourceToEquipe.has(at.id_recurso)) continue;
       if (!at.planta) continue;
       tentadas++;
 
