@@ -29,6 +29,7 @@ import {
   Pencil,
   Share2,
   Link2Off,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -177,6 +178,8 @@ const TIPO_SERVICO_KEYS = Object.keys(TIPO_SERVICO_MAP);
 
 const TIPO_SERVICO_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6"];
 
+const CAPACIDADE_PADRAO_HORAS = 10;
+
 function getEquipeColor(idx: number) {
   return EQUIPE_COLORS[idx % EQUIPE_COLORS.length];
 }
@@ -194,41 +197,41 @@ function isAtividadeAdministrativa(tipo: string | null | undefined): boolean {
   return ATIVIDADES_ADMINISTRATIVAS.includes(tipo.toUpperCase().trim());
 }
 
-function adminLabel(tipo: string): string {
-  const t = tipo.toUpperCase().trim();
-  const map: Record<string, string> = {
-    DDS: "DDS",
-    ALMOÇO: "Almoço",
-    ALMOCO: "Almoço",
-    "RETORNO PARA BASE": "Retorno para base",
-    "MONTAR EQUIPE": "Montar equipe",
-    "SEPARAR MATERIAL / FERRAMENTA": "Separar material",
-    "SEPARAR MATERIAL / FERRAMENTAS": "Separar material",
-    FEEDBACK: "Feedback",
-    "PROBLEMAS COM VEÍCULO": "Problemas com veículo",
-    "PROBLEMAS COM VEICULO": "Problemas com veículo",
-    REUNIÃO: "Reuniões",
-    REUNIÕES: "Reuniões",
-    REUNIAO: "Reuniões",
-    TREINAMENTO: "Treinamento",
-  };
-  return map[t] || t.charAt(0) + t.slice(1).toLowerCase();
+function breakdownHoras(atividades: FieldAtividade[]): {
+  os: number;
+  dds: number;
+  almoco: number;
+  desloc: number;
+  outras: number;
+} {
+  const b = { os: 0, dds: 0, almoco: 0, desloc: 0, outras: 0 };
+  for (const a of atividades) {
+    const m = durMin(a);
+    if (m <= 0) continue;
+    const norm = (a.tipo_atividade || "").toUpperCase().trim();
+    if (norm === "DDS") b.dds += m;
+    else if (norm === "ALMOÇO" || norm === "ALMOCO") b.almoco += m;
+    else if (norm === "RETORNO PARA BASE") b.desloc += m;
+    else if (isAtividadeAdministrativa(a.tipo_atividade)) b.outras += m;
+    else b.os += m;
+  }
+  return b;
 }
 
-function calcIndisponibilidade(atividades: FieldAtividade[]): {
-  total: number;
-  detalhe: Record<string, number>;
-} {
+function horasTrabalhadasMin(atividades: FieldAtividade[]): number {
   let total = 0;
-  const detalhe: Record<string, number> = {};
-  for (const a of atividades) {
-    if (!isAtividadeAdministrativa(a.tipo_atividade)) continue;
-    const label = adminLabel(a.tipo_atividade || "");
-    const m = durMin(a);
-    total += m;
-    detalhe[label] = (detalhe[label] || 0) + m;
-  }
-  return { total, detalhe };
+  for (const a of atividades) total += durMin(a);
+  return total;
+}
+
+function formatHorasCap(horas: number): string {
+  if (!Number.isFinite(horas) || horas < 0) horas = 0;
+  const totalMin = Math.round(horas * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0 && m === 0) return "0h";
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, "0")}min`;
 }
 
 function formatTime(h: string | null | undefined): string {
@@ -240,7 +243,13 @@ function diffMinutes(inicio: string | null, fim: string | null): number {
   if (!inicio || !fim) return 0;
   const [h1, m1] = inicio.split(":").map(Number);
   const [h2, m2] = fim.split(":").map(Number);
-  return Math.max(0, h2 * 60 + m2 - (h1 * 60 + m1));
+  if (!Number.isFinite(h1) || !Number.isFinite(h2) || !Number.isFinite(m1) || !Number.isFinite(m2))
+    return 0;
+  const start = h1 * 60 + m1;
+  let end = h2 * 60 + m2;
+  // Virada de meia-noite: se o Fim for menor que o Início, soma 24h ao Fim.
+  if (end < start) end += 24 * 60;
+  return end - start;
 }
 
 function durMin(a: FieldAtividade): number {
@@ -597,6 +606,7 @@ function EquipeSection({
   recursosMap,
   metaOS,
   filtroTipoAtivo,
+  capMap,
 }: {
   equipe: FieldEquipe;
   atividades: FieldAtividade[];
@@ -606,6 +616,7 @@ function EquipeSection({
   recursosMap: Map<number, string>;
   metaOS: number;
   filtroTipoAtivo: string | null;
+  capMap: Map<number, number>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const color = getEquipeColor(equipeIdx);
@@ -679,7 +690,10 @@ function EquipeSection({
       if (techDedup.total > 0) {
         status = techDedup.exec >= metaOS ? "verde" : "amarelo";
       }
-      const indisp = calcIndisponibilidade(techAtividades);
+      const trabalhadasMin = horasTrabalhadasMin(techAtividades);
+      const capHoras = capMap.get(tecId) ?? CAPACIDADE_PADRAO_HORAS;
+      const ociosasMin = Math.round(capHoras * 60) - trabalhadasMin;
+      const breakdown = breakdownHoras(techAtividades);
       return {
         tecId,
         nome: recursosMap.get(tecId) || String(tecId),
@@ -689,13 +703,18 @@ function EquipeSection({
         tempoCorretiva,
         tipos,
         status,
-        indispMin: indisp.total,
-        indispDetalhe: indisp.detalhe,
+        trabalhadasMin,
+        capHoras,
+        ociosasMin,
+        breakdown,
       };
     });
-  }, [equipe.tecnicos, equipeAtividades, recursosMap, metaOS]);
+  }, [equipe.tecnicos, equipeAtividades, recursosMap, metaOS, capMap]);
 
-  const indispEquipe = useMemo(() => calcIndisponibilidade(equipeAtividades), [equipeAtividades]);
+  const trabalhadasEquipe = useMemo(
+    () => horasTrabalhadasMin(equipeAtividades),
+    [equipeAtividades],
+  );
 
   const suspensas = equipeDedup.osIds.filter((om) => {
     const statuses = equipeAtividades
@@ -763,7 +782,9 @@ function EquipeSection({
                   <th className="pb-1 pr-2 text-center font-semibold text-slate-500">Canc</th>
                   <th className="pb-1 pr-2 font-semibold text-slate-500">Almoço</th>
                   <th className="pb-1 pr-2 font-semibold text-slate-500">Corretiva</th>
-                  <th className="pb-1 pr-2 font-semibold text-slate-500">Indisponível</th>
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Horas Trabalhadas</th>
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Cap.</th>
+                  <th className="pb-1 pr-2 font-semibold text-slate-500">Horas Ociosas</th>
                   <th className="pb-1 font-semibold text-slate-500">Áreas</th>
                 </tr>
               </thead>
@@ -798,32 +819,63 @@ function EquipeSection({
                     <td className="py-1.5 pr-2 text-slate-600">
                       {td.tempoCorretiva > 0 ? formatDuracao(td.tempoCorretiva) : "—"}
                     </td>
-                    <td className="py-1.5 pr-2 text-slate-600">
-                      {td.indispMin > 0 ? (
-                        <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">
-                              {formatDuracao(td.indispMin)}
-                            </TooltipTrigger>
-                            <TooltipContent className="min-w-[200px]">
-                              <div className="space-y-1">
-                                {Object.entries(td.indispDetalhe)
-                                  .sort(([, a], [, b]) => b - a)
-                                  .map(([k, v]) => (
-                                    <div
-                                      key={k}
-                                      className="flex w-full items-center justify-between gap-4"
-                                    >
-                                      <span>{k}</span>
-                                      <strong>{formatDuracao(v)}</strong>
-                                    </div>
-                                  ))}
+                    <td className="py-1.5 pr-2 text-slate-700 dark:text-slate-200">
+                      <TooltipProvider delayDuration={100}>
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">
+                            {formatDuracao(td.trabalhadasMin)}
+                          </TooltipTrigger>
+                          <TooltipContent className="min-w-[220px]">
+                            <div className="space-y-1 text-[11px]">
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span>OS Técnicas</span>
+                                <strong>{formatDuracao(td.breakdown.os)}</strong>
                               </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span>DDS</span>
+                                <strong>{formatDuracao(td.breakdown.dds)}</strong>
+                              </div>
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span>Almoço</span>
+                                <strong>{formatDuracao(td.breakdown.almoco)}</strong>
+                              </div>
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span>Deslocamento (Retorno para Base)</span>
+                                <strong>{formatDuracao(td.breakdown.desloc)}</strong>
+                              </div>
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span>Outras</span>
+                                <strong>{formatDuracao(td.breakdown.outras)}</strong>
+                              </div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </td>
+                    <td className="py-1.5 pr-2 text-slate-600">{formatHorasCap(td.capHoras)}</td>
+                    <td className="py-1.5 pr-2 whitespace-nowrap">
+                      {td.ociosasMin < 0 ? (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span
+                            className="cursor-help underline decoration-dotted underline-offset-2"
+                            title="Técnico trabalhou além da capacidade"
+                          >
+                            0h 00min
+                          </span>
+                        </span>
                       ) : (
-                        "—"
+                        <span
+                          className={
+                            td.ociosasMin > 60
+                              ? "font-medium text-red-600"
+                              : td.ociosasMin >= 30
+                                ? "font-medium text-amber-600"
+                                : "font-medium text-emerald-600"
+                          }
+                        >
+                          {formatDuracao(td.ociosasMin)}
+                        </span>
                       )}
                     </td>
                     <td className="py-1.5 text-slate-500">
@@ -872,7 +924,7 @@ function EquipeSection({
                 Almoço: {almocoEquipe > 0 ? formatDuracao(almocoEquipe) : "Sem almoço"}
               </span>
               <span className="text-slate-500">
-                Indisponível: {formatDuracao(indispEquipe.total)}
+                Horas trabalhadas: {formatDuracao(trabalhadasEquipe)}
               </span>
             </div>
             {Object.keys(tiposEquipe).length > 0 && (
@@ -974,6 +1026,8 @@ function UploadModal({
   const [error, setError] = useState<string | null>(null);
   const [salvarPadrao, setSalvarPadrao] = useState(false);
   const [padraoCarregado, setPadraoCarregado] = useState(false);
+  const [capacidades, setCapacidades] = useState<Record<number, number>>({});
+  const [salvarCapPadrao, setSalvarCapPadrao] = useState(false);
 
   const loadEquipesPadrao = useCallback(async () => {
     const { data } = await supabase
@@ -1020,6 +1074,20 @@ function UploadModal({
         setRecursos([...parsed.recursos].sort((a, b) => a - b));
         setDataDia(parsed.data);
         setPadraoCarregado(false);
+        setEquipes([]);
+        setCapacidades({});
+
+        // Pré-preenche a capacidade diária dos técnicos com o padrão salvo
+        const { data: capData } = await supabase
+          .from("field_capacidade_padrao")
+          .select("id_recurso, capacidade_horas");
+        const capPadrao = new Map<number, number>();
+        for (const c of capData || []) capPadrao.set(c.id_recurso, Number(c.capacidade_horas));
+        const caps: Record<number, number> = {};
+        for (const r of parsed.recursos) {
+          caps[r] = capPadrao.get(r) ?? CAPACIDADE_PADRAO_HORAS;
+        }
+        setCapacidades(caps);
 
         // Tenta pré-preencher com a configuração padrão salva
         const padrao = await loadEquipesPadrao();
@@ -1083,6 +1151,36 @@ function UploadModal({
       const { error: eqErr } = await supabase.from("field_equipes").insert(equipeRows);
       if (eqErr) throw new Error(eqErr.message);
 
+      // Capacidade configurada por técnico para este dia
+      const capRows: { dia_id: number; id_recurso: number; capacidade_horas: number }[] = [];
+      for (const e of equipes) {
+        for (const t of e.tecnicos) {
+          capRows.push({
+            dia_id: diaData.id,
+            id_recurso: t,
+            capacidade_horas: capacidades[t] ?? CAPACIDADE_PADRAO_HORAS,
+          });
+        }
+      }
+      if (capRows.length > 0) {
+        const { error: capErr } = await supabase.from("field_capacidade_dia").insert(capRows);
+        if (capErr) throw new Error(capErr.message);
+      }
+
+      if (salvarCapPadrao) {
+        const padraoCapRows = Object.entries(capacidades).map(([r, h]) => ({
+          id_recurso: Number(r),
+          capacidade_horas: h,
+        }));
+        if (padraoCapRows.length > 0) {
+          const { error: capPadraoErr } = await supabase
+            .from("field_capacidade_padrao")
+            .upsert(padraoCapRows, { onConflict: "id_recurso" });
+          if (capPadraoErr) throw new Error(capPadraoErr.message);
+        }
+        toast.success("Capacidades salvas como padrão!");
+      }
+
       if (salvarPadrao) {
         await supabase.from("field_equipes_padrao").delete().neq("id", 0);
         const padraoRows = equipes.map((e) => ({
@@ -1132,6 +1230,8 @@ function UploadModal({
     setError(null);
     setSalvarPadrao(false);
     setPadraoCarregado(false);
+    setCapacidades({});
+    setSalvarCapPadrao(false);
   };
 
   return (
@@ -1256,6 +1356,23 @@ function UploadModal({
                         >
                           {recursosMap.get(r) || r}
                         </Badge>
+                        <label className="flex items-center gap-0.5 text-[9px] text-slate-400">
+                          Cap. (h)
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={capacidades[r] ?? CAPACIDADE_PADRAO_HORAS}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              setCapacidades((p) => ({
+                                ...p,
+                                [r]: Number.isFinite(v) ? v : CAPACIDADE_PADRAO_HORAS,
+                              }));
+                            }}
+                            className="h-6 w-14 px-1 text-[10px]"
+                          />
+                        </label>
                         <select
                           className="rounded border border-slate-200 px-1 py-0.5 text-[10px]"
                           value={eqIdx}
@@ -1290,6 +1407,13 @@ function UploadModal({
                 <label className="flex cursor-pointer items-center gap-2 text-[11px] text-slate-600">
                   <Checkbox checked={salvarPadrao} onCheckedChange={(v) => setSalvarPadrao(!!v)} />
                   Salvar esta configuração de equipes como padrão
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-[11px] text-slate-600">
+                  <Checkbox
+                    checked={salvarCapPadrao}
+                    onCheckedChange={(v) => setSalvarCapPadrao(!!v)}
+                  />
+                  Salvar capacidades como padrão
                 </label>
                 <button
                   type="button"
@@ -1356,19 +1480,27 @@ function DayDetail({
   const [filtroTipo, setFiltroTipo] = useState<string[]>([]);
   const [metaOS, setMetaOS] = useState(8);
   const [filtroTipoAtivo, setFiltroTipoAtivo] = useState<string | null>(null);
+  const [capMap, setCapMap] = useState<Map<number, number>>(new Map());
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [ativRes, eqRes, justRes, plantRes] = await Promise.all([
+      const [ativRes, eqRes, justRes, plantRes, capRes] = await Promise.all([
         supabase.from("field_atividades").select("*").eq("dia_id", dia.id),
         supabase.from("field_equipes").select("*").eq("dia_id", dia.id),
         supabase.from("field_justificativas").select("*").eq("dia_id", dia.id),
         supabase.from("elevatorias").select("planta, nome, latitude, longitude"),
+        supabase
+          .from("field_capacidade_dia")
+          .select("id_recurso, capacidade_horas")
+          .eq("dia_id", dia.id),
       ]);
       if (ativRes.data) setAtividades(ativRes.data as FieldAtividade[]);
       if (eqRes.data) setEquipes(eqRes.data as FieldEquipe[]);
       if (justRes.data) setJustificativas(justRes.data as FieldJustificativa[]);
+      const cap = new Map<number, number>();
+      for (const c of capRes.data || []) cap.set(c.id_recurso, Number(c.capacidade_horas));
+      setCapMap(cap);
       if (plantRes.data) {
         setPlantas(
           (
@@ -1544,6 +1676,7 @@ function DayDetail({
                   recursosMap={recursosMap}
                   metaOS={metaOS}
                   filtroTipoAtivo={filtroTipoAtivo}
+                  capMap={capMap}
                 />
               ))
           )}
