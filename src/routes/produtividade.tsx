@@ -1885,7 +1885,7 @@ function ProdutividadePage() {
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
               <img
-                src="/logo.png"
+                src="/logo-oi.png"
                 alt="Águas do Rio"
                 className="h-14 w-auto object-contain"
                 loading="eager"

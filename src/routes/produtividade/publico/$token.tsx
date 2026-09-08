@@ -67,7 +67,7 @@ function PublicoProdutividadePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <img
-                src="/logo.png"
+                src="/logo-oi.png"
                 alt="Águas do Rio"
                 className="h-12 w-auto object-contain"
                 loading="eager"
