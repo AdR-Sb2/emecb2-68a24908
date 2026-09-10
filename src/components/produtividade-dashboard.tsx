@@ -148,6 +148,13 @@ function formatDataBR(d: string): string {
   return `${day}/${m}/${y}`;
 }
 
+function formatMinutos(mins: number): string {
+  if (!mins) return "0h";
+  const h = Math.floor(mins / 60);
+  const min = mins % 60;
+  return min > 0 ? `${h}h${min}min` : `${h}h`;
+}
+
 // ─── Período ──────────────────────────────────────────────────
 
 type Periodo = { type: "day" | "7" | "30" | "mes"; date?: string };
@@ -350,7 +357,12 @@ export function DashboardComparacao() {
   }, [equipes]);
 
   const participadasPorTecnico = useMemo(() => {
-    type Acum = { participadas: number; dias: number; equipeDias: Map<string, number> };
+    type Acum = {
+      participadas: number;
+      dias: number;
+      equipeDias: Map<string, number>;
+      tipos: Record<string, { count: number; minutos: number }>;
+    };
     const acum = new Map<number, Acum>();
     for (const d of dias) {
       const equipesDia = equipes.filter((e) => e.dia_id === d.id);
@@ -366,14 +378,29 @@ export function DashboardComparacao() {
             !isAtividadeAdministrativa(a.tipo_atividade) &&
             eqSet.has(a.id_recurso),
         );
-        const contas = dedupOS(dayAtiv).osIds.length;
+        const exec = dedupOS(dayAtiv).exec;
         const a = acum.get(tecId) || {
           participadas: 0,
           dias: 0,
           equipeDias: new Map<string, number>(),
+          tipos: {},
         };
-        a.participadas += contas;
+        a.participadas += exec;
         a.dias++;
+        const vistos = new Set<string>();
+        for (const ativ of dayAtiv) {
+          if (normalizeStatus(ativ.status) !== "concluido") continue;
+          const key = ativ.ordem_manutencao
+            ? `om:${ativ.ordem_manutencao}`
+            : `at:${ativ.id_atividade}`;
+          if (vistos.has(key)) continue;
+          vistos.add(key);
+          const norm = (ativ.tipo_atividade || "").toUpperCase().trim();
+          const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
+          if (!a.tipos[label]) a.tipos[label] = { count: 0, minutos: 0 };
+          a.tipos[label].count++;
+          a.tipos[label].minutos += ativ.duracao_min ?? 0;
+        }
         for (const eq of minhasEqs) {
           const nome = eq.nome_equipe.trim();
           a.equipeDias.set(nome, (a.equipeDias.get(nome) || 0) + 1);
@@ -390,6 +417,7 @@ export function DashboardComparacao() {
           participadas: a.participadas,
           diasTrabalhados: a.dias,
           cor: corPorEquipe.get(pred)?.hex || "#64748b",
+          tipos: a.tipos,
         };
       })
       .filter((r) => r.participadas > 0)
@@ -661,8 +689,8 @@ export function DashboardComparacao() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">OS Participadas por Técnico</CardTitle>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Todas as O.S. únicas da equipe no dia contam como participadas para cada técnico da
-                equipe.
+                Considera apenas O.S. executadas. As O.S. únicas da equipe no dia contam como
+                participadas para cada técnico da equipe.
               </p>
             </CardHeader>
             <CardContent>
@@ -688,7 +716,7 @@ export function DashboardComparacao() {
                         if (!active || !payload?.length) return null;
                         const d = payload[0].payload as (typeof participadasPorTecnico)[number];
                         return (
-                          <div className="min-w-[180px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
+                          <div className="min-w-[220px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
                             <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">
                               {d.nome}
                             </div>
@@ -699,6 +727,23 @@ export function DashboardComparacao() {
                               <div>
                                 Dias trabalhados: <strong>{d.diasTrabalhados}</strong>
                               </div>
+                            </div>
+                            <div className="mt-1.5 border-t border-slate-100 pt-1 dark:border-slate-700">
+                              {Object.entries(d.tipos).length === 0 ? (
+                                <p className="text-slate-400">Sem O.S. executadas</p>
+                              ) : (
+                                Object.entries(d.tipos).map(([tipo, info]) => (
+                                  <div
+                                    key={tipo}
+                                    className="flex items-center justify-between gap-3 py-0.5"
+                                  >
+                                    <span className="text-slate-500">{tipo}</span>
+                                    <strong className="shrink-0 text-slate-700 dark:text-slate-200">
+                                      {info.count} O.S. · {formatMinutos(info.minutos)}
+                                    </strong>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </div>
                         );
