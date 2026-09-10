@@ -11,6 +11,7 @@ import {
   Line,
   CartesianGrid,
   Legend,
+  LabelList,
 } from "recharts";
 import {
   ClipboardList,
@@ -571,6 +572,12 @@ export function DashboardComparacao() {
                     {osPorEquipe.map((_, i) => (
                       <Cell key={i} fill={getEquipeColor(i).hex} />
                     ))}
+                    <LabelList
+                      dataKey="exec"
+                      position="right"
+                      className="fill-slate-700 dark:fill-slate-200"
+                      fontSize={12}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
