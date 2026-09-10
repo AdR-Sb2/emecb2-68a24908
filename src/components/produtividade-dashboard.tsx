@@ -158,6 +158,7 @@ export function DashboardComparacao() {
   const [dias, setDias] = useState<FieldDia[]>([]);
   const [atividades, setAtividades] = useState<FieldAtividade[]>([]);
   const [equipes, setEquipes] = useState<FieldEquipe[]>([]);
+  const [recursosList, setRecursosList] = useState<Array<{ id_recurso: number; nome: string }>>([]);
   const [periodo, setPeriodo] = useState<Periodo>({ type: "7" });
   const [loading, setLoading] = useState(true);
 
@@ -190,6 +191,11 @@ export function DashboardComparacao() {
       }
       const diasData = (diasRes.data || []) as FieldDia[];
       setDias(diasData);
+
+      const recRes = await supabase.from("field_recursos").select("*");
+      if (!recRes.error) {
+        setRecursosList((recRes.data || []) as Array<{ id_recurso: number; nome: string }>);
+      }
 
       if (diasData.length > 0) {
         const diaIds = diasData.map((d) => d.id);
@@ -323,6 +329,72 @@ export function DashboardComparacao() {
       .filter((r) => r.total > 0)
       .sort((a, b) => b.exec - a.exec);
   }, [atividades, equipes]);
+
+  const recursosMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const r of recursosList) m.set(Number(r.id_recurso), r.nome);
+    return m;
+  }, [recursosList]);
+
+  const corPorEquipe = useMemo(() => {
+    const m = new Map<string, { hex: string }>();
+    let idx = 0;
+    for (const eq of equipes) {
+      const nome = eq.nome_equipe.trim();
+      if (!m.has(nome)) {
+        m.set(nome, getEquipeColor(idx));
+        idx++;
+      }
+    }
+    return m;
+  }, [equipes]);
+
+  const participadasPorTecnico = useMemo(() => {
+    type Acum = { participadas: number; dias: number; equipeDias: Map<string, number> };
+    const acum = new Map<number, Acum>();
+    for (const d of dias) {
+      const equipesDia = equipes.filter((e) => e.dia_id === d.id);
+      const tecsDia = new Set<number>();
+      for (const eq of equipesDia) eq.tecnicos.forEach((t) => tecsDia.add(t));
+      for (const tecId of tecsDia) {
+        const minhasEqs = equipesDia.filter((eq) => eq.tecnicos.includes(tecId));
+        const eqSet = new Set<number>();
+        for (const eq of minhasEqs) eq.tecnicos.forEach((t) => eqSet.add(t));
+        const dayAtiv = atividades.filter(
+          (a) =>
+            a.dia_id === d.id &&
+            !isAtividadeAdministrativa(a.tipo_atividade) &&
+            eqSet.has(a.id_recurso),
+        );
+        const contas = dedupOS(dayAtiv).osIds.length;
+        const a = acum.get(tecId) || {
+          participadas: 0,
+          dias: 0,
+          equipeDias: new Map<string, number>(),
+        };
+        a.participadas += contas;
+        a.dias++;
+        for (const eq of minhasEqs) {
+          const nome = eq.nome_equipe.trim();
+          a.equipeDias.set(nome, (a.equipeDias.get(nome) || 0) + 1);
+        }
+        acum.set(tecId, a);
+      }
+    }
+    return [...acum.entries()]
+      .map(([tecId, a]) => {
+        const pred = [...a.equipeDias.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] || "";
+        return {
+          tecId,
+          nome: recursosMap.get(tecId) || String(tecId),
+          participadas: a.participadas,
+          diasTrabalhados: a.dias,
+          cor: corPorEquipe.get(pred)?.hex || "#64748b",
+        };
+      })
+      .filter((r) => r.participadas > 0)
+      .sort((x, y) => y.participadas - x.participadas);
+  }, [dias, equipes, atividades, recursosMap, corPorEquipe]);
 
   const composicaoPorDia = useMemo(() => {
     return dias
@@ -581,6 +653,71 @@ export function DashboardComparacao() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* OS Participadas por Técnico */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">OS Participadas por Técnico</CardTitle>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Todas as O.S. únicas da equipe no dia contam como participadas para cada técnico da
+                equipe.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {participadasPorTecnico.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-400">
+                  Sem técnicos em equipe no período selecionado.
+                </p>
+              ) : (
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(150, participadasPorTecnico.length * 35)}
+                >
+                  <BarChart
+                    data={participadasPorTecnico}
+                    layout="vertical"
+                    margin={{ left: 10, right: 40 }}
+                  >
+                    <XAxis type="number" tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="nome" width={150} tick={{ fontSize: 11 }} />
+                    <RechartsTooltip
+                      cursor={{ fill: "transparent" }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload as (typeof participadasPorTecnico)[number];
+                        return (
+                          <div className="min-w-[180px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
+                            <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">
+                              {d.nome}
+                            </div>
+                            <div className="space-y-0.5 text-slate-600 dark:text-slate-300">
+                              <div>
+                                O.S. participadas: <strong>{d.participadas}</strong>
+                              </div>
+                              <div>
+                                Dias trabalhados: <strong>{d.diasTrabalhados}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="participadas" radius={[0, 4, 4, 0]}>
+                      {participadasPorTecnico.map((r) => (
+                        <Cell key={r.tecId} fill={r.cor} />
+                      ))}
+                      <LabelList
+                        dataKey="participadas"
+                        position="right"
+                        className="fill-slate-700 dark:fill-slate-200"
+                        fontSize={12}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
