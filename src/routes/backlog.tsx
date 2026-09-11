@@ -470,18 +470,35 @@ function BacklogPage() {
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Row[];
-        if (Array.isArray(parsed) && parsed.length) {
-          setData(parsed);
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("backlog_dados")
+          .select("dados")
+          .eq("id", 1)
+          .single();
+        const arr = (error ? null : data?.dados) as Row[] | null;
+        if (Array.isArray(arr) && arr.length) {
+          setData(arr);
           setHasCustomData(true);
+          return;
         }
+      } catch {
+        // tabela ainda não criada no deploy → segue para fallback
       }
-    } catch {
-      // ignore
-    }
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Row[];
+          if (Array.isArray(parsed) && parsed.length) {
+            setData(parsed);
+            setHasCustomData(true);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   // Recalcula "agora" a cada minuto para atualizar SLA/Dias em aberto.
@@ -1134,11 +1151,20 @@ function BacklogPage() {
           }
         }
         return out;
-      });
+      }) as Row[];
+      const { error } = await supabase
+        .from("backlog_dados")
+        .upsert(
+          { id: 1, dados: norm, atualizado_em: new Date().toISOString() },
+          { onConflict: "id" },
+        );
+      if (error) throw error;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
-      setData(norm as Row[]);
+      setData(norm);
       setHasCustomData(true);
-      alert(`Bucket atualizado com ${norm.length} registros.`);
+      alert(
+        `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`,
+      );
     } catch (err) {
       console.error(err);
       alert("Falha ao ler o arquivo.");
@@ -2032,7 +2058,8 @@ function BacklogPage() {
           </button>
           {hasCustomData && (
             <button
-              onClick={() => {
+              onClick={async () => {
+                await supabase.from("backlog_dados").delete().eq("id", 1);
                 localStorage.removeItem(STORAGE_KEY);
                 setData(DATA);
                 setHasCustomData(false);
