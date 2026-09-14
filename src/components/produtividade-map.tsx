@@ -258,24 +258,15 @@ export default function ProdutividadeMap({
       at: FieldAtividade;
     }> = [];
 
-    let tentadas = 0;
-    let comPlanta = 0;
-    let semPlanta = 0;
-
     for (const at of atividades) {
       if (isAtividadeAdministrativa(at.tipo_atividade)) continue;
       // Só considera atividades de técnicos que estão em equipe
       if (!resourceToEquipe.has(at.id_recurso)) continue;
       if (!at.planta) continue;
-      tentadas++;
 
       const normalizedPlanta = at.planta.trim().toUpperCase();
       const coord = plantaMap.get(normalizedPlanta);
-      if (!coord) {
-        semPlanta++;
-        continue;
-      }
-      comPlanta++;
+      if (!coord) continue;
 
       const normSt = normalizeStatus(at.status);
       const eqInfo = resourceToEquipe.get(at.id_recurso);
@@ -296,10 +287,23 @@ export default function ProdutividadeMap({
       });
     }
 
-    setDebugInfo({ tentadas, comPlanta, semPlanta });
-
     return result;
   }, [atividades, plantaMap, resourceToEquipe, filtroEquipes, filtroStatus, filtroTipo]);
+
+  useEffect(() => {
+    let tentadas = 0;
+    let comPlanta = 0;
+    let semPlanta = 0;
+    for (const at of atividades) {
+      if (isAtividadeAdministrativa(at.tipo_atividade)) continue;
+      if (!resourceToEquipe.has(at.id_recurso)) continue;
+      if (!at.planta) continue;
+      tentadas++;
+      if (plantaMap.has(at.planta.trim().toUpperCase())) comPlanta++;
+      else semPlanta++;
+    }
+    setDebugInfo({ tentadas, comPlanta, semPlanta });
+  }, [atividades, plantaMap, resourceToEquipe]);
 
   const points: Array<[number, number]> = useMemo(() => pins.map((p) => [p.lat, p.lon]), [pins]);
 

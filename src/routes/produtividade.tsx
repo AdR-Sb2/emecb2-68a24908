@@ -87,10 +87,10 @@ function ProdutividadeLayout() {
 }
 
 // Evita que uma falha ao carregar o mapa derrube a página inteira.
-class MapLoadError extends Component<{ children: ReactNode }, { falhou: boolean }> {
-  state = { falhou: false };
-  static getDerivedStateFromError() {
-    return { falhou: true };
+class MapLoadError extends Component<{ children: ReactNode }, { falhou: boolean; erro: string }> {
+  state = { falhou: false, erro: "" };
+  static getDerivedStateFromError(error: unknown) {
+    return { falhou: true, erro: error instanceof Error ? error.message : String(error) };
   }
   componentDidCatch(error: unknown) {
     console.error("Erro ao carregar o mapa de produtividade:", error);
@@ -100,9 +100,14 @@ class MapLoadError extends Component<{ children: ReactNode }, { falhou: boolean 
       return (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
           Não foi possível carregar o mapa.
-          <button className="ml-2 underline" onClick={() => this.setState({ falhou: false })}>
+          <button className="ml-2 underline" onClick={() => window.location.reload()}>
             Tentar novamente
           </button>
+          {this.state.erro && (
+            <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words text-[10px] text-red-500 dark:text-red-400">
+              {this.state.erro}
+            </pre>
+          )}
         </div>
       );
     }
