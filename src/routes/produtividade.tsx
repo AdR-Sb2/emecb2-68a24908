@@ -1,14 +1,5 @@
 import { createFileRoute, Link, useNavigate, useLocation, Outlet } from "@tanstack/react-router";
-import {
-  lazy,
-  Suspense,
-  Component,
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { Component, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import {
   BarChart,
@@ -38,6 +29,7 @@ import {
   Pencil,
   Share2,
   Link2Off,
+  MapPin,
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -72,7 +64,7 @@ import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { DashboardComparacao } from "@/components/produtividade-dashboard";
 import logoHeader from "@/assets/logo-branca.png";
 
-const ProdutividadeMap = lazy(() => import("@/components/produtividade-map"));
+import ProdutividadeMap from "@/components/produtividade-map";
 
 export const Route = createFileRoute("/produtividade")({
   component: ProdutividadeLayout,
@@ -87,7 +79,10 @@ function ProdutividadeLayout() {
 }
 
 // Evita que uma falha ao carregar o mapa derrube a página inteira.
-class MapLoadError extends Component<{ children: ReactNode }, { falhou: boolean; erro: string }> {
+class MapLoadError extends Component<
+  { children: ReactNode; fallback?: ReactNode },
+  { falhou: boolean; erro: string }
+> {
   state = { falhou: false, erro: "" };
   static getDerivedStateFromError(error: unknown) {
     return { falhou: true, erro: error instanceof Error ? error.message : String(error) };
@@ -98,16 +93,21 @@ class MapLoadError extends Component<{ children: ReactNode }, { falhou: boolean;
   render() {
     if (this.state.falhou) {
       return (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
-          Não foi possível carregar o mapa.
-          <button className="ml-2 underline" onClick={() => window.location.reload()}>
-            Tentar novamente
-          </button>
-          {this.state.erro && (
-            <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words text-[10px] text-red-500 dark:text-red-400">
-              {this.state.erro}
-            </pre>
-          )}
+        <div className="space-y-3">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+            <div>
+              Não foi possível carregar o mapa.
+              <button className="ml-2 underline" onClick={() => window.location.reload()}>
+                Tentar novamente
+              </button>
+            </div>
+            {this.state.erro && (
+              <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words text-[10px] text-red-500 dark:text-red-400">
+                {this.state.erro}
+              </pre>
+            )}
+          </div>
+          {this.props.fallback}
         </div>
       );
     }
@@ -1646,28 +1646,62 @@ function DayDetail({
       />
 
       {/* Map */}
-      <Suspense
+      <MapLoadError
         fallback={
-          <div className="flex min-h-[180px] items-center justify-center rounded-lg border border-slate-200 bg-white text-sm text-slate-400">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando mapa...
+          <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div className="border-b border-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:border-slate-700">
+              <MapPin className="mr-1 inline h-3.5 w-3.5" />
+              Lista de O.S. por Planta
+            </div>
+            <div className="max-h-[380px] overflow-auto p-3">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-left text-slate-400">
+                    <th className="pr-3">Planta</th>
+                    <th className="pr-3">Equipe</th>
+                    <th className="pr-3">Técnico</th>
+                    <th className="pr-3">Status</th>
+                    <th className="pr-3">Horário</th>
+                    <th>OS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {atividades.map((a) => (
+                    <tr
+                      key={a.id}
+                      className="border-t border-slate-100 align-top dark:border-slate-700"
+                    >
+                      <td className="pr-3 py-1 font-medium">{a.planta || "—"}</td>
+                      <td className="pr-3 py-1">
+                        {equipes.find((e) => e.tecnicos.includes(a.id_recurso))?.nome_equipe || "—"}
+                      </td>
+                      <td className="pr-3 py-1">{recursosMap.get(a.id_recurso) || a.id_recurso}</td>
+                      <td className="pr-3 py-1">{a.status}</td>
+                      <td className="pr-3 py-1 whitespace-nowrap">
+                        {a.inicio || "—"} ~ {a.fim || "—"}
+                      </td>
+                      <td className="py-1">{a.texto_breve || a.tipo_atividade}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         }
       >
-        <MapLoadError>
-          <ProdutividadeMap
-            atividades={atividades}
-            plantaMap={plantaMap}
-            equipes={equipes}
-            recursosMap={recursosMap}
-            filtroEquipes={filtroEquipes}
-            setFiltroEquipes={setFiltroEquipes}
-            filtroStatus={filtroStatus}
-            setFiltroStatus={setFiltroStatus}
-            filtroTipo={filtroTipo}
-            setFiltroTipo={setFiltroTipo}
-          />
-        </MapLoadError>
-      </Suspense>
+        <ProdutividadeMap
+          atividades={atividades}
+          plantaMap={plantaMap}
+          equipes={equipes}
+          recursosMap={recursosMap}
+          filtroEquipes={filtroEquipes}
+          setFiltroEquipes={setFiltroEquipes}
+          filtroStatus={filtroStatus}
+          setFiltroStatus={setFiltroStatus}
+          filtroTipo={filtroTipo}
+          setFiltroTipo={setFiltroTipo}
+        />
+      </MapLoadError>
 
       {/* Tipo de Serviço Chart */}
       <TipoServicoChart

@@ -305,7 +305,13 @@ export default function ProdutividadeMap({
     setDebugInfo({ tentadas, comPlanta, semPlanta });
   }, [atividades, plantaMap, resourceToEquipe]);
 
-  const points: Array<[number, number]> = useMemo(() => pins.map((p) => [p.lat, p.lon]), [pins]);
+  const points: Array<[number, number]> = useMemo(
+    () =>
+      pins
+        .map((p) => [Number(p.lat), Number(p.lon)] as [number, number])
+        .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon)),
+    [pins],
+  );
 
   const toggleFilter = (arr: string[], setArr: (v: string[]) => void, val: string) => {
     setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
@@ -372,7 +378,7 @@ export default function ProdutividadeMap({
             const eColor = equipeColorMap[pin.equipe] || "#64748b";
             const icon = createPinIcon(sColor, eColor);
             return (
-              <Marker key={pin.key} position={[pin.lat, pin.lon]} icon={icon}>
+              <Marker key={pin.key} position={[Number(pin.lat), Number(pin.lon)]} icon={icon}>
                 <Popup>
                   <div className="min-w-[180px] space-y-1 text-[12px]">
                     <div className="font-bold text-[#0b3a73]">{pin.at.planta}</div>
