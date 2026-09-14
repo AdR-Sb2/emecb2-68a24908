@@ -1188,23 +1188,35 @@ function BacklogPage() {
         }
         return out;
       }) as Row[];
-      const { error } = await supabase
-        .from("backlog_dados")
-        .upsert(
-          { id: 1, dados: norm, atualizado_em: new Date().toISOString() },
-          { onConflict: "id" },
-        );
-      if (error) throw error;
+
+      // Salva no banco compartilhado (todos os usuários veem). Se o
+      // banco ainda não existir ou estiver indisponível, salva local.
+      let dbSalvo = false;
+      try {
+        const { error } = await supabase
+          .from("backlog_dados")
+          .upsert(
+            { id: 1, dados: norm, atualizado_em: new Date().toISOString() },
+            { onConflict: "id" },
+          );
+        if (error) throw error;
+        dbSalvo = true;
+      } catch (dbErr) {
+        console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
+      }
+
       localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
       lastSharedDados.current = JSON.stringify(norm);
       setData(norm);
       setHasCustomData(true);
       alert(
-        `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`,
+        dbSalvo
+          ? `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`
+          : `Bucket atualizado com ${norm.length} registros (salvo localmente; banco compartilhado indisponível).`,
       );
     } catch (err) {
-      console.error(err);
-      alert("Falha ao ler o arquivo.");
+      console.error("Erro ao importar bucket:", err);
+      alert("Falha ao ler o arquivo." + (err instanceof Error ? ` Detalhe: ${err.message}` : ""));
     }
   };
 
