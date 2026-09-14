@@ -13,15 +13,7 @@ import {
   Legend,
   LabelList,
 } from "recharts";
-import {
-  ClipboardList,
-  CheckCircle2,
-  Activity,
-  Wrench,
-  Percent,
-  Loader2,
-  Trophy,
-} from "lucide-react";
+import { ClipboardList, CheckCircle2, Activity, Wrench, Loader2, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -474,10 +466,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
 
   const kpis = useMemo(() => {
     const todasOs = atividadesEquipe.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
-    const dedupAll = dedupOS(todasOs);
-    const totalExec = dedupAll.exec;
+    const totalExec = dedupOS(todasOs).exec;
     const numDias = dias.length;
-    const mediaDiaria = numDias > 0 ? totalExec / numDias : 0;
 
     const chave = (a: FieldAtividade) =>
       a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
@@ -488,7 +478,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     }
 
     let horasExec = 0;
-    let horasTotais = 0;
     let corretivas = 0;
     let corretivasMin = 0;
     const corretivasVistas = new Set<string>();
@@ -496,7 +485,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       const key = chave(a);
       const ehCorretiva =
         (a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL";
-      horasTotais += Number(a.duracao_min) || 0;
       const executada = executadas.has(key);
       if (executada) horasExec += Number(a.duracao_min) || 0;
       if (ehCorretiva) {
@@ -508,19 +496,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       }
     }
     const horasMediaDia = numDias > 0 ? horasExec / numDias : 0;
-
-    const total = todasOs.length > 0 ? totalExec + dedupAll.susp + dedupAll.canc : 0;
-    const taxa = total > 0 ? Math.round((totalExec / total) * 100) : 0;
-    return {
-      totalExec,
-      mediaDiaria,
-      corretivas,
-      taxa,
-      horasExec,
-      horasMediaDia,
-      corretivasMin,
-      horasTotais,
-    };
+    const corretivasMinMedia = numDias > 0 ? corretivasMin / numDias : 0;
+    return { totalExec, corretivas, horasMediaDia, corretivasMinMedia };
   }, [atividadesEquipe, dias]);
 
   const destaques = useMemo(() => {
@@ -583,16 +560,13 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       ) : (
         <>
           {/* KPIs do período */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Card className="shadow-sm">
               <CardContent className="flex items-center gap-3 p-3">
                 <ClipboardList className="h-8 w-8 shrink-0 text-[#0b3a73]" />
                 <div>
                   <div className="text-2xl font-bold">{kpis.totalExec}</div>
                   <div className="text-[11px] text-slate-500">OS Executadas</div>
-                  <div className="text-[10px] text-slate-400">
-                    ({formatMinutos(kpis.horasExec)} gastos)
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -600,10 +574,10 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               <CardContent className="flex items-center gap-3 p-3">
                 <Activity className="h-8 w-8 shrink-0 text-violet-600" />
                 <div>
-                  <div className="text-2xl font-bold">{kpis.mediaDiaria.toFixed(1)}</div>
-                  <div className="text-[11px] text-slate-500">Média diária</div>
+                  <div className="text-2xl font-bold">{formatMinutos(kpis.horasMediaDia)}</div>
+                  <div className="text-[11px] text-slate-500">Média diária em horas</div>
                   <div className="text-[10px] text-slate-400">
-                    ({formatMinutos(kpis.horasMediaDia)}/dia)
+                    ({formatMinutos(kpis.horasMediaDia)} gastos por dia)
                   </div>
                 </div>
               </CardContent>
@@ -615,19 +589,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                   <div className="text-2xl font-bold">{kpis.corretivas}</div>
                   <div className="text-[11px] text-slate-500">Corretivas emerg.</div>
                   <div className="text-[10px] text-slate-400">
-                    ({formatMinutos(kpis.corretivasMin)} gastos)
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm">
-              <CardContent className="flex items-center gap-3 p-3">
-                <Percent className="h-8 w-8 shrink-0 text-emerald-600" />
-                <div>
-                  <div className="text-2xl font-bold">{kpis.taxa}%</div>
-                  <div className="text-[11px] text-slate-500">Taxa de conclusão</div>
-                  <div className="text-[10px] text-slate-400">
-                    ({formatMinutos(kpis.horasTotais)} no período)
+                    ({formatMinutos(kpis.corretivasMinMedia)} gastos por dia)
                   </div>
                 </div>
               </CardContent>
