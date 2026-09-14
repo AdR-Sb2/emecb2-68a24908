@@ -206,12 +206,29 @@ export function DashboardComparacao() {
 
       if (diasData.length > 0) {
         const diaIds = diasData.map((d) => d.id);
-        const [ativRes, eqRes] = await Promise.all([
-          supabase.from("field_atividades").select("*").in("dia_id", diaIds),
-          supabase.from("field_equipes").select("*").in("dia_id", diaIds),
+        const buscarTudo = async <T,>(tabela: string, pagina = 1000): Promise<T[]> => {
+          const linhas: T[] = [];
+          let inicio = 0;
+          for (;;) {
+            const { data, error } = await supabase
+              .from(tabela)
+              .select("*")
+              .in("dia_id", diaIds)
+              .range(inicio, inicio + pagina - 1);
+            if (error) break;
+            if (!data || data.length === 0) break;
+            linhas.push(...(data as T[]));
+            if (data.length < pagina) break;
+            inicio += pagina;
+          }
+          return linhas;
+        };
+        const [ativs, eqs] = await Promise.all([
+          buscarTudo<FieldAtividade>("field_atividades"),
+          buscarTudo<FieldEquipe>("field_equipes"),
         ]);
-        setAtividades((ativRes.data || []) as FieldAtividade[]);
-        setEquipes((eqRes.data || []) as FieldEquipe[]);
+        setAtividades(ativs);
+        setEquipes(eqs);
       } else {
         setAtividades([]);
         setEquipes([]);
