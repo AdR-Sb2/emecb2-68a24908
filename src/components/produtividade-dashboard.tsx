@@ -23,6 +23,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
@@ -372,6 +373,34 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     return m;
   }, [recursosList]);
 
+  // Média de OS executadas por dia para cada técnico (usada no tooltip
+  // do KPI "Média por Equipe").
+  const mediaPorTecnico = useMemo(() => {
+    const chavesPorTecDia = new Map<string, Set<string>>();
+    for (const a of atividadesEquipe) {
+      if (isAtividadeAdministrativa(a.tipo_atividade)) continue;
+      if (normalizeStatus(a.status) !== "concluido") continue;
+      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      const tk = `${a.id_recurso}:${a.dia_id}`;
+      const s = chavesPorTecDia.get(tk) || new Set<string>();
+      s.add(key);
+      chavesPorTecDia.set(tk, s);
+    }
+    const totals = new Map<number, number>();
+    for (const [tk, s] of chavesPorTecDia) {
+      const recurso = Number(tk.split(":")[0]);
+      totals.set(recurso, (totals.get(recurso) || 0) + s.size);
+    }
+    const numDias = dias.length || 1;
+    return [...totals.entries()]
+      .map(([recurso, total]) => ({
+        nome: recursosMap.get(recurso) || `Técnico ${recurso}`,
+        media: total / numDias,
+        total,
+      }))
+      .sort((a, b) => b.media - a.media);
+  }, [atividadesEquipe, recursosMap, dias]);
+
   const corPorEquipe = useMemo(() => {
     const m = new Map<string, { hex: string }>();
     let idx = 0;
@@ -607,16 +636,46 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                 </div>
               </CardContent>
             </Card>
-            <Card className="shadow-sm">
-              <CardContent className="flex items-center gap-3 p-3">
-                <Users className="h-8 w-8 shrink-0 text-teal-600" />
-                <div>
-                  <div className="text-2xl font-bold">{kpis.mediaPorEquipe.toFixed(1)}</div>
-                  <div className="text-[11px] text-slate-500">Média por Equipe</div>
-                  <div className="text-[10px] text-slate-400">(OS executadas por equipe)</div>
-                </div>
-              </CardContent>
-            </Card>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className="cursor-help shadow-sm">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <Users className="h-8 w-8 shrink-0 text-teal-600" />
+                      <div>
+                        <div className="text-2xl font-bold">{kpis.mediaPorEquipe.toFixed(1)}</div>
+                        <div className="text-[11px] text-slate-500">Média por Equipe</div>
+                        <div className="text-[10px] text-slate-400">(OS executadas por equipe)</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  className="max-h-72 w-60 overflow-auto rounded-lg bg-white p-3 shadow-xl ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-600"
+                >
+                  <p className="mb-2 border-b border-slate-100 pb-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                    Média de O.S./dia por técnico
+                  </p>
+                  {mediaPorTecnico.length === 0 ? (
+                    <p className="text-[11px] text-slate-400">Sem dados no período</p>
+                  ) : (
+                    mediaPorTecnico.map((t) => (
+                      <div
+                        key={t.nome}
+                        className="flex items-center justify-between gap-3 py-0.5 text-[11px] text-slate-600 dark:text-slate-300"
+                      >
+                        <span className="truncate">{t.nome}</span>
+                        <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-100">
+                          {t.media.toFixed(1)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           <Card className="shadow-sm">

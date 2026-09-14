@@ -1197,60 +1197,61 @@ export function AnaliticoManutencao() {
     }
     setExportandoOS(true);
     try {
-      let res = await supabase.rpc("analitico_os_detalhes", {
-        data_inicio: periodo.inicio,
-        data_fim: periodo.fim,
-      });
-      if (res.error) {
-        const alt = await supabase.rpc("analitico_os_detalhes", { janela_meses: 480 });
-        if (alt.error) throw alt.error;
-        res = alt;
+      // Busca TODAS as O.S. (qualquer tipo de ordem), paginado, direto na
+      // tabela de registros — assim Preventiva, Corretiva, P. Condição,
+      // Serviços, Engenharia e qualquer outro tipo entram na planilha.
+      const registros: Array<{
+        elevatoria_id: number;
+        ordem: string | null;
+        texto_breve: string | null;
+        inicio_sla: string | null;
+        fim_sla: string | null;
+        data_entrada: string | null;
+        data_modificacao: string | null;
+        tipo_ordem: string | null;
+      }> = [];
+      let de = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from("registros_atendimento")
+          .select(
+            "elevatoria_id, ordem, texto_breve, inicio_sla, fim_sla, data_entrada, data_modificacao, tipo_ordem",
+          )
+          .not("elevatoria_id", "is", null)
+          .gte("data_entrada", periodo.inicio)
+          .lte("data_entrada", periodo.fim)
+          .order("elevatoria_id", { ascending: true })
+          .order("data_entrada", { ascending: true })
+          .range(de, de + 999);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        registros.push(...(data as typeof registros));
+        if (data.length < 1000) break;
+        de += 1000;
       }
+
       const nomePorId = new Map(
         dados.map((l) => [l.elevatoria_id, l.nome || l.planta || `#${l.elevatoria_id}`]),
       );
-      const categorias: Array<{
-        key: keyof DetalhesOSPorElevatoria;
-        label: string;
-      }> = [
-        { key: "preventiva", label: "Preventiva" },
-        { key: "corretiva", label: "Corretiva / Emergencial" },
-        { key: "ztpc", label: "P. Condição (ZTPC)" },
-      ];
-      const linhas: Array<{
-        elevatoria: string;
-        categoria: string;
-        ordem: string;
-        texto: string;
-        entrada: string | null;
-        fechada: string | null;
-        inicioSla: string | null;
-        fimSla: string | null;
-      }> = [];
-      for (const r of (res.data ?? []) as Array<{
-        elevatoria_id: number;
-        preventiva: DetalheOS[] | null;
-        corretiva: DetalheOS[] | null;
-        ztpc: DetalheOS[] | null;
-      }>) {
-        const nome = nomePorId.get(Number(r.elevatoria_id)) ?? `Elevatória #${r.elevatoria_id}`;
-        for (const c of categorias) {
-          for (const d of r[c.key] ?? []) {
-            const entrada = d.data_entrada ? d.data_entrada.slice(0, 10) : "";
-            if (entrada && (entrada < periodo.inicio || entrada > periodo.fim)) continue;
-            linhas.push({
-              elevatoria: nome,
-              categoria: c.label,
-              ordem: d.ordem,
-              texto: d.texto_breve ?? "",
-              entrada: d.data_entrada,
-              fechada: d.data_fechada,
-              inicioSla: d.inicio_sla,
-              fimSla: d.fim_sla,
-            });
-          }
-        }
-      }
+
+      const categoriaDe = (t: string | null): string => {
+        const v = (t || "").toUpperCase().trim();
+        if (["ZTPF", "ZTPD"].includes(v)) return "Preventiva";
+        if (["ZNTE", "ZNTP", "ZTRE"].includes(v)) return "Corretiva / Emergencial";
+        if (v === "ZTPC") return "P. Condição (ZTPC)";
+        return v ? `Outro (${v})` : "Sem tipo";
+      };
+
+      const linhas = registros.map((r) => ({
+        elevatoria: nomePorId.get(Number(r.elevatoria_id)) ?? `Elevatória #${r.elevatoria_id}`,
+        categoria: categoriaDe(r.tipo_ordem),
+        ordem: r.ordem ?? "",
+        texto: r.texto_breve ?? "",
+        entrada: r.data_entrada,
+        fechada: r.data_modificacao || r.data_entrada,
+        inicioSla: r.inicio_sla,
+        fimSla: r.fim_sla,
+      }));
       linhas.sort(
         (a, b) =>
           a.elevatoria.localeCompare(b.elevatoria, "pt-BR") ||
