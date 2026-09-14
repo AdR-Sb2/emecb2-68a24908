@@ -161,13 +161,20 @@ type Periodo = { type: "day" | "7" | "30" | "mes"; date?: string };
 
 // ─── Dashboard ────────────────────────────────────────────────
 
-export function DashboardComparacao() {
+export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   const [dias, setDias] = useState<FieldDia[]>([]);
   const [atividades, setAtividades] = useState<FieldAtividade[]>([]);
   const [equipes, setEquipes] = useState<FieldEquipe[]>([]);
   const [recursosList, setRecursosList] = useState<Array<{ id_recurso: number; nome: string }>>([]);
-  const [periodo, setPeriodo] = useState<Periodo>({ type: "7" });
+  const [periodo, setPeriodo] = useState<Periodo>(() =>
+    diaInicial ? { type: "day", date: diaInicial } : { type: "7" },
+  );
+  const [todasDatas, setTodasDatas] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (diaInicial) setPeriodo({ type: "day", date: diaInicial });
+  }, [diaInicial]);
 
   useEffect(() => {
     const load = async () => {
@@ -184,11 +191,21 @@ export function DashboardComparacao() {
 
       let diasRes;
       if (periodo.type === "day") {
-        diasRes = await supabase
+        const datesRes = await supabase
           .from("field_dias")
-          .select("*")
-          .eq("data", periodo.date)
-          .order("data", { ascending: false });
+          .select("data")
+          .order("data", { ascending: false })
+          .limit(500);
+        setTodasDatas([
+          ...new Set((datesRes.data || []).map((d: { data: string }) => d.data as string)),
+        ]);
+        diasRes = periodo.date
+          ? await supabase
+              .from("field_dias")
+              .select("*")
+              .eq("data", periodo.date)
+              .order("data", { ascending: false })
+          : { data: [] as FieldDia[] };
       } else {
         diasRes = await supabase
           .from("field_dias")
@@ -237,12 +254,6 @@ export function DashboardComparacao() {
     };
     load();
   }, [periodo]);
-
-  const datasDisponiveis = useMemo(() => {
-    const s = new Set<string>();
-    for (const d of dias) s.add(d.data);
-    return [...s].sort().reverse();
-  }, [dias]);
 
   // Só contam atividades de técnicos que estão em alguma equipe no dia.
   const tecsPorDia = useMemo(() => {
@@ -463,23 +474,53 @@ export function DashboardComparacao() {
 
   const kpis = useMemo(() => {
     const todasOs = atividadesEquipe.filter((a) => !isAtividadeAdministrativa(a.tipo_atividade));
-    const totalExec = dedupOS(todasOs).exec;
+    const dedupAll = dedupOS(todasOs);
+    const totalExec = dedupAll.exec;
     const numDias = dias.length;
     const mediaDiaria = numDias > 0 ? totalExec / numDias : 0;
+
+    const chave = (a: FieldAtividade) =>
+      a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+    const executadas = new Set<string>();
+    for (const a of todasOs) {
+      if (normalizeStatus(a.status) !== "concluido") continue;
+      executadas.add(chave(a));
+    }
+
+    let horasExec = 0;
+    let horasTotais = 0;
     let corretivas = 0;
+    let corretivasMin = 0;
     const corretivasVistas = new Set<string>();
     for (const a of todasOs) {
-      if ((a.tipo_atividade || "").toUpperCase().trim() !== "MANUTENÇÃO CORRETIVA EMERGENCIAL")
-        continue;
-      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
-      if (corretivasVistas.has(key)) continue;
-      corretivasVistas.add(key);
-      corretivas++;
+      const key = chave(a);
+      const ehCorretiva =
+        (a.tipo_atividade || "").toUpperCase().trim() === "MANUTENÇÃO CORRETIVA EMERGENCIAL";
+      horasTotais += Number(a.duracao_min) || 0;
+      const executada = executadas.has(key);
+      if (executada) horasExec += Number(a.duracao_min) || 0;
+      if (ehCorretiva) {
+        if (!corretivasVistas.has(key)) {
+          corretivasVistas.add(key);
+          corretivas++;
+        }
+        if (executada) corretivasMin += Number(a.duracao_min) || 0;
+      }
     }
-    const total =
-      todasOs.length > 0 ? totalExec + dedupOS(todasOs).susp + dedupOS(todasOs).canc : 0;
+    const horasMediaDia = numDias > 0 ? horasExec / numDias : 0;
+
+    const total = todasOs.length > 0 ? totalExec + dedupAll.susp + dedupAll.canc : 0;
     const taxa = total > 0 ? Math.round((totalExec / total) * 100) : 0;
-    return { totalExec, mediaDiaria, corretivas, taxa };
+    return {
+      totalExec,
+      mediaDiaria,
+      corretivas,
+      taxa,
+      horasExec,
+      horasMediaDia,
+      corretivasMin,
+      horasTotais,
+    };
   }, [atividadesEquipe, dias]);
 
   const destaques = useMemo(() => {
@@ -526,7 +567,7 @@ export function DashboardComparacao() {
             className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
           >
             <option value="">Selecione um dia…</option>
-            {datasDisponiveis.map((d) => (
+            {todasDatas.map((d) => (
               <option key={d} value={d}>
                 {formatDataBR(d)}
               </option>
@@ -549,6 +590,9 @@ export function DashboardComparacao() {
                 <div>
                   <div className="text-2xl font-bold">{kpis.totalExec}</div>
                   <div className="text-[11px] text-slate-500">OS Executadas</div>
+                  <div className="text-[10px] text-slate-400">
+                    ({formatMinutos(kpis.horasExec)} gastos)
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -558,6 +602,9 @@ export function DashboardComparacao() {
                 <div>
                   <div className="text-2xl font-bold">{kpis.mediaDiaria.toFixed(1)}</div>
                   <div className="text-[11px] text-slate-500">Média diária</div>
+                  <div className="text-[10px] text-slate-400">
+                    ({formatMinutos(kpis.horasMediaDia)}/dia)
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -567,6 +614,9 @@ export function DashboardComparacao() {
                 <div>
                   <div className="text-2xl font-bold">{kpis.corretivas}</div>
                   <div className="text-[11px] text-slate-500">Corretivas emerg.</div>
+                  <div className="text-[10px] text-slate-400">
+                    ({formatMinutos(kpis.corretivasMin)} gastos)
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -576,6 +626,9 @@ export function DashboardComparacao() {
                 <div>
                   <div className="text-2xl font-bold">{kpis.taxa}%</div>
                   <div className="text-[11px] text-slate-500">Taxa de conclusão</div>
+                  <div className="text-[10px] text-slate-400">
+                    ({formatMinutos(kpis.horasTotais)} no período)
+                  </div>
                 </div>
               </CardContent>
             </Card>

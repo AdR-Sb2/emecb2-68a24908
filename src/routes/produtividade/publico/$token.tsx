@@ -19,6 +19,14 @@ function PublicoProdutividadePage() {
   const { token } = Route.useParams();
   const [valido, setValido] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [datas, setDatas] = useState<string[]>([]);
+  const [dia, setDia] = useState<string>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("dia") || "";
+    } catch {
+      return "";
+    }
+  });
 
   useEffect(() => {
     (async () => {
@@ -35,6 +43,30 @@ function PublicoProdutividadePage() {
       setLoading(false);
     })();
   }, [token]);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("field_dias")
+        .select("data")
+        .order("data", { ascending: false })
+        .limit(500);
+      if (error) return;
+      setDatas([...new Set((data || []).map((d: { data: string }) => d.data))]);
+    })();
+  }, []);
+
+  const mudarDia = (d: string) => {
+    setDia(d);
+    try {
+      const url = new URL(window.location.href);
+      if (d) url.searchParams.set("dia", d);
+      else url.searchParams.delete("dia");
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      // ignora falha ao atualizar a URL
+    }
+  };
 
   if (loading) {
     return (
@@ -82,9 +114,37 @@ function PublicoProdutividadePage() {
               <BarChart3 className="h-3.5 w-3.5" /> Sem necessidade de login
             </span>
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium text-cyan-100">Filtrar por dia:</span>
+            <select
+              value={dia}
+              onChange={(e) => mudarDia(e.target.value)}
+              className="min-h-7 rounded-md border border-white/20 bg-white/10 px-2 text-[11px] text-white outline-none focus:bg-white/20"
+            >
+              <option value="">Todos os dias</option>
+              {datas.map((d) => (
+                <option key={d} value={d} className="text-slate-800">
+                  {diaBR(d)}
+                </option>
+              ))}
+            </select>
+            {dia && (
+              <button
+                onClick={() => mudarDia("")}
+                className="text-[10px] text-cyan-100 underline hover:text-white"
+              >
+                Limpar filtro
+              </button>
+            )}
+          </div>
         </div>
-        <DashboardComparacao />
+        <DashboardComparacao key={dia || "todos"} diaInicial={dia || undefined} />
       </div>
     </div>
   );
+}
+
+function diaBR(d: string): string {
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
 }

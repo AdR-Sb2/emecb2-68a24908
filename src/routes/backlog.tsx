@@ -469,6 +469,9 @@ function BacklogPage() {
   const [activeRouteTab, setActiveRouteTab] = useState<number>(0);
   useEffect(() => setMounted(true), []);
 
+  // Assinatura dos dados compartilhados — evita re-render quando nada mudou.
+  const lastSharedDados = useRef<string>("");
+
   useEffect(() => {
     (async () => {
       try {
@@ -481,6 +484,7 @@ function BacklogPage() {
         if (Array.isArray(arr) && arr.length) {
           setData(arr);
           setHasCustomData(true);
+          lastSharedDados.current = JSON.stringify(arr);
           return;
         }
       } catch {
@@ -499,6 +503,38 @@ function BacklogPage() {
         // ignore
       }
     })();
+  }, []);
+
+  // Sincroniza automaticamente com o bucket compartilhado (quando outra
+  // pessoa faz upload, todos recebem sem precisar importar ou recarregar).
+  useEffect(() => {
+    const carregar = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("backlog_dados")
+          .select("dados")
+          .eq("id", 1)
+          .single();
+        if (error) return;
+        const arr = data?.dados as Row[] | null;
+        if (!Array.isArray(arr) || arr.length === 0) return;
+        const sig = JSON.stringify(arr);
+        if (sig !== lastSharedDados.current) {
+          lastSharedDados.current = sig;
+          setData(arr);
+          setHasCustomData(true);
+        }
+      } catch {
+        // tabela ainda não criada no deploy → segue sem sincronizar
+      }
+    };
+    const id = setInterval(carregar, 20_000);
+    window.addEventListener("focus", carregar);
+    carregar();
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", carregar);
+    };
   }, []);
 
   // Recalcula "agora" a cada minuto para atualizar SLA/Dias em aberto.
@@ -1160,6 +1196,7 @@ function BacklogPage() {
         );
       if (error) throw error;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
+      lastSharedDados.current = JSON.stringify(norm);
       setData(norm);
       setHasCustomData(true);
       alert(

@@ -527,11 +527,21 @@ function TipoServicoChart({
     for (const eq of equipes) eq.tecnicos.forEach((t) => tecSet.add(t));
     const map: Record<string, number> = {};
     for (const k of TIPO_SERVICO_KEYS) map[k] = 0;
+
+    // Considera apenas O.S. executadas (que tiveram alguma atividade
+    // concluída) e conta cada ordem de manutenção uma única vez.
+    const executadas = new Map<string, { norm: string; idRecurso: number }>();
     for (const a of atividades) {
       if (!tecSet.has(a.id_recurso)) continue;
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
-      if (map[norm] !== undefined) map[norm]++;
+      if (map[norm] === undefined) continue;
+      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      if (normalizeStatus(a.status) !== "concluido") continue;
+      if (!executadas.has(key)) executadas.set(key, { norm, idRecurso: a.id_recurso });
     }
+
+    for (const { norm } of executadas.values()) map[norm]++;
+
     return TIPO_SERVICO_KEYS.map((k, i) => ({
       key: k,
       name: TIPO_SERVICO_MAP[k],
@@ -543,11 +553,22 @@ function TipoServicoChart({
   const tipoEquipes = useMemo(() => {
     const m: Record<string, Record<string, number>> = {};
     for (const k of TIPO_SERVICO_KEYS) m[k] = {};
+
+    // Mesma lógica de execução: só O.S. concluídas, cada uma contada uma vez.
+    const tecSet = new Set<number>();
+    for (const eq of equipes) eq.tecnicos.forEach((t) => tecSet.add(t));
+    const executadas = new Map<string, { norm: string; idRecurso: number }>();
     for (const a of atividades) {
+      if (!tecSet.has(a.id_recurso)) continue;
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
       if (!(norm in m)) continue;
+      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      if (normalizeStatus(a.status) !== "concluido") continue;
+      if (!executadas.has(key)) executadas.set(key, { norm, idRecurso: a.id_recurso });
+    }
+    for (const { norm, idRecurso } of executadas.values()) {
       for (const eq of equipes) {
-        if (eq.tecnicos.includes(a.id_recurso)) {
+        if (eq.tecnicos.includes(idRecurso)) {
           m[norm][eq.nome_equipe] = (m[norm][eq.nome_equipe] || 0) + 1;
         }
       }
