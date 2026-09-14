@@ -1236,9 +1236,18 @@ export function AnaliticoManutencao() {
 
       const categoriaDe = (t: string | null): string => {
         const v = (t || "").toUpperCase().trim();
-        if (["ZTPF", "ZTPD"].includes(v)) return "Preventiva";
-        if (["ZNTE", "ZNTP", "ZTRE"].includes(v)) return "Corretiva / Emergencial";
-        if (v === "ZTPC") return "P. Condição (ZTPC)";
+        if (["ZTPF", "ZTPD", "ZTRE"].includes(v) || v.includes("FREQUENC")) {
+          return "Preventiva por Frequência";
+        }
+        if (v === "ZTPC" || v.includes("CONDIÇ") || v.includes("CONDICAO")) {
+          return "Preventiva por Condição";
+        }
+        if (v === "ZNTE" || v.includes("EMERGENC")) return "Corretiva Emergencial";
+        if (v === "ZNTP" || v.includes("PROGRAMADA")) return "Corretiva Programada";
+        if (v === "ZNTS" || v.includes("SERVIÇO") || v.includes("SERVICO")) return "Serviços";
+        if (v === "ZTEN" || v.includes("MELHORIA")) return "Engenharia";
+        if (v.includes("PREDITIV") || v === "ZTPR") return "Preditiva";
+        if (v === "ZTCO" || v.includes("CONTROLE")) return "Controle Operacional";
         return v ? `Outro (${v})` : "Sem tipo";
       };
 
