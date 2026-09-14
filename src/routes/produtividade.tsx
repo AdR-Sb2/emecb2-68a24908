@@ -1197,6 +1197,10 @@ function UploadModal({
   const unassigned = recursos.filter((r) => !assigned.has(r));
 
   const handleSave = async () => {
+    if (!dataDia) {
+      toast.error("Selecione a data do dia.");
+      return;
+    }
     setIsSaving(true);
     try {
       const { data: diaData, error: diaErr } = await supabase
@@ -1331,8 +1335,16 @@ function UploadModal({
               </div>
             )}
             <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold">Data: {dataDia}</div>
+              <div className="flex items-center gap-3">
+                <div>
+                  <div className="text-xs text-slate-500">Data do dia</div>
+                  <input
+                    type="date"
+                    value={dataDia || ""}
+                    onChange={(e) => setDataDia(e.target.value || null)}
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  />
+                </div>
                 <div className="text-xs text-slate-500">
                   {atividades.length} atividades, {recursos.length} técnicos
                 </div>

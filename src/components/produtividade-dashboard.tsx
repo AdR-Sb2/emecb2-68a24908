@@ -13,7 +13,15 @@ import {
   Legend,
   LabelList,
 } from "recharts";
-import { ClipboardList, CheckCircle2, Activity, Wrench, Loader2, Trophy } from "lucide-react";
+import {
+  ClipboardList,
+  CheckCircle2,
+  Activity,
+  Wrench,
+  Users,
+  Loader2,
+  Trophy,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -141,10 +149,11 @@ function formatDataBR(d: string): string {
 }
 
 function formatMinutos(mins: number): string {
-  if (!mins) return "0h";
-  const h = Math.floor(mins / 60);
-  const min = mins % 60;
-  return min > 0 ? `${h}h${min}min` : `${h}h`;
+  if (!mins) return "00:00";
+  const total = Math.round(mins);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 // ─── Período ──────────────────────────────────────────────────
@@ -497,8 +506,12 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     }
     const horasMediaDia = numDias > 0 ? horasExec / numDias : 0;
     const corretivasMinMedia = numDias > 0 ? corretivasMin / numDias : 0;
-    return { totalExec, corretivas, horasMediaDia, corretivasMinMedia };
-  }, [atividadesEquipe, dias]);
+
+    const numEquipes = new Set(equipes.map((e) => e.nome_equipe.trim())).size;
+    const mediaPorEquipe = numEquipes > 0 ? totalExec / numEquipes : 0;
+
+    return { totalExec, corretivas, horasMediaDia, corretivasMinMedia, mediaPorEquipe };
+  }, [atividadesEquipe, dias, equipes]);
 
   const destaques = useMemo(() => {
     if (osPorEquipe.length === 0) return null;
@@ -591,6 +604,16 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                   <div className="text-[10px] text-slate-400">
                     ({formatMinutos(kpis.corretivasMinMedia)} gastos por dia)
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-3">
+                <Users className="h-8 w-8 shrink-0 text-teal-600" />
+                <div>
+                  <div className="text-2xl font-bold">{kpis.mediaPorEquipe.toFixed(1)}</div>
+                  <div className="text-[11px] text-slate-500">Média por Equipe</div>
+                  <div className="text-[10px] text-slate-400">(OS executadas por equipe)</div>
                 </div>
               </CardContent>
             </Card>
