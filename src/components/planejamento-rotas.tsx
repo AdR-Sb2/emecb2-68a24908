@@ -14,6 +14,7 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
   Copy,
   Download,
   FilePlus2,
@@ -65,9 +66,10 @@ type Parada = {
   id: string;
   elevatoria_id: number | null;
   elevatoria_nome: string;
+  planta?: string | null;
   lat: number | null;
   lon: number | null;
-  os: OsInfo;
+  oss: OsInfo[];
 };
 
 type Planejamento = {
@@ -79,6 +81,26 @@ type Planejamento = {
   paradas: Parada[];
   pendentes?: Elevatoria[];
 };
+
+const ossDeParada = (p: { oss?: OsInfo[]; os?: OsInfo }): OsInfo[] => {
+  if (Array.isArray(p.oss)) return p.oss;
+  if (p.os) return [p.os];
+  return [];
+};
+
+const normalizarParadas = (items: unknown[]): Parada[] =>
+  items.map((x) => {
+    const p = x as Parada & { os?: OsInfo };
+    return {
+      id: p.id || uuid(),
+      elevatoria_id: p.elevatoria_id ?? null,
+      elevatoria_nome: p.elevatoria_nome,
+      planta: p.planta,
+      lat: p.lat ?? null,
+      lon: p.lon ?? null,
+      oss: ossDeParada(p),
+    };
+  });
 
 const TIPOS_OS = [
   "Preventiva por Frequência",
@@ -119,9 +141,10 @@ const novaParada = (el: Elevatoria): Parada => ({
   id: uuid(),
   elevatoria_id: el.id,
   elevatoria_nome: el.nome,
+  planta: el.planta,
   lat: el.lat,
   lon: el.lon,
-  os: { origem: "vazio" },
+  oss: [],
 });
 
 const statusDaOS = (os: OsInfo): { label: string; cls: string } => {
@@ -261,9 +284,21 @@ function PlanejamentoMap({
             <div className="font-semibold text-[#0b3a73]">
               Parada #{idx + 1} · {p.elevatoria_nome}
             </div>
-            {p.os.om && <div>O.S.: {p.os.om}</div>}
-            {p.os.origem === "nova" && (
-              <div className="font-semibold text-amber-600">Pendente de criação</div>
+            {ossDeParada(p).length === 0 && (
+              <div className="mt-0.5 text-slate-400">Sem O.S. vinculadas</div>
+            )}
+            {ossDeParada(p).map((o, j) => (
+              <div key={j} className="mt-0.5">
+                {o.origem === "nova" ? (
+                  <span className="font-semibold text-amber-600">● Pendente de criação</span>
+                ) : (
+                  <span className="font-semibold">{o.om || "O.S. livre"}</span>
+                )}
+                {o.tipo ? ` · ${o.tipo}` : ""}
+              </div>
+            ))}
+            {ossDeParada(p).length > 0 && (
+              <div className="mt-1 text-[10px] text-slate-400">{ossDeParada(p).length} O.S.</div>
             )}
             <button
               className="mt-1 cursor-pointer rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-600"
@@ -508,7 +543,11 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const [planejamentoId, setPlanejamentoId] = useState<number | null>(null);
   const [planejamentoNome, setPlanejamentoNome] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [osDialogIdx, setOsDialogIdx] = useState<number | null>(null);
+  const [osDialogAlvo, setOsDialogAlvo] = useState<{ idx: number; osIdx: number | null } | null>(
+    null,
+  );
+  const [removerOsAlvo, setRemoverOsAlvo] = useState<{ idx: number; osIdx: number } | null>(null);
+  const [colapsadas, setColapsadas] = useState<Set<string>>(new Set());
   const [nomeDialogOpen, setNomeDialogOpen] = useState(false);
   const [nomeInput, setNomeInput] = useState("");
   const [bibliotecaOpen, setBibliotecaOpen] = useState(false);
@@ -630,8 +669,37 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       return next;
     });
 
-  const setParadaOs = (idx: number, patch: Partial<OsInfo>) =>
-    setParadas((prev) => prev.map((p, i) => (i === idx ? { ...p, os: { ...p.os, ...patch } } : p)));
+  const addOs = (idx: number, os: OsInfo) =>
+    setParadas((prev) =>
+      prev.map((p, i) => (i === idx ? { ...p, oss: [...ossDeParada(p), os] } : p)),
+    );
+
+  const updateOs = (idx: number, osIdx: number, patch: Partial<OsInfo>) =>
+    setParadas((prev) =>
+      prev.map((p, i) =>
+        i === idx
+          ? {
+              ...p,
+              oss: ossDeParada(p).map((o, j) => (j === osIdx ? { ...o, ...patch } : o)),
+            }
+          : p,
+      ),
+    );
+
+  const removeOs = (idx: number, osIdx: number) =>
+    setParadas((prev) =>
+      prev.map((p, i) =>
+        i === idx ? { ...p, oss: ossDeParada(p).filter((_, j) => j !== osIdx) } : p,
+      ),
+    );
+
+  const toggleParada = (id: string) =>
+    setColapsadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const findOS = (texto: string) => {
     const q = String(texto || "").trim();
@@ -646,10 +714,10 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     );
   };
 
-  const vincularPorTexto = (idx: number, texto: string) => {
+  const vincularPorTexto = (idx: number, osIdx: number, texto: string) => {
     const row = findOS(texto);
     if (!row) {
-      setParadaOs(idx, {
+      updateOs(idx, osIdx, {
         origem: texto.trim() ? "livre" : "vazio",
         om: texto.trim() ? texto.trim() : undefined,
         tipo: undefined,
@@ -660,7 +728,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       });
       return;
     }
-    setParadaOs(idx, {
+    updateOs(idx, osIdx, {
       origem: "sistema",
       om: row["Ordem de Manutenção"] || undefined,
       tipo: row["Tipo de Atividade"] || undefined,
@@ -670,20 +738,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       prioridade: row.PRIORIDADE || undefined,
     });
   };
-
-  const vincularCadastrada = (idx: number, row: BacklogOS) =>
-    setParadaOs(idx, {
-      origem: "sistema",
-      om: row["Ordem de Manutenção"] || undefined,
-      tipo: row["Tipo de Atividade"] || undefined,
-      texto_breve: row["TEXTO BREVE"] || undefined,
-      planta: row.PLANTA || undefined,
-      equipamento: row["DESCRIÇÃO EQUIPAMENTO"] || undefined,
-      prioridade: row.PRIORIDADE || undefined,
-    });
-
-  const vincularNova = (idx: number, nova: Omit<OsInfo, "origem">) =>
-    setParadaOs(idx, { ...nova, origem: "nova" });
 
   const optimizeRoute = () => {
     if (paradas.length < 3) {
@@ -885,12 +939,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   };
 
   const abrirPlanejamento = (p: Planejamento) => {
-    setParadas(
-      (Array.isArray(p.paradas) ? p.paradas : []).map((x) => ({
-        ...x,
-        id: x.id || uuid(),
-      })),
-    );
+    setParadas(normalizarParadas(Array.isArray(p.paradas) ? p.paradas : []));
     setPendentes(Array.isArray(p.pendentes) ? p.pendentes : []);
     setPlanejamentoId(p.id);
     setPlanejamentoNome(p.nome);
@@ -1003,32 +1052,66 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       const ExcelJS = await import("exceljs");
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Planejamento");
+
+      const totalOs = paradas.reduce((acc, p) => acc + ossDeParada(p).length, 0);
+      const existentes = paradas.reduce(
+        (acc, p) => acc + ossDeParada(p).filter((o) => o.origem === "sistema").length,
+        0,
+      );
+      const pendentesCriacao = paradas.reduce(
+        (acc, p) => acc + ossDeParada(p).filter((o) => o.origem === "nova").length,
+        0,
+      );
+
+      const resumo = ws.getRow(1);
+      resumo.font = { bold: true };
+      resumo.values = [
+        `Resumo do Planejamento${planejamentoNome ? ` — ${planejamentoNome}` : ""}`,
+        "",
+        `Paradas: ${paradas.length}`,
+        `O.S.: ${totalOs}`,
+        `Existentes: ${existentes}`,
+        `Pendentes de criação: ${pendentesCriacao}`,
+      ];
+      resumo.eachCell((cell) => {
+        if (cell.value)
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF3FB" } };
+      });
+
       ws.columns = [
-        { header: "#", key: "n", width: 4 },
+        { header: "Parada #", key: "n", width: 8 },
         { header: "Elevatória", key: "elev", width: 34 },
+        { header: "Planta", key: "planta", width: 20 },
         { header: "OS", key: "os", width: 14 },
         { header: "Tipo", key: "tipo", width: 26 },
         { header: "Texto Breve", key: "texto", width: 48 },
-        { header: "Status", key: "status", width: 16 },
+        { header: "Status", key: "status", width: 18 },
         { header: "Observações", key: "obs", width: 40 },
       ];
-      const header = ws.getRow(1);
+      const header = ws.getRow(2);
       header.font = { bold: true };
       header.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B3A73" } };
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
       });
-      paradas.forEach((p, i) => {
-        ws.addRow({
-          n: i + 1,
-          elev: p.elevatoria_nome,
-          os: p.os.origem === "nova" ? "PENDENTE" : p.os.origem === "vazio" ? "" : p.os.om || "",
-          tipo: p.os.tipo || "",
-          texto: p.os.texto_breve || "",
-          status: statusDaOS(p.os).label,
-          obs: p.os.observacao || "",
-        });
+
+      const linhaOs = (p: Parada, i: number, o: OsInfo) => ({
+        n: i + 1,
+        elev: p.elevatoria_nome,
+        planta: p.planta || "",
+        os: o.origem === "nova" ? "PENDENTE" : o.origem === "vazio" ? "" : o.om || "",
+        tipo: o.tipo || "",
+        texto: o.texto_breve || "",
+        status: statusDaOS(o).label,
+        obs: o.observacao || "",
       });
+
+      paradas.forEach((p, i) => {
+        const oss = ossDeParada(p);
+        if (oss.length === 0) ws.addRow(linhaOs(p, i, { origem: "vazio" }));
+        else for (const o of oss) ws.addRow(linhaOs(p, i, o));
+      });
+
       if (pendentes.length > 0) {
         const ws2 = wb.addWorksheet("Pendentes");
         ws2.columns = [
@@ -1068,22 +1151,20 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     }
   };
 
-  const marcarPendente = (idx: number) => {
-    if (paradas[idx]?.os.origem === "nova") {
-      setOsDialogIdx(idx);
-      return;
+  const removerOsConfirmar = () => {
+    if (removerOsAlvo) {
+      removeOs(removerOsAlvo.idx, removerOsAlvo.osIdx);
+      setRemoverOsAlvo(null);
+      toast.success("O.S. removida.");
     }
-    setParadaOs(idx, {
-      origem: "nova",
-      om: undefined,
-      tipo: undefined,
-      texto_breve: undefined,
-      planta: undefined,
-      equipamento: undefined,
-      prioridade: undefined,
-      observacao: undefined,
-    });
-    setOsDialogIdx(idx);
+  };
+
+  const abreOsDialog = (idx: number, osIdx: number | null) => setOsDialogAlvo({ idx, osIdx });
+
+  const removerParadaConfirmar = (idx: number) => {
+    if (window.confirm(`Remover ${String(paradas[idx]?.elevatoria_nome)} da rota?`)) {
+      removeParada(idx);
+    }
   };
 
   const tabela = (
@@ -1100,95 +1181,60 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             <th className="px-2 py-2 text-right">Ações</th>
           </tr>
         </thead>
-        <tbody>
-          {paradas.length === 0 && (
+        {paradas.length === 0 && (
+          <tbody>
             <tr>
               <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-400">
                 Nenhuma parada ainda. Clique nas elevatórias no mapa para montar a rota.
               </td>
             </tr>
-          )}
-          {paradas.map((p, idx) => {
-            const st = statusDaOS(p.os);
-            return (
-              <tr
-                key={p.id}
-                onClick={() => setOsDialogIdx(idx)}
-                className="cursor-pointer border-t border-slate-100 hover:bg-[#eaf3fb]/50 dark:border-slate-700 dark:hover:bg-slate-700/30"
-              >
-                <td className="px-2 py-1.5 font-bold text-[#0b3a73] dark:text-white">{idx + 1}</td>
+          </tbody>
+        )}
+        {paradas.map((p, idx) => {
+          const oss = ossDeParada(p);
+          const colapsada = colapsadas.has(p.id);
+          const botaoAcao =
+            "rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] disabled:opacity-30 dark:hover:bg-slate-700 cursor-pointer";
+          return (
+            <tbody key={p.id} className="border-t border-slate-100 dark:border-slate-700">
+              <tr className="bg-slate-50/60 hover:bg-[#eaf3fb]/40 dark:bg-slate-800/40 dark:hover:bg-slate-700/30">
                 <td className="px-2 py-1.5">
-                  <div className="font-medium">{p.elevatoria_nome}</div>
+                  <button
+                    onClick={() => toggleParada(p.id)}
+                    title={colapsada ? "Expandir" : "Recolher"}
+                    className="mr-1 inline-flex items-center rounded p-0.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${colapsada ? "-rotate-90" : ""}`}
+                    />
+                  </button>
+                  <span className="font-bold text-[#0b3a73] dark:text-white">{idx + 1}</span>
+                </td>
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{p.elevatoria_nome}</span>
+                    <span className="inline-flex items-center rounded bg-[#0b3a73] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {oss.length} OS
+                    </span>
+                    {p.planta && (
+                      <span className="text-[10px] text-slate-400">Planta: {p.planta}</span>
+                    )}
+                  </div>
                   <div className="text-[10px] text-slate-400">{p.elevatoria_id}</div>
                 </td>
-                <td className="px-2 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    {p.os.origem === "nova" && (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                        <FilePlus2 className="h-3 w-3" />
-                      </span>
-                    )}
-                    <input
-                      value={p.os.om || ""}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => vincularPorTexto(idx, e.target.value)}
-                      placeholder={
-                        p.os.origem === "nova" ? "Digite o nº da O.S. criada" : "Nº da O.S."
-                      }
-                      title={
-                        p.os.origem === "nova"
-                          ? "Esta parada estava marcada como pendente de criação. Digite o nº da O.S. criada para vinculá-la."
-                          : "Digite o nº da O.S. para vincular (busca no backlog)"
-                      }
-                      className="w-40 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
-                    />
-                  </div>
-                </td>
-                <td className="px-2 py-1.5">
-                  <select
-                    value={
-                      TIPOS_OS.includes(p.os.tipo || "") ? p.os.tipo : p.os.tipo ? "Outro" : ""
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) =>
-                      setParadaOs(idx, {
-                        tipo: e.target.value === "Outro" ? "Outro" : e.target.value,
-                      })
-                    }
-                    className="w-40 rounded border border-slate-200 bg-white px-1 py-1 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                <td colSpan={4} className="px-2 py-1.5 text-right">
+                  <button
+                    onClick={() => abreOsDialog(idx, null)}
+                    className="mr-2 inline-flex items-center gap-1 rounded border border-dashed border-[#1f7ad6] px-2 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] dark:text-white dark:hover:bg-slate-700 cursor-pointer"
                   >
-                    <option value="">Sem tipo</option>
-                    {TIPOS_OS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    value={p.os.texto_breve || ""}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setParadaOs(idx, { texto_breve: e.target.value })}
-                    placeholder="Texto breve"
-                    className="w-56 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
-                    {st.label}
-                  </span>
-                </td>
-                <td className="px-2 py-1.5">
-                  <div
-                    className="flex items-center justify-end gap-0.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                    <FilePlus2 className="h-3 w-3" /> Adicionar OS
+                  </button>
+                  <span className="inline-flex items-center gap-0.5">
                     <button
                       onClick={() => moveParada(idx, -1)}
                       disabled={idx === 0}
                       title="Subir"
-                      className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] disabled:opacity-30 dark:hover:bg-slate-700 cursor-pointer"
+                      className={botaoAcao}
                     >
                       <ArrowUp className="h-3.5 w-3.5" />
                     </button>
@@ -1196,23 +1242,131 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
                       onClick={() => moveParada(idx, 1)}
                       disabled={idx === paradas.length - 1}
                       title="Descer"
-                      className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] disabled:opacity-30 dark:hover:bg-slate-700 cursor-pointer"
+                      className={botaoAcao}
                     >
                       <ArrowDown className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => removeParada(idx)}
-                      title="Remover"
+                      onClick={() => removerParadaConfirmar(idx)}
+                      title="Remover da rota"
                       className="rounded p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
-                  </div>
+                  </span>
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
+              {!colapsada &&
+                oss.map((o, osIdx) => {
+                  const st = statusDaOS(o);
+                  return (
+                    <tr
+                      key={osIdx}
+                      className="border-t border-slate-100 hover:bg-[#eaf3fb]/50 dark:border-slate-700 dark:hover:bg-slate-700/30"
+                    >
+                      <td className="px-2 py-1 text-center text-[10px] text-slate-400">
+                        {osIdx + 1}º
+                      </td>
+                      <td className="px-2 py-1" />
+                      <td className="px-2 py-1">
+                        <div className="flex items-center gap-1.5">
+                          {o.origem === "nova" && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                              title="Pendente de criação"
+                            >
+                              <FilePlus2 className="h-3 w-3" />
+                            </span>
+                          )}
+                          <input
+                            value={o.om || ""}
+                            onChange={(e) => vincularPorTexto(idx, osIdx, e.target.value)}
+                            placeholder={
+                              o.origem === "nova" ? "Digite o nº da O.S. criada" : "Nº da O.S."
+                            }
+                            title={
+                              o.origem === "nova"
+                                ? "Esta O.S. está pendente de criação. Digite o nº da O.S. criada para vinculá-la."
+                                : "Digite o nº da O.S. para vincular (busca no backlog)"
+                            }
+                            className="w-40 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-2 py-1">
+                        <select
+                          value={TIPOS_OS.includes(o.tipo || "") ? o.tipo : o.tipo ? "Outro" : ""}
+                          onChange={(e) =>
+                            updateOs(idx, osIdx, {
+                              tipo: e.target.value === "Outro" ? "Outro" : e.target.value,
+                            })
+                          }
+                          className="w-40 rounded border border-slate-200 bg-white px-1 py-1 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          <option value="">Sem tipo</option>
+                          {TIPOS_OS.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          value={o.texto_breve || ""}
+                          onChange={(e) => updateOs(idx, osIdx, { texto_breve: e.target.value })}
+                          placeholder="Texto breve"
+                          className="w-56 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
+                        >
+                          {st.label}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            onClick={() => abreOsDialog(idx, osIdx)}
+                            title="Editar O.S."
+                            className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:hover:bg-slate-700 cursor-pointer"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setRemoverOsAlvo({
+                                idx,
+                                osIdx,
+                              })
+                            }
+                            title="Remover O.S."
+                            className="rounded p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              {!colapsada && (
+                <tr className="border-t border-slate-100 dark:border-slate-700">
+                  <td colSpan={7} className="px-2 py-1">
+                    <button
+                      onClick={() => abreOsDialog(idx, null)}
+                      className="inline-flex items-center gap-1 rounded border border-dashed border-[#1f7ad6] px-2 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] dark:border-slate-600 dark:text-white dark:hover:bg-slate-700 cursor-pointer"
+                    >
+                      <FilePlus2 className="h-3 w-3" /> Adicionar OS
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          );
+        })}
       </table>
     </div>
   );
@@ -1300,14 +1454,38 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       <div className="mt-3">{tabela}</div>
 
       <OsDialog
-        idx={osDialogIdx}
+        alvo={osDialogAlvo}
         paradas={paradas}
         backlogOS={backlogOS}
-        onClose={() => setOsDialogIdx(null)}
-        onVincularCadastrada={vincularCadastrada}
-        onVincularNova={vincularNova}
-        onMarcarPendente={marcarPendente}
+        onClose={() => setOsDialogAlvo(null)}
+        onAdd={addOs}
+        onUpdate={updateOs}
       />
+
+      <Dialog open={removerOsAlvo !== null} onOpenChange={(o) => !o && setRemoverOsAlvo(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Remover O.S.?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Deseja remover esta O.S. da parada?
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setRemoverOsAlvo(null)}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={removerOsConfirmar}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 cursor-pointer"
+            >
+              Remover
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={nomeDialogOpen} onOpenChange={setNomeDialogOpen}>
         <DialogContent className="max-w-sm">
@@ -1475,26 +1653,25 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 }
 
 function OsDialog({
-  idx,
+  alvo,
   paradas,
   backlogOS,
   onClose,
-  onVincularCadastrada,
-  onVincularNova,
-  onMarcarPendente,
+  onAdd,
+  onUpdate,
 }: {
-  idx: number | null;
+  alvo: { idx: number; osIdx: number | null } | null;
   paradas: Parada[];
   backlogOS: BacklogOS[];
   onClose: () => void;
-  onVincularCadastrada: (idx: number, row: BacklogOS) => void;
-  onVincularNova: (idx: number, nova: Omit<OsInfo, "origem">) => void;
-  onMarcarPendente: (idx: number) => void;
+  onAdd: (idx: number, os: OsInfo) => void;
+  onUpdate: (idx: number, osIdx: number, patch: Partial<OsInfo>) => void;
 }) {
   const [mode, setMode] = useState<"existente" | "nova">("existente");
   const [busca, setBusca] = useState("");
   const [selecionada, setSelecionada] = useState<BacklogOS | null>(null);
   const [nova, setNova] = useState({
+    om: "",
     tipo: "",
     texto_breve: "",
     planta: "",
@@ -1503,22 +1680,41 @@ function OsDialog({
     observacao: "",
   });
 
+  const editando = alvo != null && alvo.osIdx != null;
+  const idx = alvo?.idx ?? null;
+  const parada = idx != null ? paradas[idx] : null;
+  const osAtual = editando && parada ? ossDeParada(parada)[alvo!.osIdx as number] : null;
+
   useEffect(() => {
-    if (idx != null) {
+    if (alvo) {
       setBusca("");
       setSelecionada(null);
-      setNova({
-        tipo: "",
-        texto_breve: "",
-        planta: "",
-        equipamento: "",
-        prioridade: "",
-        observacao: "",
-      });
+      if (editando && osAtual) {
+        setNova({
+          om: osAtual.om || "",
+          tipo: osAtual.tipo || "",
+          texto_breve: osAtual.texto_breve || "",
+          planta: osAtual.planta || "",
+          equipamento: osAtual.equipamento || "",
+          prioridade: osAtual.prioridade || "",
+          observacao: osAtual.observacao || "",
+        });
+        setMode(osAtual.origem === "nova" ? "nova" : "existente");
+      } else {
+        setNova({
+          om: "",
+          tipo: "",
+          texto_breve: "",
+          planta: "",
+          equipamento: "",
+          prioridade: "",
+          observacao: "",
+        });
+        setMode("existente");
+      }
     }
-  }, [idx]);
-
-  const parada = idx != null ? paradas[idx] : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvo]);
 
   const resultados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -1537,31 +1733,48 @@ function OsDialog({
   const confirmar = () => {
     if (idx == null) return;
     if (mode === "existente" && selecionada) {
-      onVincularCadastrada(idx, selecionada);
+      const os = {
+        origem: "sistema" as const,
+        om: selecionada["Ordem de Manutenção"] || undefined,
+        tipo: selecionada["Tipo de Atividade"] || undefined,
+        texto_breve: selecionada["TEXTO BREVE"] || undefined,
+        planta: selecionada.PLANTA || undefined,
+        equipamento: selecionada["DESCRIÇÃO EQUIPAMENTO"] || undefined,
+        prioridade: selecionada.PRIORIDADE || undefined,
+      };
+      if (editando) onUpdate(idx, alvo!.osIdx as number, os);
+      else onAdd(idx, os);
       onClose();
       toast.success("O.S. vinculada à parada.");
     } else if (mode === "nova" && nova.tipo) {
-      onVincularNova(idx, {
+      const os = {
+        origem: "nova" as const,
+        om: nova.om || undefined,
         tipo: nova.tipo,
         texto_breve: nova.texto_breve || undefined,
         planta: nova.planta || undefined,
         equipamento: nova.equipamento || undefined,
         prioridade: nova.prioridade || undefined,
         observacao: nova.observacao || undefined,
-      });
+      };
+      if (editando) onUpdate(idx, alvo!.osIdx as number, os);
+      else onAdd(idx, os);
       onClose();
-      toast.success("O.S. registrada como pendente de criação.");
+      toast.success(editando ? "O.S. atualizada." : "O.S. registrada como pendente de criação.");
     } else if (mode === "nova") {
       toast.warning("Informe ao menos o tipo de ordem.");
+    } else if (editando) {
+      toast.warning("Selecione uma O.S. para atualizar.");
     }
   };
 
   return (
-    <Dialog open={idx != null} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={alvo != null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-[#0b3a73] dark:text-white">
-            Parada #{idx != null ? idx + 1 : ""}: {parada?.elevatoria_nome || ""}
+            {editando ? "Editar O.S." : "Adicionar O.S."} — Parada #{idx != null ? idx + 1 : ""}:{" "}
+            {parada?.elevatoria_nome || ""}
           </DialogTitle>
         </DialogHeader>
 
@@ -1584,7 +1797,8 @@ function OsDialog({
                 : "text-slate-500 dark:text-slate-400"
             } cursor-pointer`}
           >
-            <FilePlus2 className="mr-1 inline h-3 w-3" /> Nova O.S. (pendente)
+            <FilePlus2 className="mr-1 inline h-3 w-3" />
+            {editando ? "Editar campos" : "Nova O.S. (pendente)"}
           </button>
         </div>
 
@@ -1637,6 +1851,17 @@ function OsDialog({
           </div>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
+            {editando && (
+              <div className="sm:col-span-2">
+                <Field label="Nº da O.S.">
+                  <input
+                    value={nova.om}
+                    onChange={(e) => setNova({ ...nova, om: e.target.value })}
+                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  />
+                </Field>
+              </div>
+            )}
             <Field label="Tipo de Ordem *">
               <select
                 value={nova.tipo}
@@ -1701,31 +1926,20 @@ function OsDialog({
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-end gap-2">
           <button
-            onClick={() => {
-              setMode("nova");
-              onMarcarPendente(idx as number);
-            }}
-            className="text-[11px] text-amber-600 hover:underline cursor-pointer"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
           >
-            <FilePlus2 className="mr-1 inline h-3 w-3" /> Marcar como pendente de criação
+            Cancelar
           </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={confirmar}
-              disabled={(mode === "existente" && !selecionada) || (mode === "nova" && !nova.tipo)}
-              className="rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-40 cursor-pointer"
-            >
-              Confirmar
-            </button>
-          </div>
+          <button
+            onClick={confirmar}
+            disabled={(mode === "existente" && !selecionada) || (mode === "nova" && !nova.tipo)}
+            className="rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-40 cursor-pointer"
+          >
+            {editando ? "Atualizar" : "Confirmar"}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
