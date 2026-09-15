@@ -519,6 +519,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const [excluirAlvo, setExcluirAlvo] = useState<Planejamento | null>(null);
   const [pendentes, setPendentes] = useState<Elevatoria[]>([]);
   const [pendModalOpen, setPendModalOpen] = useState(false);
+  const usarColunaPendentes = useRef<boolean | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -576,6 +577,14 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   }, []);
 
   const routeIds = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
+
+  const colunaPendentesDisponivel = async () => {
+    if (usarColunaPendentes.current === null) {
+      const { error } = await supabase.from("planejamentos").select("pendentes").limit(1);
+      usarColunaPendentes.current = !(error && /pendentes/i.test(error.message || ""));
+    }
+    return usarColunaPendentes.current;
+  };
 
   const contarParadas = (p: Planejamento) => (Array.isArray(p.paradas) ? p.paradas : []).length;
 
@@ -725,16 +734,16 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const abrirBiblioteca = async () => {
     setCarregandoBiblioteca(true);
     setBibliotecaOpen(true);
-    let row = await supabase
-      .from("planejamentos")
-      .select("id, nome, autor_nome, criado_em, atualizado_em, paradas, pendentes")
-      .order("atualizado_em", { ascending: false });
-    if (row.error && /pendentes/i.test(row.error.message)) {
-      row = (await supabase
-        .from("planejamentos")
-        .select("id, nome, autor_nome, criado_em, atualizado_em, paradas")
-        .order("atualizado_em", { ascending: false })) as typeof row;
-    }
+    const comColuna = await colunaPendentesDisponivel();
+    const row = comColuna
+      ? await supabase
+          .from("planejamentos")
+          .select("id, nome, autor_nome, criado_em, atualizado_em, paradas, pendentes")
+          .order("atualizado_em", { ascending: false })
+      : await supabase
+          .from("planejamentos")
+          .select("id, nome, autor_nome, criado_em, atualizado_em, paradas")
+          .order("atualizado_em", { ascending: false });
     const { data, error } = row;
     if (error && !isRelationMissing(error)) {
       toast.error("Não foi possível carregar a biblioteca.", {
@@ -745,16 +754,21 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       return;
     }
     if (!isRelationMissing(error)) {
+      const espelhos = lerLocais();
       setBiblioteca(
-        (data ?? []).map((p) => ({
-          ...(p as unknown as Planejamento),
-          paradas: Array.isArray((p as unknown as Planejamento).paradas)
-            ? (p as unknown as Planejamento).paradas
-            : [],
-          pendentes: Array.isArray((p as { pendentes?: unknown }).pendentes)
-            ? ((p as { pendentes?: unknown }).pendentes as Elevatoria[])
-            : [],
-        })),
+        (data ?? []).map((p) => {
+          const base = p as unknown as Planejamento;
+          const local = espelhos.find((l) => l.id === base.id);
+          return {
+            ...base,
+            paradas: Array.isArray(base.paradas) ? base.paradas : [],
+            pendentes: Array.isArray(base.pendentes)
+              ? base.pendentes
+              : local && Array.isArray(local.pendentes)
+                ? local.pendentes
+                : [],
+          };
+        }),
       );
     } else {
       setBiblioteca(lerLocais());
@@ -763,8 +777,10 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   };
 
   const salvar = async () => {
-    if (paradas.length === 0) {
-      toast.warning("Adicione ao menos uma parada antes de salvar.");
+    if (paradas.length === 0 && pendentes.length === 0) {
+      toast.warning(
+        "Adicione ao menos uma parada ou marque uma elevatória pendente antes de salvar.",
+      );
       return;
     }
     const nome = planejamentoNome;
@@ -778,16 +794,34 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 
   const persistir = async (nome: string) => {
     setSalvando(true);
-    const payload = {
+    const comColuna = await colunaPendentesDisponivel();
+    const base = {
       nome,
       paradas,
-      pendentes,
       autor_id: user?.id ?? null,
       autor_nome: profile?.nome_completo ?? null,
       atualizado_em: new Date().toISOString(),
     };
+    const payload = comColuna ? { ...base, pendentes: [...pendentes] } : base;
     try {
       let id = planejamentoId;
+      const gravarEspelhoLocal = () => {
+        if (comColuna) return;
+        const items = lerLocais();
+        const idx = items.findIndex((p) => p.id === id);
+        const espelho: Planejamento = {
+          id: id as number,
+          nome,
+          autor_nome: profile?.nome_completo ?? null,
+          criado_em: idx >= 0 ? items[idx].criado_em : new Date().toISOString(),
+          atualizado_em: new Date().toISOString(),
+          paradas: [...paradas],
+          pendentes: [...pendentes],
+        };
+        if (idx >= 0) items[idx] = espelho;
+        else items.push(espelho);
+        gravarLocais(items);
+      };
       if (id != null) {
         const { error } = await supabase.from("planejamentos").update(payload).eq("id", id);
         if (error && !isRelationMissing(error)) throw error;
@@ -795,6 +829,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
           const items = lerLocais().map((p) => (p.id === id ? { ...p, ...payload } : p));
           gravarLocais(items);
         }
+        gravarEspelhoLocal();
       } else {
         const { data, error } = await supabase
           .from("planejamentos")
@@ -818,6 +853,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
           id = novo.id;
         } else {
           id = Number(data?.id);
+          gravarEspelhoLocal();
         }
       }
       setPlanejamentoId(id);
@@ -825,6 +861,11 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       setSalvando(false);
       toast.success(
         id != null && planejamentoId != null ? "Planejamento atualizado." : "Planejamento salvo.",
+        {
+          description: comColuna
+            ? undefined
+            : "Pendentes: salvos neste navegador até a sincronização do banco ativar.",
+        },
       );
     } catch (err) {
       setSalvando(false);
@@ -860,14 +901,24 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const duplicar = async (p: Planejamento) => {
     const copia = `Cópia de ${p.nome}`;
     const pendentesDuplicadas = Array.isArray(p.pendentes) ? p.pendentes : [];
-    const payload = {
+    const paradasDuplicadas = Array.isArray(p.paradas)
+      ? p.paradas.map((x) => ({ ...x, id: uuid() }))
+      : [];
+    const comColuna = await colunaPendentesDisponivel();
+    const payloadSemPendentes = {
       nome: copia,
-      paradas: Array.isArray(p.paradas) ? p.paradas.map((x) => ({ ...x, id: uuid() })) : [],
-      pendentes: pendentesDuplicadas,
+      paradas: paradasDuplicadas,
       autor_id: user?.id ?? null,
       autor_nome: profile?.nome_completo ?? null,
     };
-    const { error } = await supabase.from("planejamentos").insert(payload);
+    const payload = comColuna
+      ? { ...payloadSemPendentes, pendentes: [...pendentesDuplicadas] }
+      : payloadSemPendentes;
+    const { data, error } = await supabase
+      .from("planejamentos")
+      .insert(payload)
+      .select("id")
+      .single();
     if (error && !isRelationMissing(error)) {
       toast.error("Não foi possível duplicar.", { description: error.message });
       return;
@@ -881,7 +932,19 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         criado_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
         paradas: payload.paradas,
-        pendentes: payload.pendentes,
+        pendentes: pendentesDuplicadas,
+      });
+      gravarLocais(items);
+    } else if (!comColuna) {
+      const items = lerLocais();
+      items.push({
+        id: Number(data?.id),
+        nome: copia,
+        autor_nome: profile?.nome_completo ?? null,
+        criado_em: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+        paradas: paradasDuplicadas,
+        pendentes: pendentesDuplicadas,
       });
       gravarLocais(items);
     }
