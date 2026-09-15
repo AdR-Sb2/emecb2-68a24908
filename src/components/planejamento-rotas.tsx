@@ -515,35 +515,52 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   useEffect(() => {
     let alive = true;
     (async () => {
-      const { data, error } = await supabase
-        .from("elevatorias")
-        .select("id, nome, planta, latitude, longitude")
-        .order("nome", { ascending: true });
-      if (!alive) return;
-      setElevLoading(false);
-      if (error) {
-        toast.error("Não deu para carregar as elevatórias do mapa.", {
-          description: error.message,
-        });
-        setElevatorias([]);
-        return;
+      const PASSO = 1000;
+      const todas: Array<{
+        id: number;
+        nome: string;
+        planta: string | null;
+        lat: number;
+        lon: number;
+      }> = [];
+      let de = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from("elevatorias")
+          .select("id, nome, planta, latitude, longitude")
+          .order("nome", { ascending: true })
+          .range(de, de + PASSO - 1);
+        if (!alive) return;
+        if (error) {
+          toast.error("Não deu para carregar as elevatórias do mapa.", {
+            description: error.message,
+          });
+          setElevatorias([]);
+          setElevLoading(false);
+          return;
+        }
+        const page = (data as Array<{ [k: string]: unknown }>)
+          .filter(
+            (el) =>
+              el.latitude != null &&
+              el.longitude != null &&
+              Number.isFinite(Number(el.latitude)) &&
+              Number.isFinite(Number(el.longitude)),
+          )
+          .map((el) => ({
+            id: Number(el.id),
+            nome: String(el.nome || el.planta || `#${el.id}`),
+            planta: el.planta ? String(el.planta) : null,
+            lat: Number(el.latitude),
+            lon: Number(el.longitude),
+          }));
+        todas.push(...page);
+        if (!data || data.length < PASSO) break;
+        de += PASSO;
       }
-      const list = (data as Array<{ [k: string]: unknown }>)
-        .filter(
-          (el) =>
-            el.latitude != null &&
-            el.longitude != null &&
-            Number.isFinite(Number(el.latitude)) &&
-            Number.isFinite(Number(el.longitude)),
-        )
-        .map((el) => ({
-          id: Number(el.id),
-          nome: String(el.nome || el.planta || `#${el.id}`),
-          planta: el.planta ? String(el.planta) : null,
-          lat: Number(el.latitude),
-          lon: Number(el.longitude),
-        }));
-      setElevatorias(list);
+      if (!alive) return;
+      setElevatorias(todas);
+      setElevLoading(false);
     })();
     return () => {
       alive = false;
