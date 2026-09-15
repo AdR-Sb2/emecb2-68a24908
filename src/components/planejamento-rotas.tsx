@@ -137,6 +137,20 @@ const distKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
 const isRelationMissing = (err: { message?: string } | null): boolean =>
   !err || /relation .*does not exist|42P01|PGRST205/i.test(err.message || "");
 
+const erroParaMensagem = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object") {
+    const m = (err as { message?: unknown }).message;
+    if (typeof m === "string") return m;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+};
+
 const novaParada = (el: Elevatoria): Parada => ({
   id: uuid(),
   elevatoria_id: el.id,
@@ -923,9 +937,28 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       );
     } catch (err) {
       setSalvando(false);
-      toast.error("Não foi possível salvar o planejamento.", {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      console.error("Falha ao salvar planejamento:", err);
+      const idN = planejamentoId ?? -Date.now();
+      const items = lerLocais();
+      const idx = items.findIndex((p) => p.id === idN);
+      const espelho: Planejamento = {
+        id: idN,
+        nome,
+        autor_nome: profile?.nome_completo ?? null,
+        criado_em: idx >= 0 ? items[idx].criado_em : new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+        paradas: [...paradas],
+        pendentes: [...pendentes],
+      };
+      if (idx >= 0) items[idx] = espelho;
+      else items.push(espelho);
+      gravarLocais(items);
+      setPlanejamentoId(idN);
+      setPlanejamentoNome(nome);
+      toast.error(
+        "Não foi possível salvar no banco. O planejamento foi preservado neste navegador.",
+        { description: erroParaMensagem(err) },
+      );
     }
   };
 
