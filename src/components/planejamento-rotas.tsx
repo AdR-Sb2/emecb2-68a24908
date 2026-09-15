@@ -285,16 +285,24 @@ function PlanejamentoMap({
         center={[el.lat, el.lon]}
         radius={9}
         pathOptions={{ color: "#15803d", fillColor: "#22c55e", fillOpacity: 0.85, weight: 3 }}
-        eventHandlers={{
-          click: () =>
-            toast.info(
-              `${el.nome} está pendente. Use o botão "Pendentes" para adicioná-la à rota.`,
-            ),
-        }}
+        eventHandlers={{ click: () => onAdd(el) }}
       >
         <Tooltip>
           <span className="font-semibold text-emerald-700">● Pendente</span> · {el.nome}
         </Tooltip>
+        <Popup>
+          <div className="text-xs">
+            <div className="font-semibold text-emerald-700">● Pendente</div>
+            <div className="font-semibold text-slate-700">{el.nome}</div>
+            {el.planta && <div className="text-slate-500">{el.planta}</div>}
+            <button
+              className="mt-1 cursor-pointer rounded bg-emerald-600 px-2 py-0.5 text-[11px] text-white"
+              onClick={() => onAdd(el)}
+            >
+              + Adicionar à rota
+            </button>
+          </div>
+        </Popup>
       </CircleMarker>
     );
   };
