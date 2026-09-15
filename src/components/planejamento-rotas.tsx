@@ -1059,19 +1059,27 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
                   <div className="text-[10px] text-slate-400">{p.elevatoria_id}</div>
                 </td>
                 <td className="px-2 py-1.5">
-                  {p.os.origem === "nova" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                      <FilePlus2 className="h-3 w-3" /> Pendente criação
-                    </span>
-                  ) : (
+                  <div className="flex items-center gap-1.5">
+                    {p.os.origem === "nova" && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        <FilePlus2 className="h-3 w-3" />
+                      </span>
+                    )}
                     <input
                       value={p.os.om || ""}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => vincularPorTexto(idx, e.target.value)}
-                      placeholder="Nº da O.S. (ou clique na linha)"
+                      placeholder={
+                        p.os.origem === "nova" ? "Digite o nº da O.S. criada" : "Nº da O.S."
+                      }
+                      title={
+                        p.os.origem === "nova"
+                          ? "Esta parada estava marcada como pendente de criação. Digite o nº da O.S. criada para vinculá-la."
+                          : "Digite o nº da O.S. para vincular (busca no backlog)"
+                      }
                       className="w-40 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
                     />
-                  )}
+                  </div>
                 </td>
                 <td className="px-2 py-1.5">
                   <select
