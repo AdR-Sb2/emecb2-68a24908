@@ -2,16 +2,13 @@
 
 ## Projeto
 
-Sistema web interno da equipe de Eletromecanica da Baixada 2 (Aguas do Rio). React 19 + TypeScript + TanStack Start (SSR) + Supabase (PostgreSQL).
+Sistema web interno da equipe de Eletromecanica da Baixada 2 (Aguas do Rio). React 19 + TypeScript (SPA Vite; TanStack Start/SSR nao e mais usado) + Supabase (PostgreSQL).
 
 ## Git / Deploy (IMPORTANTE)
 
-- `origin` = HiBigGuy/emecb2-68a24908 (nosso). `upstream` = AdR-Sb2/emecb2-68a24908 (conectado ao Lovable).
-- O deploy e gerado pelo Lovable a partir de `upstream/main`. Alteracoes no `main` local NAO vao para o deploy sozinhas: criar PR para `upstream` (base `main`) e pedir merge ao usuario.
+- `origin` = AdR-Sb2/emecb2-68a24908, conectado ao Lovable; o deploy e gerado a partir de `main`. Commits pushados no `main` sincronizam direto para o deploy/Lovable.
 - NAO reescrever historico publicado (force push / rebase / amend / squash de commits ja enviados) — o Lovable sincroniza pelo historico.
-- Token GitHub com permissao limitada no repo AdR-Sb2: consegue criar/atualizar PRs, mas NAO mergear, fechar nem comentar (GraphQL "Resource not accessible by integration"). Merge/close ficam com o usuario.
-- Se um PR de sync (merge do `main` inteiro) der conflito, portar os itens especificos: branch novo a partir de `upstream/main` + `git cherry-pick <commit>`. Feito assim para justificativa/nav (#36) e fixes de estoque (#38).
-- PRs/commits no `upstream/main` em que se referem: #34 (supabase projeto antigo), #36 (justificativa + nav voltar-home), #38 (correcoes de estoque/compras).
+- Mantenha o `main` em estado funcional apos cada push.
 
 ## Supabase
 
@@ -26,7 +23,7 @@ Sistema web interno da equipe de Eletromecanica da Baixada 2 (Aguas do Rio). Rea
 | Framework | React 19 + TypeScript |
 | Build | Vite 8 |
 | Roteamento | TanStack Router v1 (file-based em src/routes/) |
-| SSR | TanStack Start + Nitro (Cloudflare) |
+| SSR | Nao usado (SPA no Vite; TanStack Start ficou para tras) |
 | Query | TanStack Query |
 | Estilizacao | Tailwind CSS v4 + tw-animate-css |
 | Componentes | shadcn/ui (Radix UI) |
@@ -52,6 +49,10 @@ src/
     cronograma/
       publico/
         $token.tsx # /cronograma/publico/:token - Modo apresentacao
+    produtividade.tsx     # /produtividade - KPIs diarios de equipes
+    produtividade/
+      publico/
+        $token.tsx # /produtividade/publico/:token - Visao publica com ?dia=
     estoque.tsx    # /estoque - Estoque e Compras
     escala.tsx     # /escala - Escala de Trabalho
     oi.tsx         # /oi - Gerador de OI
@@ -76,6 +77,7 @@ src/
     permissoes.ts  # getPermissoesCargo(), temPermissao(), temPainel()
     tema.tsx       # TemaProvider (dark/light mode)
     utils.ts       # cn() helper
+    debounce.ts    # Debounce para autosave (inline editing)
     cronograma-types.ts  # Tipos do modulo Cronograma
     estoque-types.ts     # Tipos do modulo Estoque
     estoque-permissoes.ts# Permissoes do modulo Estoque
@@ -84,6 +86,7 @@ src/
     backlog-map.tsx
     nav-voltar-home.tsx       # Botao voltar para o Hub
     analitico-manutencao.tsx  # Lista de manutencao do Analitico
+    produtividade-dashboard.tsx  # Dashboard de produtividade (KPIs, graficos, mapa)
   styles.css       # Tailwind v4 + design tokens
   routeTree.gen.ts # Auto-gerado - NAO editar manualmente
 
@@ -156,6 +159,7 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 | Escala de Trabalho | /escala | Escala semanal, importação/exportação XLSX |
 | Manuais Técnicos | /manuais | Biblioteca de manuais com upload de PDF |
 | Gerador de OI | /oi | Ordem de Intervenção / Relatório Fotográfico |
+| Produtividade | /produtividade | KPIs diários de equipes, importação, mapa, distribuição, link público |
 | Cronograma de Instalação | /cronograma | Planejamento com Gantt, drag-and-drop, autosave |
 | Relatórios | /relatorio | Relatórios técnicos e de planta |
 | Painel Administrativo | /admin | Gestão de usuários, cargos e permissões |
@@ -201,6 +205,40 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 - A busca do backlog procura tambem na observacao editavel (`obsUnica[om]`) e nos comentarios (`obsPorOm[om]`).
 - Observacao editavel salva com debounce de 700ms; em blur (`flushObsUnica`) e no unmount do componente as mudancas pendentes sao gravadas (`obsUnicaTimer` guarda `{ id, valor }`).
 - Icone de informacao (i) ao lado da O.S.: `src/components/os-info-icon.tsx` + parser `src/lib/parse-log-os.ts` (formato `* DD.MM.AAAA HH:MM:SS BRAZIL (USUARIO)` com campos `CHAVE: valor` separados por `*` e possivel `**negrito**`). Usa o campo `TEXTO LONGO` que ja vem na listagem (`e.r["TEXTO LONGO"]`) — sem fetch extra. Hover mostra a ultima entrada; clique abre dialog com historico completo; O.S. sem log (preventivas por frequencia) nao renderiza o icone.
+
+## Aba Planejamento do Backlog (src/components/planejamento-rotas.tsx)
+
+- O modulo `/backlog` tem agora navegacao por abas (Backlog / Planejamento). A aba Planejamento e lazy (`lazy(() => import("@/components/planejamento-rotas"))`) e recebe `backlogOS={data}` para buscar O.S. existentes.
+- Tab de campo: mapa Leaflet (eager dentro do lazy component) com todas as elevatorias (`elevatorias` → id/nome/planta/latitude/longitude) + paradas numeradas (1,2,3...) + polilinha; clique adiciona a elevatoria na rota.
+- Tabela de paradas: #, Elevatoria, OS (input livre que auto-vincula O.S. existente por numero/texto, badge laranja "Pendente criação" para novas), Tipo (select), Texto Breve, Status (Existente / Pendente criação / Nº livre / Sem O.S.), Acoes (subir/descer/remover; clique na linha abre o dialog de O.S.).
+- Dialog de O.S. (click na linha): 2 abas — "O.S. existente" (busca no backlogOS por nº/descricao/planta) e "Nova O.S. (pendente)" (tipo, planta, equipamento, prioridade, texto breve, observacoes; nao cria nada no sistema). Itens top-level: Salvar Planejamento, Otimizar Rota (vizinho mais proximo), Exportar (ExcelJS), Planejamentos (biblioteca: abrir/renomear/duplicar/excluir).
+- Persistencia: tabela `planejamentos` (migration 00084, RLS desabilitado, paradas em JSONB). Se a migration ainda nao estiver aplicada, cai num fallback em localStorage (`backlog_planejamentos_v1`, ids negativos) para nao quebrar antes do deploy do Lovable.
+
+## Modulo Produtividade (src/routes/produtividade.tsx + src/components/produtividade-dashboard.tsx)
+
+- Rota `/produtividade` (dashboard + importacao diaria) e visao publica `/produtividade/publico/:token` (le `?dia=YYYY-MM-DD` via URLSearchParams; seletor de dia no cabecalho; passa `key={dia||"todos"}` para o dashboard).
+- Importacao do dia por planilha: a data e editavel (`<input type="date">`) no passo de equipes; `handleSave` bloqueia com toast se `dataDia` nulo.
+- KPI "Média por Equipe" = O.S. executadas / numero de equipes (distintas por nome_equipe.trim()) no periodo. O card tem tooltip (shadcn Tooltip) listando a media de O.S. executadas por dia de cada técnico (maior primeiro) — cache em `mediaPorTecnico` (contagem deduplicada por `om:`/`at:` por dia).
+- Horas em HH:MM (`formatMinutos`); horas somam `duracao_min` apenas de O.S. com status "concluido" (dedup por OM/id_atividade).
+- `TipoServicoChart` (dia) conta apenas O.S. com alguma atividade "concluido", dedup por `om:<ordem_manutencao>` ou `at:<id_atividade>` — aplicado tambem ao `tipoEquipes`.
+- Mapa Leaflet com import estatico (nao lazy); `MapLoadError` exibe o erro, botao "Tentar novamente" recarrega a pagina e fallback em tabela de O.S. por planta. Coordenadas sanitizadas com `Number.isFinite`.
+- Base de status/natureza de O.S. por tipo em migrations (ver `00050_tipo_ordem_categorias.sql`); codigos SAP em `registros_atendimento.tipo_ordem`.
+
+## Export "Lista de O.S." do Analitico (src/components/analitico-manutencao.tsx)
+
+- `exportarListaOS`: busca direto em `registros_atendimento` (paginação de 1000 com `range`, sem filtro de tipo de ordem) — TODAS as O.S. do periodo entram na planilha, independentemente do tipo. Anexa nome da elevatória por `dados` e classifica cada linha.
+- Mapeamento `tipo_ordem` → categoria (referencia: migration 00050):
+  - `ZTPF` → Preventiva por Frequência
+  - `ZTPD` → Preditiva
+  - `ZTRE` → Preventiva por Frequência
+  - `ZTPC` → Preventiva por Condição
+  - `ZNTE` → Corretiva Emergencial
+  - `ZNTP` → Corretiva Programada
+  - `ZNTS` → Serviços
+  - `ZTEN` → Engenharia
+  - `ZTCO` → Controle Operacional
+  - Textos livres tambem casam por palavra-chave (FREQUENC, PREDITIV, EMERGENC, PROGRAMADA, SERVIÇO, MELHORIA, CONDIÇ...); desconhecidos saem como `Outro (CODIGO)`.
+- Os RPCs `analitico_os_detalhes` (migrations 00063/00081) so agregam preventiva/corretiva/ztpc — nao cobrem Servicos/Engenharia; o export nao depende deles.
 
 ## Validacao (antes de commitar)
 

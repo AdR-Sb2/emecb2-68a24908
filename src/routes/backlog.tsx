@@ -33,6 +33,7 @@ import {
   Flag,
   StickyNote,
   Plus,
+  ClipboardList,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { OsInfoIcon } from "@/components/os-info-icon";
@@ -55,6 +56,9 @@ import {
 
 // Leaflet importa `window` no topo → carrega só no cliente para evitar crash de SSR.
 const BacklogMap = lazy(() => import("@/components/backlog-map"));
+
+// Aba "Planejamento" — também usa Leaflet, lazy para não pesar o carregamento inicial.
+const PlanejamentoRotas = lazy(() => import("@/components/planejamento-rotas"));
 
 export const Route = createFileRoute("/backlog")({
   head: () => ({
@@ -461,6 +465,7 @@ function ComboboxSearch({
 // ---------- página ----------
 function BacklogPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [backlogTab, setBacklogTab] = useState<"backlog" | "planejamento">("backlog");
   const [data, setData] = useState<Row[]>(DATA);
   const [hasCustomData, setHasCustomData] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -2081,1599 +2086,1367 @@ function BacklogPage() {
         </div>
       </div>
 
-      {/* Title + actions */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">
-            Backlog BI
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Bucket Field/SAP · {data.length} O.S. · atualizado {fmtDate(now)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:justify-center">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
-          >
-            <Upload className="h-4 w-4" /> Importar bucket do Field
-          </button>
-          <button
-            onClick={() => setRouteDialogOpen(true)}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md bg-gradient-to-r from-[#f59e0b] to-[#ef4444] px-3 py-2 text-[13px] font-semibold text-white shadow hover:opacity-95"
-            title="Gerar rota otimizada"
-          >
-            <RouteIcon className="h-4 w-4" /> Montar Rota
-          </button>
-          {hasCustomData && (
+      {/* Abas do módulo */}
+      <div className="mb-4 flex flex-wrap items-end gap-1 border-b-2 border-slate-200 dark:border-slate-700">
+        {(
+          [
+            { id: "backlog", label: "Backlog", icon: <ClipboardList className="h-3.5 w-3.5" /> },
+            {
+              id: "planejamento",
+              label: "Planejamento",
+              icon: <RouteIcon className="h-3.5 w-3.5" />,
+            },
+          ] as const
+        ).map((t) => {
+          const isActive = backlogTab === t.id;
+          return (
             <button
-              onClick={async () => {
-                await supabase.from("backlog_dados").delete().eq("id", 1);
-                localStorage.removeItem(STORAGE_KEY);
-                setData(DATA);
-                setHasCustomData(false);
-              }}
-              className="rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              key={t.id}
+              onClick={() => setBacklogTab(t.id as typeof backlogTab)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[2px] cursor-pointer ${
+                isActive
+                  ? "bg-white dark:bg-slate-800 border-[#0b3a73] text-[#0b3a73] dark:text-white"
+                  : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-850 hover:bg-white/40"
+              }`}
             >
-              restaurar exemplo
+              {t.icon}
+              {t.label}
             </button>
-          )}
-          <button
-            onClick={exportCSV}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
-          >
-            <Download className="h-4 w-4" /> Exportar
-          </button>
-          <button
-            onClick={copyResumo}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-          >
-            <CopyIcon className="h-4 w-4" /> Copiar resumo
-          </button>
-          <button
-            onClick={saveView}
-            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-          >
-            Salvar view
-          </button>
-          <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            Auto-refresh SLA
-          </label>
-        </div>
+          );
+        })}
       </div>
 
-      {/* Barra de busca */}
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
-          <input
-            type="text"
-            value={fSearch}
-            onChange={(e) => setFSearch(e.target.value)}
-            placeholder="Buscar por O.S., planta, cidade, texto breve, responsabilidade, equipe, observação…"
-            className="w-full rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 py-3.5 pl-12 pr-10 text-[15px] shadow-sm placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none dark:text-white"
-          />
-          {fSearch && (
-            <button
-              type="button"
-              onClick={() => setFSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-200 cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <button
-          onClick={clearAllFilters}
-          className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-md"
-        >
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            O.S. no bucket
-          </div>
-          <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{kTotal}</div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-400">
-            clique para limpar filtros
-          </div>
-        </button>
-        <button
-          onClick={() => setOnlyLate((v) => !v)}
-          className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyLate ? "border-red-500 bg-red-50" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-red-400"}`}
-        >
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            <AlertTriangle className="h-3 w-3" /> O.S. Atrasadas
-          </div>
-          <div className="mt-1 text-3xl font-bold text-red-600">{kLate}</div>
-          {kLate > 0 && (
-            <span className="absolute right-3 top-3 inline-flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
-          )}
-        </button>
-        <button
-          onClick={() => setOnlyEmerg((v) => !v)}
-          className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyEmerg ? "border-orange-500 bg-orange-50" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-orange-400"}`}
-        >
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            <Flame className="h-3 w-3" /> Emergenciais
-          </div>
-          <div className="mt-1 text-3xl font-bold text-orange-600">{kEmerg}</div>
-          {kEmerg > 0 && (
-            <span className="absolute right-3 top-3 inline-flex h-2 w-2 animate-pulse rounded-full bg-orange-500" />
-          )}
-        </button>
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            % SLA Atrasado
-          </div>
-          <div className="mt-1 text-3xl font-bold text-[#1f7ad6]">{kPct}%</div>
-          <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#1f7ad6] to-red-500"
-              style={{ width: `${kPct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setShowFilters((v) => !v)}
-          className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-[#0b3a73] dark:text-white sm:hidden cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4" /> Filtros do Backlog
-          </span>
-          <span>{showFilters ? "ocultar" : "mostrar"}</span>
-        </button>
-        <div
-          className={`${showFilters ? "grid" : "hidden"} gap-4 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`}
-        >
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Elevatória
-            </label>
-            <MultiSelect
-              label="Elevatória"
-              options={OPT_PLANTA}
-              value={fPlantas}
-              onChange={setFPlantas}
-              hideInlineLabel
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Responsabilidade
-            </label>
-            <MultiSelect
-              label="Responsabilidade"
-              options={OPT_RESP}
-              value={fResp}
-              onChange={setFResp}
-              hideInlineLabel
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Status
-            </label>
-            <select
-              value={fStatus}
-              onChange={(e) => setFStatus(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-            >
-              <option value="TODOS">Todos</option>
-              {OPT_STATUS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Equipe
-            </label>
-            <select
-              value={fEquipe}
-              onChange={(e) => setFEquipe(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-            >
-              <option value="TODAS">Todas</option>
-              {OPT_EQUIPE.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Cidade
-            </label>
-            <select
-              value={fCidade}
-              onChange={(e) => setFCidade(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-            >
-              <option value="TODAS">Todas</option>
-              {OPT_CIDADE.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Tipo de Atividade
-            </label>
-            <select
-              value={fTipo}
-              onChange={(e) => setFTipo(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-            >
-              <option value="TODOS">Todos</option>
-              {OPT_TIPO.map((p) => (
-                <option key={p} value={p}>
-                  {abbreviateAtividade(p)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Tempo Aberto
-            </label>
-            <select
-              value={fFaixa}
-              onChange={(e) => setFFaixa(e.target.value)}
-              className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-            >
-              <option value="TODAS">Todas as faixas</option>
-              {OPT_FAIXA.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Fim SLA anterior a
-            </label>
-            <div className="relative flex min-h-11 items-center rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 shadow-sm">
-              <Clock className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0 mr-2" />
-              <input
-                type="date"
-                value={fSlaBefore}
-                onChange={(e) => setFSlaBefore(e.target.value)}
-                className="w-full border-none text-[13px] outline-none bg-transparent cursor-pointer"
-              />
+      {backlogTab === "planejamento" ? (
+        <Suspense
+          fallback={
+            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              Carregando Planejamento…
             </div>
-          </div>
-
-          {savedViews.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Views Salvas
-              </label>
-              <select
-                onChange={(e) => e.target.value && loadView(e.target.value)}
-                className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                defaultValue=""
-              >
-                <option value="">Escolha uma view…</option>
-                {savedViews.map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="min-h-11 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 text-[13px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:text-slate-100 transition cursor-pointer"
-            >
-              Limpar filtros
-            </button>
-          </div>
-        </div>
-        {fPlantas.length > 0 && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73] dark:text-white">
-            <MapPin className="h-3 w-3" /> {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}{" "}
-            selecionada{fPlantas.length > 1 ? "s" : ""}
-            <button type="button" onClick={() => setFPlantas([])} className="cursor-pointer">
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Charts row */}
-      <div className="mb-4 grid gap-3 lg:grid-cols-3">
-        {/* Faixa */}
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
-            Backlog por Tempo em Aberto
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={dataFaixa} layout="vertical" margin={{ left: 10, right: 30 }}>
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar
-                dataKey="value"
-                fill={BLUE}
-                radius={[0, 4, 4, 0]}
-                onClick={(data) => {
-                  if (data && data.name) {
-                    setFFaixa((prev) => (prev === data.name ? "TODAS" : data.name));
-                  }
-                }}
-                className="cursor-pointer"
-              >
-                <LabelList
-                  dataKey="value"
-                  position="right"
-                  style={{ fontSize: 12, fill: BLUE_DARK, fontWeight: 600 }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Pie tipo atividade */}
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
-            O.S. por Tipo de Atividade
-          </div>
-          {(() => {
-            const totalTipo = dataTipoAtividade.reduce((s, d) => s + d.value, 0);
-            return (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
-                <div className="relative sm:col-span-2" style={{ height: 200 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={dataTipoAtividade}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={1}
-                        stroke="#fff"
-                        strokeWidth={2}
-                        startAngle={90}
-                        endAngle={-270}
-                        isAnimationActive={false}
-                      >
-                        {dataTipoAtividade.map((d, i) => (
-                          <Cell
-                            key={i}
-                            fill={PIE_COLORS[i % PIE_COLORS.length]}
-                            onClick={() => {
-                              setFTipo((prev) => (prev === d.name ? "TODOS" : d.name));
-                            }}
-                            className="cursor-pointer"
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number, n: string) => [
-                          `${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`,
-                          abbreviateAtividade(n),
-                        ]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
-                      Total
-                    </div>
-                    <div className="text-2xl font-bold text-[#0b3a73] dark:text-white">
-                      {totalTipo}
-                    </div>
-                  </div>
-                </div>
-                <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
-                  {dataTipoAtividade.map((d, i) => {
-                    const pct = totalTipo ? Math.round((d.value / totalTipo) * 100) : 0;
-                    const isSelected = fTipo === d.name;
-                    return (
-                      <li key={d.name} className="truncate">
-                        <button
-                          type="button"
-                          onClick={() => setFTipo((prev) => (prev === d.name ? "TODOS" : d.name))}
-                          className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 dark:hover:bg-slate-700 p-1 rounded cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-[#eaf3fb] font-semibold text-[#0b3a73] dark:text-white"
-                              : "text-slate-750"
-                          }`}
-                          title={d.name}
-                        >
-                          <span
-                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                          />
-                          <span className="truncate">{d.displayName}</span>
-                          <span className="ml-auto shrink-0 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                            {d.value} ({pct}%)
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Cidade */}
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
-            Distribuição por Cidade
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={dataCidade} layout="vertical" margin={{ left: 10, right: 30 }}>
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar
-                dataKey="value"
-                fill={BLUE_DARK}
-                radius={[0, 4, 4, 0]}
-                onClick={(data) => {
-                  if (data && data.name) {
-                    setFCidade((prev) => (prev === data.name ? "TODAS" : data.name));
-                  }
-                }}
-                className="cursor-pointer"
-              >
-                <LabelList
-                  dataKey="value"
-                  position="right"
-                  style={{ fontSize: 11, fill: BLUE_DARK, fontWeight: 600 }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Mapa + Programar */}
-      <div className="mb-4 grid gap-3 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          {mapCard("responsive")}
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
-          <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-[#0b3a73] dark:text-white">
-            <Zap className="h-4 w-4" /> Ações recomendadas
-          </div>
-
-          <button
-            onClick={applyEmergPendente}
-            className="mb-3 flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-left transition hover:border-red-400 hover:bg-red-100"
-          >
+          }
+        >
+          <PlanejamentoRotas backlogOS={data} />
+        </Suspense>
+      ) : (
+        <>
+          {/* Title + actions */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div>
-              <div className="text-[11px] font-semibold uppercase text-red-700">
-                Emergenciais pendentes
-              </div>
-              <div className="text-2xl font-bold text-red-600">{emergSemProgramacao}</div>
-              <div className="text-[10px] text-red-500">clique para filtrar</div>
+              <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">
+                Backlog BI
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Bucket Field/SAP · {data.length} O.S. · atualizado {fmtDate(now)}
+              </p>
             </div>
-            <Flame className="h-8 w-8 text-red-400" />
-          </button>
-
-          <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">
-            <TrendingUp className="h-3 w-3" /> Top plantas (15+ dias)
-          </div>
-          <ul className="space-y-1 text-xs">
-            {topPlantasBacklog.length === 0 && (
-              <li className="text-slate-400 dark:text-slate-400">
-                Nenhuma planta com backlog crítico.
-              </li>
-            )}
-            {topPlantasBacklog.map((p) => (
-              <li key={p.planta}>
-                <button
-                  onClick={() => togglePlanta(p.planta)}
-                  className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlantas.includes(p.planta) ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100 dark:border-slate-700"}`}
-                >
-                  <span className="truncate font-medium text-[#0b3a73] dark:text-white">
-                    {p.planta.split(" - ")[0]}
-                  </span>
-                  <span className="ml-2 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                    {p.count} O.S.
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <Dialog open={mapOpen} onOpenChange={setMapOpen}>
-        <DialogContent className="max-w-6xl">
-          <DialogHeader>
-            <DialogTitle className="text-[#0b3a73] dark:text-white">
-              <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias ({mapMarkers.length})
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex items-center justify-end gap-1 pb-2">
-            {fPlantas.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:justify-center">
               <button
-                onClick={() => setFPlantas([])}
-                className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
               >
-                Limpar {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}
+                <Upload className="h-4 w-4" /> Importar bucket do Field
               </button>
-            )}
-            <button
-              onClick={() => setMapFitSignal((n) => n + 1)}
-              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-            >
-              <Crosshair className="h-3.5 w-3.5" /> Centralizar
-            </button>
-          </div>
-          <div
-            style={{ height: "85vh", width: "100%" }}
-            className="overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
-          >
-            {mapOpen && mounted && (
-              <Suspense fallback={null}>
-                <BacklogMap
-                  markers={mapMarkers}
-                  onSelect={togglePlanta}
-                  selectedPlantas={fPlantas}
-                  fitSignal={mapFitSignal}
-                  route={
-                    generatedRoutes.length > 0
-                      ? generatedRoutes[activeRouteTab] || generatedRoutes[0]
-                      : undefined
-                  }
-                />
-              </Suspense>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Route Builder — Dialog de configuração */}
-      <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-[#0b3a73] dark:text-white">
-              <RouteIcon className="mr-1 inline h-4 w-4" /> Montar Rota Otimizada
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3 py-2 text-sm">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Fim SLA anterior a *
-                </span>
-                <input
-                  type="datetime-local"
-                  value={rbSlaBefore}
-                  onChange={(e) => setRbSlaBefore(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
-                />
-                <span className="text-[10px] text-slate-400 dark:text-slate-400">
-                  critério de corte e de urgência (mais antigo = mais prioritário)
-                </span>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Ponto de partida *
-                </span>
-                <select
-                  value={rbStart}
-                  onChange={(e) => setRbStart(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[14px] shadow-sm"
+              <button
+                onClick={() => setRouteDialogOpen(true)}
+                className="inline-flex min-h-11 items-center gap-1 rounded-md bg-gradient-to-r from-[#f59e0b] to-[#ef4444] px-3 py-2 text-[13px] font-semibold text-white shadow hover:opacity-95"
+                title="Gerar rota otimizada"
+              >
+                <RouteIcon className="h-4 w-4" /> Montar Rota
+              </button>
+              {hasCustomData && (
+                <button
+                  onClick={async () => {
+                    await supabase.from("backlog_dados").delete().eq("id", 1);
+                    localStorage.removeItem(STORAGE_KEY);
+                    setData(DATA);
+                    setHasCustomData(false);
+                  }}
+                  className="rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
-                  <option value="">Selecione…</option>
-                  {allPlantas.map((p) => (
+                  restaurar exemplo
+                </button>
+              )}
+              <button
+                onClick={exportCSV}
+                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
+              >
+                <Download className="h-4 w-4" /> Exportar
+              </button>
+              <button
+                onClick={copyResumo}
+                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                <CopyIcon className="h-4 w-4" /> Copiar resumo
+              </button>
+              <button
+                onClick={saveView}
+                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                Salvar view
+              </button>
+              <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                />
+                Auto-refresh SLA
+              </label>
+            </div>
+          </div>
+
+          {/* Barra de busca */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
+              <input
+                type="text"
+                value={fSearch}
+                onChange={(e) => setFSearch(e.target.value)}
+                placeholder="Buscar por O.S., planta, cidade, texto breve, responsabilidade, equipe, observação…"
+                className="w-full rounded-xl border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 py-3.5 pl-12 pr-10 text-[15px] shadow-sm placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none dark:text-white"
+              />
+              {fSearch && (
+                <button
+                  type="button"
+                  onClick={() => setFSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-200 cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* KPIs */}
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <button
+              onClick={clearAllFilters}
+              className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f7ad6] hover:shadow-md"
+            >
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                O.S. no bucket
+              </div>
+              <div className="mt-1 text-3xl font-bold text-[#0b3a73] dark:text-white">{kTotal}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-400">
+                clique para limpar filtros
+              </div>
+            </button>
+            <button
+              onClick={() => setOnlyLate((v) => !v)}
+              className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyLate ? "border-red-500 bg-red-50" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-red-400"}`}
+            >
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <AlertTriangle className="h-3 w-3" /> O.S. Atrasadas
+              </div>
+              <div className="mt-1 text-3xl font-bold text-red-600">{kLate}</div>
+              {kLate > 0 && (
+                <span className="absolute right-3 top-3 inline-flex h-2 w-2 animate-pulse rounded-full bg-red-500" />
+              )}
+            </button>
+            <button
+              onClick={() => setOnlyEmerg((v) => !v)}
+              className={`relative rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${onlyEmerg ? "border-orange-500 bg-orange-50" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 hover:border-orange-400"}`}
+            >
+              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <Flame className="h-3 w-3" /> Emergenciais
+              </div>
+              <div className="mt-1 text-3xl font-bold text-orange-600">{kEmerg}</div>
+              {kEmerg > 0 && (
+                <span className="absolute right-3 top-3 inline-flex h-2 w-2 animate-pulse rounded-full bg-orange-500" />
+              )}
+            </button>
+            <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                % SLA Atrasado
+              </div>
+              <div className="mt-1 text-3xl font-bold text-[#1f7ad6]">{kPct}%</div>
+              <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#1f7ad6] to-red-500"
+                  style={{ width: `${kPct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros */}
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              className="mb-2 flex w-full items-center justify-between text-sm font-semibold text-[#0b3a73] dark:text-white sm:hidden cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4" /> Filtros do Backlog
+              </span>
+              <span>{showFilters ? "ocultar" : "mostrar"}</span>
+            </button>
+            <div
+              className={`${showFilters ? "grid" : "hidden"} gap-4 sm:!grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`}
+            >
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Elevatória
+                </label>
+                <MultiSelect
+                  label="Elevatória"
+                  options={OPT_PLANTA}
+                  value={fPlantas}
+                  onChange={setFPlantas}
+                  hideInlineLabel
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Responsabilidade
+                </label>
+                <MultiSelect
+                  label="Responsabilidade"
+                  options={OPT_RESP}
+                  value={fResp}
+                  onChange={setFResp}
+                  hideInlineLabel
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Status
+                </label>
+                <select
+                  value={fStatus}
+                  onChange={(e) => setFStatus(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODOS">Todos</option>
+                  {OPT_STATUS.map((p) => (
                     <option key={p} value={p}>
                       {p}
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-slate-400 dark:text-slate-400">
-                  só origem do trajeto — não é atendida
-                </span>
-              </label>
-            </div>
+              </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <MultiSelect
-                label="Tipo de Atividade *"
-                options={rbOptTipos}
-                value={rbTipos}
-                onChange={setRbTipos}
-              />
-              <MultiSelect
-                label="Responsabilidade *"
-                options={rbOptResps}
-                value={rbResps}
-                onChange={setRbResps}
-              />
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Equipe
+                </label>
+                <select
+                  value={fEquipe}
+                  onChange={(e) => setFEquipe(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODAS">Todas</option>
+                  {OPT_EQUIPE.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="grid gap-2 sm:grid-cols-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Quantidade de rotas *
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={rbRouteCount}
-                  onChange={(e) => setRbRouteCount(Math.max(1, Number(e.target.value) || 1))}
-                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
-                />
-                <span className="text-[10px] text-slate-400 dark:text-slate-400">
-                  divide as O.S. entre N rotas
-                </span>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Máximo de paradas (O.S.) *
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  value={rbMaxStops}
-                  onChange={(e) => setRbMaxStops(Number(e.target.value) || 0)}
-                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Tolerância de estouro (O.S.)
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={rbTolerance}
-                  onChange={(e) => setRbTolerance(Number(e.target.value) || 0)}
-                  className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
-                />
-                <span className="text-[10px] text-slate-400 dark:text-slate-400">
-                  um grupo é incluído inteiro se estourar até isso
-                </span>
-              </label>
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Cidade
+                </label>
+                <select
+                  value={fCidade}
+                  onChange={(e) => setFCidade(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODAS">Todas</option>
+                  {OPT_CIDADE.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <MultiSelect
-                label="Elevatórias (opcional)"
-                options={rbOptElevatorias}
-                value={rbElevatorias}
-                onChange={setRbElevatorias}
-              />
-              {!rbUseIndividualConfig && (
-                <MultiSelect
-                  label="Cidade (opcional)"
-                  options={rbOptCidades}
-                  value={rbCidades}
-                  onChange={setRbCidades}
-                />
-              )}
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Tipo de Atividade
+                </label>
+                <select
+                  value={fTipo}
+                  onChange={(e) => setFTipo(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODOS">Todos</option>
+                  {OPT_TIPO.map((p) => (
+                    <option key={p} value={p}>
+                      {abbreviateAtividade(p)}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {!rbUseIndividualConfig && (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    Equipe
-                  </span>
-                  <select
-                    value={rbEquipe}
-                    onChange={(e) => setRbEquipe(e.target.value)}
-                    className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[14px] shadow-sm"
-                  >
-                    <option value="TODAS">Todas</option>
-                    <option value="EMEC">EMEC</option>
-                    <option value="Automação">Automação</option>
-                  </select>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Tempo Aberto
+                </label>
+                <select
+                  value={fFaixa}
+                  onChange={(e) => setFFaixa(e.target.value)}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODAS">Todas as faixas</option>
+                  {OPT_FAIXA.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Fim SLA anterior a
+                </label>
+                <div className="relative flex min-h-11 items-center rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 shadow-sm">
+                  <Clock className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0 mr-2" />
+                  <input
+                    type="date"
+                    value={fSlaBefore}
+                    onChange={(e) => setFSlaBefore(e.target.value)}
+                    className="w-full border-none text-[13px] outline-none bg-transparent cursor-pointer"
+                  />
                 </div>
               </div>
-            )}
 
-            {rbRouteCount > 1 && (
-              <div className="flex items-center gap-2 pt-1">
-                <Switch
-                  checked={rbUseIndividualConfig}
-                  onCheckedChange={setRbUseIndividualConfig}
-                />
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Configuração individual por rota
-                </span>
+              {savedViews.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Views Salvas
+                  </label>
+                  <select
+                    onChange={(e) => e.target.value && loadView(e.target.value)}
+                    className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                    defaultValue=""
+                  >
+                    <option value="">Escolha uma view…</option>
+                    {savedViews.map((v) => (
+                      <option key={v.name} value={v.name}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="min-h-11 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 text-[13px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:text-slate-100 transition cursor-pointer"
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            </div>
+            {fPlantas.length > 0 && (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#eaf3fb] px-3 py-1 text-xs text-[#0b3a73] dark:text-white">
+                <MapPin className="h-3 w-3" /> {fPlantas.length} planta
+                {fPlantas.length > 1 ? "s" : ""} selecionada{fPlantas.length > 1 ? "s" : ""}
+                <button type="button" onClick={() => setFPlantas([])} className="cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
               </div>
             )}
+          </div>
 
-            {rbUseIndividualConfig && rbRouteCount > 1 && (
-              <div className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3">
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  Configurações de cada rota
-                </span>
-                {rbRouteConfigs.map((cfg, idx) => (
-                  <div
-                    key={idx}
-                    className="grid gap-3 rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 sm:grid-cols-4"
+          {/* Charts row */}
+          <div className="mb-4 grid gap-3 lg:grid-cols-3">
+            {/* Faixa */}
+            <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+              <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
+                Backlog por Tempo em Aberto
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={dataFaixa} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="value"
+                    fill={BLUE}
+                    radius={[0, 4, 4, 0]}
+                    onClick={(data) => {
+                      if (data && data.name) {
+                        setFFaixa((prev) => (prev === data.name ? "TODAS" : data.name));
+                      }
+                    }}
+                    className="cursor-pointer"
                   >
-                    <span className="text-xs font-bold text-[#0b3a73] dark:text-white flex items-center">
-                      Rota {idx + 1}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      style={{ fontSize: 12, fill: BLUE_DARK, fontWeight: 600 }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Pie tipo atividade */}
+            <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+              <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
+                O.S. por Tipo de Atividade
+              </div>
+              {(() => {
+                const totalTipo = dataTipoAtividade.reduce((s, d) => s + d.value, 0);
+                return (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+                    <div className="relative sm:col-span-2" style={{ height: 200 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={dataTipoAtividade}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={1}
+                            stroke="#fff"
+                            strokeWidth={2}
+                            startAngle={90}
+                            endAngle={-270}
+                            isAnimationActive={false}
+                          >
+                            {dataTipoAtividade.map((d, i) => (
+                              <Cell
+                                key={i}
+                                fill={PIE_COLORS[i % PIE_COLORS.length]}
+                                onClick={() => {
+                                  setFTipo((prev) => (prev === d.name ? "TODOS" : d.name));
+                                }}
+                                className="cursor-pointer"
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(v: number, n: string) => [
+                              `${v} (${totalTipo ? Math.round((v / totalTipo) * 100) : 0}%)`,
+                              abbreviateAtividade(n),
+                            ]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
+                          Total
+                        </div>
+                        <div className="text-2xl font-bold text-[#0b3a73] dark:text-white">
+                          {totalTipo}
+                        </div>
+                      </div>
+                    </div>
+                    <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
+                      {dataTipoAtividade.map((d, i) => {
+                        const pct = totalTipo ? Math.round((d.value / totalTipo) * 100) : 0;
+                        const isSelected = fTipo === d.name;
+                        return (
+                          <li key={d.name} className="truncate">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFTipo((prev) => (prev === d.name ? "TODOS" : d.name))
+                              }
+                              className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 dark:hover:bg-slate-700 p-1 rounded cursor-pointer transition-colors ${
+                                isSelected
+                                  ? "bg-[#eaf3fb] font-semibold text-[#0b3a73] dark:text-white"
+                                  : "text-slate-750"
+                              }`}
+                              title={d.name}
+                            >
+                              <span
+                                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                              />
+                              <span className="truncate">{d.displayName}</span>
+                              <span className="ml-auto shrink-0 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                {d.value} ({pct}%)
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Cidade */}
+            <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+              <div className="mb-2 text-sm font-semibold text-[#0b3a73] dark:text-white">
+                Distribuição por Cidade
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={dataCidade} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="value"
+                    fill={BLUE_DARK}
+                    radius={[0, 4, 4, 0]}
+                    onClick={(data) => {
+                      if (data && data.name) {
+                        setFCidade((prev) => (prev === data.name ? "TODAS" : data.name));
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      style={{ fontSize: 11, fill: BLUE_DARK, fontWeight: 600 }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Mapa + Programar */}
+          <div className="mb-4 grid gap-3 lg:grid-cols-3">
+            <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+              {mapCard("responsive")}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 shadow-sm">
+              <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-[#0b3a73] dark:text-white">
+                <Zap className="h-4 w-4" /> Ações recomendadas
+              </div>
+
+              <button
+                onClick={applyEmergPendente}
+                className="mb-3 flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-left transition hover:border-red-400 hover:bg-red-100"
+              >
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-red-700">
+                    Emergenciais pendentes
+                  </div>
+                  <div className="text-2xl font-bold text-red-600">{emergSemProgramacao}</div>
+                  <div className="text-[10px] text-red-500">clique para filtrar</div>
+                </div>
+                <Flame className="h-8 w-8 text-red-400" />
+              </button>
+
+              <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">
+                <TrendingUp className="h-3 w-3" /> Top plantas (15+ dias)
+              </div>
+              <ul className="space-y-1 text-xs">
+                {topPlantasBacklog.length === 0 && (
+                  <li className="text-slate-400 dark:text-slate-400">
+                    Nenhuma planta com backlog crítico.
+                  </li>
+                )}
+                {topPlantasBacklog.map((p) => (
+                  <li key={p.planta}>
+                    <button
+                      onClick={() => togglePlanta(p.planta)}
+                      className={`flex w-full items-center justify-between rounded border p-2 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] ${fPlantas.includes(p.planta) ? "border-[#1f7ad6] bg-[#eaf3fb]" : "border-slate-100 dark:border-slate-700"}`}
+                    >
+                      <span className="truncate font-medium text-[#0b3a73] dark:text-white">
+                        {p.planta.split(" - ")[0]}
+                      </span>
+                      <span className="ml-2 shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                        {p.count} O.S.
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+            <DialogContent className="max-w-6xl">
+              <DialogHeader>
+                <DialogTitle className="text-[#0b3a73] dark:text-white">
+                  <MapPin className="mr-1 inline h-4 w-4" /> Mapa de elevatórias (
+                  {mapMarkers.length})
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-end gap-1 pb-2">
+                {fPlantas.length > 0 && (
+                  <button
+                    onClick={() => setFPlantas([])}
+                    className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
+                  >
+                    Limpar {fPlantas.length} planta{fPlantas.length > 1 ? "s" : ""}
+                  </button>
+                )}
+                <button
+                  onClick={() => setMapFitSignal((n) => n + 1)}
+                  className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  <Crosshair className="h-3.5 w-3.5" /> Centralizar
+                </button>
+              </div>
+              <div
+                style={{ height: "85vh", width: "100%" }}
+                className="overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
+              >
+                {mapOpen && mounted && (
+                  <Suspense fallback={null}>
+                    <BacklogMap
+                      markers={mapMarkers}
+                      onSelect={togglePlanta}
+                      selectedPlantas={fPlantas}
+                      fitSignal={mapFitSignal}
+                      route={
+                        generatedRoutes.length > 0
+                          ? generatedRoutes[activeRouteTab] || generatedRoutes[0]
+                          : undefined
+                      }
+                    />
+                  </Suspense>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Route Builder — Dialog de configuração */}
+          <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-[#0b3a73] dark:text-white">
+                  <RouteIcon className="mr-1 inline h-4 w-4" /> Montar Rota Otimizada
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-3 py-2 text-sm">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Fim SLA anterior a *
                     </span>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                    <input
+                      type="datetime-local"
+                      value={rbSlaBefore}
+                      onChange={(e) => setRbSlaBefore(e.target.value)}
+                      className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                      critério de corte e de urgência (mais antigo = mais prioritário)
+                    </span>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Ponto de partida *
+                    </span>
+                    <select
+                      value={rbStart}
+                      onChange={(e) => setRbStart(e.target.value)}
+                      className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[14px] shadow-sm"
+                    >
+                      <option value="">Selecione…</option>
+                      {allPlantas.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                      só origem do trajeto — não é atendida
+                    </span>
+                  </label>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <MultiSelect
+                    label="Tipo de Atividade *"
+                    options={rbOptTipos}
+                    value={rbTipos}
+                    onChange={setRbTipos}
+                  />
+                  <MultiSelect
+                    label="Responsabilidade *"
+                    options={rbOptResps}
+                    value={rbResps}
+                    onChange={setRbResps}
+                  />
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Quantidade de rotas *
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={rbRouteCount}
+                      onChange={(e) => setRbRouteCount(Math.max(1, Number(e.target.value) || 1))}
+                      className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                      divide as O.S. entre N rotas
+                    </span>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Máximo de paradas (O.S.) *
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={rbMaxStops}
+                      onChange={(e) => setRbMaxStops(Number(e.target.value) || 0)}
+                      className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Tolerância de estouro (O.S.)
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={rbTolerance}
+                      onChange={(e) => setRbTolerance(Number(e.target.value) || 0)}
+                      className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                      um grupo é incluído inteiro se estourar até isso
+                    </span>
+                  </label>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <MultiSelect
+                    label="Elevatórias (opcional)"
+                    options={rbOptElevatorias}
+                    value={rbElevatorias}
+                    onChange={setRbElevatorias}
+                  />
+                  {!rbUseIndividualConfig && (
+                    <MultiSelect
+                      label="Cidade (opcional)"
+                      options={rbOptCidades}
+                      value={rbCidades}
+                      onChange={setRbCidades}
+                    />
+                  )}
+                </div>
+
+                {!rbUseIndividualConfig && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                         Equipe
                       </span>
                       <select
-                        value={cfg.equipe}
-                        onChange={(e) => {
-                          const next = [...rbRouteConfigs];
-                          next[idx] = { ...next[idx], equipe: e.target.value };
-                          setRbRouteConfigs(next);
-                        }}
-                        className="min-h-9 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[13px] shadow-sm"
+                        value={rbEquipe}
+                        onChange={(e) => setRbEquipe(e.target.value)}
+                        className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[14px] shadow-sm"
                       >
                         <option value="TODAS">Todas</option>
                         <option value="EMEC">EMEC</option>
                         <option value="Automação">Automação</option>
                       </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                        Cidade
-                      </span>
-                      <select
-                        value={cfg.cidades[0] || ""}
-                        onChange={(e) => {
-                          const next = [...rbRouteConfigs];
-                          next[idx] = {
-                            ...next[idx],
-                            cidades: e.target.value ? [e.target.value] : [],
-                          };
-                          setRbRouteConfigs(next);
-                        }}
-                        className="min-h-9 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[13px] shadow-sm"
-                      >
-                        <option value="">Todas</option>
-                        {allCidades.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                        Max paradas
-                      </span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={cfg.maxStops}
-                        onChange={(e) => {
-                          const next = [...rbRouteConfigs];
-                          next[idx] = {
-                            ...next[idx],
-                            maxStops: Number(e.target.value) || 0,
-                          };
-                          setRbRouteConfigs(next);
-                        }}
-                        className="min-h-9 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[13px] shadow-sm"
-                      />
-                    </label>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            {routeError && (
-              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                {routeError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setRouteDialogOpen(false)}
-                className="rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={generateRoute}
-                className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
-              >
-                <RouteIcon className="h-4 w-4" /> Gerar Rota
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Resultado da rota */}
-      {generatedRoutes.length > 0 && (
-        <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-md">
-          {/* Abas das rotas */}
-          <div className="flex flex-wrap border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 pt-2 gap-1">
-            {generatedRoutes.map((route, rIdx) => {
-              const isActive = activeRouteTab === rIdx;
-              return (
-                <button
-                  key={rIdx}
-                  type="button"
-                  onClick={() => setActiveRouteTab(rIdx)}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[1px] cursor-pointer ${
-                    isActive
-                      ? "bg-white dark:bg-slate-800 border-[#0b3a73] text-[#0b3a73] dark:text-white"
-                      : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-850 hover:bg-white/40"
-                  }`}
-                >
-                  <span
-                    className="h-2 w-2 rounded-full inline-block shrink-0"
-                    style={{ backgroundColor: route.color || "#0b3a73" }}
-                  />
-                  Rota {rIdx + 1}
-                </button>
-              );
-            })}
-            <div className="ml-auto flex flex-wrap items-center gap-2 pb-2 pr-2">
-              <button
-                onClick={copyRouteResumo}
-                className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-              >
-                <CopyIcon className="h-3.5 w-3.5" /> Copiar Todas (WhatsApp)
-              </button>
-              <button
-                onClick={() => exportRouteCSV()}
-                className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-              >
-                <Download className="h-3.5 w-3.5" /> Exportar Todas (CSV)
-              </button>
-              <button
-                onClick={clearRoute}
-                className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" /> Limpar
-              </button>
-            </div>
-          </div>
-
-          {/* Conteúdo da Rota Ativa */}
-          {(() => {
-            const activeRoute = generatedRoutes[activeRouteTab] || generatedRoutes[0];
-            if (!activeRoute) return null;
-            return (
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-700 bg-[#eaf3fb]/20 px-4 py-3">
-                  <div className="flex items-center gap-2 text-[#0b3a73] dark:text-white">
-                    <RouteIcon
-                      className="h-5 w-5"
-                      style={{ color: activeRoute.color || "#0b3a73" }}
+                {rbRouteCount > 1 && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <Switch
+                      checked={rbUseIndividualConfig}
+                      onCheckedChange={setRbUseIndividualConfig}
                     />
-                    <div>
-                      <div className="text-sm font-bold">Detalhes da Rota {activeRouteTab + 1}</div>
-                      <div className="text-[11px] text-slate-600 dark:text-slate-300">
-                        {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em{" "}
-                        {activeRoute.stops.length} paradas
-                        {activeRoute.totalOs > activeRoute.limitConfig.max &&
-                          ` (estouro de ${activeRoute.totalOs - activeRoute.limitConfig.max}, tolerância ${activeRoute.limitConfig.tolerance})`}
-                      </div>
-                    </div>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Configuração individual por rota
+                    </span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
-                      <span className="text-slate-500 dark:text-slate-400">Distância:</span>{" "}
-                      <span className="font-bold text-[#0b3a73] dark:text-white">
-                        {activeRoute.totalKm.toFixed(1)} km
-                      </span>
-                    </div>
-                    <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
-                      <span className="text-slate-500 dark:text-slate-400">Tempo est.:</span>{" "}
-                      <span className="font-bold text-[#0b3a73] dark:text-white">
-                        ~{activeRoute.etaMin} min
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => exportRouteCSV(activeRouteTab)}
-                      className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
-                    >
-                      <Download className="h-3 w-3" /> CSV Rota {activeRouteTab + 1}
-                    </button>
-                    <button
-                      onClick={() => copyRoute(activeRouteTab)}
-                      className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
-                    >
-                      <CopyIcon className="h-3 w-3" /> Copiar Rota {activeRouteTab + 1}
-                    </button>
-                  </div>
-                </div>
+                )}
 
-                <div className="grid gap-3 p-3 lg:grid-cols-2">
-                  <div className="rounded border border-slate-150 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-xs">
-                    <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73] dark:text-white">
-                      <Flag
-                        className="h-3.5 w-3.5"
-                        style={{ color: activeRoute.color || "#0b3a73" }}
-                      />{" "}
-                      Ponto de partida:{" "}
-                      <span className="font-normal text-slate-700 dark:text-slate-200">
-                        {activeRoute.start.label}
-                      </span>
-                    </div>
-                    <ol className="space-y-1 max-h-[380px] overflow-auto pr-1">
-                      {activeRoute.details.map((d) => (
-                        <li
-                          key={d.ordem}
-                          className="rounded border border-slate-100 dark:border-slate-700 p-2 hover:border-[#1f7ad6]"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                                style={{ backgroundColor: activeRoute.color || "#0b3a73" }}
-                              >
-                                {d.ordem}
-                              </span>
-                              <div>
-                                <div className="font-semibold text-[#0b3a73] dark:text-white">
-                                  {d.plantaShort}
-                                </div>
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                  {d.cidade}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right text-[10px] text-slate-500 dark:text-slate-400">
-                              <div>+{d.distKm.toFixed(1)} km</div>
-                              <div className="text-slate-400 dark:text-slate-400">
-                                Σ {d.cumKm.toFixed(1)} km
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 ml-2">
-                              <button
-                                onClick={() => {
-                                  const routes = [...generatedRoutes];
-                                  const r = { ...routes[activeRouteTab] };
-                                  const idx = r.details.findIndex((x) => x.planta === d.planta);
-                                  if (idx === -1) return;
-                                  const newDetails = r.details.filter((_, i) => i !== idx);
-                                  const newStops = r.stops.filter((_, i) => i !== idx);
-                                  // Recalculate cumulative distances
-                                  let cumKm = 0;
-                                  const prev = activeRoute.start;
-                                  const recalcDetails = newDetails.map((x, i) => {
-                                    const dist =
-                                      i === 0
-                                        ? haversineKm(prev, {
-                                            lat: x.oss[0].lat!,
-                                            lon: x.oss[0].lon!,
-                                          })
-                                        : haversineKm(
-                                            {
-                                              lat: newDetails[i - 1].oss[0].lat!,
-                                              lon: newDetails[i - 1].oss[0].lon!,
-                                            },
-                                            { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
-                                          );
-                                    cumKm += dist;
-                                    return { ...x, ordem: i + 1, distKm: dist, cumKm };
-                                  });
-                                  const totalKm = cumKm;
-                                  routes[activeRouteTab] = {
-                                    ...r,
-                                    details: recalcDetails,
-                                    stops: newStops.map((s, i) => ({ ...s, ordem: i + 1 })),
-                                    totalKm,
-                                    etaMin: Math.round((totalKm / AVG_KMH) * 60),
-                                  };
-                                  setGeneratedRoutes(routes);
-                                }}
-                                className="rounded bg-red-50 px-1 py-0.5 text-[10px] text-red-600 hover:bg-red-100 cursor-pointer"
-                                title="Remover elevatória desta rota"
-                              >
-                                ✕
-                              </button>
-                              {generatedRoutes.length > 1 && (
-                                <select
-                                  value=""
-                                  onChange={(e) => {
-                                    const targetIdx = Number(e.target.value);
-                                    if (isNaN(targetIdx) || targetIdx === activeRouteTab) return;
-                                    const routes = [...generatedRoutes];
-                                    // Remove from current route
-                                    const src = { ...routes[activeRouteTab] };
-                                    const idx = src.details.findIndex((x) => x.planta === d.planta);
-                                    if (idx === -1) return;
-                                    const movedDetail = src.details[idx];
-                                    src.details = src.details.filter((_, i) => i !== idx);
-                                    src.stops = src.stops.filter((_, i) => i !== idx);
-                                    // Recalc source route
-                                    let cumKm = 0;
-                                    const prev = activeRoute.start;
-                                    src.details = src.details.map((x, i) => {
-                                      const dist =
-                                        i === 0
-                                          ? haversineKm(prev, {
-                                              lat: x.oss[0].lat!,
-                                              lon: x.oss[0].lon!,
-                                            })
-                                          : haversineKm(
-                                              {
-                                                lat: src.details[i - 1].oss[0].lat!,
-                                                lon: src.details[i - 1].oss[0].lon!,
-                                              },
-                                              { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
-                                            );
-                                      cumKm += dist;
-                                      return { ...x, ordem: i + 1, distKm: dist, cumKm };
-                                    });
-                                    src.totalKm = cumKm;
-                                    src.etaMin = Math.round((cumKm / AVG_KMH) * 60);
-                                    src.stops = src.stops.map((s, i) => ({ ...s, ordem: i + 1 }));
-
-                                    // Add to target route at the end
-                                    const tgt = { ...routes[targetIdx] };
-                                    const tgtPrev =
-                                      tgt.details.length > 0
-                                        ? {
-                                            lat: tgt.details[tgt.details.length - 1].oss[0].lat!,
-                                            lon: tgt.details[tgt.details.length - 1].oss[0].lon!,
-                                          }
-                                        : tgt.start;
-                                    const distToNew = haversineKm(tgtPrev, {
-                                      lat: movedDetail.oss[0].lat!,
-                                      lon: movedDetail.oss[0].lon!,
-                                    });
-                                    const newDetail = {
-                                      ...movedDetail,
-                                      ordem: tgt.details.length + 1,
-                                      distKm: distToNew,
-                                      cumKm:
-                                        (tgt.details.length > 0
-                                          ? tgt.details[tgt.details.length - 1].cumKm
-                                          : 0) + distToNew,
-                                    };
-                                    tgt.details = [...tgt.details, newDetail];
-                                    tgt.stops = [
-                                      ...tgt.stops,
-                                      {
-                                        planta: movedDetail.planta,
-                                        lat: movedDetail.oss[0].lat!,
-                                        lon: movedDetail.oss[0].lon!,
-                                        ordem: tgt.stops.length + 1,
-                                        osCount: movedDetail.oss.length,
-                                      },
-                                    ];
-                                    tgt.totalKm = tgt.details.reduce((s, x) => s + x.distKm, 0);
-                                    tgt.etaMin = Math.round((tgt.totalKm / AVG_KMH) * 60);
-
-                                    routes[activeRouteTab] = src;
-                                    routes[targetIdx] = tgt;
-                                    setGeneratedRoutes(routes);
-                                    setActiveRouteTab(targetIdx);
-                                  }}
-                                  className="rounded border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-1 py-0.5 text-[10px] text-slate-600 dark:text-slate-300 cursor-pointer"
-                                  title="Transferir para outra rota"
-                                >
-                                  <option value="">→</option>
-                                  {generatedRoutes.map((_, ri) =>
-                                    ri !== activeRouteTab ? (
-                                      <option key={ri} value={ri}>
-                                        Rota {ri + 1}
-                                      </option>
-                                    ) : null,
-                                  )}
-                                </select>
-                              )}
-                            </div>
-                          </div>
-                          <ul className="mt-1 ml-8 space-y-0.5">
-                            {d.oss.map((os) => (
-                              <li
-                                key={os.om}
-                                className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300"
-                              >
-                                <span className="font-mono text-[#1f7ad6]">{os.om}</span>
-                                <span className="truncate">{os.r["TEXTO BREVE"]}</span>
-                                {os.slaStatus === "ATRASADO" && (
-                                  <span className="ml-auto shrink-0 rounded bg-red-100 px-1 text-[9px] font-semibold text-red-700">
-                                    {os.diasAberto}d
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                  <div className="min-h-[500px] rounded border border-slate-150 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
-                    <div className="h-full min-h-[500px]" style={{ height: 500 }}>
-                      {mounted ? (
-                        <Suspense
-                          fallback={
-                            <div className="flex h-full items-center justify-center text-xs text-slate-400 dark:text-slate-400">
-                              Carregando mapa…
-                            </div>
-                          }
-                        >
-                          <BacklogMap
-                            markers={mapMarkers}
-                            onSelect={togglePlanta}
-                            selectedPlantas={fPlantas}
-                            fitSignal={mapFitSignal}
-                            route={activeRoute}
-                          />
-                        </Suspense>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* Tabela */}
-      <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-sm">
-        <div className="border-b border-slate-100 dark:border-slate-700 p-3 text-sm font-semibold text-[#0b3a73] dark:text-white flex items-center justify-between">
-          <span>O.S. filtradas ({sortedRows.length})</span>
-          <button
-            type="button"
-            onClick={() => setTableExpanded(true)}
-            className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-            title="Expandir tabela"
-          >
-            <Maximize2 className="h-3.5 w-3.5" /> Expandir
-          </button>
-        </div>
-        <div className="max-h-[500px] overflow-auto">
-          <table className="min-w-[900px] w-full text-left text-[13px]">
-            <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:text-white">
-              <tr>
-                {(
-                  [
-                    ["om", "Ordem"],
-                    ["textoBreve", "Texto Breve"],
-                    ["planta", "Planta"],
-                    ["inicioSla", "Início SLA"],
-                    ["tipo", "Tipo de Atividade"],
-                  ] as Array<[SortKey, string]>
-                ).map(([k, label]) => (
-                  <th
-                    key={k}
-                    className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
-                    onClick={() => toggleSort(k)}
-                  >
-                    {label} {sortKey === k ? (sortDir === "asc" ? "▲" : "▼") : ""}
-                  </th>
-                ))}
-                <th className="px-2 py-2 font-semibold">Elevatória</th>
-                <th className="px-2 py-2 font-semibold">SLA</th>
-                <th className="px-2 py-2 font-semibold">Resp.</th>
-                <th className="px-2 py-2 font-semibold">Equipe</th>
-                <th className="px-2 py-2 font-semibold">Observação</th>
-                <th className="px-2 py-2 font-semibold">Comentários</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((e, i) => (
-                <tr
-                  key={`${e.om}-${i}`}
-                  className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                >
-                  <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
-                    <span className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(e.om);
-                          setCopiedOm(e.om);
-                          setTimeout(() => setCopiedOm(null), 1500);
-                        }}
-                        className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
-                        title="Clique para copiar a O.S."
+                {rbUseIndividualConfig && rbRouteCount > 1 && (
+                  <div className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Configurações de cada rota
+                    </span>
+                    {rbRouteConfigs.map((cfg, idx) => (
+                      <div
+                        key={idx}
+                        className="grid gap-3 rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 p-3 sm:grid-cols-4"
                       >
-                        {e.om}
-                        {copiedOm === e.om && (
-                          <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
-                            Copiado!
-                          </span>
-                        )}
-                      </button>
-                      <OsInfoIcon
-                        textoLongo={e.r["TEXTO LONGO"]}
-                        numeroOs={e.om}
-                        textoBreve={e.r["TEXTO BREVE"] ?? undefined}
-                      />
-                    </span>
-                  </td>
-                  <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
-                  <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
-                  <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
-                  <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
-                  <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800 dark:text-slate-100">
-                    {getElevatoriaName(e.planta)}
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1">
-                    <span
-                      className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
-                    >
-                      {e.slaStatus}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                    <span className="inline-flex items-center gap-1">
-                      <select
-                        value={e.responsabilidade}
-                        onChange={(ev) => {
-                          const val = ev.target.value;
-                          if (!val) return;
-                          setResponsabilidadeOverrides((prev) => ({
-                            ...prev,
-                            [e.om]: val as Responsabilidade,
-                          }));
-                          supabase
-                            .from("responsabilidade_overrides")
-                            .upsert(
-                              { om: e.om, responsabilidade: val },
-                              { ignoreDuplicates: false },
-                            )
-                            .then(
-                              ({ error }) => error && console.warn("Falha ao salvar resp", error),
-                            );
-                        }}
-                        className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-                      >
-                        {(
-                          [
-                            "Planta Inativa",
-                            "Não atendemos",
-                            "CDA",
-                            "Baixada 1",
-                            "Baixada 2",
-                            "Outra SUP",
-                            "Ainda não identificado",
-                          ] as const
-                        ).map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      {responsabilidadeOverrides[e.om] && (
-                        <button
-                          onClick={() => {
-                            setResponsabilidadeOverrides((prev) => {
-                              const next = { ...prev };
-                              delete next[e.om];
-                              return next;
-                            });
-                            supabase
-                              .from("responsabilidade_overrides")
-                              .delete()
-                              .eq("om", e.om)
-                              .then(
-                                ({ error }) =>
-                                  error && console.warn("Falha ao remover resp override", error),
-                              );
-                          }}
-                          className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
-                          title="Reverter ao cálculo automático"
-                        >
-                          ↺
-                        </button>
-                      )}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                    {e.responsabilidade === "Baixada 2" ? (
-                      <span className="inline-flex items-center gap-1">
-                        <select
-                          value={e.equipe === "Não analisado" ? "" : e.equipe}
-                          onChange={(ev) => {
-                            const val = ev.target.value;
-                            if (!val) return;
-                            setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
-                            supabase
-                              .from("equipe_overrides")
-                              .upsert({ om: e.om, equipe: val }, { ignoreDuplicates: false })
-                              .then(({ error }) => error && console.warn("Falha ao salvar", error));
-                          }}
-                          className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
-                            e.equipe === "EMEC"
-                              ? "border-blue-200 bg-blue-50 text-blue-700"
-                              : e.equipe === "Automação"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-400 dark:text-slate-400"
-                          }`}
-                        >
-                          <option value="" disabled>
-                            {e.equipe === "Não analisado" ? "Selecionar…" : e.equipe}
-                          </option>
-                          <option value="EMEC">EMEC</option>
-                          <option value="Automação">Automação</option>
-                        </select>
-                        {equipeOverrides[e.om] && (
-                          <button
-                            onClick={() => {
-                              setEquipeOverrides((prev) => {
-                                const next = { ...prev };
-                                delete next[e.om];
-                                return next;
-                              });
-                              supabase
-                                .from("equipe_overrides")
-                                .delete()
-                                .eq("om", e.om)
-                                .then(
-                                  ({ error }) =>
-                                    error && console.warn("Falha ao remover override", error),
-                                );
-                            }}
-                            className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
-                            title="Reverter ao cálculo automático"
-                          >
-                            ↺
-                          </button>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
-                    )}
-                  </td>
-                  <td className="min-w-[160px] px-2 py-1">
-                    <input
-                      value={obsUnica[e.om] ?? ""}
-                      onChange={(ev) => atualizarObsUnica(e.om, ev.target.value)}
-                      onBlur={() => flushObsUnica(e.om)}
-                      placeholder="Escreva uma observação..."
-                      className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
-                    />
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setObsDialogOm(e.om)}
-                      title="Ver/Adicionar observações"
-                      className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 cursor-pointer"
-                    >
-                      <StickyNote className="h-4 w-4" />
-                      {(obsPorOm[e.om]?.length ?? 0) > 0 && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
-                          {obsPorOm[e.om]!.length}
+                        <span className="text-xs font-bold text-[#0b3a73] dark:text-white flex items-center">
+                          Rota {idx + 1}
                         </span>
-                      )}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Dialog da Tabela Expandida */}
-      <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
-        <DialogContent className="max-w-7xl">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-2">
-            <DialogTitle className="text-[#0b3a73] dark:text-white font-bold">
-              Todas as O.S. Filtradas ({sortedRows.length})
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[70vh] overflow-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:text-white z-10">
-                <tr>
-                  {(
-                    [
-                      ["om", "Ordem"],
-                      ["textoBreve", "Texto Breve"],
-                      ["planta", "Planta"],
-                      ["inicioSla", "Início SLA"],
-                      ["tipo", "Tipo de Atividade"],
-                    ] as Array<[SortKey, string]>
-                  ).map(([k, label]) => (
-                    <th
-                      key={k}
-                      className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
-                      onClick={() => toggleSort(k)}
-                    >
-                      {label} {sortKey === k ? (sortDir === "asc" ? "▲" : "▼") : ""}
-                    </th>
-                  ))}
-                  <th className="px-2 py-2 font-semibold">Elevatória</th>
-                  <th className="px-2 py-2 font-semibold">SLA</th>
-                  <th className="px-2 py-2 font-semibold">Resp.</th>
-                  <th className="px-2 py-2 font-semibold">Equipe</th>
-                  <th className="px-2 py-2 font-semibold">Observação</th>
-                  <th className="px-2 py-2 font-semibold">Comentários</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((e, i) => (
-                  <tr
-                    key={`${e.om}-${i}`}
-                    className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-                  >
-                    <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
-                      <span className="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(e.om);
-                            setCopiedOm(e.om);
-                            setTimeout(() => setCopiedOm(null), 1500);
-                          }}
-                          className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
-                          title="Clique para copiar a O.S."
-                        >
-                          {e.om}
-                          {copiedOm === e.om && (
-                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
-                              Copiado!
-                            </span>
-                          )}
-                        </button>
-                        <OsInfoIcon
-                          textoLongo={e.r["TEXTO LONGO"]}
-                          numeroOs={e.om}
-                          textoBreve={e.r["TEXTO BREVE"] ?? undefined}
-                        />
-                      </span>
-                    </td>
-                    <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
-                    <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
-                    <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
-                    <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
-                    <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800 dark:text-slate-100">
-                      {getElevatoriaName(e.planta)}
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1">
-                      <span
-                        className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
-                      >
-                        {e.slaStatus}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                      <span className="inline-flex items-center gap-1">
-                        <select
-                          value={e.responsabilidade}
-                          onChange={(ev) => {
-                            const val = ev.target.value;
-                            if (!val) return;
-                            setResponsabilidadeOverrides((prev) => ({
-                              ...prev,
-                              [e.om]: val as Responsabilidade,
-                            }));
-                            supabase
-                              .from("responsabilidade_overrides")
-                              .upsert(
-                                { om: e.om, responsabilidade: val },
-                                { ignoreDuplicates: false },
-                              )
-                              .then(
-                                ({ error }) => error && console.warn("Falha ao salvar resp", error),
-                              );
-                          }}
-                          className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-                        >
-                          {(
-                            [
-                              "Planta Inativa",
-                              "Não atendemos",
-                              "CDA",
-                              "Baixada 1",
-                              "Baixada 2",
-                              "Outra SUP",
-                              "Ainda não identificado",
-                            ] as const
-                          ).map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        {responsabilidadeOverrides[e.om] && (
-                          <button
-                            onClick={() => {
-                              setResponsabilidadeOverrides((prev) => {
-                                const next = { ...prev };
-                                delete next[e.om];
-                                return next;
-                              });
-                              supabase
-                                .from("responsabilidade_overrides")
-                                .delete()
-                                .eq("om", e.om)
-                                .then(
-                                  ({ error }) =>
-                                    error && console.warn("Falha ao remover resp override", error),
-                                );
-                            }}
-                            className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
-                            title="Reverter ao cálculo automático"
-                          >
-                            ↺
-                          </button>
-                        )}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-[12px]">
-                      {e.responsabilidade === "Baixada 2" ? (
-                        <span className="inline-flex items-center gap-1">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                            Equipe
+                          </span>
                           <select
-                            value={e.equipe === "Não analisado" ? "" : e.equipe}
-                            onChange={(ev) => {
-                              const val = ev.target.value;
-                              if (!val) return;
-                              setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
-                              supabase
-                                .from("equipe_overrides")
-                                .upsert({ om: e.om, equipe: val }, { ignoreDuplicates: false })
-                                .then(
-                                  ({ error }) => error && console.warn("Falha ao salvar", error),
-                                );
+                            value={cfg.equipe}
+                            onChange={(e) => {
+                              const next = [...rbRouteConfigs];
+                              next[idx] = { ...next[idx], equipe: e.target.value };
+                              setRbRouteConfigs(next);
                             }}
-                            className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
-                              e.equipe === "EMEC"
-                                ? "border-blue-200 bg-blue-50 text-blue-700"
-                                : e.equipe === "Automação"
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-400 dark:text-slate-400"
-                            }`}
+                            className="min-h-9 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[13px] shadow-sm"
                           >
-                            <option value="" disabled>
-                              {e.equipe === "Não analisado" ? "Selecionar…" : e.equipe}
-                            </option>
+                            <option value="TODAS">Todas</option>
                             <option value="EMEC">EMEC</option>
                             <option value="Automação">Automação</option>
                           </select>
-                          {equipeOverrides[e.om] && (
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                            Cidade
+                          </span>
+                          <select
+                            value={cfg.cidades[0] || ""}
+                            onChange={(e) => {
+                              const next = [...rbRouteConfigs];
+                              next[idx] = {
+                                ...next[idx],
+                                cidades: e.target.value ? [e.target.value] : [],
+                              };
+                              setRbRouteConfigs(next);
+                            }}
+                            className="min-h-9 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 text-[13px] shadow-sm"
+                          >
+                            <option value="">Todas</option>
+                            {allCidades.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                            Max paradas
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={cfg.maxStops}
+                            onChange={(e) => {
+                              const next = [...rbRouteConfigs];
+                              next[idx] = {
+                                ...next[idx],
+                                maxStops: Number(e.target.value) || 0,
+                              };
+                              setRbRouteConfigs(next);
+                            }}
+                            className="min-h-9 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[13px] shadow-sm"
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {routeError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {routeError}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setRouteDialogOpen(false)}
+                    className="rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={generateRoute}
+                    className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-4 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
+                  >
+                    <RouteIcon className="h-4 w-4" /> Gerar Rota
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Resultado da rota */}
+          {generatedRoutes.length > 0 && (
+            <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-md">
+              {/* Abas das rotas */}
+              <div className="flex flex-wrap border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 pt-2 gap-1">
+                {generatedRoutes.map((route, rIdx) => {
+                  const isActive = activeRouteTab === rIdx;
+                  return (
+                    <button
+                      key={rIdx}
+                      type="button"
+                      onClick={() => setActiveRouteTab(rIdx)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[1px] cursor-pointer ${
+                        isActive
+                          ? "bg-white dark:bg-slate-800 border-[#0b3a73] text-[#0b3a73] dark:text-white"
+                          : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-850 hover:bg-white/40"
+                      }`}
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full inline-block shrink-0"
+                        style={{ backgroundColor: route.color || "#0b3a73" }}
+                      />
+                      Rota {rIdx + 1}
+                    </button>
+                  );
+                })}
+                <div className="ml-auto flex flex-wrap items-center gap-2 pb-2 pr-2">
+                  <button
+                    onClick={copyRouteResumo}
+                    className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    <CopyIcon className="h-3.5 w-3.5" /> Copiar Todas (WhatsApp)
+                  </button>
+                  <button
+                    onClick={() => exportRouteCSV()}
+                    className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Exportar Todas (CSV)
+                  </button>
+                  <button
+                    onClick={clearRoute}
+                    className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" /> Limpar
+                  </button>
+                </div>
+              </div>
+
+              {/* Conteúdo da Rota Ativa */}
+              {(() => {
+                const activeRoute = generatedRoutes[activeRouteTab] || generatedRoutes[0];
+                if (!activeRoute) return null;
+                return (
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-700 bg-[#eaf3fb]/20 px-4 py-3">
+                      <div className="flex items-center gap-2 text-[#0b3a73] dark:text-white">
+                        <RouteIcon
+                          className="h-5 w-5"
+                          style={{ color: activeRoute.color || "#0b3a73" }}
+                        />
+                        <div>
+                          <div className="text-sm font-bold">
+                            Detalhes da Rota {activeRouteTab + 1}
+                          </div>
+                          <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                            {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em{" "}
+                            {activeRoute.stops.length} paradas
+                            {activeRoute.totalOs > activeRoute.limitConfig.max &&
+                              ` (estouro de ${activeRoute.totalOs - activeRoute.limitConfig.max}, tolerância ${activeRoute.limitConfig.tolerance})`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
+                          <span className="text-slate-500 dark:text-slate-400">Distância:</span>{" "}
+                          <span className="font-bold text-[#0b3a73] dark:text-white">
+                            {activeRoute.totalKm.toFixed(1)} km
+                          </span>
+                        </div>
+                        <div className="rounded bg-white dark:bg-slate-800 px-2 py-1 shadow-sm border border-slate-100 dark:border-slate-700">
+                          <span className="text-slate-500 dark:text-slate-400">Tempo est.:</span>{" "}
+                          <span className="font-bold text-[#0b3a73] dark:text-white">
+                            ~{activeRoute.etaMin} min
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => exportRouteCSV(activeRouteTab)}
+                          className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
+                        >
+                          <Download className="h-3 w-3" /> CSV Rota {activeRouteTab + 1}
+                        </button>
+                        <button
+                          onClick={() => copyRoute(activeRouteTab)}
+                          className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
+                        >
+                          <CopyIcon className="h-3 w-3" /> Copiar Rota {activeRouteTab + 1}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 p-3 lg:grid-cols-2">
+                      <div className="rounded border border-slate-150 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-xs">
+                        <div className="mb-2 flex items-center gap-1 font-semibold text-[#0b3a73] dark:text-white">
+                          <Flag
+                            className="h-3.5 w-3.5"
+                            style={{ color: activeRoute.color || "#0b3a73" }}
+                          />{" "}
+                          Ponto de partida:{" "}
+                          <span className="font-normal text-slate-700 dark:text-slate-200">
+                            {activeRoute.start.label}
+                          </span>
+                        </div>
+                        <ol className="space-y-1 max-h-[380px] overflow-auto pr-1">
+                          {activeRoute.details.map((d) => (
+                            <li
+                              key={d.ordem}
+                              className="rounded border border-slate-100 dark:border-slate-700 p-2 hover:border-[#1f7ad6]"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                                    style={{ backgroundColor: activeRoute.color || "#0b3a73" }}
+                                  >
+                                    {d.ordem}
+                                  </span>
+                                  <div>
+                                    <div className="font-semibold text-[#0b3a73] dark:text-white">
+                                      {d.plantaShort}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                      {d.cidade}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right text-[10px] text-slate-500 dark:text-slate-400">
+                                  <div>+{d.distKm.toFixed(1)} km</div>
+                                  <div className="text-slate-400 dark:text-slate-400">
+                                    Σ {d.cumKm.toFixed(1)} km
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => {
+                                      const routes = [...generatedRoutes];
+                                      const r = { ...routes[activeRouteTab] };
+                                      const idx = r.details.findIndex((x) => x.planta === d.planta);
+                                      if (idx === -1) return;
+                                      const newDetails = r.details.filter((_, i) => i !== idx);
+                                      const newStops = r.stops.filter((_, i) => i !== idx);
+                                      // Recalculate cumulative distances
+                                      let cumKm = 0;
+                                      const prev = activeRoute.start;
+                                      const recalcDetails = newDetails.map((x, i) => {
+                                        const dist =
+                                          i === 0
+                                            ? haversineKm(prev, {
+                                                lat: x.oss[0].lat!,
+                                                lon: x.oss[0].lon!,
+                                              })
+                                            : haversineKm(
+                                                {
+                                                  lat: newDetails[i - 1].oss[0].lat!,
+                                                  lon: newDetails[i - 1].oss[0].lon!,
+                                                },
+                                                { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
+                                              );
+                                        cumKm += dist;
+                                        return { ...x, ordem: i + 1, distKm: dist, cumKm };
+                                      });
+                                      const totalKm = cumKm;
+                                      routes[activeRouteTab] = {
+                                        ...r,
+                                        details: recalcDetails,
+                                        stops: newStops.map((s, i) => ({ ...s, ordem: i + 1 })),
+                                        totalKm,
+                                        etaMin: Math.round((totalKm / AVG_KMH) * 60),
+                                      };
+                                      setGeneratedRoutes(routes);
+                                    }}
+                                    className="rounded bg-red-50 px-1 py-0.5 text-[10px] text-red-600 hover:bg-red-100 cursor-pointer"
+                                    title="Remover elevatória desta rota"
+                                  >
+                                    ✕
+                                  </button>
+                                  {generatedRoutes.length > 1 && (
+                                    <select
+                                      value=""
+                                      onChange={(e) => {
+                                        const targetIdx = Number(e.target.value);
+                                        if (isNaN(targetIdx) || targetIdx === activeRouteTab)
+                                          return;
+                                        const routes = [...generatedRoutes];
+                                        // Remove from current route
+                                        const src = { ...routes[activeRouteTab] };
+                                        const idx = src.details.findIndex(
+                                          (x) => x.planta === d.planta,
+                                        );
+                                        if (idx === -1) return;
+                                        const movedDetail = src.details[idx];
+                                        src.details = src.details.filter((_, i) => i !== idx);
+                                        src.stops = src.stops.filter((_, i) => i !== idx);
+                                        // Recalc source route
+                                        let cumKm = 0;
+                                        const prev = activeRoute.start;
+                                        src.details = src.details.map((x, i) => {
+                                          const dist =
+                                            i === 0
+                                              ? haversineKm(prev, {
+                                                  lat: x.oss[0].lat!,
+                                                  lon: x.oss[0].lon!,
+                                                })
+                                              : haversineKm(
+                                                  {
+                                                    lat: src.details[i - 1].oss[0].lat!,
+                                                    lon: src.details[i - 1].oss[0].lon!,
+                                                  },
+                                                  { lat: x.oss[0].lat!, lon: x.oss[0].lon! },
+                                                );
+                                          cumKm += dist;
+                                          return { ...x, ordem: i + 1, distKm: dist, cumKm };
+                                        });
+                                        src.totalKm = cumKm;
+                                        src.etaMin = Math.round((cumKm / AVG_KMH) * 60);
+                                        src.stops = src.stops.map((s, i) => ({
+                                          ...s,
+                                          ordem: i + 1,
+                                        }));
+
+                                        // Add to target route at the end
+                                        const tgt = { ...routes[targetIdx] };
+                                        const tgtPrev =
+                                          tgt.details.length > 0
+                                            ? {
+                                                lat: tgt.details[tgt.details.length - 1].oss[0]
+                                                  .lat!,
+                                                lon: tgt.details[tgt.details.length - 1].oss[0]
+                                                  .lon!,
+                                              }
+                                            : tgt.start;
+                                        const distToNew = haversineKm(tgtPrev, {
+                                          lat: movedDetail.oss[0].lat!,
+                                          lon: movedDetail.oss[0].lon!,
+                                        });
+                                        const newDetail = {
+                                          ...movedDetail,
+                                          ordem: tgt.details.length + 1,
+                                          distKm: distToNew,
+                                          cumKm:
+                                            (tgt.details.length > 0
+                                              ? tgt.details[tgt.details.length - 1].cumKm
+                                              : 0) + distToNew,
+                                        };
+                                        tgt.details = [...tgt.details, newDetail];
+                                        tgt.stops = [
+                                          ...tgt.stops,
+                                          {
+                                            planta: movedDetail.planta,
+                                            lat: movedDetail.oss[0].lat!,
+                                            lon: movedDetail.oss[0].lon!,
+                                            ordem: tgt.stops.length + 1,
+                                            osCount: movedDetail.oss.length,
+                                          },
+                                        ];
+                                        tgt.totalKm = tgt.details.reduce((s, x) => s + x.distKm, 0);
+                                        tgt.etaMin = Math.round((tgt.totalKm / AVG_KMH) * 60);
+
+                                        routes[activeRouteTab] = src;
+                                        routes[targetIdx] = tgt;
+                                        setGeneratedRoutes(routes);
+                                        setActiveRouteTab(targetIdx);
+                                      }}
+                                      className="rounded border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-1 py-0.5 text-[10px] text-slate-600 dark:text-slate-300 cursor-pointer"
+                                      title="Transferir para outra rota"
+                                    >
+                                      <option value="">→</option>
+                                      {generatedRoutes.map((_, ri) =>
+                                        ri !== activeRouteTab ? (
+                                          <option key={ri} value={ri}>
+                                            Rota {ri + 1}
+                                          </option>
+                                        ) : null,
+                                      )}
+                                    </select>
+                                  )}
+                                </div>
+                              </div>
+                              <ul className="mt-1 ml-8 space-y-0.5">
+                                {d.oss.map((os) => (
+                                  <li
+                                    key={os.om}
+                                    className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300"
+                                  >
+                                    <span className="font-mono text-[#1f7ad6]">{os.om}</span>
+                                    <span className="truncate">{os.r["TEXTO BREVE"]}</span>
+                                    {os.slaStatus === "ATRASADO" && (
+                                      <span className="ml-auto shrink-0 rounded bg-red-100 px-1 text-[9px] font-semibold text-red-700">
+                                        {os.diasAberto}d
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                      <div className="min-h-[500px] rounded border border-slate-150 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
+                        <div className="h-full min-h-[500px]" style={{ height: 500 }}>
+                          {mounted ? (
+                            <Suspense
+                              fallback={
+                                <div className="flex h-full items-center justify-center text-xs text-slate-400 dark:text-slate-400">
+                                  Carregando mapa…
+                                </div>
+                              }
+                            >
+                              <BacklogMap
+                                markers={mapMarkers}
+                                onSelect={togglePlanta}
+                                selectedPlantas={fPlantas}
+                                fitSignal={mapFitSignal}
+                                route={activeRoute}
+                              />
+                            </Suspense>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Tabela */}
+          <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-sm">
+            <div className="border-b border-slate-100 dark:border-slate-700 p-3 text-sm font-semibold text-[#0b3a73] dark:text-white flex items-center justify-between">
+              <span>O.S. filtradas ({sortedRows.length})</span>
+              <button
+                type="button"
+                onClick={() => setTableExpanded(true)}
+                className="inline-flex items-center gap-1 rounded border border-slate-350 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
+                title="Expandir tabela"
+              >
+                <Maximize2 className="h-3.5 w-3.5" /> Expandir
+              </button>
+            </div>
+            <div className="max-h-[500px] overflow-auto">
+              <table className="min-w-[900px] w-full text-left text-[13px]">
+                <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:text-white">
+                  <tr>
+                    {(
+                      [
+                        ["om", "Ordem"],
+                        ["textoBreve", "Texto Breve"],
+                        ["planta", "Planta"],
+                        ["inicioSla", "Início SLA"],
+                        ["tipo", "Tipo de Atividade"],
+                      ] as Array<[SortKey, string]>
+                    ).map(([k, label]) => (
+                      <th
+                        key={k}
+                        className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
+                        onClick={() => toggleSort(k)}
+                      >
+                        {label} {sortKey === k ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                      </th>
+                    ))}
+                    <th className="px-2 py-2 font-semibold">Elevatória</th>
+                    <th className="px-2 py-2 font-semibold">SLA</th>
+                    <th className="px-2 py-2 font-semibold">Resp.</th>
+                    <th className="px-2 py-2 font-semibold">Equipe</th>
+                    <th className="px-2 py-2 font-semibold">Observação</th>
+                    <th className="px-2 py-2 font-semibold">Comentários</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRows.map((e, i) => (
+                    <tr
+                      key={`${e.om}-${i}`}
+                      className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    >
+                      <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await navigator.clipboard.writeText(e.om);
+                              setCopiedOm(e.om);
+                              setTimeout(() => setCopiedOm(null), 1500);
+                            }}
+                            className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
+                            title="Clique para copiar a O.S."
+                          >
+                            {e.om}
+                            {copiedOm === e.om && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
+                                Copiado!
+                              </span>
+                            )}
+                          </button>
+                          <OsInfoIcon
+                            textoLongo={e.r["TEXTO LONGO"]}
+                            numeroOs={e.om}
+                            textoBreve={e.r["TEXTO BREVE"] ?? undefined}
+                          />
+                        </span>
+                      </td>
+                      <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
+                      <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
+                      <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
+                      <td className="px-2 py-1">{abbreviateAtividade(e.r["Tipo de Atividade"])}</td>
+                      <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800 dark:text-slate-100">
+                        {getElevatoriaName(e.planta)}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1">
+                        <span
+                          className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
+                        >
+                          {e.slaStatus}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                        <span className="inline-flex items-center gap-1">
+                          <select
+                            value={e.responsabilidade}
+                            onChange={(ev) => {
+                              const val = ev.target.value;
+                              if (!val) return;
+                              setResponsabilidadeOverrides((prev) => ({
+                                ...prev,
+                                [e.om]: val as Responsabilidade,
+                              }));
+                              supabase
+                                .from("responsabilidade_overrides")
+                                .upsert(
+                                  { om: e.om, responsabilidade: val },
+                                  { ignoreDuplicates: false },
+                                )
+                                .then(
+                                  ({ error }) =>
+                                    error && console.warn("Falha ao salvar resp", error),
+                                );
+                            }}
+                            className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                          >
+                            {(
+                              [
+                                "Planta Inativa",
+                                "Não atendemos",
+                                "CDA",
+                                "Baixada 1",
+                                "Baixada 2",
+                                "Outra SUP",
+                                "Ainda não identificado",
+                              ] as const
+                            ).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                          {responsabilidadeOverrides[e.om] && (
                             <button
                               onClick={() => {
-                                setEquipeOverrides((prev) => {
+                                setResponsabilidadeOverrides((prev) => {
                                   const next = { ...prev };
                                   delete next[e.om];
                                   return next;
                                 });
                                 supabase
-                                  .from("equipe_overrides")
+                                  .from("responsabilidade_overrides")
                                   .delete()
                                   .eq("om", e.om)
                                   .then(
                                     ({ error }) =>
-                                      error && console.warn("Falha ao remover override", error),
+                                      error &&
+                                      console.warn("Falha ao remover resp override", error),
                                   );
                               }}
                               className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
@@ -3683,116 +3456,417 @@ function BacklogPage() {
                             </button>
                           )}
                         </span>
-                      ) : (
-                        <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
-                      )}
-                    </td>
-                    <td className="min-w-[160px] px-2 py-1">
-                      <input
-                        value={obsUnica[e.om] ?? ""}
-                        onChange={(ev) => atualizarObsUnica(e.om, ev.target.value)}
-                        onBlur={() => flushObsUnica(e.om)}
-                        placeholder="Escreva uma observação..."
-                        className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setObsDialogOm(e.om)}
-                        title="Ver/Adicionar observações"
-                        className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 cursor-pointer"
-                      >
-                        <StickyNote className="h-4 w-4" />
-                        {(obsPorOm[e.om]?.length ?? 0) > 0 && (
-                          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
-                            {obsPorOm[e.om]!.length}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                        {e.responsabilidade === "Baixada 2" ? (
+                          <span className="inline-flex items-center gap-1">
+                            <select
+                              value={e.equipe === "Não analisado" ? "" : e.equipe}
+                              onChange={(ev) => {
+                                const val = ev.target.value;
+                                if (!val) return;
+                                setEquipeOverrides((prev) => ({ ...prev, [e.om]: val as Equipe }));
+                                supabase
+                                  .from("equipe_overrides")
+                                  .upsert({ om: e.om, equipe: val }, { ignoreDuplicates: false })
+                                  .then(
+                                    ({ error }) => error && console.warn("Falha ao salvar", error),
+                                  );
+                              }}
+                              className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
+                                e.equipe === "EMEC"
+                                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                                  : e.equipe === "Automação"
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-400 dark:text-slate-400"
+                              }`}
+                            >
+                              <option value="" disabled>
+                                {e.equipe === "Não analisado" ? "Selecionar…" : e.equipe}
+                              </option>
+                              <option value="EMEC">EMEC</option>
+                              <option value="Automação">Automação</option>
+                            </select>
+                            {equipeOverrides[e.om] && (
+                              <button
+                                onClick={() => {
+                                  setEquipeOverrides((prev) => {
+                                    const next = { ...prev };
+                                    delete next[e.om];
+                                    return next;
+                                  });
+                                  supabase
+                                    .from("equipe_overrides")
+                                    .delete()
+                                    .eq("om", e.om)
+                                    .then(
+                                      ({ error }) =>
+                                        error && console.warn("Falha ao remover override", error),
+                                    );
+                                }}
+                                className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
+                                title="Reverter ao cálculo automático"
+                              >
+                                ↺
+                              </button>
+                            )}
                           </span>
+                        ) : (
+                          <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                         )}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Observações da O.S. */}
-      <Dialog open={obsDialogOm !== null} onOpenChange={(o) => !o && setObsDialogOm(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-bold text-[#0b3a73] dark:text-white">
-              <StickyNote className="h-4 w-4 text-orange-500" /> Observações · {obsDialogOm}
-            </DialogTitle>
-          </DialogHeader>
-          {obsDialogOm && (
-            <div className="space-y-3 text-sm">
-              <div className="max-h-[40vh] space-y-2 overflow-y-auto pr-1">
-                {(obsPorOm[obsDialogOm] ?? []).length === 0 ? (
-                  <p className="py-6 text-center text-sm text-slate-400">
-                    Nenhuma observação para esta O.S.
-                  </p>
-                ) : (
-                  (obsPorOm[obsDialogOm] ?? []).map((o) => (
-                    <div
-                      key={o.id}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-700/40"
-                    >
-                      <p className="whitespace-pre-wrap text-[13px] text-slate-700 dark:text-slate-200">
-                        {o.texto}
-                      </p>
-                      <p className="mt-1 text-[10px] text-slate-400">
-                        {o.criado_em ? new Date(o.criado_em).toLocaleString("pt-BR") : ""}
-                        {o.autor_nome ? ` · ${o.autor_nome}` : ""}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="flex gap-2">
-                <textarea
-                  value={novoObsTexto}
-                  onChange={(e) => setNovoObsTexto(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      adicionarObservacao();
-                    }
-                  }}
-                  rows={2}
-                  placeholder="Digite uma observação sobre a O.S...."
-                  className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                />
-                <button
-                  onClick={adicionarObservacao}
-                  disabled={!novoObsTexto.trim() || obsEnviando}
-                  className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
-                >
-                  <Plus className="h-4 w-4" /> Adicionar
-                </button>
-              </div>
+                      </td>
+                      <td className="min-w-[160px] px-2 py-1">
+                        <input
+                          value={obsUnica[e.om] ?? ""}
+                          onChange={(ev) => atualizarObsUnica(e.om, ev.target.value)}
+                          onBlur={() => flushObsUnica(e.om)}
+                          placeholder="Escreva uma observação..."
+                          className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setObsDialogOm(e.om)}
+                          title="Ver/Adicionar observações"
+                          className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                          <StickyNote className="h-4 w-4" />
+                          {(obsPorOm[e.om]?.length ?? 0) > 0 && (
+                            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
+                              {obsPorOm[e.om]!.length}
+                            </span>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv,.xlsx,.xls"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleUpload(f);
-          e.target.value = "";
-        }}
-      />
+          {/* Dialog da Tabela Expandida */}
+          <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
+            <DialogContent className="max-w-7xl">
+              <DialogHeader className="flex flex-row items-center justify-between border-b pb-2">
+                <DialogTitle className="text-[#0b3a73] dark:text-white font-bold">
+                  Todas as O.S. Filtradas ({sortedRows.length})
+                </DialogTitle>
+              </DialogHeader>
+              <div className="max-h-[70vh] overflow-auto">
+                <table className="w-full text-left text-[13px]">
+                  <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:text-white z-10">
+                    <tr>
+                      {(
+                        [
+                          ["om", "Ordem"],
+                          ["textoBreve", "Texto Breve"],
+                          ["planta", "Planta"],
+                          ["inicioSla", "Início SLA"],
+                          ["tipo", "Tipo de Atividade"],
+                        ] as Array<[SortKey, string]>
+                      ).map(([k, label]) => (
+                        <th
+                          key={k}
+                          className="cursor-pointer whitespace-nowrap px-2 py-2 font-semibold hover:underline"
+                          onClick={() => toggleSort(k)}
+                        >
+                          {label} {sortKey === k ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                        </th>
+                      ))}
+                      <th className="px-2 py-2 font-semibold">Elevatória</th>
+                      <th className="px-2 py-2 font-semibold">SLA</th>
+                      <th className="px-2 py-2 font-semibold">Resp.</th>
+                      <th className="px-2 py-2 font-semibold">Equipe</th>
+                      <th className="px-2 py-2 font-semibold">Observação</th>
+                      <th className="px-2 py-2 font-semibold">Comentários</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedRows.map((e, i) => (
+                      <tr
+                        key={`${e.om}-${i}`}
+                        className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+                      >
+                        <td className="whitespace-nowrap px-2 py-1 font-mono text-[12px]">
+                          <span className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await navigator.clipboard.writeText(e.om);
+                                setCopiedOm(e.om);
+                                setTimeout(() => setCopiedOm(null), 1500);
+                              }}
+                              className="hover:underline text-[#1f7ad6] hover:text-[#0b3a73] dark:text-white font-bold text-left cursor-pointer flex items-center gap-1.5"
+                              title="Clique para copiar a O.S."
+                            >
+                              {e.om}
+                              {copiedOm === e.om && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded animate-fade-in font-normal font-sans shrink-0">
+                                  Copiado!
+                                </span>
+                              )}
+                            </button>
+                            <OsInfoIcon
+                              textoLongo={e.r["TEXTO LONGO"]}
+                              numeroOs={e.om}
+                              textoBreve={e.r["TEXTO BREVE"] ?? undefined}
+                            />
+                          </span>
+                        </td>
+                        <td className="px-2 py-1">{e.r["TEXTO BREVE"]}</td>
+                        <td className="whitespace-nowrap px-2 py-1">{e.plantaShort}</td>
+                        <td className="whitespace-nowrap px-2 py-1">{fmtDate(e.inicioSla)}</td>
+                        <td className="px-2 py-1">
+                          {abbreviateAtividade(e.r["Tipo de Atividade"])}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800 dark:text-slate-100">
+                          {getElevatoriaName(e.planta)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1">
+                          <span
+                            className={`rounded px-1 text-[11px] font-semibold ${e.slaStatus === "ATRASADO" ? "bg-red-100 text-red-700" : e.slaStatus === "NO PRAZO" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
+                          >
+                            {e.slaStatus}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                          <span className="inline-flex items-center gap-1">
+                            <select
+                              value={e.responsabilidade}
+                              onChange={(ev) => {
+                                const val = ev.target.value;
+                                if (!val) return;
+                                setResponsabilidadeOverrides((prev) => ({
+                                  ...prev,
+                                  [e.om]: val as Responsabilidade,
+                                }));
+                                supabase
+                                  .from("responsabilidade_overrides")
+                                  .upsert(
+                                    { om: e.om, responsabilidade: val },
+                                    { ignoreDuplicates: false },
+                                  )
+                                  .then(
+                                    ({ error }) =>
+                                      error && console.warn("Falha ao salvar resp", error),
+                                  );
+                              }}
+                              className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                            >
+                              {(
+                                [
+                                  "Planta Inativa",
+                                  "Não atendemos",
+                                  "CDA",
+                                  "Baixada 1",
+                                  "Baixada 2",
+                                  "Outra SUP",
+                                  "Ainda não identificado",
+                                ] as const
+                              ).map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                            {responsabilidadeOverrides[e.om] && (
+                              <button
+                                onClick={() => {
+                                  setResponsabilidadeOverrides((prev) => {
+                                    const next = { ...prev };
+                                    delete next[e.om];
+                                    return next;
+                                  });
+                                  supabase
+                                    .from("responsabilidade_overrides")
+                                    .delete()
+                                    .eq("om", e.om)
+                                    .then(
+                                      ({ error }) =>
+                                        error &&
+                                        console.warn("Falha ao remover resp override", error),
+                                    );
+                                }}
+                                className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
+                                title="Reverter ao cálculo automático"
+                              >
+                                ↺
+                              </button>
+                            )}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                          {e.responsabilidade === "Baixada 2" ? (
+                            <span className="inline-flex items-center gap-1">
+                              <select
+                                value={e.equipe === "Não analisado" ? "" : e.equipe}
+                                onChange={(ev) => {
+                                  const val = ev.target.value;
+                                  if (!val) return;
+                                  setEquipeOverrides((prev) => ({
+                                    ...prev,
+                                    [e.om]: val as Equipe,
+                                  }));
+                                  supabase
+                                    .from("equipe_overrides")
+                                    .upsert({ om: e.om, equipe: val }, { ignoreDuplicates: false })
+                                    .then(
+                                      ({ error }) =>
+                                        error && console.warn("Falha ao salvar", error),
+                                    );
+                                }}
+                                className={`min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer ${
+                                  e.equipe === "EMEC"
+                                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                                    : e.equipe === "Automação"
+                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                      : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-400 dark:text-slate-400"
+                                }`}
+                              >
+                                <option value="" disabled>
+                                  {e.equipe === "Não analisado" ? "Selecionar…" : e.equipe}
+                                </option>
+                                <option value="EMEC">EMEC</option>
+                                <option value="Automação">Automação</option>
+                              </select>
+                              {equipeOverrides[e.om] && (
+                                <button
+                                  onClick={() => {
+                                    setEquipeOverrides((prev) => {
+                                      const next = { ...prev };
+                                      delete next[e.om];
+                                      return next;
+                                    });
+                                    supabase
+                                      .from("equipe_overrides")
+                                      .delete()
+                                      .eq("om", e.om)
+                                      .then(
+                                        ({ error }) =>
+                                          error && console.warn("Falha ao remover override", error),
+                                      );
+                                  }}
+                                  className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
+                                  title="Reverter ao cálculo automático"
+                                >
+                                  ↺
+                                </button>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
+                          )}
+                        </td>
+                        <td className="min-w-[160px] px-2 py-1">
+                          <input
+                            value={obsUnica[e.om] ?? ""}
+                            onChange={(ev) => atualizarObsUnica(e.om, ev.target.value)}
+                            onBlur={() => flushObsUnica(e.om)}
+                            placeholder="Escreva uma observação..."
+                            className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 text-[12px] text-slate-700 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-slate-200 dark:hover:border-slate-600 dark:focus:bg-slate-800"
+                          />
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setObsDialogOm(e.om)}
+                            title="Ver/Adicionar observações"
+                            className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 cursor-pointer"
+                          >
+                            <StickyNote className="h-4 w-4" />
+                            {(obsPorOm[e.om]?.length ?? 0) > 0 && (
+                              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
+                                {obsPorOm[e.om]!.length}
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-      <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-        Águas do Rio · Eletromecânica · Backlog Field/SAP
-      </p>
+          {/* Dialog Observações da O.S. */}
+          <Dialog open={obsDialogOm !== null} onOpenChange={(o) => !o && setObsDialogOm(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 font-bold text-[#0b3a73] dark:text-white">
+                  <StickyNote className="h-4 w-4 text-orange-500" /> Observações · {obsDialogOm}
+                </DialogTitle>
+              </DialogHeader>
+              {obsDialogOm && (
+                <div className="space-y-3 text-sm">
+                  <div className="max-h-[40vh] space-y-2 overflow-y-auto pr-1">
+                    {(obsPorOm[obsDialogOm] ?? []).length === 0 ? (
+                      <p className="py-6 text-center text-sm text-slate-400">
+                        Nenhuma observação para esta O.S.
+                      </p>
+                    ) : (
+                      (obsPorOm[obsDialogOm] ?? []).map((o) => (
+                        <div
+                          key={o.id}
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-700/40"
+                        >
+                          <p className="whitespace-pre-wrap text-[13px] text-slate-700 dark:text-slate-200">
+                            {o.texto}
+                          </p>
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            {o.criado_em ? new Date(o.criado_em).toLocaleString("pt-BR") : ""}
+                            {o.autor_nome ? ` · ${o.autor_nome}` : ""}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <textarea
+                      value={novoObsTexto}
+                      onChange={(e) => setNovoObsTexto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          adicionarObservacao();
+                        }
+                      }}
+                      rows={2}
+                      placeholder="Digite uma observação sobre a O.S...."
+                      className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    />
+                    <button
+                      onClick={adicionarObservacao}
+                      disabled={!novoObsTexto.trim() || obsEnviando}
+                      className="inline-flex min-h-10 items-center gap-1 self-end rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
+                    >
+                      <Plus className="h-4 w-4" /> Adicionar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+              e.target.value = "";
+            }}
+          />
+
+          <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+            Águas do Rio · Eletromecânica · Backlog Field/SAP
+          </p>
+        </>
+      )}
     </div>
   );
 }
