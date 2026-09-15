@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import L from "leaflet";
 import {
@@ -8,6 +8,7 @@ import {
   Polyline,
   Popup,
   TileLayer,
+  Tooltip,
   useMap,
 } from "react-leaflet";
 import {
@@ -76,6 +77,7 @@ type Planejamento = {
   criado_em: string | null;
   atualizado_em: string | null;
   paradas: Parada[];
+  pendentes?: Elevatoria[];
 };
 
 const TIPOS_OS = [
@@ -150,25 +152,179 @@ function numberedIcon(n: number) {
   });
 }
 
+function pulseIcon() {
+  return L.divIcon({
+    className: "planejamento-pulse",
+    html: `
+      <div style="position:relative;width:40px;height:40px;">
+        <span style="position:absolute;inset:4px;border-radius:9999px;background:rgba(245,158,11,.45);animation:planejRing 1.2s ease-out infinite;"></span>
+        <span style="position:absolute;top:12px;left:12px;width:16px;height:16px;border-radius:9999px;background:#f59e0b;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);"></span>
+      </div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  });
+}
+
+const planejAnimationCss = `
+  @keyframes planejRing {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+`;
+
+function FlyTo({ point, signal }: { point: [number, number] | null; signal: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!point) return;
+    map.flyTo(point, 15, { duration: 1 });
+  }, [point, signal, map]);
+  return null;
+}
+
 function PlanejamentoMap({
   elevatorias,
   paradas,
+  pendentes,
   onAdd,
   onRemove,
 }: {
   elevatorias: Elevatoria[];
   paradas: Parada[];
+  pendentes: Elevatoria[];
   onAdd: (el: Elevatoria) => void;
   onRemove: (idx: number) => void;
 }) {
   const [fitSignal, setFitSignal] = useState(0);
+  const [pesquisa, setPesquisa] = useState("");
+  const [mostrandoRes, setMostrandoRes] = useState(false);
+  const [mostra, setMostra] = useState({ rota: true, pend: true, resto: true });
+  const [destaque, setDestaque] = useState<number | null>(null);
+  const [flySig, setFlySig] = useState(0);
+  const [flyPonto, setFlyPonto] = useState<[number, number] | null>(null);
+  const destaqueTimer = useRef<number | null>(null);
+
   const routeIds = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
-  const points = useMemo(() => {
+  const pendIds = useMemo(() => new Set(pendentes.map((p) => p.id)), [pendentes]);
+
+  const pontosRota: Array<[number, number]> = useMemo(() => {
+    if (!mostra.rota) return [];
+    return paradas.filter((p) => p.lat != null && p.lon != null).map((p) => [p.lat!, p.lon!]);
+  }, [paradas, mostra.rota]);
+
+  const pontosFit = useMemo(() => {
+    if (pontosRota.length) return pontosRota;
     const pts: Array<[number, number]> = [];
-    for (const p of paradas) if (p.lat != null && p.lon != null) pts.push([p.lat, p.lon]);
-    if (!pts.length) for (const el of elevatorias) pts.push([el.lat, el.lon]);
+    if (mostra.pend) for (const p of pendentes) pts.push([p.lat, p.lon]);
+    if (mostra.resto)
+      for (const el of elevatorias)
+        if (!routeIds.has(el.id) && !pendIds.has(el.id)) pts.push([el.lat, el.lon]);
     return pts;
-  }, [paradas, elevatorias]);
+  }, [pontosRota, mostra.pend, mostra.resto, pendentes, elevatorias, routeIds, pendIds]);
+
+  const q = pesquisa.trim().toLowerCase();
+  const resultados = useMemo(() => {
+    if (!q) return [];
+    return elevatorias.filter((el) => el.nome.toLowerCase().includes(q)).slice(0, 8);
+  }, [q, elevatorias]);
+
+  useEffect(
+    () => () => {
+      if (destaqueTimer.current) window.clearTimeout(destaqueTimer.current);
+    },
+    [],
+  );
+
+  const selecionar = (el: Elevatoria) => {
+    setDestaque(el.id);
+    setFlyPonto([el.lat, el.lon]);
+    setFlySig((n) => n + 1);
+    setPesquisa("");
+    setMostrandoRes(false);
+    if (destaqueTimer.current) window.clearTimeout(destaqueTimer.current);
+    destaqueTimer.current = window.setTimeout(() => {
+      setDestaque(null);
+      destaqueTimer.current = null;
+    }, 2600);
+  };
+
+  const renderMarcadorRota = (p: Parada, idx: number) => {
+    if (!mostra.rota || p.lat == null || p.lon == null) return null;
+    return (
+      <Marker key={p.id} position={[p.lat, p.lon]} icon={numberedIcon(idx + 1)}>
+        <Tooltip>
+          <span className="font-semibold">
+            {idx + 1}. {p.elevatoria_nome}
+          </span>
+        </Tooltip>
+        <Popup>
+          <div className="text-xs">
+            <div className="font-semibold text-[#0b3a73]">
+              Parada #{idx + 1} · {p.elevatoria_nome}
+            </div>
+            {p.os.om && <div>O.S.: {p.os.om}</div>}
+            {p.os.origem === "nova" && (
+              <div className="font-semibold text-amber-600">Pendente de criação</div>
+            )}
+            <button
+              className="mt-1 cursor-pointer rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-600"
+              onClick={() => onRemove(idx)}
+            >
+              Remover da rota
+            </button>
+          </div>
+        </Popup>
+      </Marker>
+    );
+  };
+
+  const renderMarcadorPendente = (el: Elevatoria) => {
+    if (!mostra.pend || destaque === el.id) return null;
+    return (
+      <CircleMarker
+        key={`pend-${el.id}`}
+        center={[el.lat, el.lon]}
+        radius={9}
+        pathOptions={{ color: "#15803d", fillColor: "#22c55e", fillOpacity: 0.85, weight: 3 }}
+        eventHandlers={{
+          click: () =>
+            toast.info(
+              `${el.nome} está pendente. Use o botão "Pendentes" para adicioná-la à rota.`,
+            ),
+        }}
+      >
+        <Tooltip>
+          <span className="font-semibold text-emerald-700">● Pendente</span> · {el.nome}
+        </Tooltip>
+      </CircleMarker>
+    );
+  };
+
+  const renderMarcadorResto = (el: Elevatoria) => {
+    if (!mostra.resto || destaque === el.id) return null;
+    return (
+      <CircleMarker
+        key={`resto-${el.id}`}
+        center={[el.lat, el.lon]}
+        radius={8}
+        pathOptions={{ color: "#94a3b8", fillColor: "#cbd5e1", fillOpacity: 0.85, weight: 2 }}
+        eventHandlers={{ click: () => onAdd(el) }}
+      >
+        <Tooltip>{el.nome}</Tooltip>
+        <Popup>
+          <div className="text-xs">
+            <div className="font-semibold text-slate-700">{el.nome}</div>
+            {el.planta && <div className="text-slate-500">{el.planta}</div>}
+            <button
+              className="mt-1 cursor-pointer rounded bg-[#0b3a73] px-2 py-0.5 text-[11px] text-white"
+              onClick={() => onAdd(el)}
+            >
+              + Adicionar à rota
+            </button>
+          </div>
+        </Popup>
+      </CircleMarker>
+    );
+  };
 
   return (
     <div>
@@ -176,93 +332,161 @@ function PlanejamentoMap({
         <div className="text-sm font-semibold text-[#0b3a73] dark:text-white">
           <MapPin className="mr-1 inline h-4 w-4" /> Rota de campo ({paradas.length} parada
           {paradas.length === 1 ? "" : "s"})
+          {pendentes.length > 0 && (
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+              {pendentes.length} pendente{pendentes.length === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
         <button
           onClick={() => setFitSignal((n) => n + 1)}
-          className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+          className="cursor-pointer rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
         >
           Centralizar
         </button>
       </div>
+
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+          <input
+            value={pesquisa}
+            onChange={(e) => {
+              setPesquisa(e.target.value);
+              setMostrandoRes(true);
+            }}
+            onFocus={() => setMostrandoRes(true)}
+            onBlur={() => setMostrandoRes(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && resultados.length > 0) selecionar(resultados[0]);
+            }}
+            placeholder="Buscar elevatória..."
+            className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-[12px] focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          />
+          {mostrandoRes && q && (
+            <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800">
+              {resultados.length === 0 ? (
+                <div className="px-3 py-2 text-[11px] text-slate-400">
+                  Nenhuma elevatória encontrada.
+                </div>
+              ) : (
+                resultados.map((el) => (
+                  <button
+                    key={el.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selecionar(el);
+                    }}
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[#eaf3fb] dark:hover:bg-slate-700"
+                  >
+                    <span className="truncate">{el.nome}</span>
+                    {routeIds.has(el.id) && (
+                      <span className="shrink-0 rounded bg-[#0b3a73] px-1.5 text-[9px] font-bold text-white">
+                        ROTA
+                      </span>
+                    )}
+                    {pendIds.has(el.id) && (
+                      <span className="shrink-0 rounded bg-emerald-600 px-1.5 text-[9px] font-bold text-white">
+                        PENDENTE
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-slate-300">
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-[#0b3a73]"
+              checked={mostra.rota}
+              onChange={(e) => setMostra({ ...mostra, rota: e.target.checked })}
+            />
+            Rota
+          </label>
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-emerald-600"
+              checked={mostra.pend}
+              onChange={(e) => setMostra({ ...mostra, pend: e.target.checked })}
+            />
+            Pendentes
+          </label>
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-slate-400"
+              checked={mostra.resto}
+              onChange={(e) => setMostra({ ...mostra, resto: e.target.checked })}
+            />
+            Sem associação
+          </label>
+        </div>
+      </div>
+
       <div className="h-[320px] w-full overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800 sm:h-[380px]">
         <MapContainer center={[-22.85, -43.5]} zoom={10} style={{ height: "100%", width: "100%" }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <FitBounds points={points} signal={fitSignal} />
+          <FitBounds points={pontosFit} signal={fitSignal} />
+          <FlyTo point={flyPonto} signal={flySig} />
+          <style>{planejAnimationCss}</style>
           {elevatorias.map((el) => {
             if (routeIds.has(el.id)) return null;
-            return (
-              <CircleMarker
-                key={el.id}
-                center={[el.lat, el.lon]}
-                radius={9}
-                pathOptions={{
-                  color: "#0b3a73",
-                  fillColor: "#1f7ad6",
-                  fillOpacity: 0.8,
-                  weight: 2,
-                }}
-                eventHandlers={{
-                  click: () => onAdd(el),
-                  mouseover: (e) => {
-                    const m = e.target;
-                    m.setStyle({ fillOpacity: 1, weight: 4, color: "#0b3a73" });
-                  },
-                  mouseout: (e) => {
-                    const m = e.target;
-                    m.setStyle({ fillOpacity: 0.8, weight: 2, color: "#0b3a73" });
-                  },
-                }}
-              >
-                <Popup>
-                  <div className="text-xs">
-                    <div className="font-semibold text-[#0b3a73]">{el.nome}</div>
-                    {el.planta && <div className="text-slate-500">{el.planta}</div>}
-                    <button
-                      className="mt-1 bg-[#0b3a73] px-2 py-0.5 rounded text-white text-[11px] cursor-pointer"
-                      onClick={() => onAdd(el)}
-                    >
-                      + Adicionar à rota
-                    </button>
-                  </div>
-                </Popup>
-              </CircleMarker>
-            );
+            if (pendIds.has(el.id)) return renderMarcadorPendente(el);
+            return renderMarcadorResto(el);
           })}
-          {paradas.length >= 2 && (
+          {pontosRota.length >= 2 && (
             <Polyline
-              positions={paradas
-                .filter((p) => p.lat != null && p.lon != null)
-                .map((p) => [p.lat!, p.lon!])}
+              positions={pontosRota}
               pathOptions={{ color: "#0b3a73", weight: 4, opacity: 0.8, dashArray: "6 6" }}
             />
           )}
-          {paradas.map((p, idx) =>
-            p.lat != null && p.lon != null ? (
-              <Marker key={p.id} position={[p.lat, p.lon]} icon={numberedIcon(idx + 1)}>
-                <Popup>
-                  <div className="text-xs">
-                    <div className="font-semibold text-[#0b3a73]">
-                      Parada #{idx + 1} · {p.elevatoria_nome}
-                    </div>
-                    {p.os.om && <div>O.S.: {p.os.om}</div>}
-                    {p.os.origem === "nova" && (
-                      <div className="text-amber-600 font-semibold">Pendente de criação</div>
-                    )}
-                    <button
-                      className="mt-1 rounded bg-red-50 px-2 py-0.5 text-[11px] text-red-600 cursor-pointer"
-                      onClick={() => onRemove(idx)}
-                    >
-                      Remover da rota
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            ) : null,
-          )}
+          {paradas.map((p, idx) => renderMarcadorRota(p, idx))}
+          {destaque != null &&
+            (() => {
+              const el = elevatorias.find((x) => x.id === destaque);
+              if (!el) return null;
+              return (
+                <Marker
+                  key={`pulse-${el.id}`}
+                  position={[el.lat, el.lon]}
+                  icon={pulseIcon()}
+                  zIndexOffset={2000}
+                />
+              );
+            })()}
         </MapContainer>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
+        <span className="font-semibold">Legenda:</span>
+        <span className="flex items-center gap-1">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: "#0b3a73", boxShadow: "0 0 0 1px rgba(0,0,0,.12)" }}
+          />
+          Rota
+        </span>
+        <span className="flex items-center gap-1">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: "#22c55e", boxShadow: "0 0 0 1px rgba(0,0,0,.12)" }}
+          />
+          Pendente
+        </span>
+        <span className="flex items-center gap-1">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: "#cbd5e1", boxShadow: "0 0 0 1px rgba(0,0,0,.12)" }}
+          />
+          Sem associação
+        </span>
       </div>
     </div>
   );
@@ -285,6 +509,8 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const [renomearAlvo, setRenomearAlvo] = useState<Planejamento | null>(null);
   const [renomearInput, setRenomearInput] = useState("");
   const [excluirAlvo, setExcluirAlvo] = useState<Planejamento | null>(null);
+  const [pendentes, setPendentes] = useState<Elevatoria[]>([]);
+  const [pendModalOpen, setPendModalOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -334,6 +560,29 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       return;
     }
     setParadas((prev) => [...prev, novaParada(el)]);
+    setPendentes((prev) => prev.filter((p) => p.id !== el.id));
+  };
+
+  const addPendente = (el: Elevatoria) => {
+    if (pendentes.some((p) => p.id === el.id)) return;
+    setPendentes((prev) => [...prev, el]);
+    toast.success(`${el.nome} marcada como pendente.`);
+  };
+
+  const removePendente = (id: number) => setPendentes((prev) => prev.filter((p) => p.id !== id));
+
+  const promoverPendente = (id: number) => {
+    const el = pendentes.find((p) => p.id === id);
+    if (!el) return;
+    setParadas((prev) => {
+      if (prev.some((p) => p.elevatoria_id === id)) {
+        toast.info(`${el.nome} já está na rota.`);
+        return prev;
+      }
+      return [...prev, novaParada(el)];
+    });
+    setPendentes((prev) => prev.filter((p) => p.id !== id));
+    toast.success(`${el.nome} adicionada à rota.`);
   };
 
   const removeParada = (idx: number) => setParadas((prev) => prev.filter((_, i) => i !== idx));
@@ -451,12 +700,21 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const abrirBiblioteca = async () => {
     setCarregandoBiblioteca(true);
     setBibliotecaOpen(true);
-    const { data, error } = await supabase
+    let row = await supabase
       .from("planejamentos")
-      .select("id, nome, autor_nome, criado_em, atualizado_em, paradas")
+      .select("id, nome, autor_nome, criado_em, atualizado_em, paradas, pendentes")
       .order("atualizado_em", { ascending: false });
+    if (row.error && /pendentes/i.test(row.error.message)) {
+      row = (await supabase
+        .from("planejamentos")
+        .select("id, nome, autor_nome, criado_em, atualizado_em, paradas")
+        .order("atualizado_em", { ascending: false })) as typeof row;
+    }
+    const { data, error } = row;
     if (error && !isRelationMissing(error)) {
-      toast.error("Não foi possível carregar a biblioteca.", { description: error.message });
+      toast.error("Não foi possível carregar a biblioteca.", {
+        description: error.message,
+      });
       setBiblioteca(lerLocais());
       setCarregandoBiblioteca(false);
       return;
@@ -467,6 +725,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
           ...(p as unknown as Planejamento),
           paradas: Array.isArray((p as unknown as Planejamento).paradas)
             ? (p as unknown as Planejamento).paradas
+            : [],
+          pendentes: Array.isArray((p as { pendentes?: unknown }).pendentes)
+            ? ((p as { pendentes?: unknown }).pendentes as Elevatoria[])
             : [],
         })),
       );
@@ -495,6 +756,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     const payload = {
       nome,
       paradas,
+      pendentes,
       autor_id: user?.id ?? null,
       autor_nome: profile?.nome_completo ?? null,
       atualizado_em: new Date().toISOString(),
@@ -524,6 +786,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             criado_em: new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
             paradas: [...paradas],
+            pendentes: [...pendentes],
           };
           items.push(novo);
           gravarLocais(items);
@@ -562,6 +825,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         id: x.id || uuid(),
       })),
     );
+    setPendentes(Array.isArray(p.pendentes) ? p.pendentes : []);
     setPlanejamentoId(p.id);
     setPlanejamentoNome(p.nome);
     setBibliotecaOpen(false);
@@ -570,9 +834,11 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 
   const duplicar = async (p: Planejamento) => {
     const copia = `Cópia de ${p.nome}`;
+    const pendentesDuplicadas = Array.isArray(p.pendentes) ? p.pendentes : [];
     const payload = {
       nome: copia,
       paradas: Array.isArray(p.paradas) ? p.paradas.map((x) => ({ ...x, id: uuid() })) : [],
+      pendentes: pendentesDuplicadas,
       autor_id: user?.id ?? null,
       autor_nome: profile?.nome_completo ?? null,
     };
@@ -590,6 +856,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         criado_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
         paradas: payload.paradas,
+        pendentes: payload.pendentes,
       });
       gravarLocais(items);
     }
@@ -674,6 +941,24 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
           obs: p.os.observacao || "",
         });
       });
+      if (pendentes.length > 0) {
+        const ws2 = wb.addWorksheet("Pendentes");
+        ws2.columns = [
+          { header: "Elevatória", key: "elev", width: 34 },
+          { header: "Planta", key: "planta", width: 22 },
+          { header: "Latitude", key: "lat", width: 14 },
+          { header: "Longitude", key: "lon", width: 14 },
+        ];
+        const head2 = ws2.getRow(1);
+        head2.font = { bold: true };
+        head2.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF15803D" } };
+          cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        });
+        for (const p of pendentes) {
+          ws2.addRow({ elev: p.nome, planta: p.planta || "", lat: p.lat, lon: p.lon });
+        }
+      }
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -870,6 +1155,17 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             <Wand2 className="h-3.5 w-3.5" /> Otimizar Rota
           </button>
           <button
+            onClick={() => setPendModalOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Pendentes
+            {pendentes.length > 0 && (
+              <span className="ml-0.5 rounded-full bg-emerald-600 px-1.5 text-[9px] font-bold text-white">
+                {pendentes.length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={exportar}
             disabled={paradas.length === 0}
             className="inline-flex items-center gap-1 rounded-md border border-[#1f7ad6] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] disabled:opacity-40 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 cursor-pointer"
@@ -894,6 +1190,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       <PlanejamentoMap
         elevatorias={elevatorias}
         paradas={paradas}
+        pendentes={pendentes}
         onAdd={addElevatoria}
         onRemove={removeParada}
       />
@@ -1066,6 +1363,17 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
           </div>
         </DialogContent>
       </Dialog>
+
+      <PendentesDialog
+        open={pendModalOpen}
+        onOpenChange={setPendModalOpen}
+        elevatorias={elevatorias}
+        pendentes={pendentes}
+        paradas={paradas}
+        onAdd={addPendente}
+        onRemove={removePendente}
+        onPromover={promoverPendente}
+      />
     </div>
   );
 }
@@ -1393,6 +1701,141 @@ function CadastroDialog({
             >
               Salvar
             </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PendentesDialog({
+  open,
+  onOpenChange,
+  elevatorias,
+  pendentes,
+  paradas,
+  onAdd,
+  onRemove,
+  onPromover,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  elevatorias: Elevatoria[];
+  pendentes: Elevatoria[];
+  paradas: Parada[];
+  onAdd: (el: Elevatoria) => void;
+  onRemove: (id: number) => void;
+  onPromover: (id: number) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const q = busca.trim().toLowerCase();
+  const naRota = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
+  const pendIds = useMemo(() => new Set(pendentes.map((p) => p.id)), [pendentes]);
+  const lista = useMemo(
+    () => elevatorias.filter((el) => !q || el.nome.toLowerCase().includes(q)),
+    [elevatorias, q],
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+            <Pencil className="h-4 w-4" /> Pendentes
+          </DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Marcar como pendente
+            </div>
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar elevatória..."
+                className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-[12px] focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </div>
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-1.5 dark:border-slate-700">
+              {lista.length === 0 && (
+                <p className="px-2 py-3 text-center text-[11px] text-slate-400">
+                  Nenhuma elevatória encontrada.
+                </p>
+              )}
+              {lista.map((el) => {
+                const jaPendente = pendIds.has(el.id);
+                const rota = naRota.has(el.id);
+                return (
+                  <button
+                    key={el.id}
+                    disabled={jaPendente || rota}
+                    onClick={() => onAdd(el)}
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-[12px] hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-emerald-900/20"
+                  >
+                    <span className="truncate">{el.nome}</span>
+                    {rota ? (
+                      <span className="shrink-0 rounded bg-[#0b3a73] px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        NA ROTA
+                      </span>
+                    ) : jaPendente ? (
+                      <span className="shrink-0 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        PENDENTE
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] text-emerald-600">+ marcar</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Pendentes marcados ({pendentes.length})
+            </div>
+            {pendentes.length === 0 ? (
+              <p className="rounded-md border border-dashed border-slate-300 px-3 py-4 text-center text-[11px] text-slate-400 dark:border-slate-700">
+                Nenhuma elevatória pendente. Marque acima para planejar a próxima rota.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {pendentes.map((el) => (
+                  <div
+                    key={el.id}
+                    className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2 dark:border-emerald-800 dark:bg-emerald-900/20"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12px] font-semibold text-emerald-800 dark:text-emerald-200">
+                        {el.nome}
+                      </div>
+                      {el.planta && (
+                        <div className="text-[10px] text-emerald-700/70 dark:text-emerald-300/60">
+                          {el.planta}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onPromover(el.id)}
+                        className="cursor-pointer rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                      >
+                        Adicionar à Rota
+                      </button>
+                      <button
+                        onClick={() => onRemove(el.id)}
+                        title="Remover pendente"
+                        className="cursor-pointer rounded-md border border-red-200 p-1.5 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/30"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
