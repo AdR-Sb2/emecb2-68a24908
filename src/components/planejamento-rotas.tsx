@@ -79,7 +79,6 @@ type Planejamento = {
   criado_em: string | null;
   atualizado_em: string | null;
   paradas: Parada[];
-  pendentes?: Elevatoria[];
 };
 
 const ossDeParada = (p: { oss?: OsInfo[]; os?: OsInfo }): OsInfo[] => {
@@ -115,6 +114,7 @@ const TIPOS_OS = [
 ];
 
 const LS_KEY = "backlog_planejamentos_v1";
+const PEND_LS = "backlog_pendentes_v1";
 
 const uuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -134,8 +134,10 @@ const distKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const IS_RELATION_MISSING_RE = /relation .*does not exist|42P01|PGRST205/i;
+
 const isRelationMissing = (err: { message?: string } | null): boolean =>
-  !err || /relation .*does not exist|42P01|PGRST205/i.test(err.message || "");
+  !err || IS_RELATION_MISSING_RE.test(err.message || "");
 
 const erroParaMensagem = (err: unknown): string => {
   if (err instanceof Error) return err.message;
@@ -572,7 +574,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const [excluirAlvo, setExcluirAlvo] = useState<Planejamento | null>(null);
   const [pendentes, setPendentes] = useState<Elevatoria[]>([]);
   const [pendModalOpen, setPendModalOpen] = useState(false);
-  const usarColunaPendentes = useRef<boolean | null>(null);
+  const usarTabelaPend = useRef<boolean | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -629,14 +631,84 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     };
   }, []);
 
+  useEffect(() => {
+    void carregarPendentesGlobais();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const routeIds = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
 
-  const colunaPendentesDisponivel = async () => {
-    if (usarColunaPendentes.current === null) {
-      const { error } = await supabase.from("planejamentos").select("pendentes").limit(1);
-      usarColunaPendentes.current = !(error && /pendentes/i.test(error.message || ""));
+  const tabelaPendentesDisponivel = async () => {
+    if (usarTabelaPend.current === null) {
+      const { error } = await supabase.from("planejamentos_pendentes").select("id").limit(1);
+      usarTabelaPend.current = !error ? true : !isRelationMissing(error);
     }
-    return usarColunaPendentes.current;
+    return usarTabelaPend.current;
+  };
+
+  const carregarPendentesGlobais = async () => {
+    const comTabela = await tabelaPendentesDisponivel();
+    if (!comTabela) {
+      setPendentes(lerPendGlobais());
+      return;
+    }
+    const { data, error } = await supabase
+      .from("planejamentos_pendentes")
+      .select("elevatoria_id, nome, planta, lat, lon, criado_em")
+      .order("criado_em", { ascending: true });
+    if (error) {
+      console.warn("planejamento: falha ao ler pendentes globais.", error);
+      setPendentes(lerPendGlobais());
+      return;
+    }
+    setPendentes(
+      (data ?? [])
+        .map((r) => ({
+          id: Number(r.elevatoria_id),
+          nome: String(r.nome || `#${r.elevatoria_id}`),
+          planta: typeof r.planta === "string" ? r.planta : null,
+          lat: Number(r.lat),
+          lon: Number(r.lon),
+        }))
+        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon)),
+    );
+  };
+
+  const sincronizarPendentes = async (lista: Elevatoria[]) => {
+    try {
+      const comTabela = await tabelaPendentesDisponivel();
+      if (!comTabela) {
+        gravarPendGlobais(lista);
+        return;
+      }
+      const { error: delErr } = await supabase
+        .from("planejamentos_pendentes")
+        .delete()
+        .neq("id", 0);
+      if (delErr) throw delErr;
+      if (lista.length > 0) {
+        const { error: insErr } = await supabase.from("planejamentos_pendentes").insert(
+          lista.map((p) => ({
+            elevatoria_id: p.id,
+            nome: p.nome,
+            planta: p.planta,
+            lat: p.lat,
+            lon: p.lon,
+            autor_id: user?.id ?? null,
+            autor_nome: profile?.nome_completo ?? null,
+          })),
+        );
+        if (insErr) throw insErr;
+      }
+    } catch (err) {
+      console.warn("planejamento: pendentes globais salvas apenas localmente.", err);
+      gravarPendGlobais(lista);
+    }
+  };
+
+  const atualizarPendentes = (lista: Elevatoria[]) => {
+    setPendentes(lista);
+    void sincronizarPendentes(lista);
   };
 
   const contarParadas = (p: Planejamento) => (Array.isArray(p.paradas) ? p.paradas : []).length;
@@ -647,28 +719,28 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       return;
     }
     setParadas((prev) => [...prev, novaParada(el)]);
-    setPendentes((prev) => prev.filter((p) => p.id !== el.id));
+    if (pendentes.some((p) => p.id === el.id)) {
+      atualizarPendentes(pendentes.filter((p) => p.id !== el.id));
+    }
   };
 
   const addPendente = (el: Elevatoria) => {
     if (pendentes.some((p) => p.id === el.id)) return;
-    setPendentes((prev) => [...prev, el]);
+    atualizarPendentes([...pendentes, el]);
     toast.success(`${el.nome} marcada como pendente.`);
   };
 
-  const removePendente = (id: number) => setPendentes((prev) => prev.filter((p) => p.id !== id));
+  const removePendente = (id: number) => atualizarPendentes(pendentes.filter((p) => p.id !== id));
 
   const promoverPendente = (id: number) => {
     const el = pendentes.find((p) => p.id === id);
     if (!el) return;
-    setParadas((prev) => {
-      if (prev.some((p) => p.elevatoria_id === id)) {
-        toast.info(`${el.nome} já está na rota.`);
-        return prev;
-      }
-      return [...prev, novaParada(el)];
-    });
-    setPendentes((prev) => prev.filter((p) => p.id !== id));
+    if (routeIds.has(el.id)) {
+      toast.info(`${el.nome} já está na rota.`);
+      return;
+    }
+    setParadas((prev) => [...prev, novaParada(el)]);
+    atualizarPendentes(pendentes.filter((p) => p.id !== id));
     toast.success(`${el.nome} adicionada à rota.`);
   };
 
@@ -799,56 +871,57 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     }
   };
 
+  const lerPendGlobais = (): Elevatoria[] => {
+    try {
+      const raw = localStorage.getItem(PEND_LS);
+      return raw ? (JSON.parse(raw) as Elevatoria[]) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const gravarPendGlobais = (items: Elevatoria[]) => {
+    try {
+      localStorage.setItem(PEND_LS, JSON.stringify(items));
+    } catch {
+      // sem storage disponível (modo privado/SR) — ignora
+    }
+  };
+
   const abrirBiblioteca = async () => {
     setCarregandoBiblioteca(true);
     setBibliotecaOpen(true);
-    const comColuna = await colunaPendentesDisponivel();
-    const row = comColuna
-      ? await supabase
-          .from("planejamentos")
-          .select("id, nome, autor_nome, criado_em, atualizado_em, paradas, pendentes")
-          .order("atualizado_em", { ascending: false })
-      : await supabase
-          .from("planejamentos")
-          .select("id, nome, autor_nome, criado_em, atualizado_em, paradas")
-          .order("atualizado_em", { ascending: false });
-    const { data, error } = row;
+    const { data, error } = await supabase
+      .from("planejamentos")
+      .select("id, nome, autor_nome, criado_em, atualizado_em, paradas")
+      .order("atualizado_em", { ascending: false });
     if (error && !isRelationMissing(error)) {
       toast.error("Não foi possível carregar a biblioteca.", {
-        description: error.message,
+        description: erroParaMensagem(error),
       });
       setBiblioteca(lerLocais());
       setCarregandoBiblioteca(false);
       return;
     }
-    if (!isRelationMissing(error)) {
-      const espelhos = lerLocais();
+    if (isRelationMissing(error)) {
+      setBiblioteca(lerLocais());
+    } else {
       setBiblioteca(
         (data ?? []).map((p) => {
           const base = p as unknown as Planejamento;
-          const local = espelhos.find((l) => l.id === base.id);
           return {
             ...base,
             paradas: Array.isArray(base.paradas) ? base.paradas : [],
-            pendentes: Array.isArray(base.pendentes)
-              ? base.pendentes
-              : local && Array.isArray(local.pendentes)
-                ? local.pendentes
-                : [],
           };
         }),
       );
-    } else {
-      setBiblioteca(lerLocais());
     }
     setCarregandoBiblioteca(false);
   };
 
   const salvar = async () => {
-    if (paradas.length === 0 && pendentes.length === 0) {
-      toast.warning(
-        "Adicione ao menos uma parada ou marque uma elevatória pendente antes de salvar.",
-      );
+    if (paradas.length === 0) {
+      toast.warning("Adicione ao menos uma parada antes de salvar.");
       return;
     }
     const nome = planejamentoNome;
@@ -862,19 +935,16 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 
   const persistir = async (nome: string) => {
     setSalvando(true);
-    const comColuna = await colunaPendentesDisponivel();
-    const base = {
+    const payload = {
       nome,
       paradas,
       autor_id: user?.id ?? null,
       autor_nome: profile?.nome_completo ?? null,
       atualizado_em: new Date().toISOString(),
     };
-    const payload = comColuna ? { ...base, pendentes: [...pendentes] } : base;
     try {
       let id = planejamentoId;
       const gravarEspelhoLocal = () => {
-        if (comColuna) return;
         const items = lerLocais();
         const idx = items.findIndex((p) => p.id === id);
         const espelho: Planejamento = {
@@ -884,7 +954,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
           criado_em: idx >= 0 ? items[idx].criado_em : new Date().toISOString(),
           atualizado_em: new Date().toISOString(),
           paradas: [...paradas],
-          pendentes: [...pendentes],
         };
         if (idx >= 0) items[idx] = espelho;
         else items.push(espelho);
@@ -914,7 +983,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             criado_em: new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
             paradas: [...paradas],
-            pendentes: [...pendentes],
           };
           items.push(novo);
           gravarLocais(items);
@@ -929,11 +997,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       setSalvando(false);
       toast.success(
         id != null && planejamentoId != null ? "Planejamento atualizado." : "Planejamento salvo.",
-        {
-          description: comColuna
-            ? undefined
-            : "Pendentes: salvos neste navegador até a sincronização do banco ativar.",
-        },
       );
     } catch (err) {
       setSalvando(false);
@@ -948,7 +1011,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         criado_em: idx >= 0 ? items[idx].criado_em : new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
         paradas: [...paradas],
-        pendentes: [...pendentes],
       };
       if (idx >= 0) items[idx] = espelho;
       else items.push(espelho);
@@ -973,7 +1035,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 
   const abrirPlanejamento = (p: Planejamento) => {
     setParadas(normalizarParadas(Array.isArray(p.paradas) ? p.paradas : []));
-    setPendentes(Array.isArray(p.pendentes) ? p.pendentes : []);
     setPlanejamentoId(p.id);
     setPlanejamentoNome(p.nome);
     setBibliotecaOpen(false);
@@ -982,27 +1043,22 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 
   const duplicar = async (p: Planejamento) => {
     const copia = `Cópia de ${p.nome}`;
-    const pendentesDuplicadas = Array.isArray(p.pendentes) ? p.pendentes : [];
     const paradasDuplicadas = Array.isArray(p.paradas)
       ? p.paradas.map((x) => ({ ...x, id: uuid() }))
       : [];
-    const comColuna = await colunaPendentesDisponivel();
-    const payloadSemPendentes = {
+    const payload = {
       nome: copia,
       paradas: paradasDuplicadas,
       autor_id: user?.id ?? null,
       autor_nome: profile?.nome_completo ?? null,
     };
-    const payload = comColuna
-      ? { ...payloadSemPendentes, pendentes: [...pendentesDuplicadas] }
-      : payloadSemPendentes;
     const { data, error } = await supabase
       .from("planejamentos")
       .insert(payload)
       .select("id")
       .single();
     if (error && !isRelationMissing(error)) {
-      toast.error("Não foi possível duplicar.", { description: error.message });
+      toast.error("Não foi possível duplicar.", { description: erroParaMensagem(error) });
       return;
     }
     if (isRelationMissing(error)) {
@@ -1014,10 +1070,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         criado_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
         paradas: payload.paradas,
-        pendentes: pendentesDuplicadas,
       });
       gravarLocais(items);
-    } else if (!comColuna) {
+    } else {
       const items = lerLocais();
       items.push({
         id: Number(data?.id),
@@ -1026,7 +1081,6 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         criado_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
         paradas: paradasDuplicadas,
-        pendentes: pendentesDuplicadas,
       });
       gravarLocais(items);
     }
