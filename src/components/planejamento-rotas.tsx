@@ -726,10 +726,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const routeIds = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
 
   const tabelaModelosDisponivel = async () => {
-    if (usarTabelaModelos.current === null) {
-      const { error } = await supabase.from("planejamento_os_modelos").select("id").limit(1);
-      usarTabelaModelos.current = !error ? true : !isRelationMissing(error);
-    }
+    if (usarTabelaModelos.current === true) return true;
+    const { error } = await supabase.from("planejamento_os_modelos").select("id").limit(1);
+    usarTabelaModelos.current = !error || !isRelationMissing(error);
     return usarTabelaModelos.current;
   };
 
@@ -870,10 +869,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   };
 
   const tabelaPendentesDisponivel = async () => {
-    if (usarTabelaPend.current === null) {
-      const { error } = await supabase.from("planejamentos_pendentes").select("id").limit(1);
-      usarTabelaPend.current = !error ? true : !isRelationMissing(error);
-    }
+    if (usarTabelaPend.current === true) return true;
+    const { error } = await supabase.from("planejamentos_pendentes").select("id").limit(1);
+    usarTabelaPend.current = !error || !isRelationMissing(error);
     return usarTabelaPend.current;
   };
 
@@ -892,34 +890,38 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       setPendentes(lerPendGlobais());
       return;
     }
-    setPendentes(
-      (data ?? [])
-        .map((r) => ({
-          id: Number(r.elevatoria_id),
-          nome: String(r.nome || `#${r.elevatoria_id}`),
-          planta: typeof r.planta === "string" ? r.planta : null,
-          lat: Number(r.lat),
-          lon: Number(r.lon),
-        }))
-        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon)),
-    );
+    const globais = (data ?? [])
+      .map((r) => ({
+        id: Number(r.elevatoria_id),
+        nome: String(r.nome || `#${r.elevatoria_id}`),
+        planta: typeof r.planta === "string" ? r.planta : null,
+        lat: Number(r.lat),
+        lon: Number(r.lon),
+      }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+    // auto-cura: pendentes que ficaram só no localStorage (salvas enquanto a
+    // tabela ainda não existia) são unidas às globais e gravadas no DB.
+    const locais = lerPendGlobais().filter((l) => !globais.some((g) => g.id === l.id));
+    const merged = globais.concat(locais);
+    setPendentes(merged);
+    if (locais.length > 0) void sincronizarPendentes(merged);
   };
 
   const sincronizarPendentes = async (lista: Elevatoria[]) => {
+    const comTabela = await tabelaPendentesDisponivel();
+    if (!comTabela) {
+      gravarPendGlobais(lista);
+      return;
+    }
     try {
-      const comTabela = await tabelaPendentesDisponivel();
-      if (!comTabela) {
-        gravarPendGlobais(lista);
-        return;
-      }
-      const { error: delErr } = await supabase
+      const { data: atuais } = await supabase
         .from("planejamentos_pendentes")
-        .delete()
-        .neq("id", 0);
-      if (delErr) throw delErr;
-      if (lista.length > 0) {
-        const { error: insErr } = await supabase.from("planejamentos_pendentes").insert(
-          lista.map((p) => ({
+        .select("elevatoria_id");
+      const emDb = new Set((atuais ?? []).map((r) => Number(r.elevatoria_id)));
+      const novos = lista.filter((p) => !emDb.has(p.id));
+      if (novos.length > 0) {
+        const { error: insErr } = await supabase.from("planejamentos_pendentes").upsert(
+          novos.map((p) => ({
             elevatoria_id: p.id,
             nome: p.nome,
             planta: p.planta,
@@ -928,9 +930,19 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             autor_id: user?.id ?? null,
             autor_nome: profile?.nome_completo ?? null,
           })),
+          { onConflict: "elevatoria_id", ignoreDuplicates: true },
         );
         if (insErr) throw insErr;
       }
+      const remover = [...emDb].filter((id) => !lista.some((p) => p.id === id));
+      if (remover.length > 0) {
+        const { error: delErr } = await supabase
+          .from("planejamentos_pendentes")
+          .delete()
+          .in("elevatoria_id", remover);
+        if (delErr) throw delErr;
+      }
+      gravarPendGlobais(lista);
     } catch (err) {
       console.warn("planejamento: pendentes globais salvas apenas localmente.", err);
       gravarPendGlobais(lista);
