@@ -121,6 +121,7 @@ type Planejamento = {
 
 type OsModelo = {
   id: number;
+  uid: string;
   nome: string;
   tipo_ordem: string;
   planta: string | null;
@@ -854,7 +855,21 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const lerModelosLocais = (): OsModelo[] => {
     try {
       const raw = localStorage.getItem(MODELOS_LS);
-      return raw ? (JSON.parse(raw) as OsModelo[]) : [];
+      const items = raw ? (JSON.parse(raw) as Array<Partial<OsModelo>>) : [];
+      return items.map((m) => ({
+        id: typeof m.id === "number" ? m.id : -(Date.now() + Math.floor(Math.random() * 999)),
+        uid: m.uid || uuid(),
+        nome: String(m.nome || ""),
+        tipo_ordem: String(m.tipo_ordem || ""),
+        planta: m.planta ? String(m.planta) : null,
+        equipamento: m.equipamento ? String(m.equipamento) : null,
+        prioridade: m.prioridade ? String(m.prioridade) : null,
+        texto_breve: m.texto_breve ? String(m.texto_breve) : null,
+        observacoes: m.observacoes ? String(m.observacoes) : null,
+        criado_por: m.criado_por ? String(m.criado_por) : null,
+        criado_em: m.criado_em ? String(m.criado_em) : null,
+        atualizado_em: m.atualizado_em ? String(m.atualizado_em) : null,
+      }));
     } catch {
       return [];
     }
@@ -877,7 +892,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     const { data, error } = await supabase
       .from("planejamento_os_modelos")
       .select(
-        "id, nome, tipo_ordem, planta, equipamento, prioridade, texto_breve, observacoes, criado_por, criado_em, atualizado_em",
+        "uid, id, nome, tipo_ordem, planta, equipamento, prioridade, texto_breve, observacoes, criado_por, criado_em, atualizado_em",
       )
       .order("nome", { ascending: true });
     if (error) {
@@ -885,38 +900,41 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       setModelos(lerModelosLocais());
       return;
     }
-    setModelos(
-      (data ?? []).map((r) => ({
-        id: Number(r.id),
-        nome: String(r.nome || ""),
-        tipo_ordem: String(r.tipo_ordem || ""),
-        planta: r.planta ? String(r.planta) : null,
-        equipamento: r.equipamento ? String(r.equipamento) : null,
-        prioridade: r.prioridade ? String(r.prioridade) : null,
-        texto_breve: r.texto_breve ? String(r.texto_breve) : null,
-        observacoes: r.observacoes ? String(r.observacoes) : null,
-        criado_por: r.criado_por ? String(r.criado_por) : null,
-        criado_em: r.criado_em ? String(r.criado_em) : null,
-        atualizado_em: r.atualizado_em ? String(r.atualizado_em) : null,
-      })) as OsModelo[],
-    );
+    const globais = (data ?? []).map((r) => ({
+      uid: String(r.uid || `legacy-${r.id}`),
+      id: Number(r.id),
+      nome: String(r.nome || ""),
+      tipo_ordem: String(r.tipo_ordem || ""),
+      planta: r.planta ? String(r.planta) : null,
+      equipamento: r.equipamento ? String(r.equipamento) : null,
+      prioridade: r.prioridade ? String(r.prioridade) : null,
+      texto_breve: r.texto_breve ? String(r.texto_breve) : null,
+      observacoes: r.observacoes ? String(r.observacoes) : null,
+      criado_por: r.criado_por ? String(r.criado_por) : null,
+      criado_em: r.criado_em ? String(r.criado_em) : null,
+      atualizado_em: r.atualizado_em ? String(r.atualizado_em) : null,
+    })) as OsModelo[];
+    // auto-cura: modelos que ficaram só no localStorage (criados enquanto a
+    // tabela não existia) são unidos aos globais e gravados no DB.
+    const locais = lerModelosLocais().filter((l) => !globais.some((g) => g.uid === l.uid));
+    const merged = globais.concat(locais);
+    setModelos(merged);
+    if (locais.length > 0) void sincronizarModelos(merged);
   };
 
   const sincronizarModelos = async (lista: OsModelo[]) => {
+    const comTabela = await tabelaModelosDisponivel();
+    if (!comTabela) {
+      gravarModelosLocais(lista);
+      return;
+    }
     try {
-      const comTabela = await tabelaModelosDisponivel();
-      if (!comTabela) {
-        gravarModelosLocais(lista);
-        return;
-      }
-      const { error: delErr } = await supabase
-        .from("planejamento_os_modelos")
-        .delete()
-        .neq("id", 0);
-      if (delErr) throw delErr;
+      const { data: atuais } = await supabase.from("planejamento_os_modelos").select("uid");
+      const emDb = new Set((atuais ?? []).map((r) => String(r.uid)));
       if (lista.length > 0) {
-        const { error: insErr } = await supabase.from("planejamento_os_modelos").insert(
+        const { error: upsErr } = await supabase.from("planejamento_os_modelos").upsert(
           lista.map((m) => ({
+            uid: m.uid,
             nome: m.nome,
             tipo_ordem: m.tipo_ordem,
             planta: m.planta,
@@ -928,9 +946,19 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             criado_em: m.criado_em ?? new Date().toISOString(),
             atualizado_em: new Date().toISOString(),
           })),
+          { onConflict: "uid" },
         );
-        if (insErr) throw insErr;
+        if (upsErr) throw upsErr;
       }
+      const remover = [...emDb].filter((uid) => !lista.some((m) => m.uid === uid));
+      if (remover.length > 0) {
+        const { error: delErr } = await supabase
+          .from("planejamento_os_modelos")
+          .delete()
+          .in("uid", remover);
+        if (delErr) throw delErr;
+      }
+      gravarModelosLocais(lista);
     } catch (err) {
       console.warn("planejamento: modelos salvos apenas localmente.", err);
       gravarModelosLocais(lista);
@@ -940,6 +968,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const criarModelo = (dados: OsModeloDados) => {
     const novo: OsModelo = {
       id: -Date.now(),
+      uid: uuid(),
       nome: dados.nome.trim(),
       tipo_ordem: dados.tipo_ordem,
       planta: dados.planta.trim() || null,
@@ -970,6 +999,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     const copia: OsModelo = {
       ...modelo,
       id: -Date.now(),
+      uid: uuid(),
       nome: `Cópia de ${modelo.nome}`,
       criado_em: new Date().toISOString(),
       atualizado_em: new Date().toISOString(),
