@@ -12,6 +12,7 @@ import {
   useMap,
 } from "react-leaflet";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ChevronDown,
@@ -29,6 +30,7 @@ import {
   Route as RouteIcon,
   Save,
   Search,
+  Settings,
   Trash2,
   Wand2,
 } from "lucide-react";
@@ -50,12 +52,41 @@ export type BacklogOS = {
   "DESCRIÇÃO EQUIPAMENTO"?: string | null;
 };
 
+type Criticidade = "critica" | "importante" | "padrao";
+
 type Elevatoria = {
   id: number;
   nome: string;
   planta: string | null;
   lat: number;
   lon: number;
+  criticidade: Criticidade;
+};
+
+type ElevatoriaBasica = {
+  id: number;
+  nome: string;
+  planta: string | null;
+  criticidade: Criticidade;
+};
+
+type AlertaConfig = {
+  id: number;
+  elevatoria_id: number | null;
+  criticidade: Criticidade | null;
+  prazo_dias: number;
+  atualizado_por: string | null;
+  atualizado_em: string | null;
+};
+
+type AlertaItem = {
+  el: Elevatoria;
+  dias: number | null;
+  ultima: string | null;
+  ordem: string | null;
+  prazo: number;
+  personalizado: boolean;
+  nivel: "excedido" | "proximo";
 };
 
 type OsInfo = {
@@ -197,6 +228,39 @@ const fmtDataSla = (d: Date | null): string => {
 const LS_KEY = "backlog_planejamentos_v1";
 const PEND_LS = "backlog_pendentes_v1";
 const MODELOS_LS = "planejamento_os_modelos_v1";
+
+const PRAZO_DEFAULTS: Record<Criticidade, number> = { critica: 30, importante: 45, padrao: 60 };
+const CRITICIDADES: Criticidade[] = ["critica", "importante", "padrao"];
+const CRITICIDADE_META: Record<
+  Criticidade,
+  { label: string; emoji: string; badgeCls: string; dotCls: string }
+> = {
+  critica: {
+    label: "Crítica",
+    emoji: "🔴",
+    badgeCls: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+    dotCls: "bg-red-500",
+  },
+  importante: {
+    label: "Importante",
+    emoji: "🟡",
+    badgeCls: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    dotCls: "bg-amber-500",
+  },
+  padrao: {
+    label: "Padrão",
+    emoji: "🟢",
+    badgeCls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    dotCls: "bg-emerald-500",
+  },
+};
+
+const fmtDateBR = (iso: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
 
 const uuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -661,6 +725,17 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const [modelos, setModelos] = useState<OsModelo[]>([]);
   const [gerenciarModelosOpen, setGerenciarModelosOpen] = useState(false);
   const usarTabelaModelos = useRef<boolean | null>(null);
+  const [alertaConfig, setAlertaConfig] = useState<AlertaConfig[]>([]);
+  const [alertasPreventivas, setAlertasPreventivas] = useState<
+    Map<number, { dias: number | null; ultima: string | null; ordem: string | null }>
+  >(new Map());
+  const [alertas, setAlertas] = useState<AlertaItem[]>([]);
+  const [alertaFiltro, setAlertaFiltro] = useState<Criticidade | "todas">("todas");
+  const [alertasOpen, setAlertasOpen] = useState(false);
+  const [alertaConfigOpen, setAlertaConfigOpen] = useState(false);
+  const [todasElevatorias, setTodasElevatorias] = useState<ElevatoriaBasica[]>([]);
+  const usarTabelaAlerta = useRef<boolean | null>(null);
+  const usarRpcAlerta = useRef<boolean | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -672,12 +747,13 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         planta: string | null;
         lat: number;
         lon: number;
+        criticidade: Criticidade;
       }> = [];
       let de = 0;
       for (;;) {
         const { data, error } = await supabase
           .from("elevatorias")
-          .select("id, nome, planta, latitude, longitude")
+          .select("id, nome, planta, latitude, longitude, criticidade")
           .order("nome", { ascending: true })
           .range(de, de + PASSO - 1);
         if (!alive) return;
@@ -703,6 +779,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             planta: el.planta ? String(el.planta) : null,
             lat: Number(el.latitude),
             lon: Number(el.longitude),
+            criticidade: (CRITICIDADES.includes(el.criticidade as Criticidade)
+              ? el.criticidade
+              : "padrao") as Criticidade,
           }));
         todas.push(...page);
         if (!data || data.length < PASSO) break;
@@ -720,8 +799,48 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   useEffect(() => {
     void carregarPendentesGlobais();
     void carregarModelos();
+    void carregarAlertaConfig();
+    void carregarAlertasPreventivas();
+    void carregarTodasElevatorias();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const defaultMap = new Map(
+      alertaConfig
+        .filter((c) => c.elevatoria_id === null && c.criticidade)
+        .map((c) => [c.criticidade as Criticidade, c.prazo_dias]),
+    );
+    const overrideMap = new Map(
+      alertaConfig
+        .filter((c) => c.elevatoria_id !== null)
+        .map((c) => [c.elevatoria_id as number, c.prazo_dias]),
+    );
+    const itens: AlertaItem[] = [];
+    for (const el of elevatorias) {
+      const personalizado = overrideMap.has(el.id);
+      const prazo =
+        overrideMap.get(el.id) ?? defaultMap.get(el.criticidade) ?? PRAZO_DEFAULTS[el.criticidade];
+      const prev = alertasPreventivas.get(el.id);
+      const dias = prev?.dias ?? null;
+      if (dias !== null && dias < prazo * 0.8) continue;
+      itens.push({
+        el,
+        dias,
+        ultima: prev?.ultima ?? null,
+        ordem: prev?.ordem ?? null,
+        prazo,
+        personalizado,
+        nivel: dias === null || dias >= prazo ? "excedido" : "proximo",
+      });
+    }
+    itens.sort((a, b) => {
+      const ad = a.dias ?? Number.MAX_SAFE_INTEGER;
+      const bd = b.dias ?? Number.MAX_SAFE_INTEGER;
+      return bd - ad || a.el.nome.localeCompare(b.el.nome);
+    });
+    setAlertas(itens);
+  }, [alertaConfig, alertasPreventivas, elevatorias]);
 
   const routeIds = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
 
@@ -868,6 +987,203 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     toast.success("Modelo removido.");
   };
 
+  const carregarTodasElevatorias = async () => {
+    const { data, error } = await supabase
+      .from("elevatorias")
+      .select("id, nome, planta, criticidade")
+      .order("nome", { ascending: true });
+    if (error) {
+      console.warn("planejamento: falha ao listar elevatórias para alertas.", error);
+      return;
+    }
+    setTodasElevatorias(
+      (data ?? []).map((r) => ({
+        id: Number(r.id),
+        nome: String(r.nome || `#${r.id}`),
+        planta: r.planta ? String(r.planta) : null,
+        criticidade: CRITICIDADES.includes(r.criticidade as Criticidade)
+          ? (r.criticidade as Criticidade)
+          : "padrao",
+      })),
+    );
+  };
+
+  const tabelaAlertaDisponivel = async () => {
+    if (usarTabelaAlerta.current === true) return true;
+    const { error } = await supabase.from("planejamento_alerta_config").select("id").limit(1);
+    usarTabelaAlerta.current = !error || !isRelationMissing(error);
+    return usarTabelaAlerta.current;
+  };
+
+  const rpcAlertaDisponivel = async () => {
+    if (usarRpcAlerta.current === true) return true;
+    const { error } = await supabase.rpc("alerta_ultima_preventiva");
+    usarRpcAlerta.current = !error || !isRelationMissing(error);
+    return usarRpcAlerta.current;
+  };
+
+  const carregarAlertaConfig = async () => {
+    const comTabela = await tabelaAlertaDisponivel();
+    if (!comTabela) {
+      setAlertaConfig([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("planejamento_alerta_config")
+      .select("id, elevatoria_id, criticidade, prazo_dias, atualizado_por, atualizado_em");
+    if (error) {
+      console.warn("planejamento: falha ao ler configuração de alertas.", error);
+      setAlertaConfig([]);
+      return;
+    }
+    setAlertaConfig(
+      (data ?? []).map((r) => ({
+        id: Number(r.id),
+        elevatoria_id: r.elevatoria_id != null ? Number(r.elevatoria_id) : null,
+        criticidade: CRITICIDADES.includes(r.criticidade as Criticidade)
+          ? (r.criticidade as Criticidade)
+          : null,
+        prazo_dias: Number(r.prazo_dias),
+        atualizado_por: r.atualizado_por ? String(r.atualizado_por) : null,
+        atualizado_em: r.atualizado_em ? String(r.atualizado_em) : null,
+      })),
+    );
+  };
+
+  const carregarAlertasPreventivas = async () => {
+    if (!(await rpcAlertaDisponivel())) {
+      setAlertasPreventivas(new Map());
+      return;
+    }
+    const { data, error } = await supabase.rpc("alerta_ultima_preventiva");
+    if (error) {
+      console.warn("planejamento: falha ao ler últimas preventivas.", error);
+      setAlertasPreventivas(new Map());
+      return;
+    }
+    const mapa = new Map<
+      number,
+      { dias: number | null; ultima: string | null; ordem: string | null }
+    >();
+    for (const r of data ?? []) {
+      mapa.set(Number(r.elevatoria_id), {
+        dias: r.dias_sem_preventiva != null ? Number(r.dias_sem_preventiva) : null,
+        ultima: r.ultima_preventiva ? String(r.ultima_preventiva) : null,
+        ordem: r.ultima_preventiva_ordem ? String(r.ultima_preventiva_ordem) : null,
+      });
+    }
+    setAlertasPreventivas(mapa);
+  };
+
+  const salvarPrazoCriticidade = async (crit: Criticidade, dias: number) => {
+    if (!dias || dias <= 0) {
+      toast.error("Prazo deve ser um número maior que zero.");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("planejamento_alerta_config")
+      .upsert(
+        {
+          elevatoria_id: null,
+          criticidade: crit,
+          prazo_dias: dias,
+          atualizado_por: user?.id ?? null,
+          atualizado_em: new Date().toISOString(),
+        },
+        { onConflict: "elevatoria_id,criticidade" },
+      )
+      .select("id, elevatoria_id, criticidade, prazo_dias, atualizado_por, atualizado_em")
+      .single();
+    if (error) {
+      toast.error("Falha ao salvar prazo.", { description: erroParaMensagem(error) });
+      console.warn("planejamento: falha ao salvar prazo por criticidade.", error);
+      return;
+    }
+    const nova: AlertaConfig = {
+      id: Number(data.id),
+      elevatoria_id: data.elevatoria_id != null ? Number(data.elevatoria_id) : null,
+      criticidade: CRITICIDADES.includes(data.criticidade as Criticidade)
+        ? (data.criticidade as Criticidade)
+        : null,
+      prazo_dias: Number(data.prazo_dias),
+      atualizado_por: data.atualizado_por ? String(data.atualizado_por) : null,
+      atualizado_em: data.atualizado_em ? String(data.atualizado_em) : null,
+    };
+    setAlertaConfig((prev) => {
+      const existe = prev.some((c) => c.elevatoria_id === null && c.criticidade === crit);
+      return existe
+        ? prev.map((c) => (c.elevatoria_id === null && c.criticidade === crit ? nova : c))
+        : [...prev, nova];
+    });
+    toast.success("Prazo padrão atualizado.");
+  };
+
+  const salvarPrazoElevatoria = async (elId: number, dias: number | null) => {
+    const el = todasElevatorias.find((e) => e.id === elId);
+    const defaultDias =
+      (el
+        ? alertaConfig.find((c) => c.elevatoria_id === null && c.criticidade === el.criticidade)
+            ?.prazo_dias
+        : undefined) ?? PRAZO_DEFAULTS[el?.criticidade ?? "padrao"];
+    if (dias == null || dias <= 0 || dias === defaultDias) {
+      const atual = alertaConfig.find((c) => c.elevatoria_id === elId);
+      if (atual) {
+        setAlertaConfig((prev) => prev.filter((c) => c.id !== atual.id));
+        const { error } = await supabase
+          .from("planejamento_alerta_config")
+          .delete()
+          .eq("id", atual.id);
+        if (error) console.warn("planejamento: falha ao remover prazo individual.", error);
+        toast.success("Prazo individual removido.");
+      }
+      return;
+    }
+    const { data, error } = await supabase
+      .from("planejamento_alerta_config")
+      .upsert(
+        {
+          elevatoria_id: elId,
+          criticidade: null,
+          prazo_dias: dias,
+          atualizado_por: user?.id ?? null,
+          atualizado_em: new Date().toISOString(),
+        },
+        { onConflict: "elevatoria_id,criticidade" },
+      )
+      .select("id, elevatoria_id, criticidade, prazo_dias, atualizado_por, atualizado_em")
+      .single();
+    if (error) {
+      toast.error("Falha ao salvar prazo.", { description: erroParaMensagem(error) });
+      console.warn("planejamento: falha ao salvar prazo por elevatória.", error);
+      return;
+    }
+    const nova: AlertaConfig = {
+      id: Number(data.id),
+      elevatoria_id: Number(data.elevatoria_id),
+      criticidade: null,
+      prazo_dias: Number(data.prazo_dias),
+      atualizado_por: data.atualizado_por ? String(data.atualizado_por) : null,
+      atualizado_em: data.atualizado_em ? String(data.atualizado_em) : null,
+    };
+    setAlertaConfig((prev) => {
+      const existe = prev.some((c) => c.elevatoria_id === elId);
+      return existe ? prev.map((c) => (c.elevatoria_id === elId ? nova : c)) : [...prev, nova];
+    });
+    toast.success("Prazo individual atualizado.");
+  };
+
+  const salvarCriticidadeElevatoria = async (elId: number, criticidade: Criticidade) => {
+    setTodasElevatorias((prev) => prev.map((e) => (e.id === elId ? { ...e, criticidade } : e)));
+    setElevatorias((prev) => prev.map((e) => (e.id === elId ? { ...e, criticidade } : e)));
+    const { error } = await supabase.from("elevatorias").update({ criticidade }).eq("id", elId);
+    if (error) {
+      toast.error("Falha ao salvar criticidade.", { description: erroParaMensagem(error) });
+      console.warn("planejamento: falha ao salvar criticidade.", error);
+      return;
+    }
+    toast.success("Criticidade atualizada.");
+  };
+
   const tabelaPendentesDisponivel = async () => {
     if (usarTabelaPend.current === true) return true;
     const { error } = await supabase.from("planejamentos_pendentes").select("id").limit(1);
@@ -897,6 +1213,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         planta: typeof r.planta === "string" ? r.planta : null,
         lat: Number(r.lat),
         lon: Number(r.lon),
+        criticidade: "padrao" as Criticidade,
       }))
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
     // auto-cura: pendentes que ficaram só no localStorage (salvas enquanto a
@@ -1797,6 +2114,25 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             )}
           </button>
           <button
+            onClick={() => setAlertasOpen(true)}
+            title="Elevatórias sem preventiva executada"
+            className="inline-flex items-center gap-1 rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-red-700 hover:bg-red-50 dark:border-red-900 dark:bg-slate-800 dark:text-red-300 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" /> Alertas
+            {alertas.length > 0 && (
+              <span className="ml-0.5 rounded-full bg-red-600 px-1.5 text-[9px] font-bold text-white">
+                {alertas.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setAlertaConfigOpen(true)}
+            title="Configurar prazos de alerta por criticidade ou por elevatória"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            <Settings className="h-3.5 w-3.5" /> Configurar Alertas
+          </button>
+          <button
             onClick={exportar}
             disabled={paradas.length === 0}
             className="inline-flex items-center gap-1 rounded-md border border-[#1f7ad6] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] disabled:opacity-40 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 cursor-pointer"
@@ -1853,6 +2189,28 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         onAtualizar={atualizarModelo}
         onDuplicar={duplicarModelo}
         onRemover={removerModelo}
+      />
+
+      <AlertasDialog
+        open={alertasOpen}
+        onOpenChange={setAlertasOpen}
+        alertas={alertas}
+        filtro={alertaFiltro}
+        onFiltro={setAlertaFiltro}
+        planejamentoId={planejamentoId}
+        onAdicionar={addElevatoria}
+        onAbrirSeletor={abrirBiblioteca}
+        onAbrirConfig={() => setAlertaConfigOpen(true)}
+      />
+
+      <ConfigAlertasDialog
+        open={alertaConfigOpen}
+        onOpenChange={setAlertaConfigOpen}
+        config={alertaConfig}
+        elevatorias={todasElevatorias}
+        onSalvarPrazoCriticidade={salvarPrazoCriticidade}
+        onSalvarPrazoElevatoria={salvarPrazoElevatoria}
+        onSalvarCriticidade={salvarCriticidadeElevatoria}
       />
 
       <PuxarOSDialog
@@ -2529,6 +2887,330 @@ function GerenciarModelosDialog({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function AlertasDialog({
+  open,
+  onOpenChange,
+  alertas,
+  filtro,
+  onFiltro,
+  planejamentoId,
+  onAdicionar,
+  onAbrirSeletor,
+  onAbrirConfig,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  alertas: AlertaItem[];
+  filtro: Criticidade | "todas";
+  onFiltro: (f: Criticidade | "todas") => void;
+  planejamentoId: number | null;
+  onAdicionar: (el: Elevatoria) => void;
+  onAbrirSeletor: () => void;
+  onAbrirConfig: () => void;
+}) {
+  const contagem = {
+    critica: alertas.filter((a) => a.el.criticidade === "critica").length,
+    importante: alertas.filter((a) => a.el.criticidade === "importante").length,
+    padrao: alertas.filter((a) => a.el.criticidade === "padrao").length,
+  };
+  const filtrados =
+    filtro === "todas" ? alertas : alertas.filter((a) => a.el.criticidade === filtro);
+
+  const adicionarOuSelecionar = (a: AlertaItem) => {
+    if (planejamentoId != null) {
+      onAdicionar(a.el);
+      toast.success(`${a.el.nome} adicionada à rota.`);
+    } else {
+      onAbrirSeletor();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600" /> Alertas de preventiva
+            <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">
+              {alertas.length}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1">
+            {[
+              { id: "todas" as const, label: `Todas (${alertas.length})` },
+              { id: "critica" as const, label: `🔴 Críticas (${contagem.critica})` },
+              { id: "importante" as const, label: `🟡 Importantes (${contagem.importante})` },
+              { id: "padrao" as const, label: `🟢 Padrão (${contagem.padrao})` },
+            ].map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onFiltro(c.id)}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold cursor-pointer ${
+                  filtro === c.id
+                    ? "bg-[#0b3a73] text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={onAbrirConfig}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            <Settings className="h-3 w-3" /> Configurar
+          </button>
+        </div>
+
+        <div className="max-h-80 overflow-y-auto pr-1">
+          {filtrados.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">
+              Nenhuma elevatória em alerta no momento.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {filtrados.map((a) => {
+                const meta = CRITICIDADE_META[a.el.criticidade];
+                const excedido = a.nivel === "excedido";
+                const numDias = a.dias != null ? `${a.dias} dias` : "—";
+                return (
+                  <li
+                    key={a.el.id}
+                    className={`rounded-lg border-l-4 bg-white p-2.5 shadow-sm dark:bg-slate-800 ${
+                      excedido ? "border-l-red-500" : "border-l-orange-400"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-[13px] font-bold text-[#0b3a73] dark:text-white">
+                            {a.el.nome}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.badgeCls}`}
+                          >
+                            {meta.emoji} {meta.label}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            Última preventiva: {a.ultima ? fmtDateBR(a.ultima) : "Nunca registrada"}
+                          </span>
+                          <span>
+                            Prazo: {a.prazo} dias
+                            {a.personalizado ? " (personalizado)" : ""}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-md px-2 py-1 text-[12px] font-bold ${
+                            excedido
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                              : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+                          }`}
+                        >
+                          {numDias} sem preventiva
+                        </span>
+                        <button
+                          onClick={() => adicionarOuSelecionar(a)}
+                          title={
+                            planejamentoId != null
+                              ? `Adicionar ${a.el.nome} à rota atual`
+                              : "Nenhum planejamento aberto — abrir seletor"
+                          }
+                          className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#1f7ad6] cursor-pointer"
+                        >
+                          <Plus className="h-3 w-3" /> Adicionar ao Planejamento
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PrazoDiasInput({
+  valor,
+  onConfirmar,
+}: {
+  valor: number;
+  onConfirmar: (v: number) => void;
+}) {
+  const [val, setVal] = useState<string>(String(valor));
+  useEffect(() => setVal(String(valor)), [valor]);
+  return (
+    <input
+      type="number"
+      min={1}
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={() => {
+        const n = parseInt(val, 10);
+        if (isNaN(n) || n <= 0) {
+          setVal(String(valor));
+          return;
+        }
+        if (n !== valor) onConfirmar(n);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-right text-xs font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+    />
+  );
+}
+
+function ConfigAlertasDialog({
+  open,
+  onOpenChange,
+  config,
+  elevatorias,
+  onSalvarPrazoCriticidade,
+  onSalvarPrazoElevatoria,
+  onSalvarCriticidade,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  config: AlertaConfig[];
+  elevatorias: ElevatoriaBasica[];
+  onSalvarPrazoCriticidade: (crit: Criticidade, dias: number) => void;
+  onSalvarPrazoElevatoria: (elId: number, dias: number | null) => void;
+  onSalvarCriticidade: (elId: number, crit: Criticidade) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const defaultPorCriticidade = (c: Criticidade) =>
+    config.find((x) => x.elevatoria_id === null && x.criticidade === c)?.prazo_dias ??
+    PRAZO_DEFAULTS[c];
+  const overrides = useMemo(
+    () =>
+      new Map(
+        config
+          .filter((c) => c.elevatoria_id !== null)
+          .map((c) => [c.elevatoria_id as number, c.prazo_dias]),
+      ),
+    [config],
+  );
+  const q = busca.trim().toLowerCase();
+  const filtradas = elevatorias.filter(
+    (e) => !q || e.nome.toLowerCase().includes(q) || (e.planta ?? "").toLowerCase().includes(q),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-[#0b3a73]" /> Configurar Alertas
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+          <h3 className="mb-2 text-[12px] font-bold text-slate-700 dark:text-slate-200">
+            Prazo por criticidade (padrão global)
+          </h3>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {CRITICIDADES.map((c) => (
+              <div
+                key={c}
+                className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-600 dark:bg-slate-800"
+              >
+                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+                  <span>{CRITICIDADE_META[c].emoji}</span> {CRITICIDADE_META[c].label}
+                </span>
+                <span className="flex items-center gap-1">
+                  <PrazoDiasInput
+                    valor={defaultPorCriticidade(c)}
+                    onConfirmar={(v) => onSalvarPrazoCriticidade(c, v)}
+                  />
+                  <span className="text-[10px] text-slate-400">dias</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+          <h3 className="mb-2 text-[12px] font-bold text-slate-700 dark:text-slate-200">
+            Prazo por elevatória (override individual)
+          </h3>
+          <div className="relative mb-2">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar elevatória…"
+              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+            />
+          </div>
+          <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+            {filtradas.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400">
+                Nenhuma elevatória encontrada.
+              </p>
+            ) : (
+              filtradas.map((e) => {
+                const personalizado = overrides.has(e.id);
+                const prazoEfetivo = overrides.get(e.id) ?? defaultPorCriticidade(e.criticidade);
+                return (
+                  <div
+                    key={e.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 dark:border-slate-600 dark:bg-slate-800"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+                          {e.nome}
+                        </span>
+                        {personalizado ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                            Customizado
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                            Padrão
+                          </span>
+                        )}
+                      </div>
+                      {e.planta && <div className="text-[10px] text-slate-400">{e.planta}</div>}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={e.criticidade}
+                        onChange={(ev) => onSalvarCriticidade(e.id, ev.target.value as Criticidade)}
+                        className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-white cursor-pointer"
+                      >
+                        <option value="critica">🔴 Crítica</option>
+                        <option value="importante">🟡 Importante</option>
+                        <option value="padrao">🟢 Padrão</option>
+                      </select>
+                      <PrazoDiasInput
+                        valor={prazoEfetivo}
+                        onConfirmar={(v) => onSalvarPrazoElevatoria(e.id, v)}
+                      />
+                      <span className="text-[10px] text-slate-400">dias</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
