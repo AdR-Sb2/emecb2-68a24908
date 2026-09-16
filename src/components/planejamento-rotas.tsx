@@ -15,6 +15,7 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
+  ClipboardList,
   Copy,
   Download,
   FilePlus2,
@@ -36,6 +37,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 export type BacklogOS = {
   "Ordem de Manutenção"?: string | null;
+  NOTA?: string | null;
+  "Status da Atividade"?: string | null;
+  "Início do SLA"?: string | null;
+  "Fim do SLA"?: string | null;
   "TEXTO BREVE"?: string | null;
   PLANTA?: string | null;
   "Tipo de Atividade"?: string | null;
@@ -112,6 +117,56 @@ const TIPOS_OS = [
   "Controle Operacional",
   "Outro",
 ];
+
+// "Tipo de Atividade" do Field/SAP → categoria exibida na tabela.
+const TIPO_ATIVIDADE_MAP: Record<string, string> = {
+  "MANUTENÇÃO PREVENTIVA POR FREQUÊNCIA": "Preventiva por Frequência",
+  "MANUTENÇÃO PREVENTIVA POR CONDIÇÃO": "Preventiva por Condição",
+  "MANUTENÇÃO CORRETIVA EMERGENCIAL": "Corretiva Emergencial",
+  "MANUTENÇÃO CORRETIVA PROGRAMADA": "Corretiva Programada",
+  "MANUTENÇÃO PREDITIVA": "Preditiva",
+  "ENGENHARIA DE MANUTENÇÃO": "Engenharia",
+  "CONTROLE OPERACIONAL": "Controle Operacional",
+  SERVIÇOS: "Serviços",
+};
+
+const normalizaTipoOS = (raw: string | null | undefined): string | undefined => {
+  const v = String(raw || "").trim();
+  if (!v) return undefined;
+  return TIPO_ATIVIDADE_MAP[v] || v;
+};
+
+// "DD/MM/YY HH:MM" ou "DD/MM/YYYY HH:MM" → Date (horário local), igual ao backlog.
+const parseDataSla = (s: string | null | undefined): Date | null => {
+  if (!s) return null;
+  const m = String(s)
+    .trim()
+    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (!m) {
+    const iso = new Date(s);
+    return isNaN(iso.getTime()) ? null : iso;
+  }
+  let dd = +m[1];
+  let mm = +m[2];
+  let yy = +m[3];
+  if (yy < 100) yy += 2000;
+  if (mm > 12 && dd <= 12) [dd, mm] = [mm, dd];
+  const hh = m[4] ? +m[4] : 0;
+  const mi = m[5] ? +m[5] : 0;
+  return new Date(yy, mm - 1, dd, hh, mi, 0);
+};
+
+// "PL-RJB-EAT0832 - NOME" → "PL-RJB-EAT0832"
+const codigoPlanta = (s: string | null | undefined): string =>
+  String(s || "")
+    .split(" - ")[0]
+    .trim()
+    .toUpperCase();
+
+const fmtDataSla = (d: Date | null): string => {
+  if (!d) return "";
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
 
 const LS_KEY = "backlog_planejamentos_v1";
 const PEND_LS = "backlog_pendentes_v1";
@@ -563,6 +618,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     null,
   );
   const [removerOsAlvo, setRemoverOsAlvo] = useState<{ idx: number; osIdx: number } | null>(null);
+  const [puxarAlvo, setPuxarAlvo] = useState<number | null>(null);
   const [colapsadas, setColapsadas] = useState<Set<string>>(new Set());
   const [nomeDialogOpen, setNomeDialogOpen] = useState(false);
   const [nomeInput, setNomeInput] = useState("");
@@ -779,6 +835,30 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
       ),
     );
 
+  const puxarOs = (idx: number, rows: BacklogOS[]) => {
+    if (!rows.length) return;
+    setParadas((prev) =>
+      prev.map((p, i) => {
+        if (i !== idx) return p;
+        const atuais = ossDeParada(p);
+        const existentes = new Set(atuais.map((o) => o.om).filter(Boolean));
+        const novos = rows
+          .filter((r) => !existentes.has(String(r["Ordem de Manutenção"] || "")))
+          .map((r): OsInfo => ({
+            origem: "sistema",
+            om: r["Ordem de Manutenção"] || undefined,
+            tipo: normalizaTipoOS(r["Tipo de Atividade"]),
+            texto_breve: r["TEXTO BREVE"] || undefined,
+            planta: r.PLANTA || undefined,
+            equipamento: r["DESCRIÇÃO EQUIPAMENTO"] || undefined,
+            prioridade: r.PRIORIDADE || undefined,
+          }));
+        return { ...p, oss: [...atuais, ...novos] };
+      }),
+    );
+    toast.success(`${rows.length} O.S. puxadas para a parada.`);
+  };
+
   const toggleParada = (id: string) =>
     setColapsadas((prev) => {
       const next = new Set(prev);
@@ -817,7 +897,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
     updateOs(idx, osIdx, {
       origem: "sistema",
       om: row["Ordem de Manutenção"] || undefined,
-      tipo: row["Tipo de Atividade"] || undefined,
+      tipo: normalizaTipoOS(row["Tipo de Atividade"]),
       texto_breve: row["TEXTO BREVE"] || undefined,
       planta: row.PLANTA || undefined,
       equipamento: row["DESCRIÇÃO EQUIPAMENTO"] || undefined,
@@ -1311,6 +1391,18 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
                 </td>
                 <td colSpan={4} className="px-2 py-1.5 text-right">
                   <button
+                    onClick={() => setPuxarAlvo(idx)}
+                    disabled={!p.planta}
+                    title={
+                      p.planta
+                        ? "Puxar todas as O.S. dessa planta (filtra por tipo e SLA)"
+                        : "Parada sem planta vinculada"
+                    }
+                    className="mr-2 inline-flex items-center gap-1 rounded border border-dashed border-emerald-600 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/30 cursor-pointer"
+                  >
+                    <ClipboardList className="h-3 w-3" /> Puxar O.S.
+                  </button>
+                  <button
                     onClick={() => abreOsDialog(idx, null)}
                     className="mr-2 inline-flex items-center gap-1 rounded border border-dashed border-[#1f7ad6] px-2 py-1 text-[11px] font-semibold text-[#0b3a73] hover:bg-[#eaf3fb] dark:text-white dark:hover:bg-slate-700 cursor-pointer"
                   >
@@ -1382,7 +1474,7 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
                       </td>
                       <td className="px-2 py-1">
                         <select
-                          value={TIPOS_OS.includes(o.tipo || "") ? o.tipo : o.tipo ? "Outro" : ""}
+                          value={o.tipo || ""}
                           onChange={(e) =>
                             updateOs(idx, osIdx, {
                               tipo: e.target.value === "Outro" ? "Outro" : e.target.value,
@@ -1391,6 +1483,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
                           className="w-40 rounded border border-slate-200 bg-white px-1 py-1 text-[12px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                         >
                           <option value="">Sem tipo</option>
+                          {o.tipo && !TIPOS_OS.includes(o.tipo) && (
+                            <option value={o.tipo}>{o.tipo}</option>
+                          )}
                           {TIPOS_OS.map((t) => (
                             <option key={t} value={t}>
                               {t}
@@ -1547,6 +1642,14 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         onClose={() => setOsDialogAlvo(null)}
         onAdd={addOs}
         onUpdate={updateOs}
+      />
+
+      <PuxarOSDialog
+        idx={puxarAlvo}
+        paradas={paradas}
+        backlogOS={backlogOS}
+        onClose={() => setPuxarAlvo(null)}
+        onPuxar={puxarOs}
       />
 
       <Dialog open={removerOsAlvo !== null} onOpenChange={(o) => !o && setRemoverOsAlvo(null)}>
@@ -1739,6 +1842,194 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   );
 }
 
+function PuxarOSDialog({
+  idx,
+  paradas,
+  backlogOS,
+  onClose,
+  onPuxar,
+}: {
+  idx: number | null;
+  paradas: Parada[];
+  backlogOS: BacklogOS[];
+  onClose: () => void;
+  onPuxar: (idx: number, rows: BacklogOS[]) => void;
+}) {
+  const parada = idx != null ? paradas[idx] : null;
+  const [fTipos, setFTipos] = useState<string[]>([]);
+  const [fSlaAntes, setFSlaAntes] = useState("");
+
+  const daParada = useMemo(() => {
+    if (!parada?.planta) return [] as BacklogOS[];
+    const codigo = codigoPlanta(parada.planta);
+    return backlogOS.filter((r) => codigoPlanta(r.PLANTA) === codigo);
+  }, [parada, backlogOS]);
+
+  const tipos = useMemo(
+    () =>
+      Array.from(
+        new Set(daParada.map((r) => normalizaTipoOS(r["Tipo de Atividade"]) || "").filter(Boolean)),
+      ).sort(),
+    [daParada],
+  );
+
+  const resultado = useMemo(() => {
+    const slaLimit = fSlaAntes ? new Date(fSlaAntes + "T00:00:00") : null;
+    return daParada.filter((r) => {
+      if (fTipos.length && !fTipos.includes(normalizaTipoOS(r["Tipo de Atividade"]) || ""))
+        return false;
+      if (slaLimit) {
+        const fim = parseDataSla(r["Fim do SLA"]);
+        if (fim && fim >= slaLimit) return false;
+      }
+      return true;
+    });
+  }, [daParada, fTipos, fSlaAntes]);
+
+  const jaExistentes = useMemo(() => {
+    if (idx == null) return new Set<string>();
+    return new Set(
+      ossDeParada(paradas[idx])
+        .map((o) => o.om)
+        .filter(Boolean),
+    );
+  }, [idx, paradas]);
+
+  const aPuxar = resultado.filter((r) => !jaExistentes.has(String(r["Ordem de Manutenção"] || "")));
+
+  const toggTipo = (t: string) => {
+    if (fTipos.includes(t)) setFTipos(fTipos.filter((x) => x !== t));
+    else setFTipos([...fTipos, t]);
+  };
+
+  const fChip = (ativo: boolean) =>
+    `inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold transition cursor-pointer ${
+      ativo
+        ? "border-emerald-600 bg-emerald-600 text-white"
+        : "border-slate-300 text-slate-600 hover:border-emerald-600 dark:border-slate-600 dark:text-slate-300"
+    }`;
+
+  return (
+    <Dialog open={idx != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-[#0b3a73] dark:text-white">
+            Puxar O.S. — {parada?.elevatoria_nome || ""}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-[11px] text-slate-400">
+          {parada?.planta ? `Planta: ${parada.planta}` : "Parada sem planta vinculada."}
+          {daParada.length > 0 && ` · ${daParada.length} O.S. no backlog`}
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Tipo de O.S.
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setFTipos([])}
+                className={fChip(fTipos.length === 0)}
+              >
+                Todos
+              </button>
+              {tipos.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggTipo(t)}
+                  className={fChip(fTipos.includes(t))}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Fim do SLA até
+            </label>
+            <input
+              type="date"
+              value={fSlaAntes}
+              onChange={(e) => setFSlaAntes(e.target.value)}
+              className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            />
+            {fSlaAntes && (
+              <button
+                type="button"
+                onClick={() => setFSlaAntes("")}
+                className="text-[11px] text-[#1f7ad6] hover:underline cursor-pointer"
+              >
+                limpar
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+          {resultado.length === 0 && (
+            <p className="py-6 text-center text-xs text-slate-400">
+              Nenhuma O.S. encontrada com esses filtros.
+            </p>
+          )}
+          {resultado.map((r, i) => {
+            const ja = jaExistentes.has(String(r["Ordem de Manutenção"] || ""));
+            return (
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-lg border border-slate-200 p-2 text-xs dark:border-slate-600"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[#0b3a73] dark:text-white">
+                    {r["Ordem de Manutenção"] || "—"}
+                  </div>
+                  <div className="truncate text-slate-500 dark:text-slate-400">
+                    {r["TEXTO BREVE"] || "—"}
+                  </div>
+                  <div className="truncate text-[10px] text-slate-400">
+                    {normalizaTipoOS(r["Tipo de Atividade"]) || "—"} · Fim SLA:{" "}
+                    {fmtDataSla(parseDataSla(r["Fim do SLA"])) || "—"}
+                  </div>
+                </div>
+                {ja && (
+                  <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 dark:bg-slate-700">
+                    já na rota
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => {
+              if (idx != null) {
+                onPuxar(idx, aPuxar);
+                onClose();
+              }
+            }}
+            disabled={aPuxar.length === 0}
+            className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40 cursor-pointer"
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            Puxar ({aPuxar.length}) para a rota
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function OsDialog({
   alvo,
   paradas,
@@ -1823,7 +2114,7 @@ function OsDialog({
       const os = {
         origem: "sistema" as const,
         om: selecionada["Ordem de Manutenção"] || undefined,
-        tipo: selecionada["Tipo de Atividade"] || undefined,
+        tipo: normalizaTipoOS(selecionada["Tipo de Atividade"]),
         texto_breve: selecionada["TEXTO BREVE"] || undefined,
         planta: selecionada.PLANTA || undefined,
         equipamento: selecionada["DESCRIÇÃO EQUIPAMENTO"] || undefined,
