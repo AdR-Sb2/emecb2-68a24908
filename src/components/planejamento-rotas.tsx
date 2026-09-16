@@ -20,10 +20,12 @@ import {
   Download,
   FilePlus2,
   FolderOpen,
+  LayoutTemplate,
   Link2,
   Loader2,
   MapPin,
   Pencil,
+  Plus,
   Route as RouteIcon,
   Save,
   Search,
@@ -84,6 +86,30 @@ type Planejamento = {
   criado_em: string | null;
   atualizado_em: string | null;
   paradas: Parada[];
+};
+
+type OsModelo = {
+  id: number;
+  nome: string;
+  tipo_ordem: string;
+  planta: string | null;
+  equipamento: string | null;
+  prioridade: string | null;
+  texto_breve: string | null;
+  observacoes: string | null;
+  criado_por: string | null;
+  criado_em: string | null;
+  atualizado_em: string | null;
+};
+
+type OsModeloDados = {
+  nome: string;
+  tipo_ordem: string;
+  planta: string;
+  equipamento: string;
+  prioridade: string;
+  texto_breve: string;
+  observacoes: string;
 };
 
 const ossDeParada = (p: { oss?: OsInfo[]; os?: OsInfo }): OsInfo[] => {
@@ -170,6 +196,7 @@ const fmtDataSla = (d: Date | null): string => {
 
 const LS_KEY = "backlog_planejamentos_v1";
 const PEND_LS = "backlog_pendentes_v1";
+const MODELOS_LS = "planejamento_os_modelos_v1";
 
 const uuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -631,6 +658,9 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
   const [pendentes, setPendentes] = useState<Elevatoria[]>([]);
   const [pendModalOpen, setPendModalOpen] = useState(false);
   const usarTabelaPend = useRef<boolean | null>(null);
+  const [modelos, setModelos] = useState<OsModelo[]>([]);
+  const [gerenciarModelosOpen, setGerenciarModelosOpen] = useState(false);
+  const usarTabelaModelos = useRef<boolean | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -689,10 +719,155 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
 
   useEffect(() => {
     void carregarPendentesGlobais();
+    void carregarModelos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const routeIds = useMemo(() => new Set(paradas.map((p) => p.elevatoria_id)), [paradas]);
+
+  const tabelaModelosDisponivel = async () => {
+    if (usarTabelaModelos.current === null) {
+      const { error } = await supabase.from("planejamento_os_modelos").select("id").limit(1);
+      usarTabelaModelos.current = !error ? true : !isRelationMissing(error);
+    }
+    return usarTabelaModelos.current;
+  };
+
+  const lerModelosLocais = (): OsModelo[] => {
+    try {
+      const raw = localStorage.getItem(MODELOS_LS);
+      return raw ? (JSON.parse(raw) as OsModelo[]) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const gravarModelosLocais = (items: OsModelo[]) => {
+    try {
+      localStorage.setItem(MODELOS_LS, JSON.stringify(items));
+    } catch {
+      // sem storage disponível (modo privado/SR) — ignora
+    }
+  };
+
+  const carregarModelos = async () => {
+    const comTabela = await tabelaModelosDisponivel();
+    if (!comTabela) {
+      setModelos(lerModelosLocais());
+      return;
+    }
+    const { data, error } = await supabase
+      .from("planejamento_os_modelos")
+      .select(
+        "id, nome, tipo_ordem, planta, equipamento, prioridade, texto_breve, observacoes, criado_por, criado_em, atualizado_em",
+      )
+      .order("nome", { ascending: true });
+    if (error) {
+      console.warn("planejamento: falha ao ler modelos de O.S.", error);
+      setModelos(lerModelosLocais());
+      return;
+    }
+    setModelos(
+      (data ?? []).map((r) => ({
+        id: Number(r.id),
+        nome: String(r.nome || ""),
+        tipo_ordem: String(r.tipo_ordem || ""),
+        planta: r.planta ? String(r.planta) : null,
+        equipamento: r.equipamento ? String(r.equipamento) : null,
+        prioridade: r.prioridade ? String(r.prioridade) : null,
+        texto_breve: r.texto_breve ? String(r.texto_breve) : null,
+        observacoes: r.observacoes ? String(r.observacoes) : null,
+        criado_por: r.criado_por ? String(r.criado_por) : null,
+        criado_em: r.criado_em ? String(r.criado_em) : null,
+        atualizado_em: r.atualizado_em ? String(r.atualizado_em) : null,
+      })) as OsModelo[],
+    );
+  };
+
+  const sincronizarModelos = async (lista: OsModelo[]) => {
+    try {
+      const comTabela = await tabelaModelosDisponivel();
+      if (!comTabela) {
+        gravarModelosLocais(lista);
+        return;
+      }
+      const { error: delErr } = await supabase
+        .from("planejamento_os_modelos")
+        .delete()
+        .neq("id", 0);
+      if (delErr) throw delErr;
+      if (lista.length > 0) {
+        const { error: insErr } = await supabase.from("planejamento_os_modelos").insert(
+          lista.map((m) => ({
+            nome: m.nome,
+            tipo_ordem: m.tipo_ordem,
+            planta: m.planta,
+            equipamento: m.equipamento,
+            prioridade: m.prioridade,
+            texto_breve: m.texto_breve,
+            observacoes: m.observacoes,
+            criado_por: user?.id ?? null,
+            criado_em: m.criado_em ?? new Date().toISOString(),
+            atualizado_em: new Date().toISOString(),
+          })),
+        );
+        if (insErr) throw insErr;
+      }
+    } catch (err) {
+      console.warn("planejamento: modelos salvos apenas localmente.", err);
+      gravarModelosLocais(lista);
+    }
+  };
+
+  const criarModelo = (dados: OsModeloDados) => {
+    const novo: OsModelo = {
+      id: -Date.now(),
+      nome: dados.nome.trim(),
+      tipo_ordem: dados.tipo_ordem,
+      planta: dados.planta.trim() || null,
+      equipamento: dados.equipamento.trim() || null,
+      prioridade: dados.prioridade || null,
+      texto_breve: dados.texto_breve.trim() || null,
+      observacoes: dados.observacoes.trim() || null,
+      criado_por: user?.id ?? null,
+      criado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    };
+    const lista = [...modelos, novo];
+    setModelos(lista);
+    void sincronizarModelos(lista);
+    toast.success("Modelo criado.");
+  };
+
+  const atualizarModelo = (modelo: OsModelo) => {
+    const lista = modelos.map((m) =>
+      m.id === modelo.id ? { ...modelo, atualizado_em: new Date().toISOString() } : m,
+    );
+    setModelos(lista);
+    void sincronizarModelos(lista);
+    toast.success("Modelo atualizado.");
+  };
+
+  const duplicarModelo = (modelo: OsModelo) => {
+    const copia: OsModelo = {
+      ...modelo,
+      id: -Date.now(),
+      nome: `Cópia de ${modelo.nome}`,
+      criado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    };
+    const lista = [...modelos, copia];
+    setModelos(lista);
+    void sincronizarModelos(lista);
+    toast.success("Modelo duplicado.");
+  };
+
+  const removerModelo = (id: number) => {
+    const lista = modelos.filter((m) => m.id !== id);
+    setModelos(lista);
+    void sincronizarModelos(lista);
+    toast.success("Modelo removido.");
+  };
 
   const tabelaPendentesDisponivel = async () => {
     if (usarTabelaPend.current === null) {
@@ -1587,6 +1762,18 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
             <Wand2 className="h-3.5 w-3.5" /> Otimizar Rota
           </button>
           <button
+            onClick={() => setGerenciarModelosOpen(true)}
+            title="Gerenciar modelos de O.S. reutilizáveis"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+          >
+            <LayoutTemplate className="h-3.5 w-3.5" /> Modelos
+            {modelos.length > 0 && (
+              <span className="ml-0.5 rounded-full bg-slate-200 px-1.5 text-[9px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                {modelos.length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setPendModalOpen(true)}
             className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-slate-700 cursor-pointer"
           >
@@ -1639,9 +1826,21 @@ export default function PlanejamentoRotas({ backlogOS }: { backlogOS: BacklogOS[
         alvo={osDialogAlvo}
         paradas={paradas}
         backlogOS={backlogOS}
+        modelos={modelos}
         onClose={() => setOsDialogAlvo(null)}
         onAdd={addOs}
         onUpdate={updateOs}
+        onAbrirModelos={() => setGerenciarModelosOpen(true)}
+      />
+
+      <GerenciarModelosDialog
+        open={gerenciarModelosOpen}
+        onOpenChange={setGerenciarModelosOpen}
+        modelos={modelos}
+        onCriar={criarModelo}
+        onAtualizar={atualizarModelo}
+        onDuplicar={duplicarModelo}
+        onRemover={removerModelo}
       />
 
       <PuxarOSDialog
@@ -2030,23 +2229,319 @@ function PuxarOSDialog({
   );
 }
 
+const MODELO_VAZIO: OsModeloDados = {
+  nome: "",
+  tipo_ordem: "",
+  planta: "",
+  equipamento: "",
+  prioridade: "",
+  texto_breve: "",
+  observacoes: "",
+};
+
+function GerenciarModelosDialog({
+  open,
+  onOpenChange,
+  modelos,
+  onCriar,
+  onAtualizar,
+  onDuplicar,
+  onRemover,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  modelos: OsModelo[];
+  onCriar: (dados: OsModeloDados) => void;
+  onAtualizar: (m: OsModelo) => void;
+  onDuplicar: (m: OsModelo) => void;
+  onRemover: (id: number) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [formAberto, setFormAberto] = useState(false);
+  const [formEditando, setFormEditando] = useState<OsModelo | null>(null);
+  const [formDados, setFormDados] = useState<OsModeloDados>(MODELO_VAZIO);
+
+  useEffect(() => {
+    if (!open) {
+      setBusca("");
+      setFormAberto(false);
+      setFormEditando(null);
+    }
+  }, [open]);
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    const ordenados = [...modelos].sort((a, b) => a.nome.localeCompare(b.nome));
+    if (!q) return ordenados;
+    return ordenados.filter(
+      (m) => m.nome.toLowerCase().includes(q) || m.tipo_ordem.toLowerCase().includes(q),
+    );
+  }, [busca, modelos]);
+
+  const abrirNovo = () => {
+    setFormEditando(null);
+    setFormDados(MODELO_VAZIO);
+    setFormAberto(true);
+  };
+
+  const abrirEdicao = (m: OsModelo) => {
+    setFormEditando(m);
+    setFormDados({
+      nome: m.nome,
+      tipo_ordem: m.tipo_ordem,
+      planta: m.planta || "",
+      equipamento: m.equipamento || "",
+      prioridade: m.prioridade || "",
+      texto_breve: m.texto_breve || "",
+      observacoes: m.observacoes || "",
+    });
+    setFormAberto(true);
+  };
+
+  const salvarForm = () => {
+    if (!formDados.nome.trim()) {
+      toast.warning("Informe o nome do modelo.");
+      return;
+    }
+    if (!formDados.tipo_ordem) {
+      toast.warning("Selecione o tipo de ordem.");
+      return;
+    }
+    if (formEditando) {
+      onAtualizar({ ...formEditando, ...formDados });
+    } else {
+      onCriar(formDados);
+    }
+    setFormAberto(false);
+    setFormEditando(null);
+  };
+
+  const excluir = (m: OsModelo) => {
+    if (window.confirm(`Excluir o modelo "${m.nome}"?`)) {
+      onRemover(m.id);
+    }
+  };
+
+  const campo =
+    "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200";
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] dark:text-white">
+              <LayoutTemplate className="mr-1.5 inline h-4 w-4" /> Modelos de O.S.
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar modelo por nome ou tipo…"
+                className="w-full rounded-md border border-slate-300 py-2 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              />
+            </div>
+            <button
+              onClick={abrirNovo}
+              className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[11px] font-semibold text-white hover:bg-[#1f7ad6] cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" /> Novo Modelo
+            </button>
+          </div>
+
+          <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+            {filtrados.length === 0 && (
+              <p className="py-8 text-center text-xs text-slate-400">
+                {modelos.length === 0
+                  ? "Nenhum modelo cadastrado ainda. Crie o primeiro acima."
+                  : "Nenhum modelo encontrado para a busca."}
+              </p>
+            )}
+            {filtrados.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 dark:border-slate-600"
+              >
+                <LayoutTemplate className="mt-0.5 h-4 w-4 shrink-0 text-[#1f7ad6]" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[#0b3a73] dark:text-white">{m.nome}</div>
+                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {m.texto_breve || "Sem texto breve"}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-1 text-[10px]">
+                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                      {m.tipo_ordem}
+                    </span>
+                    {m.planta && (
+                      <span className="rounded-full bg-[#eaf3fb] px-1.5 py-0.5 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                        {m.planta}
+                      </span>
+                    )}
+                    {m.prioridade && (
+                      <span className="rounded-full bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        {m.prioridade}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    onClick={() => abrirEdicao(m)}
+                    title="Editar modelo"
+                    className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => onDuplicar(m)}
+                    title="Duplicar modelo"
+                    className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-[#0b3a73] dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => excluir(m)}
+                    title="Excluir modelo"
+                    className="rounded p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={formAberto} onOpenChange={(o) => !o && setFormAberto(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] dark:text-white">
+              {formEditando ? "Editar modelo" : "Novo modelo de O.S."}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Field label="Nome do Modelo *">
+                <input
+                  autoFocus
+                  value={formDados.nome}
+                  onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })}
+                  placeholder='Ex.: "Preventiva Padrão Bomba"'
+                  className={campo}
+                />
+              </Field>
+            </div>
+            <Field label="Tipo de Ordem *">
+              <select
+                value={formDados.tipo_ordem}
+                onChange={(e) => setFormDados({ ...formDados, tipo_ordem: e.target.value })}
+                className={campo}
+              >
+                <option value="">Selecione…</option>
+                {TIPOS_OS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Planta">
+              <input
+                value={formDados.planta}
+                onChange={(e) => setFormDados({ ...formDados, planta: e.target.value })}
+                className={campo}
+              />
+            </Field>
+            <Field label="Equipamento">
+              <input
+                value={formDados.equipamento}
+                onChange={(e) => setFormDados({ ...formDados, equipamento: e.target.value })}
+                className={campo}
+              />
+            </Field>
+            <Field label="Prioridade">
+              <select
+                value={formDados.prioridade}
+                onChange={(e) => setFormDados({ ...formDados, prioridade: e.target.value })}
+                className={campo}
+              >
+                <option value="">—</option>
+                {["NORMAL", "ALTA", "EMERGENCIAL"].map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Texto Breve">
+                <input
+                  value={formDados.texto_breve}
+                  onChange={(e) => setFormDados({ ...formDados, texto_breve: e.target.value })}
+                  className={campo}
+                />
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Observações">
+                <textarea
+                  value={formDados.observacoes}
+                  onChange={(e) => setFormDados({ ...formDados, observacoes: e.target.value })}
+                  rows={2}
+                  className={campo}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              onClick={() => setFormAberto(false)}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={salvarForm}
+              className="rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6] cursor-pointer"
+            >
+              {formEditando ? "Salvar alterações" : "Criar modelo"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function OsDialog({
   alvo,
   paradas,
   backlogOS,
+  modelos,
   onClose,
   onAdd,
   onUpdate,
+  onAbrirModelos,
 }: {
   alvo: { idx: number; osIdx: number | null } | null;
   paradas: Parada[];
   backlogOS: BacklogOS[];
+  modelos: OsModelo[];
   onClose: () => void;
   onAdd: (idx: number, os: OsInfo) => void;
   onUpdate: (idx: number, osIdx: number, patch: Partial<OsInfo>) => void;
+  onAbrirModelos: () => void;
 }) {
-  const [mode, setMode] = useState<"existente" | "nova">("existente");
+  const [mode, setMode] = useState<"existente" | "nova" | "modelo">("existente");
   const [busca, setBusca] = useState("");
+  const [buscaModelo, setBuscaModelo] = useState("");
   const [selecionada, setSelecionada] = useState<BacklogOS | null>(null);
   const [nova, setNova] = useState({
     om: "",
@@ -2066,6 +2561,7 @@ function OsDialog({
   useEffect(() => {
     if (alvo) {
       setBusca("");
+      setBuscaModelo("");
       setSelecionada(null);
       if (editando && osAtual) {
         setNova({
@@ -2093,6 +2589,28 @@ function OsDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo]);
+
+  const usarModelo = (m: OsModelo) => {
+    setNova({
+      om: "",
+      tipo: m.tipo_ordem,
+      texto_breve: m.texto_breve || "",
+      planta: m.planta || "",
+      equipamento: m.equipamento || "",
+      prioridade: m.prioridade || "",
+      observacao: m.observacoes || "",
+    });
+    setMode("nova");
+  };
+
+  const modelosFiltrados = useMemo(() => {
+    const q = buscaModelo.trim().toLowerCase();
+    const ordenados = [...modelos].sort((a, b) => a.nome.localeCompare(b.nome));
+    if (!q) return ordenados;
+    return ordenados.filter(
+      (m) => m.nome.toLowerCase().includes(q) || m.tipo_ordem.toLowerCase().includes(q),
+    );
+  }, [buscaModelo, modelos]);
 
   const resultados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -2178,9 +2696,80 @@ function OsDialog({
             <FilePlus2 className="mr-1 inline h-3 w-3" />
             {editando ? "Editar campos" : "Nova O.S. (pendente)"}
           </button>
+          <button
+            onClick={() => setMode("modelo")}
+            className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold ${
+              mode === "modelo"
+                ? "bg-white text-[#0b3a73] shadow dark:bg-slate-800 dark:text-white"
+                : "text-slate-500 dark:text-slate-400"
+            } cursor-pointer`}
+          >
+            <LayoutTemplate className="mr-1 inline h-3 w-3" /> Modelo de OS
+          </button>
         </div>
 
-        {mode === "existente" ? (
+        {mode === "modelo" ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  autoFocus
+                  value={buscaModelo}
+                  onChange={(e) => setBuscaModelo(e.target.value)}
+                  placeholder="Buscar modelo por nome ou tipo…"
+                  className="w-full rounded-md border border-slate-300 py-2 pl-8 pr-3 text-sm focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                />
+              </div>
+              <button
+                onClick={onAbrirModelos}
+                title="Criar, editar ou remover modelos"
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2.5 py-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                <LayoutTemplate className="h-3.5 w-3.5" /> Gerenciar
+              </button>
+            </div>
+            {modelos.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <p className="text-xs text-slate-400">Nenhum modelo cadastrado ainda.</p>
+                <button
+                  onClick={onAbrirModelos}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#1f7ad6] cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Criar primeiro modelo
+                </button>
+              </div>
+            ) : modelosFiltrados.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400">
+                Nenhum modelo encontrado para a busca.
+              </p>
+            ) : (
+              <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+                {modelosFiltrados.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => usarModelo(m)}
+                    title={`Usar "${m.nome}" como base`}
+                    className="flex w-full items-start gap-2 rounded-lg border border-slate-200 p-2 text-left text-xs transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:hover:bg-slate-700/60 cursor-pointer"
+                  >
+                    <LayoutTemplate className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1f7ad6]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-[#0b3a73] dark:text-white">{m.nome}</div>
+                      <div className="truncate text-slate-500 dark:text-slate-400">
+                        {m.texto_breve || "—"}
+                      </div>
+                      <div className="truncate text-[10px] text-slate-400">
+                        {m.tipo_ordem}
+                        {m.planta ? ` · ${m.planta}` : ""}
+                        {m.prioridade ? ` · ${m.prioridade}` : ""}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : mode === "existente" ? (
           <div className="space-y-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -2313,7 +2902,11 @@ function OsDialog({
           </button>
           <button
             onClick={confirmar}
-            disabled={(mode === "existente" && !selecionada) || (mode === "nova" && !nova.tipo)}
+            disabled={
+              mode === "modelo" ||
+              (mode === "existente" && !selecionada) ||
+              (mode === "nova" && !nova.tipo)
+            }
             className="rounded-md bg-[#0b3a73] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-40 cursor-pointer"
           >
             {editando ? "Atualizar" : "Confirmar"}
