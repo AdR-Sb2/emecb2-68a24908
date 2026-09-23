@@ -63,6 +63,7 @@ src/
     analitico.tsx  # /analitico - Analitico
     manuais-avaliacao.tsx  # /manuais-avaliacao
     registros.tsx  # /registros - Registros
+    procedimentos.tsx # /procedimentos - Procedimentos passo-a-passo com PDF
     testes.tsx     # /testes - Testes e Afericoes
     relatorio.tsx  # /relatorio - Relatorios Tecnicos
     manuais.tsx    # /manuais - Manuais Tecnicos
@@ -101,6 +102,9 @@ supabase/
     00054_analitico_justificativa_sem_preventiva.sql
     00055_backlog_observacoes.sql
     00056_backlog_obs_unica.sql
+    ...
+    00087_planejamento_os_modelos.sql
+    00090_procedimentos.sql
 ```
 
 ## Convencoes
@@ -162,6 +166,7 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 | Produtividade | /produtividade | KPIs diários de equipes, importação, mapa, distribuição, link público |
 | Cronograma de Instalação | /cronograma | Planejamento com Gantt, drag-and-drop, autosave |
 | Relatórios | /relatorio | Relatórios técnicos e de planta |
+| Procedimentos | /procedimentos | Cards de procedimentos passo-a-passo com PDF |
 | Painel Administrativo | /admin | Gestão de usuários, cargos e permissões |
 
 ## Modulo Estoque / Compras (src/routes/estoque.tsx) - notas
@@ -224,6 +229,16 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 - Coluna OS de cada sublinha e sempre um input editavel (inclusive em "pendente de criação" — digitar o nº vincula via `vincularPorTexto(idx, osIdx, texto)`).
 - Exportar: resumo no topo (Paradas / O.S. / Existentes / Pendentes de criação) + coluna "Parada #" e "Planta"; uma linha por O.S. (elevatoria repetida).
 
+## Modulo Procedimentos (src/routes/procedimentos.tsx)
+
+- Rota `/procedimentos` com gate de painel (`cargo_paineis` → `paineis.chave = 'procedimentos'`, mesmo padrão de `registros.tsx`) e permissões granulares `procedimentos.ver` / `procedimentos.gerenciar`.
+- Tabela `procedimentos` (migration 00090: titulo, descricao, pdf_url, pdf_nome, ordem, criado_por/atualizado_por, trigger atualizado_em; RLS desabilitado). Bucket `procedimentos` (público, application/pdf, 50MB) com 4 policies.
+- Acesso inicial: cargos com painel `manuais` herdam o painel; Admin e Supervisor recebem ver+gerenciar; demais recebem só `ver` (gerenciar pode ser concedido no `/admin`).
+- Cards com título, descrição e botão de PDF; com `gerenciar`: Novo/Editar (dialog com upload/substituir/remover PDF) e Excluir (confirmação; remove objeto do storage parseando `/public/procedimentos/`).
+- Busca por título/descrição aparece apenas com mais de 6 itens; ordenação por `ordem` e depois `titulo`.
+- Hub: cor `procedimentos` em `CARD_COLORS` (lime) + `shouldShowProcedimentos = hasPanel("procedimentos")` (sem fallback — opt-in via migration).
+- `routeTree.gen.ts` regenerado com a API de `@tanstack/router-generator` (`Generator` + `getConfig`), nunca à mão.
+
 ## Modulo Produtividade (src/routes/produtividade.tsx + src/components/produtividade-dashboard.tsx)
 
 - Rota `/produtividade` (dashboard + importacao diaria) e visao publica `/produtividade/publico/:token` (le `?dia=YYYY-MM-DD` via URLSearchParams; seletor de dia no cabecalho; passa `key={dia||"todos"}` para o dashboard).
@@ -252,10 +267,11 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 
 ## Validacao (antes de commitar)
 
+- `npx prettier --write <arquivo.tsx>` — nunca rodar prettier em `.sql`.
 - `npx tsc --noEmit` — erros PRE-EXISTENTES esperados (nao corrigir fora de escopo): `src/routes/elevatorias.tsx` linhas ~963 e ~1090 (tipo de Link de rota).
 - `npx eslint <arquivo>` — ha ~1174 erros pre-existentes de prettier/any no codigo do Lovable; nao "corrigir" fora do escopo. No estoque.tsx os 4 erros pre-existentes sao: `any` (~linha 1950) e prettier (~4842/4868/4915).
-- `npx vite build` — deve passar; regenera `src/routeTree.gen.ts` (reverter antes de commitar).
 - Nao adicionar erros novos de lint/tsc nas alteracoes.
+- `routeTree.gen.ts`: regenerar com `Generator`+`getConfig` de `@tanstack/router-generator` (nunca editar à mão); commitar junto quando houver rota nova.
 
 ## Como criar um novo modulo
 

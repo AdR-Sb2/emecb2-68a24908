@@ -18,6 +18,7 @@ import {
   CalendarRange,
   Building2,
   Activity,
+  ListChecks,
 } from "lucide-react";
 import {
   Dialog,
@@ -63,6 +64,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   cronograma: { bg: "bg-teal-100", icon: "text-teal-600", ring: "hover:ring-teal-300" },
   ficha_elevatoria: { bg: "bg-sky-100", icon: "text-sky-600", ring: "hover:ring-sky-300" },
   produtividade: { bg: "bg-fuchsia-100", icon: "text-fuchsia-600", ring: "hover:ring-fuchsia-300" },
+  procedimentos: { bg: "bg-lime-100", icon: "text-lime-600", ring: "hover:ring-lime-300" },
 };
 
 function getCardColor(chave: string) {
@@ -77,6 +79,7 @@ function getCardColor(chave: string) {
   if (chave === "cronograma") return CARD_COLORS.cronograma;
   if (chave === "ficha_elevatoria") return CARD_COLORS.ficha_elevatoria;
   if (chave === "produtividade") return CARD_COLORS.produtividade;
+  if (chave === "procedimentos") return CARD_COLORS.procedimentos;
   return CARD_COLORS.dashboard;
 }
 
@@ -152,6 +155,7 @@ function Index() {
   const shouldShowOI = hasPanel("gerador_oi") || hasFallbackPanels;
   const shouldShowCronograma = hasPanel("cronograma") || hasFallbackPanels;
   const shouldShowFichaElevatoria = hasPanel("ficha_elevatoria");
+  const shouldShowProcedimentos = hasPanel("procedimentos");
   const canAdmin = hasPanel("admin");
 
   return (
@@ -307,6 +311,16 @@ function Index() {
                 <CardTitle>Cronograma</CardTitle>
                 <CardDesc>Planejamento e cronograma de instalações, obras e manutenções.</CardDesc>
                 <CardCta>Abrir cronograma</CardCta>
+              </CardLink>
+            )}
+
+            {/* Procedimentos */}
+            {shouldShowProcedimentos && (
+              <CardLink to="/procedimentos" chave="procedimentos" delay={9}>
+                <CardIcon chave="procedimentos" icon={ListChecks} />
+                <CardTitle>Procedimentos</CardTitle>
+                <CardDesc>Procedimentos operacionais passo-a-passo com PDF.</CardDesc>
+                <CardCta>Abrir procedimentos</CardCta>
               </CardLink>
             )}
 

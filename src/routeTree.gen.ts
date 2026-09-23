@@ -24,6 +24,7 @@ import { Route as ManuaisRouteImport } from './routes/manuais'
 import { Route as ManuaisAvaliacaoRouteImport } from './routes/manuais-avaliacao'
 import { Route as OiRouteImport } from './routes/oi'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as ProcedimentosRouteImport } from './routes/procedimentos'
 import { Route as ProdutividadeRouteImport } from './routes/produtividade'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RegistrosRouteImport } from './routes/registros'
@@ -110,6 +111,11 @@ const PendingRoute = PendingRouteImport.update({
   path: '/pending',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProcedimentosRoute = ProcedimentosRouteImport.update({
+  id: '/procedimentos',
+  path: '/procedimentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProdutividadeRoute = ProdutividadeRouteImport.update({
   id: '/produtividade',
   path: '/produtividade',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
+  '/procedimentos': typeof ProcedimentosRoute
   '/produtividade': typeof ProdutividadeRouteWithChildren
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
+  '/procedimentos': typeof ProcedimentosRoute
   '/produtividade': typeof ProdutividadeRouteWithChildren
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
@@ -233,6 +241,7 @@ export interface FileRoutesById {
   '/manuais-avaliacao': typeof ManuaisAvaliacaoRoute
   '/oi': typeof OiRoute
   '/pending': typeof PendingRoute
+  '/procedimentos': typeof ProcedimentosRoute
   '/produtividade': typeof ProdutividadeRouteWithChildren
   '/register': typeof RegisterRoute
   '/registros': typeof RegistrosRoute
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/manuais-avaliacao'
     | '/oi'
     | '/pending'
+    | '/procedimentos'
     | '/produtividade'
     | '/register'
     | '/registros'
@@ -289,6 +299,7 @@ export interface FileRouteTypes {
     | '/manuais-avaliacao'
     | '/oi'
     | '/pending'
+    | '/procedimentos'
     | '/produtividade'
     | '/register'
     | '/registros'
@@ -316,6 +327,7 @@ export interface FileRouteTypes {
     | '/manuais-avaliacao'
     | '/oi'
     | '/pending'
+    | '/procedimentos'
     | '/produtividade'
     | '/register'
     | '/registros'
@@ -344,6 +356,7 @@ export interface RootRouteChildren {
   ManuaisAvaliacaoRoute: typeof ManuaisAvaliacaoRoute
   OiRoute: typeof OiRoute
   PendingRoute: typeof PendingRoute
+  ProcedimentosRoute: typeof ProcedimentosRoute
   ProdutividadeRoute: typeof ProdutividadeRouteWithChildren
   RegisterRoute: typeof RegisterRoute
   RegistrosRoute: typeof RegistrosRoute
@@ -458,6 +471,13 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/procedimentos': {
+      id: '/procedimentos'
+      path: '/procedimentos'
+      fullPath: '/procedimentos'
+      preLoaderRoute: typeof ProcedimentosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/produtividade': {
@@ -585,6 +605,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManuaisAvaliacaoRoute: ManuaisAvaliacaoRoute,
   OiRoute: OiRoute,
   PendingRoute: PendingRoute,
+  ProcedimentosRoute: ProcedimentosRoute,
   ProdutividadeRoute: ProdutividadeRouteWithChildren,
   RegisterRoute: RegisterRoute,
   RegistrosRoute: RegistrosRoute,
@@ -596,13 +617,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
