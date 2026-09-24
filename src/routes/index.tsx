@@ -19,6 +19,7 @@ import {
   Building2,
   Activity,
   ListChecks,
+  Wrench,
 } from "lucide-react";
 import {
   Dialog,
@@ -58,6 +59,7 @@ const CARD_COLORS: Record<string, { bg: string; icon: string; ring: string }> = 
   relatorio: { bg: "bg-amber-100", icon: "text-amber-600", ring: "hover:ring-amber-300" },
   backlog: { bg: "bg-violet-100", icon: "text-violet-600", ring: "hover:ring-violet-300" },
   estoque: { bg: "bg-cyan-100", icon: "text-cyan-600", ring: "hover:ring-cyan-300" },
+  plano_manutencao: { bg: "bg-orange-100", icon: "text-orange-600", ring: "hover:ring-orange-300" },
   escala: { bg: "bg-rose-100", icon: "text-rose-600", ring: "hover:ring-rose-300" },
   manuais: { bg: "bg-orange-100", icon: "text-orange-600", ring: "hover:ring-orange-300" },
   oi: { bg: "bg-indigo-100", icon: "text-indigo-600", ring: "hover:ring-indigo-300" },
@@ -78,6 +80,7 @@ function getCardColor(chave: string) {
   if (chave === "oi" || chave === "gerador_oi") return CARD_COLORS.oi;
   if (chave === "cronograma") return CARD_COLORS.cronograma;
   if (chave === "ficha_elevatoria") return CARD_COLORS.ficha_elevatoria;
+  if (chave === "plano_manutencao") return CARD_COLORS.plano_manutencao;
   if (chave === "produtividade") return CARD_COLORS.produtividade;
   if (chave === "procedimentos") return CARD_COLORS.procedimentos;
   return CARD_COLORS.dashboard;
@@ -101,6 +104,7 @@ function Index() {
   const [loadingPaineis, setLoadingPaineis] = useState(true);
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
+  const [fichaChoiceOpen, setFichaChoiceOpen] = useState(false);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
@@ -155,6 +159,8 @@ function Index() {
   const shouldShowOI = hasPanel("gerador_oi") || hasFallbackPanels;
   const shouldShowCronograma = hasPanel("cronograma") || hasFallbackPanels;
   const shouldShowFichaElevatoria = hasPanel("ficha_elevatoria");
+  const shouldShowPlanoManutencao =
+    hasPanel("plano_manutencao") || hasPanel("ficha_elevatoria") || hasPanel("estoque");
   const shouldShowProcedimentos = hasPanel("procedimentos");
   const canAdmin = hasPanel("admin");
 
@@ -326,13 +332,29 @@ function Index() {
 
             {/* Ficha da Elevatória */}
             {shouldShowFichaElevatoria && (
-              <CardLink to="/elevatorias" chave="ficha_elevatoria" delay={9}>
+              <CardButton
+                onClick={() => setFichaChoiceOpen(true)}
+                chave="ficha_elevatoria"
+                delay={9}
+              >
                 <CardIcon chave="ficha_elevatoria" icon={Building2} />
                 <CardTitle>Ficha da Elevatória</CardTitle>
                 <CardDesc>
                   Ficha técnica completa de elevatórias, equipamentos, elétrica e hidráulica.
                 </CardDesc>
-                <CardCta>Abrir fichas</CardCta>
+                <CardCta>Escolher módulo</CardCta>
+              </CardButton>
+            )}
+
+            {/* Plano de Manutenção */}
+            {shouldShowPlanoManutencao && (
+              <CardLink to="/plano-manutencao" chave="plano_manutencao" delay={9}>
+                <CardIcon chave="plano_manutencao" icon={Wrench} />
+                <CardTitle>Plano de Manutenção</CardTitle>
+                <CardDesc>
+                  Cadastre equipamentos, acompanhe planos ativos e identifique pendências.
+                </CardDesc>
+                <CardCta>Abrir plano</CardCta>
               </CardLink>
             )}
           </div>
@@ -386,6 +408,56 @@ function Index() {
                 <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
               </Link>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== DIALOG: FICHA / PLANO ===== */}
+      <Dialog open={fichaChoiceOpen} onOpenChange={setFichaChoiceOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#0b3a73] dark:text-white">Escolha o módulo</DialogTitle>
+            <DialogDescription>
+              Acesse a ficha técnica da elevatória ou o controle de manutenção por equipamento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Link
+              to="/elevatorias"
+              onClick={() => setFichaChoiceOpen(false)}
+              className="flex min-h-[144px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
+            >
+              <div>
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <div className="text-lg font-semibold text-[#0b3a73] dark:text-white">
+                  Ficha de Elevatórias
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                Consulte o cadastro técnico, informações e histórico das elevatórias.
+              </div>
+            </Link>
+
+            <Link
+              to="/plano-manutencao"
+              onClick={() => setFichaChoiceOpen(false)}
+              className="flex min-h-[144px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#f59e0b] hover:bg-orange-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#f59e0b] dark:hover:bg-slate-700"
+            >
+              <div>
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                  <Wrench className="h-5 w-5" />
+                </div>
+                <div className="text-lg font-semibold text-[#0b3a73] dark:text-white">
+                  Plano de Manutenção
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                Cadastre equipamentos, acompanhe planos ativos e identifique pendências de
+                manutenção.
+              </div>
+            </Link>
           </div>
         </DialogContent>
       </Dialog>

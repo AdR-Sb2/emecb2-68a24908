@@ -58,6 +58,7 @@ src/
     oi.tsx         # /oi - Gerador de OI
     backlog.tsx    # /backlog - Backlog BI
     dashboard.tsx  # /dashboard - Dashboard Automacao
+    plano-manutencao.tsx   # /plano-manutencao - Plano de manutenção por equipamento
     elevatorias.tsx        # /elevatorias - Elevadores
     elevatorias_.$id.tsx   # /elevatorias/:id - Detalhe do elevador
     analitico.tsx  # /analitico - Analitico
@@ -165,9 +166,24 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
 | Gerador de OI | /oi | Ordem de Intervenção / Relatório Fotográfico |
 | Produtividade | /produtividade | KPIs diários de equipes, importação, mapa, distribuição, link público |
 | Cronograma de Instalação | /cronograma | Planejamento com Gantt, drag-and-drop, autosave |
+| Plano de Manutenção | /plano-manutencao | Equipamentos por elevatória, planos ativos, pendências e modelos |
 | Relatórios | /relatorio | Relatórios técnicos e de planta |
 | Procedimentos | /procedimentos | Cards de procedimentos passo-a-passo com PDF |
 | Painel Administrativo | /admin | Gestão de usuários, cargos e permissões |
+
+## Modulo Plano de Manutenção (src/routes/plano-manutencao.tsx)
+
+- Rota dedicada `/plano-manutencao` acessada pelo hub através de um `Dialog` de escolha ao clicar em "Ficha da Elevatória".
+- Fluxo principal: o card de elevatórias agora oferece duas opções — `Ficha de Elevatórias` e `Plano de Manutenção` — preservando a rota original e adicionando a nova gestão por equipamento.
+- A unidade de cadastro é o `equipamento da elevatória`, não a elevatória em si. Cada equipamento recebe `nome_elevatoria`, `planta`, `tag_equipamento`, `tipo_equipamento`, `plano_ativo`, `movimentado_corretamente` e `observacao`.
+- Tabela principal: `plano_manutencao_equipamentos` com `elevatoria_id` opcional, `criado_por`, `atualizado_por`, `criado_em` e `atualizado_em`; RLS desabilitado.
+- A página inclui indicadores de total, sem plano ativo, com plano ativo, movimentação pendente e elevatórias sem cobertura.
+- Filtros: busca geral, planta, tipo, elevatória, plano ativo e movimentado corretamente.
+- Destacados visuais: linhas sem plano ativo recebem borda laranja; itens críticos combinam `plano_ativo = false` + `movimentado_corretamente = false` com badge `Crítico`.
+- A ação de duplicação por elevatória conserva somente `nome_elevatoria` e `planta`; os demais campos voltam vazios/padrão para evitar cópia acidental de TAG ou status de plano.
+- Modelos: `plano_manutencao_modelos` com presets iniciais como Inversor, Bomba, Motor, Softstarter, CLP e Sensor de nível; o formulário aceita “Adicionar por modelo” para acelerar cadastros repetitivos.
+- Permissões sugeridas: `plano_manutencao.ver`, `plano_manutencao.criar`, `plano_manutencao.editar`, `plano_manutencao.excluir`, `plano_manutencao.modelos`; por simplicidade, o módulo pode ficar acessível para os mesmos cargos que já veem `ficha_elevatoria` ou `estoque`.
+- A migration 00091 inclui trigger de atualização de `atualizado_em` e seed inicial dos modelos.
 
 ## Modulo Estoque / Compras (src/routes/estoque.tsx) - notas
 
