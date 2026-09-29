@@ -125,6 +125,80 @@ function toText(v: unknown): string | null {
 
 const CHUNK = 1000;
 
+// Planta que SEMPRE exige validação manual (nunca vincular automaticamente)
+const PLANTAS_MANUAIS = new Set(["PL-RJB-SDA1003"]);
+
+export function extrairCodigoPL(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const m = String(v)
+    .toUpperCase()
+    .match(/PL-RJB-[A-Z]{2,4}\d{2,6}/);
+  return m ? m[0] : null;
+}
+
+async function carregarMapaPL(): Promise<Map<string, number>> {
+  const mapa = new Map<string, number>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await supabase
+      .from("elevatorias")
+      .select("id, planta")
+      .range(from, from + 999);
+    for (const e of data ?? []) {
+      const cod = extrairCodigoPL(e.planta);
+      if (cod && !PLANTAS_MANUAIS.has(cod) && !mapa.has(cod)) mapa.set(cod, e.id as number);
+    }
+    if (!data || data.length < 1000) break;
+  }
+  return mapa;
+}
+
+function resolverElevatoria(
+  mapa: Map<string, number>,
+  ...campos: unknown[]
+): number | null {
+  for (const c of campos) {
+    const cod = extrairCodigoPL(c);
+    if (!cod) continue;
+    if (PLANTAS_MANUAIS.has(cod)) return null;
+    const id = mapa.get(cod);
+    if (id) return id;
+  }
+  return null;
+}
+
+/** Vincula automaticamente as O.S. sem elevatória pelo código PL-RJB. */
+export async function autoVincularAtendimentos(): Promise<number> {
+  const mapa = await carregarMapaPL();
+  const porElev = new Map<number, number[]>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from("registros_atendimento")
+      .select("id, planta, local_instalacao")
+      .is("elevatoria_id", null)
+      .order("id")
+      .range(from, from + 999);
+    if (error) break;
+    for (const r of data ?? []) {
+      const id = resolverElevatoria(mapa, r.planta, r.local_instalacao);
+      if (id) porElev.set(id, [...(porElev.get(id) ?? []), r.id as number]);
+    }
+    if (!data || data.length < 1000) break;
+  }
+  let total = 0;
+  for (const [elevId, ids] of porElev) {
+    for (let i = 0; i < ids.length; i += 200) {
+      const lote = ids.slice(i, i + 200);
+      const { error } = await supabase
+        .from("registros_atendimento")
+        .update({ elevatoria_id: elevId })
+        .in("id", lote)
+        .is("elevatoria_id", null);
+      if (!error) total += lote.length;
+    }
+  }
+  return total;
+}
+
 export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosResumo> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
@@ -148,11 +222,7 @@ export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosR
   const get = (r: RowRecord, field: string): unknown =>
     headerMap[field] ? r[headerMap[field]] : undefined;
 
-  const { data: elevatorias } = await supabase.from("elevatorias").select("id, planta");
-  const plantaToId = new Map<string, number>();
-  for (const e of elevatorias ?? []) {
-    if (e.planta) plantaToId.set(normKey(String(e.planta)), e.id as number);
-  }
+  const mapaPL = await carregarMapaPL();
 
   const registros: Array<Record<string, unknown>> = [];
   let semElevatoria = 0;
@@ -169,7 +239,7 @@ export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosR
     if (!ordem) semOrdem++;
     const tipoOrdem = toText(get(r, "tipo_ordem"));
     const statusSistema = toText(get(r, "status_sistema"));
-    const elevatoriaId = planta ? (plantaToId.get(normKey(planta)) ?? null) : null;
+    const elevatoriaId = resolverElevatoria(mapaPL, planta, localInstalacao, lista);
     if (!elevatoriaId) semElevatoria++;
 
     registros.push({
@@ -228,7 +298,7 @@ export async function importarRegistrosSAP(file: File): Promise<ImportRegistrosR
     if (!r.ordem) continue;
     const ex = dadosExistentes.get(String(r.ordem));
     if (!ex) continue;
-    r.elevatoria_id = ex.elevatoria_id;
+    r.elevatoria_id = ex.elevatoria_id ?? r.elevatoria_id;
     r.pdf_anexo_url = ex.pdf_anexo_url;
     r.anexado_por = ex.anexado_por;
     r.anexado_em = ex.anexado_em;

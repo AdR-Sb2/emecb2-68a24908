@@ -49,7 +49,7 @@ import type {
   RegistroInformacaoFoto,
 } from "@/lib/registros-types";
 import { TIPOS_ORDEM } from "@/lib/registros-types";
-import { importarRegistrosSAP } from "@/lib/registros-import";
+import { importarRegistrosSAP, autoVincularAtendimentos } from "@/lib/registros-import";
 
 type Props = {
   elevatoriaId?: string | number;
@@ -460,6 +460,21 @@ export function ListaRegistros({ elevatoriaId, permissoes: permissoesProp }: Pro
     }
     setCarregandoAtendimentos(false);
   };
+
+  const autoVinculoFeito = useRef(false);
+  useEffect(() => {
+    if (aba !== "atendimentos" || autoVinculoFeito.current) return;
+    autoVinculoFeito.current = true;
+    autoVincularAtendimentos()
+      .then((n) => {
+        if (n > 0) {
+          toast.success(`${n} O.S. vinculadas automaticamente pela planta PL-RJB.`);
+          recarregarAtendimentos();
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aba]);
 
   useEffect(() => {
     if (aba !== "atendimentos") return;
