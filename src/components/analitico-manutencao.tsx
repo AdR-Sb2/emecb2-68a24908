@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
+import { buscarOsExecutadas, carregarDesconsideradas } from "@/lib/analitico-os";
+import { VerificarOSDialog } from "@/components/analitico-verificar-os";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -28,6 +30,7 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
+  LabelList,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -781,6 +784,7 @@ export function AnaliticoManutencao() {
   const [periodoFim, setPeriodoFim] = useState<string>(mesAtualISO());
   const [periodoAno, setPeriodoAno] = useState<string>(String(new Date().getFullYear()));
   const [exportandoOS, setExportandoOS] = useState(false);
+  const [modalVerificar, setModalVerificar] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -1200,35 +1204,11 @@ export function AnaliticoManutencao() {
       // Busca TODAS as O.S. (qualquer tipo de ordem), paginado, direto na
       // tabela de registros — assim Preventiva, Corretiva, P. Condição,
       // Serviços, Engenharia e qualquer outro tipo entram na planilha.
-      const registros: Array<{
-        elevatoria_id: number;
-        ordem: string | null;
-        texto_breve: string | null;
-        inicio_sla: string | null;
-        fim_sla: string | null;
-        data_entrada: string | null;
-        data_modificacao: string | null;
-        tipo_ordem: string | null;
-      }> = [];
-      let de = 0;
-      for (;;) {
-        const { data, error } = await supabase
-          .from("registros_atendimento")
-          .select(
-            "elevatoria_id, ordem, texto_breve, inicio_sla, fim_sla, data_entrada, data_modificacao, tipo_ordem",
-          )
-          .not("elevatoria_id", "is", null)
-          .gte("data_entrada", periodo.inicio)
-          .lte("data_entrada", periodo.fim)
-          .order("elevatoria_id", { ascending: true })
-          .order("data_entrada", { ascending: true })
-          .range(de, de + 999);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        registros.push(...(data as typeof registros));
-        if (data.length < 1000) break;
-        de += 1000;
-      }
+      const [todas, desc] = await Promise.all([
+        buscarOsExecutadas(periodo.inicio, periodo.fim),
+        carregarDesconsideradas(),
+      ]);
+      const registros = todas.filter((r) => !desc.has(r.ordem ?? ""));
 
       const nomePorId = new Map(
         dados.map((l) => [l.elevatoria_id, l.nome || l.planta || `#${l.elevatoria_id}`]),
@@ -1252,7 +1232,9 @@ export function AnaliticoManutencao() {
       };
 
       const linhas = registros.map((r) => ({
-        elevatoria: nomePorId.get(Number(r.elevatoria_id)) ?? `Elevatória #${r.elevatoria_id}`,
+        elevatoria: r.elevatoria_id
+          ? (nomePorId.get(Number(r.elevatoria_id)) ?? `Elevatória #${r.elevatoria_id}`)
+          : `SDA - ${r.planta || r.local_instalacao || "sem local"}`,
         categoria: categoriaDe(r.tipo_ordem),
         ordem: r.ordem ?? "",
         texto: r.texto_breve ?? "",
@@ -1415,6 +1397,13 @@ export function AnaliticoManutencao() {
               className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] disabled:opacity-60"
             >
               <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
+            </button>
+            <button
+              onClick={() => setModalVerificar(true)}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-amber-500 bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50"
+              title="Listar todas as O.S. do período e desconsiderar as que não devem contar"
+            >
+              <Search className="h-4 w-4" /> VERIFICAR
             </button>
             <button
               onClick={() => setModalExportOS(true)}
@@ -1659,57 +1648,57 @@ export function AnaliticoManutencao() {
           <h2 className="mb-2 text-sm font-bold text-[#0b3a73] dark:text-white">
             Tendência mensal — Total executadas, Preventiva válida e Corretiva (últimos 24 meses)
           </h2>
-          <div className="h-[280px]">
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Barras: quantidade de O.S. no mês. O número em cima é o total executado.
+          </p>
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={tendenciaComRazao}>
-                <CartesianGrid strokeDasharray="3 3" />
+              <ComposedChart data={tendenciaComRazao} barGap={2} barCategoryGap="18%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="mes" tickFormatter={formatMesTick} tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 11 }} allowDecimals={false} />
-                <YAxis
-                  yAxisId="ratio"
-                  orientation="right"
-                  tick={{ fontSize: 11 }}
-                  width={40}
-                  domain={[0, (dataMax: number) => Math.max(META_RAZAO, dataMax)]}
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip
+                  content={<TooltipTendencia />}
+                  cursor={{ fill: "rgba(31,122,214,0.08)" }}
                 />
-                <Tooltip content={<TooltipTendencia />} />
-                <Legend />
+                <Legend verticalAlign="top" height={28} />
+                <Bar dataKey="total" name="Total executadas" fill="#93c5fd" radius={[3, 3, 0, 0]}>
+                  <LabelList dataKey="total" position="top" fontSize={10} fill="#1f7ad6" />
+                </Bar>
                 <Bar
-                  yAxisId="left"
                   dataKey="preventiva"
                   name="Preventiva válida"
                   fill="#10b981"
                   radius={[3, 3, 0, 0]}
                 />
-                <Bar
-                  yAxisId="left"
-                  dataKey="corretiva"
-                  name="Corretiva"
-                  fill="#ef4444"
-                  radius={[3, 3, 0, 0]}
+                <Bar dataKey="corretiva" name="Corretiva" fill="#ef4444" radius={[3, 3, 0, 0]} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <h3 className="mt-5 mb-1 text-xs font-bold text-[#0b3a73] dark:text-white">
+            Razão Preventiva / Corretiva (meta 10:1)
+          </h3>
+          <div className="h-[140px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={tendenciaComRazao}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="mes" tickFormatter={formatMesTick} tick={{ fontSize: 11 }} />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  width={40}
+                  domain={[0, (dataMax: number) => Math.max(META_RAZAO, dataMax)]}
                 />
+                <Tooltip content={<TooltipTendencia />} />
                 <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="total"
-                  name="Total executadas"
-                  stroke="#1f7ad6"
-                  strokeWidth={2}
-                  dot={{ r: 3, strokeWidth: 1, fill: "#1f7ad6" }}
-                  connectNulls={false}
-                />
-                <Line
-                  yAxisId="ratio"
                   type="monotone"
                   dataKey="razao"
                   name="Razão Prev/Corr"
                   stroke="#f59e0b"
                   strokeWidth={2}
-                  dot={false}
+                  dot={{ r: 3 }}
                   connectNulls={false}
                 />
                 <ReferenceLine
-                  yAxisId="ratio"
                   y={META_RAZAO}
                   stroke="#d97706"
                   strokeDasharray="6 4"
@@ -1975,6 +1964,11 @@ export function AnaliticoManutencao() {
       </Dialog>
 
       {/* ==== MODAL DE EXPORTAÇÃO DA LISTA DE O.S. ==== */}
+      <VerificarOSDialog
+        open={modalVerificar}
+        onOpenChange={setModalVerificar}
+        onAlterado={() => void carregar()}
+      />
       <Dialog open={modalExportOS} onOpenChange={(o) => !o && setModalExportOS(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

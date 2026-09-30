@@ -54,7 +54,10 @@ export function VerificarOSDialog({
     if (!open || !/^\d{4}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}$/.test(fim)) return;
     let vivo = true;
     setLoading(true);
-    Promise.all([buscarOsExecutadas(`${inicio}-01`, `${fim}-${ultimoDia(fim)}`), carregarDesconsideradas()])
+    Promise.all([
+      buscarOsExecutadas(`${inicio}-01`, `${fim}-${ultimoDia(fim)}`),
+      carregarDesconsideradas(),
+    ])
       .then(([r, d]) => {
         if (!vivo) return;
         r.sort((a, b) =>
