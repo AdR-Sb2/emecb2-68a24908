@@ -144,6 +144,7 @@ export type EstoqueSapFiltros = {
   superintendencia: string;
   pep: string;
   somente_pep: boolean;
+  somente_sem_pep: boolean;
   somente_sem_vinculo: boolean;
   somente_prioritarios: boolean;
   com_bloqueado: boolean;

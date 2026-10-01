@@ -103,6 +103,7 @@ const FILTROS_INICIAIS: EstoqueSapFiltros = {
   superintendencia: "",
   pep: "",
   somente_pep: false,
+  somente_sem_pep: false,
   somente_sem_vinculo: false,
   somente_prioritarios: false,
   com_bloqueado: false,
@@ -378,6 +379,7 @@ export default function EstoqueSapTab() {
       if (filtros.superintendencia) query = query.eq("superintendencia", filtros.superintendencia);
       if (filtros.pep) query = query.ilike("pep", `%${filtros.pep}%`);
       if (filtros.somente_pep) query = query.not("pep", "is", null);
+      if (filtros.somente_sem_pep) query = query.is("pep", null);
       if (filtros.somente_sem_vinculo) {
         query = query.not("pep", "is", null).eq("pep_vinculado", false);
       }
@@ -900,6 +902,7 @@ export default function EstoqueSapTab() {
       if (filtros.superintendencia) query = query.eq("superintendencia", filtros.superintendencia);
       if (filtros.pep) query = query.ilike("pep", `%${filtros.pep}%`);
       if (filtros.somente_pep) query = query.not("pep", "is", null);
+      if (filtros.somente_sem_pep) query = query.is("pep", null);
       if (filtros.somente_sem_vinculo) {
         query = query.not("pep", "is", null).eq("pep_vinculado", false);
       }
@@ -1215,10 +1218,27 @@ export default function EstoqueSapTab() {
               </select>
               <label className="flex items-center gap-2 text-xs">
                 <Checkbox
-                  checked={filtros.somente_pep}
-                  onCheckedChange={(value) => alterarFiltros({ somente_pep: !!value })}
+                  checked={filtros.somente_sem_pep}
+                  onCheckedChange={(value) =>
+                    alterarFiltros({
+                      somente_sem_pep: !!value,
+                      ...(value ? { somente_pep: false } : {}),
+                    })
+                  }
                 />{" "}
-                Somente com PEP
+                OPEX
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox
+                  checked={filtros.somente_pep}
+                  onCheckedChange={(value) =>
+                    alterarFiltros({
+                      somente_pep: !!value,
+                      ...(value ? { somente_sem_pep: false } : {}),
+                    })
+                  }
+                />{" "}
+                CAPEX
               </label>
               <label className="flex items-center gap-2 text-xs">
                 <Checkbox
@@ -1233,27 +1253,6 @@ export default function EstoqueSapTab() {
                   onCheckedChange={(value) => alterarFiltros({ somente_prioritarios: !!value })}
                 />{" "}
                 Somente prioritários
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={filtros.somente_pep}
-                  onCheckedChange={(value) => alterarFiltros({ somente_pep: !!value })}
-                />{" "}
-                Somente com PEP
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={filtros.somente_sem_vinculo}
-                  onCheckedChange={(value) => alterarFiltros({ somente_sem_vinculo: !!value })}
-                />{" "}
-                Sem vínculo
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={filtros.com_bloqueado}
-                  onCheckedChange={(value) => alterarFiltros({ com_bloqueado: !!value })}
-                />{" "}
-                Com bloqueado
               </label>
               <label className="flex items-center gap-2 text-xs">
                 <Checkbox
