@@ -1580,7 +1580,7 @@ export default function EstoqueSapTab() {
                 <p className="text-sm text-red-600">Falha anterior: {rascunho.erro}</p>
               )}
               <div className="flex flex-wrap justify-end gap-2">
-                {!rascunho.id ? (
+                {!rascunho.id || importando ? (
                   <Button onClick={() => void iniciarUpload()} disabled={importando}>
                     {importando ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
