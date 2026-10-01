@@ -33,16 +33,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -1579,6 +1569,35 @@ export default function EstoqueSapTab() {
               {rascunho.erro && (
                 <p className="text-sm text-red-600">Falha anterior: {rascunho.erro}</p>
               )}
+              {confirmarDuplicada && !importando && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p className="font-semibold">Já houve importação hoje</p>
+                  <p className="mt-1 text-xs">
+                    Última importação por {importacaoAtiva?.nome_importador || "outro usuário"} às{" "}
+                    {importacaoAtiva
+                      ? new Date(importacaoAtiva.importado_em).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                    . Deseja substituir pelo novo snapshot?
+                  </p>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setConfirmarDuplicada(false)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setConfirmarDuplicada(false);
+                        void iniciarUpload(true);
+                      }}
+                    >
+                      Substituir
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="flex flex-wrap justify-end gap-2">
                 {!rascunho.id || importando ? (
                   <Button onClick={() => void iniciarUpload()} disabled={importando}>
@@ -1607,35 +1626,6 @@ export default function EstoqueSapTab() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={confirmarDuplicada} onOpenChange={setConfirmarDuplicada}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Já houve importação hoje</AlertDialogTitle>
-            <AlertDialogDescription>
-              Última importação por {importacaoAtiva?.nome_importador || "outro usuário"} às{" "}
-              {importacaoAtiva
-                ? new Date(importacaoAtiva.importado_em).toLocaleTimeString("pt-BR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "—"}
-              . Deseja substituir pelo novo snapshot?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                setConfirmarDuplicada(false);
-                void iniciarUpload(true);
-              }}
-            >
-              Substituir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
