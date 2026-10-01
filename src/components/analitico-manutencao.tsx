@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import {
@@ -14,10 +14,12 @@ import {
   ChevronsUpDown,
   Clock,
   ListChecks,
+  Upload,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { buscarOsExecutadas, carregarDesconsideradas } from "@/lib/analitico-os";
+import { importarRegistrosSAP, autoVincularAtendimentos } from "@/lib/registros-import";
 import { VerificarOSDialog } from "@/components/analitico-verificar-os";
 import {
   ResponsiveContainer,
@@ -785,6 +787,8 @@ export function AnaliticoManutencao() {
   const [periodoAno, setPeriodoAno] = useState<string>(String(new Date().getFullYear()));
   const [exportandoOS, setExportandoOS] = useState(false);
   const [modalVerificar, setModalVerificar] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
