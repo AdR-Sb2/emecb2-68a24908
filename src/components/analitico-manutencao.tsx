@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import {
@@ -14,10 +14,12 @@ import {
   ChevronsUpDown,
   Clock,
   ListChecks,
+  Upload,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 import { buscarOsExecutadas, carregarDesconsideradas } from "@/lib/analitico-os";
+import { importarRegistrosSAP, autoVincularAtendimentos } from "@/lib/registros-import";
 import { VerificarOSDialog } from "@/components/analitico-verificar-os";
 import {
   ResponsiveContainer,
@@ -785,6 +787,8 @@ export function AnaliticoManutencao() {
   const [periodoAno, setPeriodoAno] = useState<string>(String(new Date().getFullYear()));
   const [exportandoOS, setExportandoOS] = useState(false);
   const [modalVerificar, setModalVerificar] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -840,6 +844,23 @@ export function AnaliticoManutencao() {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  const importar = async (file: File) => {
+    setImportando(true);
+    try {
+      const resumo = await importarRegistrosSAP(file);
+      const vinculados = await autoVincularAtendimentos();
+      toast.success(
+        `Importação concluída: ${resumo.importados} novos, ${resumo.atualizados} atualizados, ${resumo.semElevatoria} sem elevatória.` +
+          (vinculados > 0 ? ` ${vinculados} O.S. vinculadas automaticamente.` : ""),
+      );
+      await carregar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao importar a planilha.");
+    } finally {
+      setImportando(false);
+    }
+  };
 
   const municipiosDisponiveis = useMemo(() => {
     const map = new Map<string, number>();
@@ -1391,6 +1412,30 @@ export function AnaliticoManutencao() {
                 </option>
               ))}
             </select>
+            <button
+              onClick={() => importRef.current?.click()}
+              disabled={importando}
+              className="inline-flex min-h-11 items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
+              title="Importar planilha de O.S. do SAP (mesma importação da aba Registros)"
+            >
+              {importando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              Importar
+            </button>
+            <input
+              ref={importRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) await importar(file);
+                if (importRef.current) importRef.current.value = "";
+              }}
+            />
             <button
               onClick={() => setModalExport("excel")}
               disabled={exportando}
