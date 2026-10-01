@@ -35,6 +35,7 @@ import {
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
 const LazyEquipamentosTab = lazy(() => import("@/components/estoque/equipamentos-tab"));
+const LazyEstoqueSapTab = lazy(() => import("@/components/estoque/estoque-sap-tab"));
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -276,7 +277,9 @@ const ALIASES_IMPORT_COMPRAS: Record<string, string> = {
 function EstoquePage() {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
-  const [aba, setAba] = useState<"estoque" | "compras" | "registros" | "equipamentos">("estoque");
+  const [aba, setAba] = useState<
+    "estoque" | "compras" | "registros" | "equipamentos" | "estoque_sap"
+  >("estoque");
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
@@ -368,6 +371,9 @@ function EstoquePage() {
     cadastrarMaterial: false,
     gerenciarCategorias: false,
     gerenciarFila: false,
+    sapVer: false,
+    sapImportar: false,
+    sapConfigurar: false,
   });
   const [permissoesLoading, setPermissoesLoading] = useState(true);
   const [acessoVerificado, setAcessoVerificado] = useState(false);
@@ -415,6 +421,9 @@ function EstoquePage() {
         cadastrarMaterial: temPermissao(perms, "estoque", "cadastrar_material"),
         gerenciarCategorias: temPermissao(perms, "estoque", "gerenciar_categorias"),
         gerenciarFila: temPermissao(perms, "estoque", "gerenciar_fila"),
+        sapVer: temPermissao(perms, "estoque", "sap_ver"),
+        sapImportar: temPermissao(perms, "estoque", "sap_importar"),
+        sapConfigurar: temPermissao(perms, "estoque", "sap_configurar"),
       });
       setPermissoesLoading(false);
     })();
@@ -422,10 +431,11 @@ function EstoquePage() {
 
   useEffect(() => {
     if (!acessoVerificado) return;
+    if (!permissoes.sapVer && aba === "estoque_sap") setAba("estoque");
     if (!permissoes.solicitarCompra && aba === "compras") {
       setAba("estoque");
     }
-  }, [acessoVerificado, permissoes.solicitarCompra, aba]);
+  }, [acessoVerificado, permissoes.sapVer, permissoes.solicitarCompra, aba]);
 
   // --- Carregar dados ---
   const carregarDados = async () => {
@@ -1963,8 +1973,9 @@ function EstoquePage() {
         await carregarDados();
         carregarDuplicados();
       }
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao salvar revisão");
+    } catch (err: unknown) {
+      const mensagem = err instanceof Error ? err.message : "Erro ao salvar revisão";
+      toast.error(mensagem);
     } finally {
       setSavingRevisar((prev) => ({ ...prev, [chave]: false }));
     }
@@ -3433,6 +3444,18 @@ function EstoquePage() {
           >
             <Wrench className="h-4 w-4" /> Equipamentos
           </button>
+          {permissoes.sapVer && (
+            <button
+              onClick={() => setAba("estoque_sap")}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition ${
+                aba === "estoque_sap"
+                  ? "bg-[#0b3a73] text-white shadow"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Estoque SAP
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {aba === "estoque" && (
@@ -3531,12 +3554,15 @@ function EstoquePage() {
               <Upload className="h-4 w-4" /> Atualizar Pedidos
             </button>
           )}
-          <button
-            onClick={carregarDados}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+          {aba !== "estoque_sap" && (
+            <button
+              onClick={carregarDados}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              title="Atualizar dados do estoque"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -4175,6 +4201,16 @@ function EstoquePage() {
       ) : aba === "equipamentos" ? (
         <Suspense fallback={null}>
           <LazyEquipamentosTab />
+        </Suspense>
+      ) : aba === "estoque_sap" && permissoes.sapVer ? (
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-12">
+              <RefreshCw className="h-5 w-5 animate-spin text-slate-400" />
+            </div>
+          }
+        >
+          <LazyEstoqueSapTab />
         </Suspense>
       ) : aba === "compras" ? (
         /* ---------- ABA COMPRAS ---------- */
