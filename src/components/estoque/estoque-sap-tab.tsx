@@ -88,6 +88,7 @@ type RascunhoImportacao = {
   peps: number;
   id?: string;
   progresso: number;
+  etapa: "envio" | "comparacao";
   comparacao?: EstoqueSapComparacaoResumo | null;
   novosPepsSemVinculo?: string[];
   erro?: string;
@@ -687,6 +688,7 @@ export default function EstoqueSapTab() {
         valorTotal: parsed.linhas.reduce((total, linha) => total + linha.valor_livre, 0),
         peps: peps.size,
         progresso: 0,
+        etapa: "envio",
       };
       setRascunho(rascunhoNovo);
       setPreviewOpen(true);
@@ -732,12 +734,13 @@ export default function EstoqueSapTab() {
           const { error: insertError } = await supabase.from("estoque_sap_itens").insert(lote);
           if (insertError) throw new Error(insertError.message);
           const progresso = Math.min(
-            100,
+            99,
             Math.round(((offset + lote.length) / rascunho.linhas.length) * 100),
           );
           setRascunho((atual) => (atual ? { ...atual, progresso } : atual));
         }
 
+        setRascunho((atual) => (atual ? { ...atual, etapa: "comparacao", progresso: 100 } : atual));
         let comparacao: EstoqueSapComparacaoResumo | null = null;
         if (importacaoAtiva) {
           const { data: diff, error: diffError } = await supabase.rpc(
@@ -761,6 +764,7 @@ export default function EstoqueSapTab() {
                 ...atual,
                 id,
                 progresso: 100,
+                etapa: "comparacao",
                 comparacao,
                 novosPepsSemVinculo: (novosPeps || []).map((row: { pep: string }) => row.pep),
               }
@@ -777,7 +781,7 @@ export default function EstoqueSapTab() {
           .update({ status: "erro", ativa: false })
           .eq("id", importacaoId);
         setRascunho((atual) =>
-          atual ? { ...atual, id: undefined, erro: mensagem, progresso: 0 } : atual,
+          atual ? { ...atual, id: undefined, erro: mensagem, progresso: 0, etapa: "envio" } : atual,
         );
       }
       toast.error(`Falha ao importar. O snapshot ativo foi preservado: ${mensagem}`);
@@ -1515,7 +1519,7 @@ export default function EstoqueSapTab() {
                 <PreviewKpi label="Valor livre" value={moeda(rascunho.valorTotal)} />
                 <PreviewKpi label="PEPs" value={rascunho.peps.toLocaleString("pt-BR")} />
               </div>
-              {rascunho.progresso > 0 && rascunho.progresso < 100 && (
+              {importando && rascunho.etapa === "envio" && (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
                     <span>Enviando snapshot</span>
@@ -1528,6 +1532,22 @@ export default function EstoqueSapTab() {
                     />
                   </div>
                 </div>
+              )}
+              {importando && rascunho.etapa === "comparacao" && (
+                <div className="space-y-1" aria-live="polite">
+                  <p className="text-xs text-muted-foreground">
+                    Snapshot enviado. Calculando comparação e vínculos dos PEPs...
+                  </p>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-600" />
+                  </div>
+                </div>
+              )}
+              {rascunho.id && !importando && (
+                <p className="text-xs text-muted-foreground">
+                  Snapshot pronto para revisão. O estoque só será atualizado para todos após ativar
+                  esta importação.
+                </p>
               )}
               {rascunho.novosPepsSemVinculo && (
                 <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -1567,7 +1587,9 @@ export default function EstoqueSapTab() {
                     ) : (
                       <Upload className="mr-2 h-4 w-4" />
                     )}
-                    Enviar snapshot para comparação
+                    {importando && rascunho.etapa === "comparacao"
+                      ? "Calculando comparação..."
+                      : "Enviar snapshot para comparação"}
                   </Button>
                 ) : (
                   <Button onClick={() => void ativarImportacao()} disabled={ativando || importando}>
