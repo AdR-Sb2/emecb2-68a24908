@@ -59,6 +59,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/lib/supabase";
+import {
+  equipeChaveFinal,
+  equipeRotulo,
+  equipeRotuloFinal,
+  type AliasEquipe,
+  type AliasIntegrante,
+} from "@/lib/equipe-utils";
+import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
 import { toast } from "sonner";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { DashboardComparacao } from "@/components/produtividade-dashboard";
@@ -514,11 +522,15 @@ function SummaryCards({
 function TipoServicoChart({
   atividades,
   equipes,
+  aliasesEquipes,
+  aliasesIntegrantes,
   onFilterByTipo,
   filtroTipoAtivo,
 }: {
   atividades: FieldAtividade[];
   equipes: FieldEquipe[];
+  aliasesEquipes: AliasEquipe[];
+  aliasesIntegrantes: AliasIntegrante[];
   onFilterByTipo: (tipo: string | null) => void;
   filtroTipoAtivo: string | null;
 }) {
@@ -551,8 +563,11 @@ function TipoServicoChart({
   }, [atividades, equipes]);
 
   const tipoEquipes = useMemo(() => {
-    const m: Record<string, Record<string, number>> = {};
-    for (const k of TIPO_SERVICO_KEYS) m[k] = {};
+    const porChave: Record<
+      string,
+      Record<string, { total: number; variantes: Map<string, number> }>
+    > = {};
+    for (const k of TIPO_SERVICO_KEYS) porChave[k] = {};
 
     // Mesma lógica de execução: só O.S. concluídas, cada uma contada uma vez.
     const tecSet = new Set<number>();
@@ -561,7 +576,7 @@ function TipoServicoChart({
     for (const a of atividades) {
       if (!tecSet.has(a.id_recurso)) continue;
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
-      if (!(norm in m)) continue;
+      if (!(norm in porChave)) continue;
       const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
       if (normalizeStatus(a.status) !== "concluido") continue;
       if (!executadas.has(key)) executadas.set(key, { norm, idRecurso: a.id_recurso });
@@ -569,12 +584,34 @@ function TipoServicoChart({
     for (const { norm, idRecurso } of executadas.values()) {
       for (const eq of equipes) {
         if (eq.tecnicos.includes(idRecurso)) {
-          m[norm][eq.nome_equipe] = (m[norm][eq.nome_equipe] || 0) + 1;
+          const chave = equipeChaveFinal(eq.nome_equipe, aliasesEquipes, aliasesIntegrantes);
+          const grupo = porChave[norm][chave] || {
+            total: 0,
+            variantes: new Map<string, number>(),
+          };
+          grupo.total++;
+          grupo.variantes.set(eq.nome_equipe, (grupo.variantes.get(eq.nome_equipe) || 0) + 1);
+          porChave[norm][chave] = grupo;
         }
       }
     }
-    return m;
-  }, [atividades, equipes]);
+    return Object.fromEntries(
+      Object.entries(porChave).map(([tipo, grupos]) => [
+        tipo,
+        Object.fromEntries(
+          Object.entries(grupos).map(([chave, grupo]) => [
+            equipeRotuloFinal(
+              chave,
+              [...grupo.variantes].map(([texto, qtd]) => ({ texto, qtd })),
+              aliasesEquipes,
+              aliasesIntegrantes,
+            ) || equipeRotulo([...grupo.variantes].map(([texto, qtd]) => ({ texto, qtd }))),
+            grupo.total,
+          ]),
+        ),
+      ]),
+    );
+  }, [atividades, equipes, aliasesEquipes, aliasesIntegrantes]);
 
   const maxVal = Math.max(...counts.map((c) => c.value), 1);
 
@@ -1556,6 +1593,7 @@ function DayDetail({
   const [metaOS, setMetaOS] = useState(8);
   const [filtroTipoAtivo, setFiltroTipoAtivo] = useState<string | null>(null);
   const [capMap, setCapMap] = useState<Map<number, number>>(new Map());
+  const aliases = useEquipeAliases();
 
   useEffect(() => {
     const load = async () => {
@@ -1605,6 +1643,42 @@ function DayDetail({
     for (const p of plantas) m.set(p.planta, p);
     return m;
   }, [plantas]);
+
+  const equipesAgrupadas = useMemo(() => {
+    const grupos = new Map<
+      string,
+      { chave: string; equipes: FieldEquipe[]; variantes: Map<string, number> }
+    >();
+    for (const equipe of equipes) {
+      const chave = equipeChaveFinal(equipe.nome_equipe, aliases.equipes, aliases.integrantes);
+      const grupo = grupos.get(chave) || {
+        chave,
+        equipes: [],
+        variantes: new Map<string, number>(),
+      };
+      grupo.equipes.push(equipe);
+      const tecnicos = new Set(equipe.tecnicos);
+      const osEquipe = atividades.filter(
+        (atividade) => atividade.dia_id === equipe.dia_id && tecnicos.has(atividade.id_recurso),
+      );
+      grupo.variantes.set(
+        equipe.nome_equipe,
+        (grupo.variantes.get(equipe.nome_equipe) || 0) + (dedupOS(osEquipe).total || 1),
+      );
+      grupos.set(chave, grupo);
+    }
+    return [...grupos.values()]
+      .map((grupo) => ({
+        ...grupo,
+        rotulo: equipeRotuloFinal(
+          grupo.chave,
+          [...grupo.variantes].map(([texto, qtd]) => ({ texto, qtd })),
+          aliases.equipes,
+          aliases.integrantes,
+        ),
+      }))
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+  }, [equipes, atividades, aliases.equipes, aliases.integrantes]);
 
   const handleSalvarJust = async (
     equipeId: number,
@@ -1674,7 +1748,13 @@ function DayDetail({
       {/* Summary Cards */}
       <SummaryCards
         atividades={atividades}
-        numEquipes={equipes.length}
+        numEquipes={
+          new Set(
+            equipes.map((equipe) =>
+              equipeChaveFinal(equipe.nome_equipe, aliases.equipes, aliases.integrantes),
+            ),
+          ).size
+        }
         tecnicosEmEquipe={new Set(equipes.flatMap((eq) => eq.tecnicos))}
       />
 
@@ -1706,7 +1786,23 @@ function DayDetail({
                     >
                       <td className="pr-3 py-1 font-medium">{a.planta || "—"}</td>
                       <td className="pr-3 py-1">
-                        {equipes.find((e) => e.tecnicos.includes(a.id_recurso))?.nome_equipe || "—"}
+                        {(() => {
+                          const nome = equipes.find((e) =>
+                            e.tecnicos.includes(a.id_recurso),
+                          )?.nome_equipe;
+                          if (!nome) return "—";
+                          const chave = equipeChaveFinal(
+                            nome,
+                            aliases.equipes,
+                            aliases.integrantes,
+                          );
+                          return equipeRotuloFinal(
+                            chave,
+                            [{ texto: nome, qtd: 1 }],
+                            aliases.equipes,
+                            aliases.integrantes,
+                          );
+                        })()}
                       </td>
                       <td className="pr-3 py-1">{recursosMap.get(a.id_recurso) || a.id_recurso}</td>
                       <td className="pr-3 py-1">{a.status}</td>
@@ -1727,6 +1823,8 @@ function DayDetail({
           plantaMap={plantaMap}
           equipes={equipes}
           recursosMap={recursosMap}
+          aliasesEquipes={aliases.equipes}
+          aliasesIntegrantes={aliases.integrantes}
           filtroEquipes={filtroEquipes}
           setFiltroEquipes={setFiltroEquipes}
           filtroStatus={filtroStatus}
@@ -1740,6 +1838,8 @@ function DayDetail({
       <TipoServicoChart
         atividades={atividades}
         equipes={equipes}
+        aliasesEquipes={aliases.equipes}
+        aliasesIntegrantes={aliases.integrantes}
         onFilterByTipo={setFiltroTipoAtivo}
         filtroTipoAtivo={filtroTipoAtivo}
       />
@@ -1775,29 +1875,41 @@ function DayDetail({
           )}
         </CardHeader>
         <CardContent className="space-y-2">
-          {equipes.length === 0 ? (
+          {equipesAgrupadas.length === 0 ? (
             <p className="text-xs text-slate-400">Nenhuma equipe configurada para este dia.</p>
           ) : (
-            equipes
-              .filter((eq) => {
+            equipesAgrupadas.map((grupo) => {
+              const equipesVisiveis = grupo.equipes.filter((equipe) => {
                 if (!filtroTipoAtivo) return true;
                 const norm = filtroTipoAtivo.toUpperCase().trim();
-                return equipeTemTipo(eq, atividades, norm);
-              })
-              .map((eq, i) => (
-                <EquipeSection
-                  key={eq.id}
-                  equipe={eq}
-                  atividades={atividades}
-                  equipeIdx={i}
-                  justificativas={justificativas}
-                  onSalvar={handleSalvarJust}
-                  recursosMap={recursosMap}
-                  metaOS={metaOS}
-                  filtroTipoAtivo={filtroTipoAtivo}
-                  capMap={capMap}
-                />
-              ))
+                return equipeTemTipo(equipe, atividades, norm);
+              });
+              if (equipesVisiveis.length === 0) return null;
+              return (
+                <section key={grupo.chave} className="space-y-2 rounded-md border p-2">
+                  <div className="flex items-center justify-between gap-2 px-1">
+                    <span className="text-xs font-semibold">{grupo.rotulo}</span>
+                    <span className="text-[10px] text-slate-500">
+                      {equipesVisiveis.length} cadastro(s) de equipe
+                    </span>
+                  </div>
+                  {equipesVisiveis.map((equipe, indice) => (
+                    <EquipeSection
+                      key={equipe.id}
+                      equipe={equipe}
+                      atividades={atividades}
+                      equipeIdx={indice}
+                      justificativas={justificativas}
+                      onSalvar={handleSalvarJust}
+                      recursosMap={recursosMap}
+                      metaOS={metaOS}
+                      filtroTipoAtivo={filtroTipoAtivo}
+                      capMap={capMap}
+                    />
+                  ))}
+                </section>
+              );
+            })
           )}
         </CardContent>
       </Card>

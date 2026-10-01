@@ -21,11 +21,33 @@ import {
   Users,
   Loader2,
   Trophy,
+  GitMerge,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
+import {
+  equipeChaveFinal,
+  equipeIndiceCor,
+  equipeRotuloFinal,
+  integranteChaveFinal,
+  integranteRotuloFinal,
+} from "@/lib/equipe-utils";
+import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
+import { useAuth } from "@/lib/auth";
+import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
+import {
+  UnificarEquipesDialog,
+  type EquipeGerenciavel,
+} from "@/components/unificar-equipes-dialog";
 
 // ─── Tipos ────────────────────────────────────────────────────
 
@@ -106,8 +128,8 @@ const TIPO_SERVICO_MAP: Record<string, string> = {
 const TIPO_SERVICO_KEYS = Object.keys(TIPO_SERVICO_MAP);
 const TIPO_SERVICO_COLORS = ["#3b82f6", "#22c55e", "#ef4444", "#f59e0b", "#8b5cf6"];
 
-function getEquipeColor(idx: number) {
-  return EQUIPE_COLORS[idx % EQUIPE_COLORS.length];
+function getEquipeColor(chave: string) {
+  return EQUIPE_COLORS[equipeIndiceCor(chave, EQUIPE_COLORS.length)];
 }
 
 function normalizeStatus(s: string): string {
@@ -164,6 +186,8 @@ type Periodo = { type: "day" | "7" | "30" | "mes"; date?: string };
 // ─── Dashboard ────────────────────────────────────────────────
 
 export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
+  const { user, profile } = useAuth();
+  const aliases = useEquipeAliases();
   const [dias, setDias] = useState<FieldDia[]>([]);
   const [atividades, setAtividades] = useState<FieldAtividade[]>([]);
   const [equipes, setEquipes] = useState<FieldEquipe[]>([]);
@@ -173,6 +197,31 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   );
   const [todasDatas, setTodasDatas] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [podeUnificarEquipes, setPodeUnificarEquipes] = useState(false);
+  const [unificarAberto, setUnificarAberto] = useState(false);
+  const [equipeDetalhe, setEquipeDetalhe] = useState<(typeof osPorEquipe)[number] | null>(null);
+
+  useEffect(() => {
+    let ativo = true;
+    if (!user || !profile?.cargo_id) {
+      setPodeUnificarEquipes(false);
+      return () => {
+        ativo = false;
+      };
+    }
+    getPermissoesCargo(profile.cargo_id)
+      .then((permissoes) => {
+        if (ativo) {
+          setPodeUnificarEquipes(temPermissao(permissoes, "produtividade", "unificar_equipes"));
+        }
+      })
+      .catch(() => {
+        if (ativo) setPodeUnificarEquipes(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [profile?.cargo_id, user]);
 
   useEffect(() => {
     if (diaInicial) setPeriodo({ type: "day", date: diaInicial });
@@ -279,7 +328,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           (a) => a.dia_id === d.id && !isAtividadeAdministrativa(a.tipo_atividade),
         );
         const dedup = dedupOS(dayAtiv);
-        const byEqNome = new Map<string, number>();
+        const byEqNome = new Map<string, { exec: number; variantes: Map<string, number> }>();
         for (const eq of equipes) {
           if (eq.dia_id !== d.id) continue;
           const techSet = new Set(eq.tecnicos);
@@ -289,25 +338,43 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               !isAtividadeAdministrativa(a.tipo_atividade) &&
               techSet.has(a.id_recurso),
           );
-          const nome = eq.nome_equipe.trim();
-          byEqNome.set(nome, (byEqNome.get(nome) || 0) + dedupOS(teamAtiv).exec);
+          const chave = equipeChaveFinal(eq.nome_equipe, aliases.equipes, aliases.integrantes);
+          const exec = dedupOS(teamAtiv).exec;
+          const grupo = byEqNome.get(chave) || { exec: 0, variantes: new Map<string, number>() };
+          grupo.exec += exec;
+          grupo.variantes.set(eq.nome_equipe, (grupo.variantes.get(eq.nome_equipe) || 0) + exec);
+          byEqNome.set(chave, grupo);
         }
         return {
           data: d.data.slice(5),
           dataCompleta: d.data,
           exec: dedup.exec,
           total: dedup.total,
-          equipes: [...byEqNome.entries()].map(([nome, exec]) => ({ nome, exec })),
+          equipes: [...byEqNome.entries()]
+            .map(([chave, grupo]) => ({
+              chave,
+              nome: equipeRotuloFinal(
+                chave,
+                [...grupo.variantes].map(([texto, qtd]) => ({ texto, qtd })),
+                aliases.equipes,
+                aliases.integrantes,
+              ),
+              exec: grupo.exec,
+            }))
+            .sort((a, b) => b.exec - a.exec),
         };
       })
       .reverse();
-  }, [dias, atividadesEquipe, equipes]);
+  }, [dias, atividadesEquipe, equipes, aliases.equipes, aliases.integrantes]);
 
   const osPorEquipe = useMemo(() => {
     const byNome = new Map<
       string,
       {
-        nome: string;
+        chave: string;
+        variantes: Map<string, number>;
+        chavesOrigem: Set<string>;
+        integrantes: Map<string, { total: number; rotulos: Map<string, number> }>;
         exec: number;
         susp: number;
         canc: number;
@@ -323,21 +390,47 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         (a) => a.dia_id === eq.dia_id && techSet.has(a.id_recurso),
       );
       const dedup = dedupOS(teamAtiv);
-      const nome = eq.nome_equipe.trim();
-      const cur = byNome.get(nome) || {
-        nome: eq.nome_equipe,
+      const chave = equipeChaveFinal(eq.nome_equipe, aliases.equipes, aliases.integrantes);
+      const cur = byNome.get(chave) || {
+        chave,
+        variantes: new Map<string, number>(),
+        chavesOrigem: new Set<string>(),
+        integrantes: new Map<string, { total: number; rotulos: Map<string, number> }>(),
         exec: 0,
         susp: 0,
         canc: 0,
         total: 0,
         tecSet: new Set<number>(),
-        tipos: {},
+        tipos: {} as Record<string, number>,
         corretivas: 0,
       };
       cur.exec += dedup.exec;
       cur.susp += dedup.susp;
       cur.canc += dedup.canc;
       cur.total += dedup.total;
+      cur.variantes.set(
+        eq.nome_equipe,
+        (cur.variantes.get(eq.nome_equipe) || 0) + (dedup.total || 1),
+      );
+      cur.chavesOrigem.add(equipeChaveFinal(eq.nome_equipe, [], aliases.integrantes));
+      const integrantesVistos = new Set<string>();
+      for (const nome of eq.nome_equipe
+        .split(/[&/+,]/)
+        .map((parte) => parte.trim())
+        .filter(Boolean)) {
+        const chaveIntegrante = integranteChaveFinal(nome, aliases.integrantes);
+        if (integrantesVistos.has(chaveIntegrante)) continue;
+        integrantesVistos.add(chaveIntegrante);
+        const atual = cur.integrantes.get(chaveIntegrante) || {
+          total: 0,
+          rotulos: new Map<string, number>(),
+        };
+        const quantidade = dedup.total || 1;
+        atual.total += quantidade;
+        const rotulo = integranteRotuloFinal(nome, aliases.integrantes);
+        atual.rotulos.set(rotulo, (atual.rotulos.get(rotulo) || 0) + quantidade);
+        cur.integrantes.set(chaveIntegrante, atual);
+      }
       eq.tecnicos.forEach((t) => cur.tecSet.add(t));
       const vistos = new Set<string>();
       for (const a of teamAtiv) {
@@ -350,11 +443,24 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         cur.tipos[label] = (cur.tipos[label] || 0) + 1;
         if (norm === "MANUTENÇÃO CORRETIVA EMERGENCIAL") cur.corretivas++;
       }
-      byNome.set(nome, cur);
+      byNome.set(chave, cur);
     }
     return [...byNome.values()]
       .map((r) => ({
-        nome: r.nome,
+        chave: r.chave,
+        chavesOrigem: [...r.chavesOrigem],
+        integrantes: [...r.integrantes].map(([chave, integrante]) => ({
+          chave,
+          rotulo: [...integrante.rotulos.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || chave,
+          total: integrante.total,
+        })),
+        variantes: [...r.variantes].map(([texto, qtd]) => ({ texto, qtd })),
+        nome: equipeRotuloFinal(
+          r.chave,
+          [...r.variantes].map(([texto, qtd]) => ({ texto, qtd })),
+          aliases.equipes,
+          aliases.integrantes,
+        ),
         exec: r.exec,
         susp: r.susp,
         canc: r.canc,
@@ -365,7 +471,20 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       }))
       .filter((r) => r.total > 0)
       .sort((a, b) => b.exec - a.exec);
-  }, [atividades, equipes]);
+  }, [atividades, equipes, aliases.equipes, aliases.integrantes]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const gruposUnificados = osPorEquipe
+      .filter((equipe) => equipe.variantes.length > 1)
+      .map(({ chave, variantes, total }) => ({ chave, variantes, total }));
+    if (gruposUnificados.length > 0) {
+      console.info(
+        "[produtividade] equipes unificadas (chave, variantes, total):",
+        gruposUnificados,
+      );
+    }
+  }, [osPorEquipe]);
 
   const recursosMap = useMemo(() => {
     const m = new Map<number, string>();
@@ -403,16 +522,12 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
 
   const corPorEquipe = useMemo(() => {
     const m = new Map<string, { hex: string }>();
-    let idx = 0;
     for (const eq of equipes) {
-      const nome = eq.nome_equipe.trim();
-      if (!m.has(nome)) {
-        m.set(nome, getEquipeColor(idx));
-        idx++;
-      }
+      const chave = equipeChaveFinal(eq.nome_equipe, aliases.equipes, aliases.integrantes);
+      if (!m.has(chave)) m.set(chave, getEquipeColor(chave));
     }
     return m;
-  }, [equipes]);
+  }, [equipes, aliases.equipes, aliases.integrantes]);
 
   const participadasPorTecnico = useMemo(() => {
     type Acum = {
@@ -460,8 +575,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           a.tipos[label].minutos += ativ.duracao_min ?? 0;
         }
         for (const eq of minhasEqs) {
-          const nome = eq.nome_equipe.trim();
-          a.equipeDias.set(nome, (a.equipeDias.get(nome) || 0) + 1);
+          const chave = equipeChaveFinal(eq.nome_equipe, aliases.equipes, aliases.integrantes);
+          a.equipeDias.set(chave, (a.equipeDias.get(chave) || 0) + 1);
         }
         acum.set(tecId, a);
       }
@@ -480,7 +595,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       })
       .filter((r) => r.participadas > 0)
       .sort((x, y) => y.participadas - x.participadas);
-  }, [dias, equipes, atividades, recursosMap, corPorEquipe]);
+  }, [dias, equipes, atividades, recursosMap, corPorEquipe, aliases.equipes, aliases.integrantes]);
 
   const composicaoPorDia = useMemo(() => {
     return dias
@@ -536,11 +651,13 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     const horasMediaDia = numDias > 0 ? horasExec / numDias : 0;
     const corretivasMinMedia = numDias > 0 ? corretivasMin / numDias : 0;
 
-    const numEquipes = new Set(equipes.map((e) => e.nome_equipe.trim())).size;
+    const numEquipes = new Set(
+      equipes.map((e) => equipeChaveFinal(e.nome_equipe, aliases.equipes, aliases.integrantes)),
+    ).size;
     const mediaPorEquipe = numEquipes > 0 ? totalExec / numEquipes : 0;
 
     return { totalExec, corretivas, horasMediaDia, corretivasMinMedia, mediaPorEquipe };
-  }, [atividadesEquipe, dias, equipes]);
+  }, [atividadesEquipe, dias, equipes, aliases.equipes, aliases.integrantes]);
 
   const destaques = useMemo(() => {
     if (osPorEquipe.length === 0) return null;
@@ -548,6 +665,65 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     const maisCorretivas = [...osPorEquipe].sort((a, b) => b.corretivas - a.corretivas)[0];
     return { maisProdutiva, maisCorretivas };
   }, [osPorEquipe]);
+
+  const equipesGerenciaveis = useMemo<EquipeGerenciavel[]>(
+    () =>
+      osPorEquipe.map((equipe) => ({
+        chave: equipe.chave,
+        rotulo: equipe.nome,
+        total: equipe.exec,
+        chavesOrigem: equipe.chavesOrigem,
+        integrantes: equipe.integrantes,
+      })),
+    [osPorEquipe],
+  );
+
+  const equipeDetalheOS = useMemo(() => {
+    if (!equipeDetalhe) return [];
+    const linhas: Array<{
+      chave: string;
+      data: string;
+      ordem: number;
+      origem: string;
+      atividade: FieldAtividade;
+    }> = [];
+
+    for (const equipe of equipes) {
+      if (
+        equipeChaveFinal(equipe.nome_equipe, aliases.equipes, aliases.integrantes) !==
+        equipeDetalhe.chave
+      ) {
+        continue;
+      }
+      const tecnicos = new Set(equipe.tecnicos);
+      const concluidas = new Map<number, FieldAtividade>();
+      for (const atividade of atividades) {
+        if (
+          atividade.dia_id !== equipe.dia_id ||
+          !tecnicos.has(atividade.id_recurso) ||
+          isAtividadeAdministrativa(atividade.tipo_atividade) ||
+          !atividade.ordem_manutencao ||
+          normalizeStatus(atividade.status) !== "concluido"
+        ) {
+          continue;
+        }
+        if (!concluidas.has(atividade.ordem_manutencao)) {
+          concluidas.set(atividade.ordem_manutencao, atividade);
+        }
+      }
+      const data = dias.find((dia) => dia.id === equipe.dia_id)?.data || "";
+      for (const [ordem, atividade] of concluidas) {
+        linhas.push({
+          chave: `${equipe.id}:${equipe.dia_id}:${ordem}`,
+          data,
+          ordem,
+          origem: equipe.nome_equipe,
+          atividade,
+        });
+      }
+    }
+    return linhas.sort((a, b) => b.data.localeCompare(a.data) || a.ordem - b.ordem);
+  }, [equipeDetalhe, equipes, atividades, dias, aliases.equipes, aliases.integrantes]);
 
   if (loading) {
     return (
@@ -713,7 +889,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                                   <span className="flex items-center gap-1.5 text-slate-500">
                                     <span
                                       className="h-2 w-2 shrink-0 rounded-full"
-                                      style={{ backgroundColor: getEquipeColor(i).hex }}
+                                      style={{ backgroundColor: getEquipeColor(eq.chave).hex }}
                                     />
                                     {eq.nome}
                                   </span>
@@ -741,8 +917,13 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           </Card>
 
           <Card className="shadow-sm">
-            <CardHeader className="pb-2">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
               <CardTitle className="text-sm font-semibold">OS Executadas por Equipe</CardTitle>
+              {podeUnificarEquipes && (
+                <Button variant="outline" size="sm" onClick={() => setUnificarAberto(true)}>
+                  <GitMerge className="mr-1.5 h-4 w-4" /> Unificar equipes
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={Math.max(150, osPorEquipe.length * 35)}>
@@ -783,8 +964,13 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                     }}
                   />
                   <Bar dataKey="exec" radius={[0, 4, 4, 0]}>
-                    {osPorEquipe.map((_, i) => (
-                      <Cell key={i} fill={getEquipeColor(i).hex} />
+                    {osPorEquipe.map((equipe) => (
+                      <Cell
+                        key={equipe.chave}
+                        fill={getEquipeColor(equipe.chave).hex}
+                        cursor="pointer"
+                        onClick={() => setEquipeDetalhe(equipe)}
+                      />
                     ))}
                     <LabelList
                       dataKey="exec"
@@ -949,6 +1135,61 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           )}
         </>
       )}
+      <UnificarEquipesDialog
+        open={unificarAberto}
+        onOpenChange={setUnificarAberto}
+        equipes={equipesGerenciaveis}
+        aliasesEquipe={aliases.equipes}
+        aliasesIntegrante={aliases.integrantes}
+        sugestoesIgnoradas={aliases.ignoradas}
+        userId={user?.id || null}
+        onAliasesChanged={() => void aliases.recarregar()}
+      />
+      <Dialog open={!!equipeDetalhe} onOpenChange={(aberto) => !aberto && setEquipeDetalhe(null)}>
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{equipeDetalhe?.nome}</DialogTitle>
+            <DialogDescription>
+              {equipeDetalheOS.length} OS na lista · {equipeDetalhe?.exec || 0} executadas na barra
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">Data</th>
+                  <th className="px-3 py-2">O.S.</th>
+                  <th className="px-3 py-2">Equipe original</th>
+                  <th className="px-3 py-2">Tipo / atividade</th>
+                  <th className="px-3 py-2">Planta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {equipeDetalheOS.map((linha) => (
+                  <tr key={linha.chave} className="border-t">
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {linha.data ? formatDataBR(linha.data) : "—"}
+                    </td>
+                    <td className="px-3 py-2 font-mono">{linha.ordem}</td>
+                    <td className="px-3 py-2">{linha.origem}</td>
+                    <td className="max-w-[320px] px-3 py-2">
+                      {linha.atividade.texto_breve || linha.atividade.tipo_atividade || "—"}
+                    </td>
+                    <td className="px-3 py-2">{linha.atividade.planta || "—"}</td>
+                  </tr>
+                ))}
+                {equipeDetalheOS.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                      Nenhuma O.S. executada encontrada para esta equipe.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

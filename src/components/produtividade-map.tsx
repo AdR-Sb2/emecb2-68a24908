@@ -4,6 +4,14 @@ import L from "leaflet";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Filter, MapPin } from "lucide-react";
+import {
+  equipeChaveFinal,
+  equipeIndiceCor,
+  equipeRotulo,
+  equipeRotuloFinal,
+  type AliasEquipe,
+  type AliasIntegrante,
+} from "@/lib/equipe-utils";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -141,12 +149,14 @@ function MultiSelectDropdown({
   selected,
   onToggle,
   colors,
+  optionLabels,
 }: {
   label: string;
   options: string[];
   selected: string[];
   onToggle: (v: string) => void;
   colors?: Record<string, string>;
+  optionLabels?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -174,7 +184,7 @@ function MultiSelectDropdown({
               {colors && colors[opt] && (
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[opt] }} />
               )}
-              {opt}
+              {optionLabels?.[opt] || opt}
             </label>
           ))}
         </div>
@@ -190,6 +200,8 @@ export default function ProdutividadeMap({
   plantaMap,
   equipes,
   recursosMap,
+  aliasesEquipes,
+  aliasesIntegrantes,
   filtroEquipes,
   setFiltroEquipes,
   filtroStatus,
@@ -201,6 +213,8 @@ export default function ProdutividadeMap({
   plantaMap: Map<string, PlantaCoord>;
   equipes: FieldEquipe[];
   recursosMap: Map<number, string>;
+  aliasesEquipes: AliasEquipe[];
+  aliasesIntegrantes: AliasIntegrante[];
   filtroEquipes: string[];
   setFiltroEquipes: (v: string[]) => void;
   filtroStatus: string[];
@@ -210,15 +224,6 @@ export default function ProdutividadeMap({
 }) {
   const [fitSignal, setFitSignal] = useState(0);
   const [debugInfo, setDebugInfo] = useState({ tentadas: 0, comPlanta: 0, semPlanta: 0 });
-
-  // Build resource → team map
-  const resourceToEquipe = useMemo(() => {
-    const m = new Map<number, { nome: string; idx: number }>();
-    equipes.forEach((eq, idx) => {
-      for (const r of eq.tecnicos) m.set(r, { nome: eq.nome_equipe, idx });
-    });
-    return m;
-  }, [equipes]);
 
   // Unique filter options
   const statusOptions = useMemo(() => {
@@ -231,15 +236,77 @@ export default function ProdutividadeMap({
     return [...s].sort();
   }, [atividades]);
 
-  const equipeOptions = useMemo(() => equipes.map((e) => e.nome_equipe), [equipes]);
+  const { equipeOptions, equipeLabels } = useMemo(() => {
+    const variantesPorChave = new Map<string, Map<string, number>>();
+    for (const equipe of equipes) {
+      const chave = equipeChaveFinal(equipe.nome_equipe, aliasesEquipes, aliasesIntegrantes);
+      const variantes = variantesPorChave.get(chave) || new Map<string, number>();
+      const tecnicos = new Set(equipe.tecnicos);
+      const osExecutadas = new Set<string>();
+      for (const atividade of atividades) {
+        if (
+          atividade.dia_id !== equipe.dia_id ||
+          !tecnicos.has(atividade.id_recurso) ||
+          isAtividadeAdministrativa(atividade.tipo_atividade) ||
+          normalizeStatus(atividade.status) !== "concluido"
+        ) {
+          continue;
+        }
+        osExecutadas.add(
+          atividade.ordem_manutencao
+            ? `om:${atividade.ordem_manutencao}`
+            : `at:${atividade.id_atividade}`,
+        );
+      }
+      const quantidade = osExecutadas.size || 1;
+      variantes.set(equipe.nome_equipe, (variantes.get(equipe.nome_equipe) || 0) + quantidade);
+      variantesPorChave.set(chave, variantes);
+    }
+    const grupos = [...variantesPorChave.entries()].map(([chave, variantes]) => ({
+      chave,
+      rotulo: equipeRotuloFinal(
+        chave,
+        [...variantes].map(([texto, qtd]) => ({ texto, qtd })),
+        aliasesEquipes,
+        aliasesIntegrantes,
+      ),
+    }));
+    grupos.sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+    return {
+      equipeOptions: grupos.map((grupo) => grupo.chave),
+      equipeLabels: Object.fromEntries(grupos.map((grupo) => [grupo.chave, grupo.rotulo])),
+    };
+  }, [atividades, equipes, aliasesEquipes, aliasesIntegrantes]);
+
+  const resourceToEquipe = useMemo(() => {
+    const m = new Map<number, { nome: string; chave: string }>();
+    equipes.forEach((eq) => {
+      const chave = equipeChaveFinal(eq.nome_equipe, aliasesEquipes, aliasesIntegrantes);
+      for (const recurso of eq.tecnicos) {
+        m.set(recurso, {
+          nome:
+            equipeLabels[chave] ||
+            equipeRotuloFinal(
+              chave,
+              [{ texto: eq.nome_equipe, qtd: 1 }],
+              aliasesEquipes,
+              aliasesIntegrantes,
+            ),
+          chave,
+        });
+      }
+    });
+    return m;
+  }, [equipes, equipeLabels, aliasesEquipes, aliasesIntegrantes]);
 
   const equipeColorMap = useMemo(() => {
     const m: Record<string, string> = {};
-    equipes.forEach((eq, i) => {
-      m[eq.nome_equipe] = EQUIPE_PIN_COLORS[i % EQUIPE_PIN_COLORS.length];
+    equipes.forEach((eq) => {
+      const chave = equipeChaveFinal(eq.nome_equipe, aliasesEquipes, aliasesIntegrantes);
+      m[chave] = EQUIPE_PIN_COLORS[equipeIndiceCor(chave, EQUIPE_PIN_COLORS.length)];
     });
     return m;
-  }, [equipes]);
+  }, [equipes, aliasesEquipes, aliasesIntegrantes]);
 
   const statusColorMap = useMemo(() => {
     const m: Record<string, string> = {};
@@ -255,6 +322,7 @@ export default function ProdutividadeMap({
       lon: number;
       status: string;
       equipe: string;
+      equipeChave: string;
       at: FieldAtividade;
     }> = [];
 
@@ -271,9 +339,10 @@ export default function ProdutividadeMap({
       const normSt = normalizeStatus(at.status);
       const eqInfo = resourceToEquipe.get(at.id_recurso);
       const eqNome = eqInfo?.nome || "Sem equipe";
+      const eqChave = eqInfo?.chave || "";
 
       // Apply filters
-      if (filtroEquipes.length > 0 && !filtroEquipes.includes(eqNome)) continue;
+      if (filtroEquipes.length > 0 && !filtroEquipes.includes(eqChave)) continue;
       if (filtroStatus.length > 0 && !filtroStatus.includes(normSt)) continue;
       if (filtroTipo.length > 0 && !filtroTipo.includes(at.tipo_atividade)) continue;
 
@@ -283,6 +352,7 @@ export default function ProdutividadeMap({
         lon: coord.lon,
         status: normSt,
         equipe: eqNome,
+        equipeChave: eqChave,
         at,
       });
     }
@@ -331,6 +401,7 @@ export default function ProdutividadeMap({
           selected={filtroEquipes}
           onToggle={(v) => toggleFilter(filtroEquipes, setFiltroEquipes, v)}
           colors={equipeColorMap}
+          optionLabels={equipeLabels}
         />
         <MultiSelectDropdown
           label="Status"
@@ -375,7 +446,7 @@ export default function ProdutividadeMap({
           <FitBoundsController points={points} fitSignal={fitSignal} />
           {pins.map((pin) => {
             const sColor = STATUS_COLORS[pin.status] || "#94a3b8";
-            const eColor = equipeColorMap[pin.equipe] || "#64748b";
+            const eColor = equipeColorMap[pin.equipeChave] || "#64748b";
             const icon = createPinIcon(sColor, eColor);
             return (
               <Marker key={pin.key} position={[Number(pin.lat), Number(pin.lon)]} icon={icon}>
