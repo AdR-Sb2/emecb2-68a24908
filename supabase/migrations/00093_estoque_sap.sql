@@ -234,7 +234,7 @@ AS $$
   SELECT jsonb_build_object(
     'linhas', count(*),
     'valor_total_livre', COALESCE(sum(valor_livre), 0),
-    'qtd_peps', count(DISTINCT pep) FILTER (WHERE pep IS NOT NULL),
+    'qtd_peps', count(DISTINCT i.pep) FILTER (WHERE i.pep IS NOT NULL),
     'peps_sem_vinculo', count(DISTINCT i.pep) FILTER (
       WHERE i.pep IS NOT NULL
         AND (v.pep IS NULL OR (v.setor_id IS NULL AND v.superintendencia IS NULL))
