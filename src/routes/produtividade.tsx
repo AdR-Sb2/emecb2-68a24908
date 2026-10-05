@@ -1983,6 +1983,12 @@ function ProdutividadePage() {
       supabase.from("field_dias").select("*").order("data", { ascending: false }),
       supabase.from("field_recursos").select("*").order("id_recurso"),
     ]);
+    if (diasRes.error) console.warn("Falha ao carregar field_dias:", diasRes.error.message);
+    if (recRes.error)
+      console.warn(
+        "Falha ao carregar field_recursos (nomes de técnicos virarão IDs):",
+        recRes.error.message,
+      );
     if (diasRes.data) setDias(diasRes.data as FieldDia[]);
     if (recRes.data) setRecursos(recRes.data as FieldRecurso[]);
     setLoading(false);

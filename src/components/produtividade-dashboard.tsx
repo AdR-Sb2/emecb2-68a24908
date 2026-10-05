@@ -171,6 +171,26 @@ function formatDataBR(d: string): string {
   return `${day}/${m}/${y}`;
 }
 
+const MESES_BR = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+function formatMesBR(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return `${MESES_BR[m - 1] || m}/${y}`;
+}
+
 function formatMinutos(mins: number): string {
   if (!mins) return "00:00";
   const total = Math.round(mins);
@@ -181,7 +201,7 @@ function formatMinutos(mins: number): string {
 
 // ─── Período ──────────────────────────────────────────────────
 
-type Periodo = { type: "day" | "7" | "30" | "mes"; date?: string };
+type Periodo = { type: "day" | "7" | "30" | "mes"; date?: string; mes?: string };
 
 // ─── Dashboard ────────────────────────────────────────────────
 
@@ -232,24 +252,28 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       setLoading(true);
       const now = new Date();
       let startDate: string | undefined;
+      let endDate: string | undefined;
       if (periodo.type === "7") {
         startDate = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
       } else if (periodo.type === "30") {
         startDate = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
       } else if (periodo.type === "mes") {
-        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+        const [a, m] = periodo.mes
+          ? periodo.mes.split("-").map(Number)
+          : [now.getFullYear(), now.getMonth() + 1];
+        startDate = `${a}-${String(m).padStart(2, "0")}-01`;
+        endDate = `${a}-${String(m).padStart(2, "0")}-${new Date(a, m, 0).getDate()}`;
       }
+
+      const datesRes = await supabase
+        .from("field_dias")
+        .select("data")
+        .order("data", { ascending: false })
+        .limit(1000);
+      setTodasDatas([...new Set((datesRes.data || []).map((d: { data: string }) => d.data))]);
 
       let diasRes;
       if (periodo.type === "day") {
-        const datesRes = await supabase
-          .from("field_dias")
-          .select("data")
-          .order("data", { ascending: false })
-          .limit(500);
-        setTodasDatas([
-          ...new Set((datesRes.data || []).map((d: { data: string }) => d.data as string)),
-        ]);
         diasRes = periodo.date
           ? await supabase
               .from("field_dias")
@@ -258,17 +282,24 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               .order("data", { ascending: false })
           : { data: [] as FieldDia[] };
       } else {
-        diasRes = await supabase
+        let q = supabase
           .from("field_dias")
           .select("*")
           .gte("data", startDate!)
           .order("data", { ascending: false });
+        if (endDate) q = q.lte("data", endDate);
+        diasRes = await q;
       }
       const diasData = (diasRes.data || []) as FieldDia[];
       setDias(diasData);
 
       const recRes = await supabase.from("field_recursos").select("*");
-      if (!recRes.error) {
+      if (recRes.error) {
+        console.warn(
+          "Falha ao carregar field_recursos (nomes de técnicos virarão IDs):",
+          recRes.error.message,
+        );
+      } else {
         setRecursosList((recRes.data || []) as Array<{ id_recurso: number; nome: string }>);
       }
 
@@ -305,6 +336,12 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     };
     load();
   }, [periodo]);
+
+  const mesesDisponiveis = useMemo(() => {
+    const vistos = new Set<string>();
+    for (const d of todasDatas) vistos.add(d.slice(0, 7));
+    return [...vistos].sort().reverse();
+  }, [todasDatas]);
 
   // Só contam atividades de técnicos que estão em alguma equipe no dia.
   const tecsPorDia = useMemo(() => {
@@ -744,7 +781,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
             variant={periodo.type === p ? "default" : "outline"}
             size="sm"
             className="h-7 text-[11px]"
-            onClick={() => setPeriodo({ type: p, date: periodo.date })}
+            onClick={() => setPeriodo({ type: p, date: periodo.date, mes: periodo.mes })}
           >
             {p === "day"
               ? "Dia específico"
@@ -752,9 +789,25 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                 ? "Últimos 7 dias"
                 : p === "30"
                   ? "Últimos 30 dias"
-                  : "Este mês"}
+                  : "Mês"}
           </Button>
         ))}
+        {periodo.type === "mes" && (
+          <select
+            value={periodo.mes || ""}
+            onChange={(e) => setPeriodo({ type: "mes", mes: e.target.value })}
+            className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+          >
+            <option value="">
+              Mês atual ({new Date().getMonth() + 1}/{new Date().getFullYear()})
+            </option>
+            {mesesDisponiveis.map((m) => (
+              <option key={m} value={m}>
+                {formatMesBR(m)}
+              </option>
+            ))}
+          </select>
+        )}
         {periodo.type === "day" && (
           <select
             value={periodo.date || ""}
