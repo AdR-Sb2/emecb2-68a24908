@@ -16,7 +16,6 @@ import {
 } from "recharts";
 import {
   Activity,
-  AlertTriangle,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -337,14 +336,6 @@ function corCategoria(categoria: string): string {
   return CORES_CATEGORIA[categoria] || CORES_CATEGORIA.Outros;
 }
 
-function statusAlerta(pct: number | null): "ok" | "atencao" | "critico" | null {
-  if (pct === null || pct <= 0) return null;
-  if (pct >= 100) return "ok";
-  if (pct >= 70) return null;
-  if (pct >= 40) return "atencao";
-  return "critico";
-}
-
 function corProgresso(pct: number): string {
   if (pct >= 100) return "#22c55e";
   if (pct >= 70) return "#f59e0b";
@@ -499,20 +490,24 @@ export type LinhaEquipe = {
   total: number;
   corretivas: number;
   tecnicos: number[];
-  meta: number;
-  pct: number | null;
+  /** % de contribuição da equipe para a meta mensal global do período (null sem meta). */
+  contribPct: number | null;
+  /** O.S. da meta mensal global usada como base da contribuição. */
+  contribTotal: number;
 };
 
 export type LinhaTecnico = {
   tecId: number;
   nome: string;
   participadas: number;
+  /** O.S. concluídas com atividade do colaborador (base da % da meta individual). */
   proprias: number;
   diasTrabalhados: number;
+  /** HH apontado pelo colaborador no período, em minutos. */
+  hhMin: number;
   meta: number;
   pct: number | null;
   cor: string;
-  tipos: Record<string, { count: number; minutos: number }>;
 };
 
 type Alerta = { nivel: "ok" | "atencao" | "critico"; texto: string; detalhe: string };
@@ -703,7 +698,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     () => limiteCorretivasPeriodo(cfg, datasPeriodo),
     [cfg, datasPeriodo],
   );
-  const temMetasIndividuais = Object.keys(cfg.metasIndividuais).length > 0;
 
   // ── Janela de referência da comparação ativa ───────────────
   const datasRef = useMemo(() => datasReferencia(cmp.id, datasPeriodo), [cmp.id, datasPeriodo]);
@@ -842,20 +836,10 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       }
     }
 
-    const tecnicosPeriodo = new Set<number>();
-    for (const i of info.values()) for (const t of i.tecSet) tecnicosPeriodo.add(t);
-    const nTecnicos = tecnicosPeriodo.size || 1;
-
     const linhas: LinhaEquipe[] = [];
     for (const [chave, i] of info) {
       const c = contagem.get(chave) || { exec: 0, susp: 0, canc: 0, total: 0, corretivas: 0 };
       if (c.total === 0) continue;
-      let meta = 0;
-      if (temMetasIndividuais) {
-        for (const t of i.tecSet) meta += metaIndividualPeriodo(cfg, t, datasPeriodo);
-      } else if (temMeta) {
-        meta = metaTotal * (i.tecSet.size / nTecnicos);
-      }
       linhas.push({
         chave,
         nome: rotulosEquipe.get(chave)?.nome || chave || "Sem equipe",
@@ -871,8 +855,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         total: c.total,
         corretivas: c.corretivas,
         tecnicos: [...i.tecSet],
-        meta,
-        pct: meta > 0 ? (c.exec / meta) * 100 : null,
+        contribPct: metaTotal > 0 ? (c.exec / metaTotal) * 100 : null,
+        contribTotal: metaTotal,
       });
     }
     return linhas.sort((a, b) => b.exec - a.exec);
@@ -883,93 +867,96 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     osPeriodo,
     aliases.equipes,
     aliases.integrantes,
-    temMetasIndividuais,
-    temMeta,
     metaTotal,
-    cfg,
-    datasPeriodo,
     rotulosEquipe,
   ]);
 
   // ── Ranking de técnicos ────────────────────────────────────
   const rankingTecnicos = useMemo<LinhaTecnico[]>(() => {
-    const acum = new Map<
-      number,
-      {
-        participadas: number;
-        proprias: number;
-        dias: number;
-        equipeDias: Map<string, number>;
-        tipos: Record<string, { count: number; minutos: number }>;
-      }
-    >();
-
-    const garantir = (tecId: number) => {
-      let a = acum.get(tecId);
-      if (!a) {
-        a = { participadas: 0, proprias: 0, dias: 0, equipeDias: new Map(), tipos: {} };
-        acum.set(tecId, a);
-      }
-      return a;
-    };
+    // Só técnicos que estão registrados em equipe em algum dia do período.
+    const membros = new Set<number>();
+    const equipeDias = new Map<number, Map<string, number>>();
+    const participadas = new Map<number, number>();
 
     for (const dia of dias) {
       if (!datasPeriodoSet.has(dia.data)) continue;
       const equipesDia = equipes.filter((e) => e.dia_id === dia.id);
+      if (equipesDia.length === 0) continue;
+      const osDia = osAgrupadas.filter((os) => os.concluida && os.datas.includes(dia.data));
+
       const tecsDia = new Set<number>();
       for (const e of equipesDia) for (const t of e.tecnicos) tecsDia.add(t);
-      if (tecsDia.size === 0) continue;
-      const osDia = osAgrupadas.filter((os) => os.concluida && os.datas.includes(dia.data));
+
       for (const tec of tecsDia) {
+        membros.add(tec);
         const minhasEqs = equipesDia.filter((e) => e.tecnicos.includes(tec));
         const eqSet = new Set<number>();
         for (const e of minhasEqs) for (const t of e.tecnicos) eqSet.add(t);
-        const a = garantir(tec);
-        a.participadas += osDia.filter((os) => os.tecnicos.some((t) => eqSet.has(t))).length;
-        a.dias++;
+        participadas.set(
+          tec,
+          (participadas.get(tec) || 0) +
+            osDia.filter((os) => os.tecnicos.some((t) => eqSet.has(t))).length,
+        );
+        const mapaDia = equipeDias.get(tec) || new Map<string, number>();
         for (const e of minhasEqs) {
           const chave = equipeChaveFinal(e.nome_equipe, aliases.equipes, aliases.integrantes);
-          a.equipeDias.set(chave, (a.equipeDias.get(chave) || 0) + 1);
+          mapaDia.set(chave, (mapaDia.get(chave) || 0) + 1);
         }
+        equipeDias.set(tec, mapaDia);
       }
     }
 
+    // HH apontado individualmente + dias distintos com atividade/OS no período.
+    const hhMin = new Map<number, number>();
+    const diasSet = new Map<number, Set<string>>();
+    const proprias = new Map<number, number>();
+
     for (const os of osPeriodo) {
-      if (!os.concluida) continue;
-      for (const tec of os.tecnicos) {
-        const a = garantir(tec);
-        a.proprias++;
-        if (!a.tipos[os.categoria]) a.tipos[os.categoria] = { count: 0, minutos: 0 };
-        a.tipos[os.categoria].count++;
-        a.tipos[os.categoria].minutos += os.hh;
+      if (os.concluida) {
+        for (const tec of os.tecnicos) {
+          if (!membros.has(tec)) continue;
+          proprias.set(tec, (proprias.get(tec) || 0) + 1);
+          const setD = diasSet.get(tec) || new Set<string>();
+          for (const d of os.datas) if (datasPeriodoSet.has(d)) setD.add(d);
+          diasSet.set(tec, setD);
+        }
+      }
+      for (const a of os.atividades) {
+        if (!membros.has(a.id_recurso)) continue;
+        const dia = diaPorId.get(a.dia_id);
+        if (!dia || !datasPeriodoSet.has(dia.data)) continue;
+        const duracao = Number(a.duracao_min) || 0;
+        if (duracao > 0) hhMin.set(a.id_recurso, (hhMin.get(a.id_recurso) || 0) + duracao);
       }
     }
 
     const linhas: LinhaTecnico[] = [];
-    for (const [tecId, a] of acum) {
-      const meta = metaIndividualPeriodo(cfg, tecId, datasPeriodo);
-      const pred = [...a.equipeDias.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] || "";
+    for (const tec of membros) {
+      const pred =
+        [...(equipeDias.get(tec)?.entries() || [])].sort((x, y) => y[1] - x[1])[0]?.[0] || "";
+      const meta = metaIndividualPeriodo(cfg, tec, datasPeriodo);
       linhas.push({
-        tecId,
-        nome: recursosMap.get(tecId) || `Técnico ${tecId}`,
-        participadas: a.participadas,
-        proprias: a.proprias,
-        diasTrabalhados: a.dias,
+        tecId: tec,
+        nome: recursosMap.get(tec) || `Técnico ${tec}`,
+        participadas: participadas.get(tec) || 0,
+        proprias: proprias.get(tec) || 0,
+        diasTrabalhados: diasSet.get(tec)?.size || 0,
+        hhMin: hhMin.get(tec) || 0,
         meta,
-        pct: meta > 0 ? (a.proprias / meta) * 100 : null,
+        pct: meta > 0 ? ((proprias.get(tec) || 0) / meta) * 100 : null,
         cor: getEquipeColor(pred).hex,
-        tipos: a.tipos,
       });
     }
     return linhas
-      .filter((l) => l.participadas > 0 || l.proprias > 0)
-      .sort((x, y) => y.participadas - x.participadas || y.proprias - x.proprias);
+      .filter((l) => l.participadas > 0 || l.hhMin > 0)
+      .sort((x, y) => y.participadas - x.participadas || y.hhMin - x.hhMin);
   }, [
     dias,
     datasPeriodoSet,
     equipes,
     osAgrupadas,
     osPeriodo,
+    diaPorId,
     cfg,
     datasPeriodo,
     aliases.equipes,
@@ -1047,12 +1034,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       detalhe: base,
     };
   }, [limiteCorretivas, metricasPeriodo.corretivas]);
-
-  const alertasEquipes = useMemo(() => {
-    return rankingEquipes
-      .map((e) => ({ equipe: e, nivel: statusAlerta(e.pct) }))
-      .filter((a): a is { equipe: LinhaEquipe; nivel: "ok" | "atencao" | "critico" } => !!a.nivel);
-  }, [rankingEquipes]);
 
   const destaques = useMemo(() => {
     if (rankingEquipes.length === 0) return null;
@@ -1246,69 +1227,35 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       </div>
 
       {/* ── Alertas ────────────────────────────────────────── */}
-      {(alertaCorretivas || alertasEquipes.length > 0) && (
+      {alertaCorretivas && (
         <div className="grid gap-3 sm:grid-cols-2">
-          {alertaCorretivas && (
-            <Card
-              className={`shadow-sm ${
-                alertaCorretivas.nivel === "critico"
-                  ? "border-red-300 bg-red-50"
-                  : alertaCorretivas.nivel === "atencao"
-                    ? "border-amber-300 bg-amber-50"
-                    : "border-emerald-300 bg-emerald-50"
-              }`}
-            >
-              <CardContent className="flex items-start gap-3 p-4">
-                <span
-                  className="mt-1 h-3 w-3 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      alertaCorretivas.nivel === "critico"
-                        ? "#ef4444"
-                        : alertaCorretivas.nivel === "atencao"
-                          ? "#f59e0b"
-                          : "#22c55e",
-                  }}
-                />
-                <div>
-                  <div className="text-sm font-semibold text-slate-700">
-                    {alertaCorretivas.texto}
-                  </div>
-                  <div className="text-xs text-slate-500">{alertaCorretivas.detalhe}</div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {alertasEquipes.length > 0 && (
-            <Card className="shadow-sm">
-              <CardHeader className="pb-1">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" /> Alertas de equipes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {alertasEquipes.map(({ equipe, nivel }) => (
-                  <div key={equipe.chave} className="flex items-center gap-2 text-xs">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor:
-                          nivel === "critico"
-                            ? "#ef4444"
-                            : nivel === "atencao"
-                              ? "#f59e0b"
-                              : "#22c55e",
-                      }}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-slate-600">{equipe.nome}</span>
-                    <span className="shrink-0 font-semibold text-slate-700">
-                      {equipe.pct !== null ? `${equipe.pct.toFixed(0)}% da meta` : "sem meta"}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+          <Card
+            className={`shadow-sm ${
+              alertaCorretivas.nivel === "critico"
+                ? "border-red-300 bg-red-50"
+                : alertaCorretivas.nivel === "atencao"
+                  ? "border-amber-300 bg-amber-50"
+                  : "border-emerald-300 bg-emerald-50"
+            }`}
+          >
+            <CardContent className="flex items-start gap-3 p-4">
+              <span
+                className="mt-1 h-3 w-3 shrink-0 rounded-full"
+                style={{
+                  backgroundColor:
+                    alertaCorretivas.nivel === "critico"
+                      ? "#ef4444"
+                      : alertaCorretivas.nivel === "atencao"
+                        ? "#f59e0b"
+                        : "#22c55e",
+                }}
+              />
+              <div>
+                <div className="text-sm font-semibold text-slate-700">{alertaCorretivas.texto}</div>
+                <div className="text-xs text-slate-500">{alertaCorretivas.detalhe}</div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1645,8 +1592,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                   <th className="px-2 py-1.5 text-right">Téc.</th>
                   <th className="px-2 py-1.5 text-right">Executadas</th>
                   <th className="px-2 py-1.5 text-right">Susp./Canc.</th>
-                  <th className="px-2 py-1.5 text-right">Meta</th>
-                  <th className="px-2 py-1.5">% da meta</th>
+                  <th className="px-2 py-1.5">Contribuição à meta</th>
                   <th className="px-2 py-1.5 text-right">Corretivas</th>
                 </tr>
               </thead>
@@ -1675,24 +1621,34 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                     <td className="px-2 py-1.5 text-right text-muted-foreground">
                       {equipe.susp} / {equipe.canc}
                     </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {equipe.meta > 0 ? formatNumero(equipe.meta, 1) : "—"}
-                    </td>
                     <td className="px-2 py-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                          <span
-                            className="block h-1.5 rounded-full"
-                            style={{
-                              width: `${Math.max(0, Math.min(100, equipe.pct ?? 0))}%`,
-                              backgroundColor: corProgresso(equipe.pct ?? 0),
-                            }}
-                          />
-                        </span>
-                        <span className="w-10 shrink-0 text-right font-semibold">
-                          {equipe.pct !== null ? `${equipe.pct.toFixed(0)}%` : "—"}
-                        </span>
-                      </span>
+                      {equipe.contribPct !== null ? (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex cursor-help items-center gap-2">
+                                <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                  <span
+                                    className="block h-1.5 rounded-full bg-emerald-500"
+                                    style={{
+                                      width: `${Math.max(0, Math.min(100, equipe.contribPct))}%`,
+                                    }}
+                                  />
+                                </span>
+                                <span className="w-10 shrink-0 text-right font-semibold">
+                                  {equipe.contribPct.toFixed(0)}%
+                                </span>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {equipe.exec} O.S. de {formatNumero(equipe.contribTotal, 1)} da meta
+                              mensal global do período.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <span
@@ -1718,8 +1674,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">Ranking de Técnicos</CardTitle>
           <p className="text-[11px] text-slate-500">
-            “Participadas” conta as O.S. executadas pela equipe do técnico; “Próprias” conta as O.S.
-            em que ele tem atividade registrada (base do % da meta individual).
+            Meta e % são individuais por colaborador. HH e dias trabalhados são apurados apenas de
+            colaboradores registrados em equipe no período.
           </p>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -1733,62 +1689,121 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                 <tr>
                   <th className="px-2 py-1.5">#</th>
                   <th className="px-2 py-1.5">Técnico</th>
-                  <th className="px-2 py-1.5 text-right">Participadas</th>
-                  <th className="px-2 py-1.5 text-right">Próprias</th>
-                  <th className="px-2 py-1.5 text-right">Dias</th>
+                  <th className="px-2 py-1.5">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-block cursor-help border-b border-dotted border-slate-300">
+                            Participadas
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Quantidade de O.S. executadas pela equipe/unidade de equipe da qual o
+                          técnico participou no período.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </th>
+                  <th className="px-2 py-1.5 text-right">Dias trabalhados</th>
+                  <th className="px-2 py-1.5">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-block cursor-help border-b border-dotted border-slate-300">
+                            HH trabalhado no período
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Total de HH apontadas pelo colaborador no período selecionado.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </th>
                   <th className="px-2 py-1.5 text-right">Meta</th>
                   <th className="px-2 py-1.5">% da meta</th>
                 </tr>
               </thead>
               <tbody>
-                {rankingTecnicos.map((tec, i) => (
-                  <tr
-                    key={tec.tecId}
-                    className="cursor-pointer border-t transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                    onClick={() =>
-                      abrirDrill(`O.S. do técnico ${tec.nome}`, (os) =>
-                        os.tecnicos.includes(tec.tecId),
-                      )
-                    }
-                  >
-                    <td className="px-2 py-1.5 text-muted-foreground">{i + 1}</td>
-                    <td className="max-w-[240px] px-2 py-1.5">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: tec.cor }}
-                        />
-                        <span className="truncate font-medium text-slate-700 dark:text-slate-200">
-                          {tec.nome}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-semibold">{tec.participadas}</td>
-                    <td className="px-2 py-1.5 text-right">{tec.proprias}</td>
-                    <td className="px-2 py-1.5 text-right text-muted-foreground">
-                      {tec.diasTrabalhados}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {tec.meta > 0 ? formatNumero(tec.meta, 1) : "—"}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <span className="flex items-center gap-2">
-                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                {(() => {
+                  const maxHh = Math.max(0, ...rankingTecnicos.map((t) => t.hhMin));
+                  return rankingTecnicos.map((tec, i) => (
+                    <tr
+                      key={tec.tecId}
+                      className="cursor-pointer border-t transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      onClick={() =>
+                        abrirDrill(`O.S. do técnico ${tec.nome}`, (os) =>
+                          os.tecnicos.includes(tec.tecId),
+                        )
+                      }
+                    >
+                      <td className="px-2 py-1.5 text-muted-foreground">{i + 1}</td>
+                      <td className="max-w-[240px] px-2 py-1.5">
+                        <span className="flex items-center gap-2">
                           <span
-                            className="block h-1.5 rounded-full"
-                            style={{
-                              width: `${Math.max(0, Math.min(100, tec.pct ?? 0))}%`,
-                              backgroundColor: corProgresso(tec.pct ?? 0),
-                            }}
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: tec.cor }}
                           />
+                          <span className="truncate font-medium text-slate-700 dark:text-slate-200">
+                            {tec.nome}
+                          </span>
                         </span>
-                        <span className="w-10 shrink-0 text-right font-semibold">
-                          {tec.pct !== null ? `${tec.pct.toFixed(0)}%` : "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-semibold">{tec.participadas}</td>
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">
+                        {tec.diasTrabalhados}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex cursor-help items-center justify-end gap-2">
+                                <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                  <span
+                                    className="block h-1.5 rounded-full bg-emerald-500"
+                                    style={{
+                                      width:
+                                        maxHh > 0
+                                          ? `${Math.max(
+                                              Math.min(100, (tec.hhMin / maxHh) * 100),
+                                              tec.hhMin > 0 ? 4 : 0,
+                                            )}%`
+                                          : "0%",
+                                    }}
+                                  />
+                                </span>
+                                <span className="w-12 shrink-0 text-right font-mono font-semibold text-slate-800 dark:text-slate-100">
+                                  {formatMinutos(tec.hhMin)}
+                                </span>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">
+                              Total de HH apontadas pelo colaborador no período selecionado.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        {tec.meta > 0 ? formatNumero(tec.meta, 1) : "—"}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <span className="flex items-center gap-2">
+                          <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                            <span
+                              className="block h-1.5 rounded-full"
+                              style={{
+                                width: `${Math.max(0, Math.min(100, tec.pct ?? 0))}%`,
+                                backgroundColor: corProgresso(tec.pct ?? 0),
+                              }}
+                            />
+                          </span>
+                          <span className="w-10 shrink-0 text-right font-semibold">
+                            {tec.pct !== null ? `${tec.pct.toFixed(0)}%` : "—"}
+                          </span>
                         </span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           )}
@@ -1808,8 +1823,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                 </div>
                 <div className="text-xs text-amber-600">
                   {destaques.maisProdutiva.exec} OS executadas no período
-                  {destaques.maisProdutiva.pct !== null &&
-                    ` · ${destaques.maisProdutiva.pct.toFixed(0)}% da meta`}
+                  {destaques.maisProdutiva.contribPct !== null &&
+                    ` · ${destaques.maisProdutiva.contribPct.toFixed(0)}% da meta mensal global`}
                 </div>
               </div>
             </CardContent>
@@ -1879,8 +1894,10 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                             Corretivas: <strong>{d.corretivas}</strong>
                           </div>
                           <div className="text-slate-500">
-                            Meta: <strong>{d.meta > 0 ? formatNumero(d.meta, 1) : "—"}</strong>
-                            {d.pct !== null && ` · ${d.pct.toFixed(0)}%`}
+                            Contribuição à meta:{" "}
+                            <strong>
+                              {d.contribPct !== null ? `${d.contribPct.toFixed(0)}%` : "—"}
+                            </strong>
                           </div>
                           <div className="text-slate-500">
                             Técnicos: <strong>{d.tecnicos.length}</strong>
@@ -1949,10 +1966,10 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                               O.S. participadas: <strong>{d.participadas}</strong>
                             </div>
                             <div>
-                              O.S. próprias: <strong>{d.proprias}</strong>
+                              Dias trabalhados: <strong>{d.diasTrabalhados}</strong>
                             </div>
                             <div>
-                              Dias trabalhados: <strong>{d.diasTrabalhados}</strong>
+                              HH trabalhado: <strong>{formatMinutos(d.hhMin)}</strong>
                             </div>
                             <div>
                               Meta: <strong>{d.meta > 0 ? formatNumero(d.meta, 1) : "—"}</strong>
@@ -2044,10 +2061,10 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
             </DialogTitle>
             <DialogDescription>
               {equipeDetalheOs.length} O.S. no período · {equipeDetalhe?.exec || 0} executadas ·{" "}
-              {equipeDetalhe?.corretivas || 0} corretivas ·{" "}
-              {equipeDetalhe?.pct !== null && equipeDetalhe?.pct !== undefined
-                ? `${equipeDetalhe.pct.toFixed(0)}% da meta`
-                : "sem meta individual"}
+              {equipeDetalhe?.corretivas || 0} corretivas
+              {equipeDetalhe?.contribPct !== null && equipeDetalhe?.contribPct !== undefined
+                ? ` · contribui ${equipeDetalhe.contribPct.toFixed(0)}% da meta mensal global`
+                : ""}
             </DialogDescription>
           </DialogHeader>
           <TabelaOs
