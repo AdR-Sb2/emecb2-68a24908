@@ -31,6 +31,7 @@ import {
   Link2Off,
   MapPin,
   AlertTriangle,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,7 @@ import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
 import { toast } from "sonner";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { DashboardComparacao } from "@/components/produtividade-dashboard";
+import { ConfiguracoesDialog } from "@/components/produtividade-configuracoes";
 import logoHeader from "@/assets/logo-branca.png";
 
 import ProdutividadeMap from "@/components/produtividade-map";
@@ -1927,6 +1929,7 @@ function ProdutividadePage() {
   const [selectedDia, setSelectedDia] = useState<FieldDia | null>(null);
   const [tab, setTab] = useState<"dias" | "dashboard">("dias");
   const [gerenciarOpen, setGerenciarOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const [recursosToSave, setRecursosToSave] = useState<Record<string, string>>({});
   const [linkToken, setLinkToken] = useState<string | null>(null);
 
@@ -2174,6 +2177,13 @@ function ProdutividadePage() {
                 <Users className="mr-1 h-4 w-4" /> Gerenciar IDs
               </Button>
               <Button
+                variant="outline"
+                onClick={() => setConfigOpen(true)}
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200"
+              >
+                <Settings className="mr-1 h-4 w-4" /> Configurações
+              </Button>
+              <Button
                 onClick={() => setUploadOpen(true)}
                 className="bg-[#0b3a73] hover:bg-[#002d74]"
               >
@@ -2272,6 +2282,13 @@ function ProdutividadePage() {
         onSaved={loadDias}
         existingDates={existingDates}
         recursosMap={recursosMap}
+      />
+
+      <ConfiguracoesDialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        recursos={recursos}
+        datasExistentes={dias.map((d) => d.data)}
       />
 
       <Dialog
