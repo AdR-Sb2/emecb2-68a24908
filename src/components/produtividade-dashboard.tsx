@@ -521,7 +521,7 @@ export type LinhaTecnico = {
   /** O.S. com atividade própria do colaborador no período. */
   proprias: number;
   diasTrabalhados: number;
-  /** HH das equipes em que o colaborador participou no período, em minutos. */
+  /** HH apontado pelo próprio colaborador no período, em minutos. */
   hhMin: number;
   meta: number;
   pct: number | null;
@@ -972,16 +972,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         for (const e of minhasEqs) for (const t of e.tecnicos) eqSet.add(t);
         const osEq = osDia.filter((os) => os.tecnicos.some((t) => eqSet.has(t)));
         participadas.set(tec, (participadas.get(tec) || 0) + osEq.length);
-        // HH da equipe/unidade de equipe na qual o colaborador participou no dia.
-        let hhDia = 0;
-        for (const os of osEq) {
-          for (const a of os.atividades) {
-            if (a.dia_id === dia.id && eqSet.has(a.id_recurso)) {
-              hhDia += Number(a.duracao_min) || 0;
-            }
-          }
-        }
-        if (hhDia > 0) hhMin.set(tec, (hhMin.get(tec) || 0) + hhDia);
         const mapaDia = equipeDias.get(tec) || new Map<string, number>();
         for (const e of minhasEqs) {
           const chave = equipeChaveFinal(e.nome_equipe, aliases.equipes, aliases.integrantes);
@@ -991,7 +981,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       }
     }
 
-    // O.S. com atividade própria no período (base da média individual).
+    // O.S. com atividade própria + HH individual (apontamentos do próprio ID) no período.
     const proprias = new Map<number, number>();
 
     for (const os of osFiltrado) {
@@ -999,6 +989,10 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       for (const tec of os.tecnicos) {
         if (!membros.has(tec)) continue;
         proprias.set(tec, (proprias.get(tec) || 0) + 1);
+      }
+      for (const a of os.atividades) {
+        const duracao = Number(a.duracao_min) || 0;
+        if (duracao > 0) hhMin.set(a.id_recurso, (hhMin.get(a.id_recurso) || 0) + duracao);
       }
     }
 
@@ -1878,8 +1872,8 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">Ranking de Técnicos</CardTitle>
           <p className="text-[11px] text-slate-500">
-            Meta e % são individuais por colaborador. O.S. e HH são sumarizados pelas equipes em que
-            o colaborador participou no período.
+            Meta, % e HH são individuais por colaborador (por ID). O.S. são sumarizadas pelas
+            equipes em que o colaborador participou no período.
           </p>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -1918,8 +1912,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          Soma do HH apontado pelas equipes em que o colaborador participou no
-                          período.
+                          Total de HH apontadas pelo próprio colaborador (por ID) no período.
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1996,8 +1989,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="left">
-                              Soma do HH apontado pelas equipes em que o colaborador participou no
-                              período.
+                              Total de HH apontadas pelo próprio colaborador (por ID) no período.
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -2189,7 +2181,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                               Dias trabalhados: <strong>{d.diasTrabalhados}</strong>
                             </div>
                             <div>
-                              HH das equipes: <strong>{formatMinutos(d.hhMin)}</strong>
+                              HH do colaborador: <strong>{formatMinutos(d.hhMin)}</strong>
                             </div>
                             <div>
                               Meta: <strong>{d.meta > 0 ? formatNumero(d.meta, 1) : "—"}</strong>
