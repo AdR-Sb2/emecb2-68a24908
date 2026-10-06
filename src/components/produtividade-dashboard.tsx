@@ -165,6 +165,11 @@ const ATIVIDADES_ADMINISTRATIVAS = [
   "REUNIÕES",
   "REUNIAO",
   "TREINAMENTO",
+  "ABASTECIMENTO",
+  "ABASTECIMENTO DE VEÍCULO",
+  "ABASTECIMENTO DE COMBUSTÍVEL",
+  "ABASTECIMENTO DE VEICULO",
+  "REABASTECIMENTO",
 ];
 
 const EQUIPE_COLORS = [
@@ -238,7 +243,11 @@ function normalizeStatus(s: string): string {
 
 function isAtividadeAdministrativa(tipo: string | null | undefined): boolean {
   if (!tipo) return false;
-  return ATIVIDADES_ADMINISTRATIVAS.includes(tipo.toUpperCase().trim());
+  const norm = tipo.toUpperCase().trim();
+  if (ATIVIDADES_ADMINISTRATIVAS.includes(norm)) return true;
+  // Notas de abastecimento não são ordem de serviço de execução.
+  if (norm.startsWith("ABASTECIMENTO")) return true;
+  return false;
 }
 
 function chaveOs(a: FieldAtividade): string {
