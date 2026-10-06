@@ -442,7 +442,8 @@ function agruparAtividades(
     if (!os.categoria) os.categoria = "Outros";
     os.datas.sort();
   }
-  return lista;
+  // Só O.S. vinculadas a pelo menos uma equipe (ordens sem equipe não entram).
+  return lista.filter((os) => os.equipes.length > 0);
 }
 
 function filtrarPorDatas(osList: OsAgrupada[], datas: string[] | Set<string>): OsAgrupada[] {
