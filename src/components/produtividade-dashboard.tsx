@@ -139,6 +139,7 @@ export type OsAgrupada = {
   area: string;
   equipes: string[];
   tecnicos: number[];
+  participantes: number[];
   hhPorTecnico: Record<number, number>;
   atividades: FieldAtividade[];
 };
@@ -427,6 +428,7 @@ function agruparAtividades(
         area: "",
         equipes: [],
         tecnicos: [],
+        participantes: [],
         hhPorTecnico: {},
         atividades: [],
       };
@@ -444,6 +446,10 @@ function agruparAtividades(
     if (!os.area && a.area_trabalho) os.area = a.area_trabalho;
 
     if (!os.tecnicos.includes(a.id_recurso)) os.tecnicos.push(a.id_recurso);
+    const integrantes = integrantesPorRecursoDia.get(a.dia_id)?.get(a.id_recurso);
+    for (const tecnico of integrantes?.size ? integrantes : [a.id_recurso]) {
+      if (!os.participantes.includes(tecnico)) os.participantes.push(tecnico);
+    }
 
     for (const eq of equipesPorDia.get(a.dia_id) || []) {
       if (eq.tecnicos.includes(a.id_recurso) && !os.equipes.includes(eq.chave)) {
@@ -1017,7 +1023,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         const minhasEqs = equipesDia.filter((e) => e.tecnicos.includes(tec));
         const eqSet = new Set<number>();
         for (const e of minhasEqs) for (const t of e.tecnicos) eqSet.add(t);
-        const osEq = osDia.filter((os) => os.tecnicos.some((t) => eqSet.has(t)));
+        const osEq = osDia.filter((os) => os.participantes.some((t) => eqSet.has(t)));
         participadas.set(tec, (participadas.get(tec) || 0) + osEq.length);
         // HH da equipe/unidade de equipe na qual o colaborador participou no dia:
         // quando o horário é apontado sob um integrante, todos da equipe recebem.
@@ -1999,7 +2005,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                       className="cursor-pointer border-t transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
                       onClick={() =>
                         abrirDrill(`O.S. do técnico ${tec.nome}`, (os) =>
-                          os.tecnicos.includes(tec.tecId),
+                          os.participantes.includes(tec.tecId),
                         )
                       }
                     >
@@ -2338,6 +2344,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           <TabelaOs
             linhas={equipeDetalheOs}
             nomeEquipe={nomeDaEquipe}
+            nomeTecnico={(id) => recursosMap.get(id) || `Técnico ${id}`}
             onSelecionar={(os) => setOsDetalhe(os)}
           />
         </DialogContent>
@@ -2356,6 +2363,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           <TabelaOs
             linhas={drillOs}
             nomeEquipe={nomeDaEquipe}
+            nomeTecnico={(id) => recursosMap.get(id) || `Técnico ${id}`}
             onSelecionar={(os) => setOsDetalhe(os)}
           />
         </DialogContent>
@@ -2369,7 +2377,13 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               {osDetalhe ? `${osDetalhe.categoria} · ${osDetalhe.texto || "sem descrição"}` : ""}
             </DialogDescription>
           </DialogHeader>
-          {osDetalhe && <DetalheOs os={osDetalhe} nomeEquipe={nomeDaEquipe} />}
+          {osDetalhe && (
+            <DetalheOs
+              os={osDetalhe}
+              nomeEquipe={nomeDaEquipe}
+              nomeTecnico={(id) => recursosMap.get(id) || `Técnico ${id}`}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -2388,12 +2402,104 @@ function rotuloStatus(os: OsAgrupada): { texto: string; cor: string } {
 function TabelaOs({
   linhas,
   nomeEquipe,
+  nomeTecnico,
   onSelecionar,
 }: {
   linhas: OsAgrupada[];
   nomeEquipe: (chave: string) => string;
+  nomeTecnico: (id: number) => string;
   onSelecionar: (os: OsAgrupada) => void;
 }) {
+  const [busca, setBusca] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [equipeFiltro, setEquipeFiltro] = useState("");
+  const [tecnicoFiltro, setTecnicoFiltro] = useState("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState("");
+  const [plantaFiltro, setPlantaFiltro] = useState("");
+
+  const equipes = useMemo(
+    () =>
+      [...new Set(linhas.flatMap((os) => os.equipes))].sort((a, b) =>
+        nomeEquipe(a).localeCompare(nomeEquipe(b), "pt-BR"),
+      ),
+    [linhas, nomeEquipe],
+  );
+  const tecnicos = useMemo(
+    () =>
+      [...new Set(linhas.flatMap((os) => os.participantes))].sort((a, b) =>
+        nomeTecnico(a).localeCompare(nomeTecnico(b), "pt-BR"),
+      ),
+    [linhas, nomeTecnico],
+  );
+  const categorias = useMemo(
+    () =>
+      [...new Set(linhas.map((os) => os.categoria))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [linhas],
+  );
+  const plantas = useMemo(
+    () =>
+      [...new Set(linhas.map((os) => os.planta).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
+    [linhas],
+  );
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase("pt-BR");
+    return linhas.filter((os) => {
+      const status = rotuloStatus(os).texto;
+      const textoBusca = [
+        os.om,
+        os.texto,
+        os.planta,
+        os.categoria,
+        ...os.equipes.map(nomeEquipe),
+        ...os.participantes.map(nomeTecnico),
+        ...os.participantes,
+      ]
+        .join(" ")
+        .toLocaleLowerCase("pt-BR");
+      const dentroDoPeriodo =
+        (!dataInicio && !dataFim) ||
+        os.datas.some(
+          (data) => (!dataInicio || data >= dataInicio) && (!dataFim || data <= dataFim),
+        );
+      return (
+        (!termo || textoBusca.includes(termo)) &&
+        dentroDoPeriodo &&
+        (!equipeFiltro || os.equipes.includes(equipeFiltro)) &&
+        (!tecnicoFiltro || os.participantes.includes(Number(tecnicoFiltro))) &&
+        (!categoriaFiltro || os.categoria === categoriaFiltro) &&
+        (!statusFiltro || status === statusFiltro) &&
+        (!plantaFiltro || os.planta === plantaFiltro)
+      );
+    });
+  }, [
+    linhas,
+    busca,
+    dataInicio,
+    dataFim,
+    equipeFiltro,
+    tecnicoFiltro,
+    categoriaFiltro,
+    statusFiltro,
+    plantaFiltro,
+    nomeEquipe,
+    nomeTecnico,
+  ]);
+
+  const filtroCls =
+    "h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground";
+  const temFiltro =
+    busca ||
+    dataInicio ||
+    dataFim ||
+    equipeFiltro ||
+    tecnicoFiltro ||
+    categoriaFiltro ||
+    statusFiltro ||
+    plantaFiltro;
   if (linhas.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-slate-400">
@@ -2402,84 +2508,238 @@ function TabelaOs({
     );
   }
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-left text-xs">
-        <thead className="bg-muted/50 text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2">Data</th>
-            <th className="px-3 py-2">O.S.</th>
-            <th className="px-3 py-2">Equipe</th>
-            <th className="px-3 py-2">Categoria</th>
-            <th className="px-3 py-2">Atividade</th>
-            <th className="px-3 py-2 text-right">HH</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Planta</th>
-          </tr>
-        </thead>
-        <tbody>
-          {linhas.map((os) => {
-            const status = rotuloStatus(os);
-            return (
-              <tr
-                key={os.key}
-                className="cursor-pointer border-t transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                onClick={() => onSelecionar(os)}
-              >
-                <td className="whitespace-nowrap px-3 py-2">
-                  {os.datas.length === 0
-                    ? "—"
-                    : os.datas.length === 1
-                      ? formatDataBR(os.datas[0])
-                      : `${formatDataBR(os.datas[0])} (+${os.datas.length - 1})`}
-                </td>
-                <td className="px-3 py-2 font-mono">{os.om || "—"}</td>
-                <td className="max-w-[160px] px-3 py-2">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor: os.equipes[0]
-                          ? getEquipeColor(os.equipes[0]).hex
-                          : "#cbd5e1",
-                      }}
-                    />
-                    <span className="truncate">
-                      {os.equipes.length > 0
-                        ? os.equipes.map((c) => nomeEquipe(c)).join(" / ")
-                        : "—"}
-                    </span>
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                    style={{ backgroundColor: corCategoria(os.categoria) }}
-                  >
-                    {os.categoria}
-                  </span>
-                </td>
-                <td className="max-w-[240px] px-3 py-2">
-                  <span className="block truncate">{os.texto || "—"}</span>
-                </td>
-                <td className="px-3 py-2 text-right font-mono">{formatMinutos(os.hh)}</td>
-                <td className={`whitespace-nowrap px-3 py-2 font-medium ${status.cor}`}>
-                  {status.texto}
-                </td>
-                <td className="max-w-[140px] px-3 py-2">
-                  <span className="block truncate">{os.planta || "—"}</span>
-                </td>
+    <div className="space-y-3">
+      <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2 lg:grid-cols-4">
+        <input
+          className={filtroCls}
+          placeholder="Buscar O.S., atividade, técnico..."
+          value={busca}
+          onChange={(event) => setBusca(event.target.value)}
+        />
+        <select
+          className={filtroCls}
+          value={equipeFiltro}
+          onChange={(event) => setEquipeFiltro(event.target.value)}
+        >
+          <option value="">Todas as equipes</option>
+          {equipes.map((chave) => (
+            <option key={chave} value={chave}>
+              {nomeEquipe(chave)}
+            </option>
+          ))}
+        </select>
+        <select
+          className={filtroCls}
+          value={tecnicoFiltro}
+          onChange={(event) => setTecnicoFiltro(event.target.value)}
+        >
+          <option value="">Todos os técnicos</option>
+          {tecnicos.map((id) => (
+            <option key={id} value={id}>
+              {nomeTecnico(id)}
+            </option>
+          ))}
+        </select>
+        <select
+          className={filtroCls}
+          value={categoriaFiltro}
+          onChange={(event) => setCategoriaFiltro(event.target.value)}
+        >
+          <option value="">Todas as categorias</option>
+          {categorias.map((categoria) => (
+            <option key={categoria} value={categoria}>
+              {categoria}
+            </option>
+          ))}
+        </select>
+        <select
+          className={filtroCls}
+          value={statusFiltro}
+          onChange={(event) => setStatusFiltro(event.target.value)}
+        >
+          <option value="">Todos os status</option>
+          {["Executada", "Pendente", "Suspensa", "Cancelada"].map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+        <select
+          className={filtroCls}
+          value={plantaFiltro}
+          onChange={(event) => setPlantaFiltro(event.target.value)}
+        >
+          <option value="">Todas as plantas</option>
+          {plantas.map((planta) => (
+            <option key={planta} value={planta}>
+              {planta}
+            </option>
+          ))}
+        </select>
+        <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="shrink-0">De</span>
+          <input
+            className={`${filtroCls} w-full`}
+            type="date"
+            value={dataInicio}
+            onChange={(event) => setDataInicio(event.target.value)}
+          />
+        </label>
+        <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="shrink-0">Até</span>
+          <input
+            className={`${filtroCls} w-full`}
+            type="date"
+            value={dataFim}
+            onChange={(event) => setDataFim(event.target.value)}
+          />
+        </label>
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
+          <span>
+            Exibindo {filtradas.length} de {linhas.length} O.S.
+          </span>
+          {temFiltro && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setBusca("");
+                setDataInicio("");
+                setDataFim("");
+                setEquipeFiltro("");
+                setTecnicoFiltro("");
+                setCategoriaFiltro("");
+                setStatusFiltro("");
+                setPlantaFiltro("");
+              }}
+            >
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+      </div>
+      {filtradas.length === 0 ? (
+        <p className="py-8 text-center text-sm text-slate-400">
+          Nenhuma O.S. encontrada com os filtros selecionados.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">Data</th>
+                <th className="px-3 py-2">O.S.</th>
+                <th className="px-3 py-2">Equipe</th>
+                <th className="px-3 py-2">Categoria</th>
+                <th className="px-3 py-2">Atividade</th>
+                <th className="px-3 py-2 text-right">HH</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Planta</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {filtradas.map((os) => {
+                const status = rotuloStatus(os);
+                return (
+                  <tr
+                    key={os.key}
+                    className="cursor-pointer border-t transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    onClick={() => onSelecionar(os)}
+                  >
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {os.datas.length === 0
+                        ? "—"
+                        : os.datas.length === 1
+                          ? formatDataBR(os.datas[0])
+                          : `${formatDataBR(os.datas[0])} (+${os.datas.length - 1})`}
+                    </td>
+                    <td className="px-3 py-2 font-mono">{os.om || "—"}</td>
+                    <td className="max-w-[160px] px-3 py-2">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: os.equipes[0]
+                              ? getEquipeColor(os.equipes[0]).hex
+                              : "#cbd5e1",
+                          }}
+                        />
+                        <span className="truncate">
+                          {os.equipes.length > 0
+                            ? os.equipes.map((c) => nomeEquipe(c)).join(" / ")
+                            : "—"}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ backgroundColor: corCategoria(os.categoria) }}
+                      >
+                        {os.categoria}
+                      </span>
+                    </td>
+                    <td className="max-w-[240px] px-3 py-2">
+                      <span className="block truncate">{os.texto || "—"}</span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">{formatMinutos(os.hh)}</td>
+                    <td className={`whitespace-nowrap px-3 py-2 font-medium ${status.cor}`}>
+                      {status.texto}
+                    </td>
+                    <td className="max-w-[140px] px-3 py-2">
+                      <span className="block truncate">{os.planta || "—"}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
-function DetalheOs({ os, nomeEquipe }: { os: OsAgrupada; nomeEquipe: (chave: string) => string }) {
+function DetalheOs({
+  os,
+  nomeEquipe,
+  nomeTecnico,
+}: {
+  os: OsAgrupada;
+  nomeEquipe: (chave: string) => string;
+  nomeTecnico: (id: number) => string;
+}) {
+  const [buscaAtividade, setBuscaAtividade] = useState("");
+  const [tecnicoFiltro, setTecnicoFiltro] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState("");
   const status = rotuloStatus(os);
-  const linhas = [...os.atividades].sort((a, b) => a.id - b.id);
+  const linhas = useMemo(() => {
+    const termo = buscaAtividade.trim().toLocaleLowerCase("pt-BR");
+    return [...os.atividades]
+      .filter((atividade) => {
+        const nome = nomeTecnico(atividade.id_recurso);
+        const texto =
+          `${atividade.tipo_atividade} ${atividade.texto_breve} ${atividade.id_recurso} ${nome}`.toLocaleLowerCase(
+            "pt-BR",
+          );
+        return (
+          (!termo || texto.includes(termo)) &&
+          (!tecnicoFiltro || atividade.id_recurso === Number(tecnicoFiltro)) &&
+          (!statusFiltro || normalizeStatus(atividade.status) === statusFiltro)
+        );
+      })
+      .sort((a, b) => a.id - b.id);
+  }, [os.atividades, buscaAtividade, tecnicoFiltro, statusFiltro, nomeTecnico]);
+  const filtroCls =
+    "h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground";
+  const tecnicos = [...new Set(os.atividades.map((atividade) => atividade.id_recurso))].sort(
+    (a, b) => nomeTecnico(a).localeCompare(nomeTecnico(b), "pt-BR"),
+  );
+  const statusAtividades = [
+    ...new Set(os.atividades.map((atividade) => normalizeStatus(atividade.status)).filter(Boolean)),
+  ];
+  const temFiltroAtividade = buscaAtividade || tecnicoFiltro || statusFiltro;
   return (
     <div className="space-y-4">
       <div className="grid gap-2 sm:grid-cols-3">
@@ -2525,7 +2785,7 @@ function DetalheOs({ os, nomeEquipe }: { os: OsAgrupada; nomeEquipe: (chave: str
           Técnicos envolvidos
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {os.tecnicos.map((t) => (
+          {os.participantes.map((t) => (
             <span
               key={t}
               className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
@@ -2536,40 +2796,101 @@ function DetalheOs({ os, nomeEquipe }: { os: OsAgrupada; nomeEquipe: (chave: str
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-muted/50 text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">Atividade</th>
-              <th className="px-3 py-2">Técnico</th>
-              <th className="px-3 py-2">Início</th>
-              <th className="px-3 py-2">Fim</th>
-              <th className="px-3 py-2 text-right">Duração</th>
-              <th className="px-3 py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linhas.map((a) => (
-              <tr key={a.id} className="border-t">
-                <td className="max-w-[260px] px-3 py-2">
-                  <span className="block truncate">{a.tipo_atividade || a.texto_breve || "—"}</span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">{a.id_recurso}</td>
-                <td className="whitespace-nowrap px-3 py-2 font-mono">
-                  {a.inicio ? a.inicio.slice(11, 16) : "—"}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 font-mono">
-                  {a.fim ? a.fim.slice(11, 16) : "—"}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono">
-                  {formatMinutos(Number(a.duracao_min) || 0)}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">{normalizeStatus(a.status) || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <input
+          className={filtroCls}
+          placeholder="Buscar atividade ou técnico..."
+          value={buscaAtividade}
+          onChange={(event) => setBuscaAtividade(event.target.value)}
+        />
+        <select
+          className={filtroCls}
+          value={tecnicoFiltro}
+          onChange={(event) => setTecnicoFiltro(event.target.value)}
+        >
+          <option value="">Todos os técnicos</option>
+          {tecnicos.map((id) => (
+            <option key={id} value={id}>
+              {nomeTecnico(id)}
+            </option>
+          ))}
+        </select>
+        <select
+          className={filtroCls}
+          value={statusFiltro}
+          onChange={(event) => setStatusFiltro(event.target.value)}
+        >
+          <option value="">Todos os status</option>
+          {statusAtividades.map((valor) => (
+            <option key={valor} value={valor}>
+              {valor}
+            </option>
+          ))}
+        </select>
       </div>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          Exibindo {linhas.length} de {os.atividades.length} atividade(s)
+        </span>
+        {temFiltroAtividade && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setBuscaAtividade("");
+              setTecnicoFiltro("");
+              setStatusFiltro("");
+            }}
+          >
+            Limpar filtros
+          </Button>
+        )}
+      </div>
+      {linhas.length === 0 ? (
+        <p className="py-8 text-center text-sm text-slate-400">
+          Nenhuma atividade encontrada com os filtros selecionados.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">Atividade</th>
+                <th className="px-3 py-2">Técnico</th>
+                <th className="px-3 py-2">Início</th>
+                <th className="px-3 py-2">Fim</th>
+                <th className="px-3 py-2 text-right">Duração</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((a) => (
+                <tr key={a.id} className="border-t">
+                  <td className="max-w-[260px] px-3 py-2">
+                    <span className="block truncate">
+                      {a.tipo_atividade || a.texto_breve || "—"}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">{nomeTecnico(a.id_recurso)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono">
+                    {a.inicio ? a.inicio.slice(11, 16) : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono">
+                    {a.fim ? a.fim.slice(11, 16) : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-mono">
+                    {formatMinutos(Number(a.duracao_min) || 0)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {normalizeStatus(a.status) || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
