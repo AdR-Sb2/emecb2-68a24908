@@ -282,8 +282,8 @@ export function ConfiguracoesDialog({
                 {idsSemMeta.length > 0 && (
                   <p className="mt-1.5 flex items-start gap-1 text-[11px] text-amber-600">
                     <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    {idsSemMeta.length} colaborador(es) sem meta individual — eles não entram na
-                    soma da meta da equipe e aparecem com “—” no % de meta.
+                    {idsSemMeta.length} colaborador(es) sem meta individual — eles usam a quota
+                    proporcional da meta mensal global como referência no % de meta.
                   </p>
                 )}
               </section>
