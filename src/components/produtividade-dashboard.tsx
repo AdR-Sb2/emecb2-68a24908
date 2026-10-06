@@ -671,10 +671,21 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     [atividades, diaPorId, equipes, aliases.equipes, aliases.integrantes],
   );
 
-  const osPeriodo = useMemo(
-    () => filtrarPorDatas(osAgrupadas, datasPeriodoSet),
-    [osAgrupadas, datasPeriodoSet],
-  );
+  const osPeriodo = useMemo(() => {
+    // Agrupa apenas atividades dos dias do período: O.S. executadas fora dos
+    // dias importados não entram na apuração do período.
+    const atividadesPeriodo = atividades.filter((a) => {
+      const d = diaPorId.get(a.dia_id);
+      return !!d && datasPeriodoSet.has(d.data);
+    });
+    return agruparAtividades(
+      atividadesPeriodo,
+      diaPorId,
+      equipes,
+      aliases.equipes,
+      aliases.integrantes,
+    );
+  }, [atividades, diaPorId, datasPeriodoSet, equipes, aliases.equipes, aliases.integrantes]);
   const metricasPeriodo = useMemo(() => calcularMetricas(osPeriodo), [osPeriodo]);
 
   const diasComDadosPeriodo = useMemo(
@@ -882,7 +893,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       if (!datasPeriodoSet.has(dia.data)) continue;
       const equipesDia = equipes.filter((e) => e.dia_id === dia.id);
       if (equipesDia.length === 0) continue;
-      const osDia = osAgrupadas.filter((os) => os.concluida && os.datas.includes(dia.data));
+      const osDia = osPeriodo.filter((os) => os.concluida && os.datas.includes(dia.data));
 
       const tecsDia = new Set<number>();
       for (const e of equipesDia) for (const t of e.tecnicos) tecsDia.add(t);
@@ -954,7 +965,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     dias,
     datasPeriodoSet,
     equipes,
-    osAgrupadas,
     osPeriodo,
     diaPorId,
     cfg,
@@ -969,7 +979,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     return dias
       .filter((d) => datasPeriodoSet.has(d.data))
       .map((d) => {
-        const doDia = osAgrupadas.filter((os) => os.datas.includes(d.data));
+        const doDia = osPeriodo.filter((os) => os.datas.includes(d.data));
         const porEquipe = new Map<string, number>();
         for (const os of doDia) {
           if (!os.concluida) continue;
@@ -990,7 +1000,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         };
       })
       .reverse();
-  }, [dias, datasPeriodoSet, osAgrupadas, rotulosEquipe]);
+  }, [dias, datasPeriodoSet, osPeriodo, rotulosEquipe]);
 
   const composicaoPorDia = useMemo(() => {
     return dias
@@ -999,7 +1009,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         const row: Record<string, number | string> = { data: d.data.slice(5) };
         for (const cat of CATEGORIAS) row[cat] = 0;
         const vistos = new Set<string>();
-        for (const os of osAgrupadas) {
+        for (const os of osPeriodo) {
           if (!os.datas.includes(d.data) || vistos.has(os.key)) continue;
           vistos.add(os.key);
           row[os.categoria] = (row[os.categoria] as number) + 1;
@@ -1007,7 +1017,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         return row;
       })
       .reverse();
-  }, [dias, datasPeriodoSet, osAgrupadas]);
+  }, [dias, datasPeriodoSet, osPeriodo]);
 
   // ── Alertas ────────────────────────────────────────────────
   const alertaCorretivas = useMemo<Alerta | null>(() => {
