@@ -95,51 +95,49 @@ function PublicoProdutividadePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 dark:bg-slate-900 md:p-6">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <img
-                src={logoHeader}
-                alt="Águas do Rio"
-                className="h-12 w-auto object-contain"
-                loading="eager"
-              />
-              <div className="text-white">
-                <p className="text-lg font-semibold">Dashboard de Produtividade</p>
-                <p className="text-sm text-cyan-50/90">Compartilhado · visualização pública</p>
-              </div>
+      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <img
+              src={logoHeader}
+              alt="Águas do Rio"
+              className="h-12 w-auto object-contain"
+              loading="eager"
+            />
+            <div className="text-white">
+              <p className="text-lg font-semibold">Dashboard de Produtividade</p>
+              <p className="text-sm text-cyan-50/90">Compartilhado · visualização pública</p>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px] font-semibold text-cyan-50">
-              <BarChart3 className="h-3.5 w-3.5" /> Sem necessidade de login
-            </span>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium text-cyan-100">Filtrar por dia:</span>
-            <select
-              value={dia}
-              onChange={(e) => mudarDia(e.target.value)}
-              className="min-h-7 rounded-md border border-white/20 bg-white/10 px-2 text-[11px] text-white outline-none focus:bg-white/20"
-            >
-              <option value="">Todos os dias</option>
-              {datas.map((d) => (
-                <option key={d} value={d} className="text-slate-800">
-                  {diaBR(d)}
-                </option>
-              ))}
-            </select>
-            {dia && (
-              <button
-                onClick={() => mudarDia("")}
-                className="text-[10px] text-cyan-100 underline hover:text-white"
-              >
-                Limpar filtro
-              </button>
-            )}
-          </div>
+          <span className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px] font-semibold text-cyan-50">
+            <BarChart3 className="h-3.5 w-3.5" /> Sem necessidade de login
+          </span>
         </div>
-        <DashboardComparacao key={dia || "todos"} diaInicial={dia || undefined} />
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-cyan-100">Filtrar por dia:</span>
+          <select
+            value={dia}
+            onChange={(e) => mudarDia(e.target.value)}
+            className="min-h-7 rounded-md border border-white/20 bg-white/10 px-2 text-[11px] text-white outline-none focus:bg-white/20"
+          >
+            <option value="">Todos os dias</option>
+            {datas.map((d) => (
+              <option key={d} value={d} className="text-slate-800">
+                {diaBR(d)}
+              </option>
+            ))}
+          </select>
+          {dia && (
+            <button
+              onClick={() => mudarDia("")}
+              className="text-[10px] text-cyan-100 underline hover:text-white"
+            >
+              Limpar filtro
+            </button>
+          )}
+        </div>
       </div>
+      <DashboardComparacao key={dia || "todos"} diaInicial={dia || undefined} />
     </div>
   );
 }
