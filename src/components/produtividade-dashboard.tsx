@@ -26,6 +26,7 @@ import {
   Loader2,
   Pause,
   Play,
+  RefreshCw,
   Target,
   Trophy,
   Users,
@@ -111,7 +112,13 @@ export type FieldAtividade = {
   cidade: string;
 };
 
-export type Periodo = { type: "day" | "7" | "30" | "mes"; date?: string; mes?: string };
+export type Periodo = {
+  type: "day" | "7" | "30" | "mes" | "custom";
+  date?: string;
+  mes?: string;
+  inicio?: string;
+  fim?: string;
+};
 
 /** O.S. agrupada por OM/ID com status, HH, categoria e vínculos. */
 export type OsAgrupada = {
@@ -302,6 +309,7 @@ function datasDoPeriodo(periodo: Periodo): string[] {
   if (periodo.type === "day") return periodo.date ? [periodo.date] : [];
   if (periodo.type === "7") return rangeDatas(adicionarDias(hoje, -6), hoje);
   if (periodo.type === "30") return rangeDatas(adicionarDias(hoje, -29), hoje);
+  if (periodo.type === "custom") return rangeDatas(periodo.inicio || "", periodo.fim || "");
   const [a, m] = periodo.mes
     ? periodo.mes.split("-").map(Number)
     : [Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7))];
@@ -538,6 +546,11 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   const [periodo, setPeriodo] = useState<Periodo>(() =>
     diaInicial ? { type: "day", date: diaInicial } : { type: "7" },
   );
+  const [filtroEquipe, setFiltroEquipe] = useState("");
+  const [filtroTecnico, setFiltroTecnico] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroLocal, setFiltroLocal] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [podeUnificarEquipes, setPodeUnificarEquipes] = useState(false);
   const [unificarAberto, setUnificarAberto] = useState(false);
@@ -651,7 +664,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     return () => {
       ativo = false;
     };
-  }, [periodo]);
+  }, [periodo, refreshKey]);
 
   // Rotação automática da comparação secundária dos KPIs.
   useEffect(() => {
@@ -696,7 +709,22 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       aliases.integrantes,
     );
   }, [atividades, diaPorId, datasPeriodoSet, equipes, aliases.equipes, aliases.integrantes]);
-  const metricasPeriodo = useMemo(() => calcularMetricas(osPeriodo), [osPeriodo]);
+
+  // Filtros adicionais (equipe, técnico, tipo de OS e local) aplicados sobre
+  // as O.S. do período. Todos os cálculos abaixo passam a usar esta lista.
+  const osFiltrado = useMemo(() => {
+    let lista = osPeriodo;
+    if (filtroEquipe) lista = lista.filter((os) => os.equipes.includes(filtroEquipe));
+    if (filtroTecnico) {
+      const id = Number(filtroTecnico);
+      lista = lista.filter((os) => os.tecnicos.includes(id));
+    }
+    if (filtroTipo) lista = lista.filter((os) => os.categoria === filtroTipo);
+    if (filtroLocal) lista = lista.filter((os) => os.planta === filtroLocal);
+    return lista;
+  }, [osPeriodo, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal]);
+
+  const metricasPeriodo = useMemo(() => calcularMetricas(osFiltrado), [osFiltrado]);
 
   const diasComDadosPeriodo = useMemo(
     () => dias.filter((d) => datasPeriodoSet.has(d.data)).length,
@@ -789,6 +817,29 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
 
   const nomeDaEquipe = (chave: string) => rotulosEquipe.get(chave)?.nome || chave || "Sem equipe";
 
+  // ── Opções dos filtros da barra superior ───────────────────
+  const opcoesEquipe = useMemo(
+    () =>
+      [...rotulosEquipe.entries()]
+        .map(([chave, v]) => ({ chave, nome: v.nome }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    [rotulosEquipe],
+  );
+
+  const opcoesTecnico = useMemo(
+    () =>
+      [...recursosList]
+        .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"))
+        .map((r) => ({ id: r.id_recurso, nome: r.nome || `Técnico ${r.id_recurso}` })),
+    [recursosList],
+  );
+
+  const opcoesLocal = useMemo(() => {
+    const vistos = new Set<string>();
+    for (const os of osPeriodo) if (os.planta) vistos.add(os.planta);
+    return [...vistos].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [osPeriodo]);
+
   // ── Ranking de equipes (com meta individual) ───────────────
   const rankingEquipes = useMemo<LinhaEquipe[]>(() => {
     const info = new Map<
@@ -845,7 +896,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     for (const chave of info.keys()) {
       contagem.set(chave, { exec: 0, susp: 0, canc: 0, total: 0, corretivas: 0 });
     }
-    for (const os of osPeriodo) {
+    for (const os of osFiltrado) {
       for (const chave of os.equipes) {
         const c = contagem.get(chave);
         if (!c) continue;
@@ -885,7 +936,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     equipes,
     diaPorId,
     datasPeriodoSet,
-    osPeriodo,
+    osFiltrado,
     aliases.equipes,
     aliases.integrantes,
     metaTotal,
@@ -899,18 +950,23 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     const equipeDias = new Map<number, Map<string, number>>();
     const participadas = new Map<number, number>();
     const hhMin = new Map<number, number>();
+    const diasSet = new Map<number, Set<string>>();
 
     for (const dia of dias) {
       if (!datasPeriodoSet.has(dia.data)) continue;
       const equipesDia = equipes.filter((e) => e.dia_id === dia.id);
       if (equipesDia.length === 0) continue;
-      const osDia = osPeriodo.filter((os) => os.concluida && os.datas.includes(dia.data));
+      const osDia = osFiltrado.filter((os) => os.concluida && os.datas.includes(dia.data));
 
       const tecsDia = new Set<number>();
       for (const e of equipesDia) for (const t of e.tecnicos) tecsDia.add(t);
 
       for (const tec of tecsDia) {
         membros.add(tec);
+        // Dias trabalhados = dia em que o colaborador participa de equipe no período.
+        const setD = diasSet.get(tec) || new Set<string>();
+        setD.add(dia.data);
+        diasSet.set(tec, setD);
         const minhasEqs = equipesDia.filter((e) => e.tecnicos.includes(tec));
         const eqSet = new Set<number>();
         for (const e of minhasEqs) for (const t of e.tecnicos) eqSet.add(t);
@@ -935,18 +991,14 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       }
     }
 
-    // O.S. com atividade própria + dias distintos com atividade/OS no período.
-    const diasSet = new Map<number, Set<string>>();
+    // O.S. com atividade própria no período (base da média individual).
     const proprias = new Map<number, number>();
 
-    for (const os of osPeriodo) {
+    for (const os of osFiltrado) {
       if (!os.concluida) continue;
       for (const tec of os.tecnicos) {
         if (!membros.has(tec)) continue;
         proprias.set(tec, (proprias.get(tec) || 0) + 1);
-        const setD = diasSet.get(tec) || new Set<string>();
-        for (const d of os.datas) if (datasPeriodoSet.has(d)) setD.add(d);
-        diasSet.set(tec, setD);
       }
     }
 
@@ -982,7 +1034,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     dias,
     datasPeriodoSet,
     equipes,
-    osPeriodo,
+    osFiltrado,
     cfg,
     datasPeriodo,
     metaTotal,
@@ -996,7 +1048,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     return dias
       .filter((d) => datasPeriodoSet.has(d.data))
       .map((d) => {
-        const doDia = osPeriodo.filter((os) => os.datas.includes(d.data));
+        const doDia = osFiltrado.filter((os) => os.datas.includes(d.data));
         const porEquipe = new Map<string, number>();
         for (const os of doDia) {
           if (!os.concluida) continue;
@@ -1017,7 +1069,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         };
       })
       .reverse();
-  }, [dias, datasPeriodoSet, osPeriodo, rotulosEquipe]);
+  }, [dias, datasPeriodoSet, osFiltrado, rotulosEquipe]);
 
   const composicaoPorDia = useMemo(() => {
     return dias
@@ -1026,7 +1078,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         const row: Record<string, number | string> = { data: d.data.slice(5) };
         for (const cat of CATEGORIAS) row[cat] = 0;
         const vistos = new Set<string>();
-        for (const os of osPeriodo) {
+        for (const os of osFiltrado) {
           if (!os.datas.includes(d.data) || vistos.has(os.key)) continue;
           vistos.add(os.key);
           row[os.categoria] = (row[os.categoria] as number) + 1;
@@ -1034,7 +1086,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         return row;
       })
       .reverse();
-  }, [dias, datasPeriodoSet, osPeriodo]);
+  }, [dias, datasPeriodoSet, osFiltrado]);
 
   // ── Alertas ────────────────────────────────────────────────
   const alertaCorretivas = useMemo<Alerta | null>(() => {
@@ -1093,17 +1145,17 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
 
   const equipeDetalheOs = useMemo(() => {
     if (!equipeDetalhe) return [];
-    return osPeriodo
+    return osFiltrado
       .filter((os) => os.equipes.includes(equipeDetalhe.chave))
       .sort((a, b) => (b.datas.at(-1) || "").localeCompare(a.datas.at(-1) || "") || a.om - b.om);
-  }, [equipeDetalhe, osPeriodo]);
+  }, [equipeDetalhe, osFiltrado]);
 
   const drillOs = useMemo(() => {
     if (!drill) return [];
-    return osPeriodo
+    return osFiltrado
       .filter(drill.filtro)
       .sort((a, b) => (b.datas.at(-1) || "").localeCompare(a.datas.at(-1) || "") || a.om - b.om);
-  }, [drill, osPeriodo]);
+  }, [drill, osFiltrado]);
 
   if (loading) {
     return (
@@ -1123,9 +1175,13 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
             periodo.mes ||
               `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
           )
-        : periodo.type === "7"
-          ? "últimos 7 dias"
-          : "últimos 30 dias";
+        : periodo.type === "custom"
+          ? periodo.inicio && periodo.fim
+            ? `${formatDataBR(periodo.inicio)} – ${formatDataBR(periodo.fim)}`
+            : "—"
+          : periodo.type === "7"
+            ? "últimos 7 dias"
+            : "últimos 30 dias";
 
   const nEquipesPeriodo = rankingEquipes.length || 1;
   const mediaOsDia = diasPeriodoEfetivos > 0 ? metricasPeriodo.osExec / diasPeriodoEfetivos : 0;
@@ -1173,57 +1229,164 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
 
   return (
     <div className="space-y-6">
-      {/* ── Controles: período ─────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-slate-500">Período:</span>
-        {(["day", "7", "30", "mes"] as const).map((p) => (
-          <Button
-            key={p}
-            variant={periodo.type === p ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-[11px]"
-            onClick={() => setPeriodo({ type: p, date: periodo.date, mes: periodo.mes })}
-          >
-            {p === "day"
-              ? "Dia específico"
-              : p === "7"
-                ? "Últimos 7 dias"
-                : p === "30"
-                  ? "Últimos 30 dias"
-                  : "Mês"}
-          </Button>
-        ))}
-        {periodo.type === "mes" && (
-          <select
-            value={periodo.mes || ""}
-            onChange={(e) => setPeriodo({ type: "mes", mes: e.target.value })}
-            className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
-          >
-            <option value="">
-              Mês atual ({new Date().getMonth() + 1}/{new Date().getFullYear()})
-            </option>
-            {mesesDisponiveis.map((m) => (
-              <option key={m} value={m}>
-                {formatMesBR(m)}
-              </option>
+      {/* ── Barra de filtros ───────────────────────────────── */}
+      <Card className="shadow-sm">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              Período:
+            </span>
+            {(
+              [
+                { key: "day", rotulo: "Hoje" },
+                { key: "7", rotulo: "7 dias" },
+                { key: "30", rotulo: "30 dias" },
+                { key: "mes", rotulo: "Mês" },
+                { key: "custom", rotulo: "Personalizado" },
+              ] as const
+            ).map((p) => (
+              <Button
+                key={p.key}
+                variant={periodo.type === p.key ? "default" : "outline"}
+                size="sm"
+                className={`h-7 text-[11px] ${
+                  periodo.type === p.key ? "bg-[#0b3a73] hover:bg-[#002d74]" : ""
+                }`}
+                onClick={() => {
+                  if (p.key === "day") setPeriodo({ type: "day", date: hojeISO() });
+                  else if (p.key === "custom")
+                    setPeriodo({
+                      type: "custom",
+                      inicio:
+                        periodo.type === "custom"
+                          ? periodo.inicio || ""
+                          : adicionarDias(hojeISO(), -6),
+                      fim: periodo.type === "custom" ? periodo.fim || "" : hojeISO(),
+                    });
+                  else setPeriodo({ type: p.key } as Periodo);
+                }}
+              >
+                {p.rotulo}
+              </Button>
             ))}
-          </select>
-        )}
-        {periodo.type === "day" && (
-          <select
-            value={periodo.date || ""}
-            onChange={(e) => setPeriodo({ type: "day", date: e.target.value })}
-            className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
-          >
-            <option value="">Selecione um dia…</option>
-            {todasDatas.map((d) => (
-              <option key={d} value={d}>
-                {formatDataBR(d)}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+            {periodo.type === "day" && (
+              <input
+                type="date"
+                value={periodo.date || ""}
+                onChange={(e) => setPeriodo({ type: "day", date: e.target.value })}
+                className="h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+              />
+            )}
+            {periodo.type === "mes" && (
+              <select
+                value={periodo.mes || ""}
+                onChange={(e) => setPeriodo({ type: "mes", mes: e.target.value })}
+                className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+              >
+                <option value="">
+                  Mês atual ({new Date().getMonth() + 1}/{new Date().getFullYear()})
+                </option>
+                {mesesDisponiveis.map((m) => (
+                  <option key={m} value={m}>
+                    {formatMesBR(m)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {periodo.type === "custom" && (
+              <>
+                <span className="text-xs text-slate-500">de</span>
+                <input
+                  type="date"
+                  value={periodo.inicio || ""}
+                  onChange={(e) =>
+                    setPeriodo({ type: "custom", inicio: e.target.value, fim: periodo.fim })
+                  }
+                  className="h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+                />
+                <span className="text-xs text-slate-500">até</span>
+                <input
+                  type="date"
+                  value={periodo.fim || ""}
+                  onChange={(e) =>
+                    setPeriodo({ type: "custom", inicio: periodo.inicio, fim: e.target.value })
+                  }
+                  className="h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+                />
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={filtroEquipe}
+              onChange={(e) => setFiltroEquipe(e.target.value)}
+              className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+            >
+              <option value="">Equipe: Todas</option>
+              {opcoesEquipe.map((o) => (
+                <option key={o.chave} value={o.chave}>
+                  {o.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroTecnico}
+              onChange={(e) => setFiltroTecnico(e.target.value)}
+              className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+            >
+              <option value="">Técnico: Todos</option>
+              {opcoesTecnico.map((o) => (
+                <option key={o.id} value={String(o.id)}>
+                  {o.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+            >
+              <option value="">Tipo de OS: Todos</option>
+              {CATEGORIAS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroLocal}
+              onChange={(e) => setFiltroLocal(e.target.value)}
+              className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+            >
+              <option value="">Local / Elevatória: Todos</option>
+              {opcoesLocal.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+            <span className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              disabled={loading}
+              onClick={() => {
+                setLoading(true);
+                setRefreshKey((k) => k + 1);
+              }}
+            >
+              {loading ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1 h-3.5 w-3.5" />
+              )}
+              Atualizar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Controles: comparação cíclica ──────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
@@ -1254,7 +1417,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       </div>
 
       {/* ── Alertas ────────────────────────────────────────── */}
-      {alertaCorretivas && (
+      {alertaCorretivas ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Card
             className={`shadow-sm ${
@@ -1284,6 +1447,20 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
             </CardContent>
           </Card>
         </div>
+      ) : (
+        <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-700">
+          <CardContent className="flex items-start gap-3 p-4">
+            <span className="mt-1 h-3 w-3 shrink-0 rounded-full bg-slate-400" />
+            <div>
+              <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                Alerta de corretivas desativado
+              </div>
+              <div className="text-xs text-slate-500">
+                Defina o máximo de corretivas no mês em Configurações para ativar este alerta.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ── KPIs ───────────────────────────────────────────── */}
