@@ -139,6 +139,7 @@ export type OsAgrupada = {
   area: string;
   equipes: string[];
   tecnicos: number[];
+  hhPorTecnico: Record<number, number>;
   atividades: FieldAtividade[];
 };
 
@@ -378,6 +379,7 @@ function agruparAtividades(
   const mapa = new Map<string, OsAgrupada>();
 
   const equipesPorDia = new Map<number, Array<{ chave: string; tecnicos: number[] }>>();
+  const integrantesPorRecursoDia = new Map<number, Map<number, Set<number>>>();
   for (const eq of equipes) {
     const lista = equipesPorDia.get(eq.dia_id) || [];
     lista.push({
@@ -385,6 +387,21 @@ function agruparAtividades(
       tecnicos: eq.tecnicos,
     });
     equipesPorDia.set(eq.dia_id, lista);
+
+    let recursosDia = integrantesPorRecursoDia.get(eq.dia_id);
+    if (!recursosDia) {
+      recursosDia = new Map<number, Set<number>>();
+      integrantesPorRecursoDia.set(eq.dia_id, recursosDia);
+    }
+    const tecnicosEquipe = new Set(eq.tecnicos);
+    for (const recurso of tecnicosEquipe) {
+      let integrantes = recursosDia.get(recurso);
+      if (!integrantes) {
+        integrantes = new Set<number>();
+        recursosDia.set(recurso, integrantes);
+      }
+      for (const tecnico of tecnicosEquipe) integrantes.add(tecnico);
+    }
   }
 
   for (const a of atividades) {
@@ -410,6 +427,7 @@ function agruparAtividades(
         area: "",
         equipes: [],
         tecnicos: [],
+        hhPorTecnico: {},
         atividades: [],
       };
       mapa.set(key, os);
@@ -453,8 +471,16 @@ function agruparAtividades(
       os.suspensa = statuses.length > 0 && statuses.every((s) => s === "suspenso");
       os.cancelada = statuses.length > 0 && statuses.every((s) => s === "cancelado");
     }
+    for (const a of os.atividades) {
+      const duracao = Number(a.duracao_min) || 0;
+      const integrantes = integrantesPorRecursoDia.get(a.dia_id)?.get(a.id_recurso);
+      const tecnicos = integrantes?.size ? integrantes : new Set([a.id_recurso]);
+      for (const tecnico of tecnicos) {
+        os.hhPorTecnico[tecnico] = (os.hhPorTecnico[tecnico] || 0) + duracao;
+      }
+    }
     if (os.concluida) {
-      os.hh = os.atividades.reduce((acc, a) => acc + (Number(a.duracao_min) || 0), 0);
+      os.hh = Object.values(os.hhPorTecnico).reduce((total, hh) => total + hh, 0);
     }
     if (!os.categoria) os.categoria = "Outros";
     os.datas.sort();
@@ -463,13 +489,7 @@ function agruparAtividades(
   return lista.filter((os) => os.equipes.length > 0);
 }
 
-function filtrarPorDatas(osList: OsAgrupada[], datas: string[] | Set<string>): OsAgrupada[] {
-  const alvo = datas instanceof Set ? datas : new Set(datas);
-  if (alvo.size === 0) return [];
-  return osList.filter((os) => os.datas.some((d) => alvo.has(d)));
-}
-
-function calcularMetricas(osList: OsAgrupada[]): Metricas {
+function calcularMetricas(osList: OsAgrupada[], tecnicoId?: number): Metricas {
   const m: Metricas = {
     osExec: 0,
     osSusp: 0,
@@ -486,9 +506,10 @@ function calcularMetricas(osList: OsAgrupada[]): Metricas {
     else if (os.cancelada) m.osCanc++;
     m.osTotal++;
     if (os.concluida) {
-      m.hhExec += os.hh;
-      if (os.corretiva) m.hhCorretiva += os.hh;
-      if (os.melhoria) m.hhMelhoria += os.hh;
+      const hh = tecnicoId === undefined ? os.hh : (os.hhPorTecnico[tecnicoId] ?? 0);
+      m.hhExec += hh;
+      if (os.corretiva) m.hhCorretiva += hh;
+      if (os.melhoria) m.hhMelhoria += hh;
     }
     if (os.corretiva) m.corretivas++;
   }
@@ -689,11 +710,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   const datasPeriodoSet = useMemo(() => new Set(datasPeriodo), [datasPeriodo]);
   const diaPorId = useMemo(() => new Map(dias.map((d) => [d.id, d])), [dias]);
 
-  const osAgrupadas = useMemo(
-    () => agruparAtividades(atividades, diaPorId, equipes, aliases.equipes, aliases.integrantes),
-    [atividades, diaPorId, equipes, aliases.equipes, aliases.integrantes],
-  );
-
   const osPeriodo = useMemo(() => {
     // Agrupa apenas atividades dos dias do período: O.S. executadas fora dos
     // dias importados não entram na apuração do período.
@@ -717,14 +733,18 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     if (filtroEquipe) lista = lista.filter((os) => os.equipes.includes(filtroEquipe));
     if (filtroTecnico) {
       const id = Number(filtroTecnico);
-      lista = lista.filter((os) => os.tecnicos.includes(id));
+      lista = lista.filter((os) => os.hhPorTecnico[id] !== undefined);
     }
     if (filtroTipo) lista = lista.filter((os) => os.categoria === filtroTipo);
     if (filtroLocal) lista = lista.filter((os) => os.planta === filtroLocal);
     return lista;
   }, [osPeriodo, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal]);
 
-  const metricasPeriodo = useMemo(() => calcularMetricas(osFiltrado), [osFiltrado]);
+  const tecnicoFiltradoId = filtroTecnico ? Number(filtroTecnico) : undefined;
+  const metricasPeriodo = useMemo(
+    () => calcularMetricas(osFiltrado, tecnicoFiltradoId),
+    [osFiltrado, tecnicoFiltradoId],
+  );
 
   const diasComDadosPeriodo = useMemo(
     () => dias.filter((d) => datasPeriodoSet.has(d.data)).length,
@@ -750,8 +770,35 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
 
   // ── Janela de referência da comparação ativa ───────────────
   const datasRef = useMemo(() => datasReferencia(cmp.id, datasPeriodo), [cmp.id, datasPeriodo]);
-  const osRef = useMemo(() => filtrarPorDatas(osAgrupadas, datasRef), [osAgrupadas, datasRef]);
-  const metricasRef = useMemo(() => calcularMetricas(osRef), [osRef]);
+  const osRef = useMemo(() => {
+    const datasRefSet = new Set(datasRef);
+    const atividadesRef = atividades.filter((a) => {
+      const dia = diaPorId.get(a.dia_id);
+      return !!dia && datasRefSet.has(dia.data);
+    });
+    return agruparAtividades(
+      atividadesRef,
+      diaPorId,
+      equipes,
+      aliases.equipes,
+      aliases.integrantes,
+    );
+  }, [atividades, diaPorId, datasRef, equipes, aliases.equipes, aliases.integrantes]);
+  const osRefFiltrado = useMemo(() => {
+    let lista = osRef;
+    if (filtroEquipe) lista = lista.filter((os) => os.equipes.includes(filtroEquipe));
+    if (filtroTecnico) {
+      const id = Number(filtroTecnico);
+      lista = lista.filter((os) => os.hhPorTecnico[id] !== undefined);
+    }
+    if (filtroTipo) lista = lista.filter((os) => os.categoria === filtroTipo);
+    if (filtroLocal) lista = lista.filter((os) => os.planta === filtroLocal);
+    return lista;
+  }, [osRef, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal]);
+  const metricasRef = useMemo(
+    () => calcularMetricas(osRefFiltrado, tecnicoFiltradoId),
+    [osRefFiltrado, tecnicoFiltradoId],
+  );
   const diasComDadosRef = useMemo(() => {
     const alvo = new Set(datasRef);
     return dias.filter((d) => alvo.has(d.data)).length;
