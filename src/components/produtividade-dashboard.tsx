@@ -210,6 +210,13 @@ const CATEGORIAS = [
   "Outros",
 ];
 
+const STATUS_OS = [
+  { key: "concluida", rotulo: "Concluída" },
+  { key: "andamento", rotulo: "Em andamento" },
+  { key: "suspensa", rotulo: "Suspensa" },
+  { key: "cancelada", rotulo: "Cancelada" },
+] as const;
+
 const MESES_BR = [
   "Janeiro",
   "Fevereiro",
@@ -248,6 +255,14 @@ function normalizeStatus(s: string): string {
   if (lower === "suspenso" || lower === "pendente") return "suspenso";
   if (lower === "cancelado") return "cancelado";
   return lower;
+}
+
+function encaixaStatus(os: OsAgrupada, status: string): boolean {
+  if (status === "concluida") return os.concluida;
+  if (status === "suspensa") return os.suspensa;
+  if (status === "cancelada") return os.cancelada;
+  if (status === "andamento") return !os.concluida && !os.suspensa && !os.cancelada;
+  return true;
 }
 
 function isAtividadeAdministrativa(tipo: string | null | undefined): boolean {
@@ -577,6 +592,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   const [filtroTecnico, setFiltroTecnico] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroLocal, setFiltroLocal] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [podeUnificarEquipes, setPodeUnificarEquipes] = useState(false);
@@ -743,8 +759,9 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     }
     if (filtroTipo) lista = lista.filter((os) => os.categoria === filtroTipo);
     if (filtroLocal) lista = lista.filter((os) => os.planta === filtroLocal);
+    if (filtroStatus) lista = lista.filter((os) => encaixaStatus(os, filtroStatus));
     return lista;
-  }, [osPeriodo, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal]);
+  }, [osPeriodo, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal, filtroStatus]);
 
   const tecnicoFiltradoId = filtroTecnico ? Number(filtroTecnico) : undefined;
   const metricasPeriodo = useMemo(
@@ -799,8 +816,9 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     }
     if (filtroTipo) lista = lista.filter((os) => os.categoria === filtroTipo);
     if (filtroLocal) lista = lista.filter((os) => os.planta === filtroLocal);
+    if (filtroStatus) lista = lista.filter((os) => encaixaStatus(os, filtroStatus));
     return lista;
-  }, [osRef, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal]);
+  }, [osRef, filtroEquipe, filtroTecnico, filtroTipo, filtroLocal, filtroStatus]);
   const metricasRef = useMemo(
     () => calcularMetricas(osRefFiltrado, tecnicoFiltradoId),
     [osRefFiltrado, tecnicoFiltradoId],
@@ -1211,6 +1229,40 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       .sort((a, b) => (b.datas.at(-1) || "").localeCompare(a.datas.at(-1) || "") || a.om - b.om);
   }, [drill, osFiltrado]);
 
+  // ── Média HH por técnico (por ID/colaborador, não por equipe) ──
+  const idsComApontamento = useMemo(() => {
+    const ids = new Set<number>();
+    for (const os of osFiltrado) {
+      for (const a of os.atividades) {
+        if ((Number(a.duracao_min) || 0) <= 0) continue;
+        if (tecnicoFiltradoId !== undefined && a.id_recurso !== tecnicoFiltradoId) continue;
+        ids.add(a.id_recurso);
+      }
+    }
+    return ids;
+  }, [osFiltrado, tecnicoFiltradoId]);
+  const tecnicosComAtividade = idsComApontamento.size;
+
+  const idsComCorretiva = useMemo(() => {
+    const ids = new Set<number>();
+    for (const os of osFiltrado) {
+      if (!os.concluida || !os.corretiva) continue;
+      for (const [id, v] of Object.entries(os.hhPorTecnico)) {
+        if ((Number(v) || 0) <= 0) continue;
+        const t = Number(id);
+        if (tecnicoFiltradoId !== undefined && t !== tecnicoFiltradoId) continue;
+        ids.add(t);
+      }
+    }
+    return ids;
+  }, [osFiltrado, tecnicoFiltradoId]);
+  const tecnicosComCorretiva = idsComCorretiva.size;
+
+  const mediaHhTecnico =
+    tecnicosComAtividade > 0 ? metricasPeriodo.hhExec / tecnicosComAtividade : 0;
+  const mediaHhCorretivaTecnico =
+    tecnicosComCorretiva > 0 ? metricasPeriodo.hhCorretiva / tecnicosComCorretiva : 0;
+
   if (loading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
@@ -1290,39 +1342,34 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
               Período:
             </span>
-            {(
-              [
-                { key: "day", rotulo: "Hoje" },
-                { key: "7", rotulo: "7 dias" },
-                { key: "30", rotulo: "30 dias" },
-                { key: "mes", rotulo: "Mês" },
-                { key: "custom", rotulo: "Personalizado" },
-              ] as const
-            ).map((p) => (
-              <Button
-                key={p.key}
-                variant={periodo.type === p.key ? "default" : "outline"}
-                size="sm"
-                className={`h-7 text-[11px] ${
-                  periodo.type === p.key ? "bg-[#0b3a73] hover:bg-[#002d74]" : ""
-                }`}
-                onClick={() => {
-                  if (p.key === "day") setPeriodo({ type: "day", date: hojeISO() });
-                  else if (p.key === "custom")
-                    setPeriodo({
-                      type: "custom",
-                      inicio:
-                        periodo.type === "custom"
-                          ? periodo.inicio || ""
-                          : adicionarDias(hojeISO(), -6),
-                      fim: periodo.type === "custom" ? periodo.fim || "" : hojeISO(),
-                    });
-                  else setPeriodo({ type: p.key } as Periodo);
-                }}
-              >
-                {p.rotulo}
-              </Button>
-            ))}
+            <select
+              value={periodo.type}
+              onChange={(e) => {
+                const k = e.target.value as Periodo["type"];
+                if (k === "day") setPeriodo({ type: "day", date: hojeISO() });
+                else if (k === "custom")
+                  setPeriodo({
+                    type: "custom",
+                    inicio:
+                      periodo.type === "custom"
+                        ? periodo.inicio || ""
+                        : adicionarDias(hojeISO(), -6),
+                    fim: periodo.type === "custom" ? periodo.fim || "" : hojeISO(),
+                  });
+                else
+                  setPeriodo({
+                    type: k,
+                    mes: periodo.type === "mes" ? periodo.mes : undefined,
+                  } as Periodo);
+              }}
+              className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+            >
+              <option value="day">Hoje</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="mes">Mês</option>
+              <option value="custom">Personalizado</option>
+            </select>
             {periodo.type === "day" && (
               <input
                 type="date"
@@ -1417,6 +1464,18 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               {opcoesLocal.map((l) => (
                 <option key={l} value={l}>
                   {l}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value)}
+              className="min-h-7 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-[11px] text-slate-700 dark:text-slate-200"
+            >
+              <option value="">Status: Todos</option>
+              {STATUS_OS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.rotulo}
                 </option>
               ))}
             </select>
@@ -1600,6 +1659,22 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               <div className="text-2xl font-bold leading-tight">
                 {formatMinutos(metricasPeriodo.hhExec)}
               </div>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-fit cursor-help border-b border-dotted border-slate-300 text-[10px] text-slate-500">
+                      Média HH por técnico: {formatMinutos(mediaHhTecnico)}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Como é calculado
+                    <br />
+                    HH total do período ÷ técnicos com apontamento no período.
+                    <br />
+                    Considera colaboradores (ID), não equipes.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className="text-[10px] text-slate-400">média {formatMinutos(hhDia)} por dia</div>
               <div className={`text-[10px] font-medium ${corDelta(linhaHh.delta)}`}>
                 {linhaHh.texto}
@@ -1639,6 +1714,22 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               <div className="text-2xl font-bold leading-tight">
                 {formatMinutos(metricasPeriodo.hhCorretiva)}
               </div>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-fit cursor-help border-b border-dotted border-slate-300 text-[10px] text-slate-500">
+                      Média por técnico: {formatMinutos(mediaHhCorretivaTecnico)}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Como é calculado
+                    <br />
+                    HH de corretivas ÷ técnicos com HH de corretivas no período.
+                    <br />
+                    Considera Corretiva Emergencial + Corretiva Programada.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className="text-[10px] text-slate-400">
                 {formatNumero(shareHhCorretiva, 0)}% do HH executado
               </div>
@@ -1998,7 +2089,6 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               </thead>
               <tbody>
                 {(() => {
-                  const maxHh = Math.max(0, ...rankingTecnicos.map((t) => t.hhMin));
                   return rankingTecnicos.map((tec, i) => (
                     <tr
                       key={tec.tecId}
@@ -2029,21 +2119,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                         <TooltipProvider delayDuration={200}>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="flex cursor-help items-center justify-end gap-2">
-                                <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                                  <span
-                                    className="block h-1.5 rounded-full bg-emerald-500"
-                                    style={{
-                                      width:
-                                        maxHh > 0
-                                          ? `${Math.max(
-                                              Math.min(100, (tec.hhMin / maxHh) * 100),
-                                              tec.hhMin > 0 ? 4 : 0,
-                                            )}%`
-                                          : "0%",
-                                    }}
-                                  />
-                                </span>
+                              <span className="flex cursor-help justify-end">
                                 <span className="w-12 shrink-0 text-right font-mono font-semibold text-slate-800 dark:text-slate-100">
                                   {formatMinutos(tec.hhMin)}
                                 </span>
