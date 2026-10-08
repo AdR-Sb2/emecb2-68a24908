@@ -143,7 +143,10 @@ export function abbreviateAtividade(name: string | null | undefined): string {
   return s;
 }
 
+const STORAGE_KEY_BUCKET = "backlog_data_bucket_v1";
 const STORAGE_KEY = "backlog_data_v1";
+const STORAGE_KEY_PLANO = "backlog_data_plano_v1";
+const STORAGE_KEY_ACTIVE = "backlog_import_active_v1";
 const VIEW_STORAGE_KEY = "backlog_saved_views_v1";
 
 const BLUE = "#1f7ad6";
@@ -466,8 +469,27 @@ function ComboboxSearch({
 function BacklogPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [backlogTab, setBacklogTab] = useState<"backlog" | "planejamento">("backlog");
-  const [data, setData] = useState<Row[]>(DATA);
+  const [dataBucket, setDataBucket] = useState<Row[]>([]);
+  const [dataPlano, setDataPlano] = useState<Row[]>([]);
   const [hasCustomData, setHasCustomData] = useState(false);
+  const [mostrarSomenteProgramaveis, setMostrarSomenteProgramaveis] = useState(false);
+  const [importType, setImportType] = useState<"bucket" | "planejamento">(() => {
+    try {
+      return (localStorage.getItem("backlog:importType") as "bucket" | "planejamento") || "bucket";
+    } catch {
+      return "bucket";
+    }
+  });
+  const data = importType === "bucket" ? dataBucket : dataPlano;
+  const [importMeta, setImportMeta] = useState<{
+    tipo: "bucket" | "planejamento";
+    arquivo?: string;
+    linhasLidas?: number;
+    linhasImportadas?: number;
+    linhasDescartadas?: number;
+    avisos?: string[];
+    atualizadoEm?: string;
+  } | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -487,28 +509,55 @@ function BacklogPage() {
           .single();
         const arr = (error ? null : data?.dados) as Row[] | null;
         if (Array.isArray(arr) && arr.length) {
-          setData(arr);
+          setDataBucket(arr);
           setHasCustomData(true);
           lastSharedDados.current = JSON.stringify(arr);
-          return;
         }
       } catch {
-        // tabela ainda não criada no deploy → segue para fallback
+        // ignore
       }
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(STORAGE_KEY_BUCKET);
         if (raw) {
           const parsed = JSON.parse(raw) as Row[];
           if (Array.isArray(parsed) && parsed.length) {
-            setData(parsed);
+            setDataBucket(parsed);
             setHasCustomData(true);
           }
         }
       } catch {
         // ignore
       }
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_PLANO);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Row[];
+          if (Array.isArray(parsed) && parsed.length) {
+            setDataPlano(parsed);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        const t = localStorage.getItem(STORAGE_KEY_ACTIVE);
+        if (t === "bucket" || t === "planejamento") setImportType(t);
+      } catch {
+        // ignore
+      }
     })();
   }, []);
+
+  const bucketOms = useMemo(
+    () => new Set(dataBucket.map((r) => String(r["Ordem de Manutenção"] || "").trim())),
+    [dataBucket],
+  );
+  const dataFiltrada = useMemo(() => {
+    if (importType === "planejamento" && mostrarSomenteProgramaveis) {
+      return data.filter((r) => bucketOms.has(String(r["Ordem de Manutenção"] || "").trim()));
+    }
+    return data;
+  }, [data, importType, mostrarSomenteProgramaveis, bucketOms]);
 
   // Sincroniza automaticamente com o bucket compartilhado (quando outra
   // pessoa faz upload, todos recebem sem precisar importar ou recarregar).
@@ -526,7 +575,7 @@ function BacklogPage() {
         const sig = JSON.stringify(arr);
         if (sig !== lastSharedDados.current) {
           lastSharedDados.current = sig;
-          setData(arr);
+          setDataBucket(arr);
           setHasCustomData(true);
         }
       } catch {
@@ -553,14 +602,18 @@ function BacklogPage() {
     try {
       const stored = localStorage.getItem("equipeOverrides");
       if (stored) return JSON.parse(stored) as Record<string, Equipe>;
-    } catch {}
+    } catch {
+      // ignore
+    }
     return EQUIPE_OVERRIDES as Record<string, Equipe>;
   });
   // Persiste no localStorage sempre que mudar
   useEffect(() => {
     try {
       localStorage.setItem("equipeOverrides", JSON.stringify(equipeOverrides));
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [equipeOverrides]);
   // Carrega overrides do Supabase (persiste pra todo mundo)
   useEffect(() => {
@@ -587,13 +640,17 @@ function BacklogPage() {
     try {
       const stored = localStorage.getItem("responsabilidadeOverrides");
       if (stored) return JSON.parse(stored) as Record<string, Responsabilidade>;
-    } catch {}
+    } catch {
+      // ignore
+    }
     return RESP_OVERRIDES as Record<string, Responsabilidade>;
   });
   useEffect(() => {
     try {
       localStorage.setItem("responsabilidadeOverrides", JSON.stringify(responsabilidadeOverrides));
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [responsabilidadeOverrides]);
   useEffect(() => {
     supabase
@@ -626,7 +683,7 @@ function BacklogPage() {
 
   const enriched = useMemo(
     () =>
-      enrich(data, now).map((e) => {
+      enrich(dataFiltrada, now).map((e) => {
         const eqOverride = equipeOverrides[e.om];
         const respOverride = responsabilidadeOverrides[e.om];
         let result = e;
@@ -634,7 +691,7 @@ function BacklogPage() {
         if (respOverride) result = { ...result, responsabilidade: respOverride };
         return result;
       }),
-    [data, now, equipeOverrides, responsabilidadeOverrides],
+    [dataFiltrada, now, equipeOverrides, responsabilidadeOverrides],
   );
 
   // ---------- observações por O.S. ----------
@@ -1090,23 +1147,84 @@ function BacklogPage() {
     setObsEnviando(false);
   };
 
+  const TIPO_MAP: Record<string, string> = {
+    ELE: "ELE",
+    MEC: "MEC",
+    AUT: "AUT",
+    TER: "TER",
+    OUT: "OUT",
+    INP: "INP",
+    INS: "INS",
+  };
+
+  function normalizeHeader(s: string): string {
+    return s
+      .replace(/^\uFEFF/, "")
+      .replace(/\n/g, "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  }
+
+  function parseExcelSerialToDate(v: number | string | null | undefined): string | null {
+    if (v === null || v === undefined || v === "") return null;
+    const num = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(num) || num < 0) return null;
+    // Excel 1899-12-30
+    const d = new Date(Date.UTC(1899, 11, 30) + num * 86_400_000);
+    if (isNaN(d.getTime())) return null;
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const yyyy = d.getUTCFullYear();
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function isFormatoA(headers: string[]): boolean {
+    const set = new Set(headers.map(normalizeHeader));
+    return set.has("id do recurso") && set.has("ordem de manutencao") && set.has("inicio do sla");
+  }
+
+  function isFormatoB(headers: string[]): boolean {
+    const set = new Set(headers.map(normalizeHeader));
+    return set.has("sequencia_rota") && set.has("data_programada") && set.has("equipe_rota");
+  }
+
   // ---------- upload ----------
   const handleUpload = async (file: File) => {
     try {
-      const name = file.name.toLowerCase();
-      const isCSV = name.endsWith(".csv");
-      let rows: Record<string, unknown>[];
+      const name = file.name;
+      const nameLower = name.toLowerCase();
+      const isCSV = nameLower.endsWith(".csv");
+      const isXLSX = nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls");
+
+      let rowsRaw: Record<string, unknown>[];
+      let headersAll: string[] = [];
 
       if (isCSV) {
-        // CSV: lê como texto e parseia manualmente para evitar que o xlsx
-        // interprete datas BR como US e converta para serial number.
+        if (importType !== "bucket") {
+          if (
+            !confirm(
+              "Este arquivo parece ser do tipo Bucket do Field (CSV). Trocar para essa opção?",
+            )
+          ) {
+            return;
+          }
+          setImportType("bucket");
+          try {
+            localStorage.setItem("backlog:importType", "bucket");
+          } catch {
+            // ignore
+          }
+        }
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter(Boolean);
         if (lines.length < 2) {
           alert("CSV vazio ou inválido.");
           return;
         }
-        // Detecta delimitador (; ou ,)
         const delim = lines[0].includes(";") ? ";" : ",";
         const parseLine = (line: string) =>
           line.split(delim).map((s) => {
@@ -1115,7 +1233,8 @@ function BacklogPage() {
             return s;
           });
         const headers = parseLine(lines[0]);
-        rows = lines.slice(1).map((line) => {
+        headersAll = headers;
+        rowsRaw = lines.slice(1).map((line) => {
           const cols = parseLine(line);
           const r: Record<string, unknown> = {};
           headers.forEach((h, i) => {
@@ -1124,103 +1243,309 @@ function BacklogPage() {
           return r;
         });
       } else {
-        // XLSX/XLS: usa a biblioteca com cellDates:false para obter valores crus
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array", cellDates: false });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        const ws =
+          wb.Sheets[
+            wb.SheetNames.find((s) => s.toUpperCase().includes("PLANEJAMENTO")) || wb.SheetNames[0]
+          ];
+        rowsRaw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (rowsRaw.length > 0) {
+          headersAll = Object.keys(rowsRaw[0]);
+        }
       }
 
-      if (!rows.length) {
+      if (!rowsRaw.length) {
         alert("Planilha vazia ou inválida.");
         return;
       }
 
-      // Normaliza nome da coluna para matching (ignora acentos, encoding, BOM, espaços)
-      function normKey(s: string): string {
-        return s
-          .replace(/^\uFEFF/, "") // BOM
-          .replace(/\n/g, "")
-          .trim()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "") // remove acentos
-          .replace(/\u00A0/g, " ") // non-breaking space → espaço
-          .replace(/\s+/g, " ") // whitespace → um espaço
-          .toLowerCase();
-      }
-      // Mapeia qualquer variação do nome da coluna para o nome padrão
-      const dateFieldMap: Record<string, string> = {};
-      for (const name of ["Início do SLA", "Fim do SLA"]) {
-        dateFieldMap[normKey(name)] = name;
-      }
-
-      function serialToBR(v: number): string {
-        const adjusted = v > 60 ? v - 1 : v;
-        const d = new Date(Date.UTC(1899, 11, 30) + adjusted * 86_400_000);
-        const hh = String(d.getUTCHours()).padStart(2, "0");
-        const mi = String(d.getUTCMinutes()).padStart(2, "0");
-        return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} ${hh}:${mi}`;
-      }
-
-      const dateStrRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
-      function normalizeDateStr(s: string): string {
-        const m = s.trim().match(dateStrRe);
-        if (!m) return s;
-        let a = +m[1],
-          b = +m[2];
-        if (b > 12 && a <= 12) [a, b] = [b, a];
-        const y = +m[3] < 100 ? +m[3] + 2000 : +m[3];
-        const hh = s.trim().match(/(\d{1,2}):(\d{2})$/);
-        const time = hh ? `${hh[1]}:${hh[2]}` : "00:00";
-        return `${String(a).padStart(2, "0")}/${String(b).padStart(2, "0")}/${y} ${time}`;
-      }
-
-      const norm = rows.map((r) => {
-        const out: Record<string, unknown> = {};
-        for (let [k, v] of Object.entries(r)) {
-          k = k.replace(/\n/g, "").trim();
-          const canon = dateFieldMap[normKey(k)];
-          if (canon) {
-            out[canon] =
-              typeof v === "number"
-                ? serialToBR(v)
-                : typeof v === "string"
-                  ? normalizeDateStr(v)
-                  : v;
+      // Validação por tipo selecionado
+      if (importType === "bucket") {
+        if (isXLSX) {
+          if (isFormatoB(headersAll)) {
+            const swap = confirm(
+              "Este arquivo parece ser um Planejamento semanal. Trocar para essa opção?",
+            );
+            if (!swap) return;
+            setImportType("planejamento");
+            try {
+              localStorage.setItem("backlog:importType", "planejamento");
+            } catch {
+              // ignore
+            }
           } else {
-            out[k] = v;
+            alert("Este arquivo não corresponde ao formato Bucket do Field (CSV).");
+            return;
           }
         }
-        return out;
-      }) as Row[];
-
-      // Salva no banco compartilhado (todos os usuários veem). Se o
-      // banco ainda não existir ou estiver indisponível, salva local.
-      let dbSalvo = false;
-      try {
-        const { error } = await supabase
-          .from("backlog_dados")
-          .upsert(
-            { id: 1, dados: norm, atualizado_em: new Date().toISOString() },
-            { onConflict: "id" },
+        if (!isFormatoA(headersAll)) {
+          const faltando = [];
+          const set = new Set(headersAll.map(normalizeHeader));
+          if (!set.has("id do recurso")) faltando.push("ID do Recurso");
+          if (!set.has("ordem de manutencao")) faltando.push("Ordem de Manutenção");
+          if (!set.has("inicio do sla")) faltando.push("Início do SLA");
+          alert("Formato inválido para Bucket do Field. Colunas faltantes: " + faltando.join(", "));
+          return;
+        }
+      } else if (importType === "planejamento") {
+        if (isCSV) {
+          const swap = confirm(
+            "Este arquivo parece ser um CSV (Bucket do Field). Trocar para essa opção?",
           );
-        if (error) throw error;
-        dbSalvo = true;
-      } catch (dbErr) {
-        console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
+          if (!swap) return;
+          setImportType("bucket");
+          try {
+            localStorage.setItem("backlog:importType", "bucket");
+          } catch {
+            // ignore
+          }
+          // process as bucket after? but easier to re-trigger; for now process
+        }
+        if (!isFormatoB(headersAll)) {
+          const faltando = [];
+          const set = new Set(headersAll.map(normalizeHeader));
+          if (!set.has("sequencia_rota")) faltando.push("SEQUENCIA_ROTA");
+          if (!set.has("data_programada")) faltando.push("DATA_PROGRAMADA");
+          if (!set.has("equipe_rota")) faltando.push("EQUIPE_ROTA");
+          alert(
+            "Formato inválido para Planejamento semanal. Colunas faltantes: " + faltando.join(", "),
+          );
+          return;
+        }
       }
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(norm));
-      lastSharedDados.current = JSON.stringify(norm);
-      setData(norm);
-      setHasCustomData(true);
-      alert(
-        dbSalvo
-          ? `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`
-          : `Bucket atualizado com ${norm.length} registros (salvo localmente; banco compartilhado indisponível).`,
-      );
+      if (importType === "bucket") {
+        // Usa lógica existente: normaliza datas de Início/Fim SLA
+        const dateFieldMap: Record<string, string> = {};
+        for (const name of ["Início do SLA", "Fim do SLA"]) {
+          dateFieldMap[normalizeHeader(name)] = name;
+        }
+        function serialToBR(v: number): string {
+          const adjusted = v > 60 ? v - 1 : v;
+          const d = new Date(Date.UTC(1899, 11, 30) + adjusted * 86_400_000);
+          const hh = String(d.getUTCHours()).padStart(2, "0");
+          const mi = String(d.getUTCMinutes()).padStart(2, "0");
+          return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} ${hh}:${mi}`;
+        }
+        const dateStrRe = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/;
+        function normalizeDateStr(s: string): string {
+          const m = s.trim().match(dateStrRe);
+          if (!m) return s;
+          let a = +m[1],
+            b = +m[2];
+          if (b > 12 && a <= 12) [a, b] = [b, a];
+          const y = +m[3] < 100 ? +m[3] + 2000 : +m[3];
+          const hh = s.trim().match(/(\d{1,2}):(\d{2})$/);
+          const time = hh ? `${hh[1]}:${hh[2]}` : "00:00";
+          return `${String(a).padStart(2, "0")}/${String(b).padStart(2, "0")}/${y} ${time}`;
+        }
+        const norm = rowsRaw.map((r) => {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(r)) {
+            const key = k.replace(/\n/g, "").trim();
+            const canon = dateFieldMap[normalizeHeader(key)];
+            if (canon) {
+              out[canon] =
+                typeof v === "number"
+                  ? serialToBR(v)
+                  : typeof v === "string"
+                    ? normalizeDateStr(v)
+                    : v;
+            } else {
+              out[k] = v;
+            }
+          }
+          return out;
+        }) as Row[];
+        const linhasLidas = norm.length;
+        const linhasImportadas = norm.length;
+        const linhasDescartadas = 0;
+        if (
+          !confirm(
+            `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?`,
+          )
+        ) {
+          return;
+        }
+        let dbSalvo = false;
+        try {
+          const { error } = await supabase
+            .from("backlog_dados")
+            .upsert(
+              { id: 1, dados: norm, atualizado_em: new Date().toISOString() },
+              { onConflict: "id" },
+            );
+          if (error) throw error;
+          dbSalvo = true;
+        } catch (dbErr) {
+          console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
+        }
+        try {
+          localStorage.setItem(STORAGE_KEY_BUCKET, JSON.stringify(norm));
+        } catch {
+          // ignore
+        }
+        lastSharedDados.current = JSON.stringify(norm);
+        setDataBucket(norm);
+        try {
+          localStorage.setItem(STORAGE_KEY_ACTIVE, "bucket");
+        } catch {
+          // ignore
+        }
+        setHasCustomData(true);
+        const agora = new Date();
+        setImportMeta({
+          tipo: "bucket",
+          arquivo: name,
+          linhasLidas,
+          linhasImportadas,
+          linhasDescartadas,
+          atualizadoEm: `${String(agora.getDate()).padStart(2, "0")}/${String(agora.getMonth() + 1).padStart(2, "0")}/${agora.getFullYear()} ${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
+        });
+        alert(
+          dbSalvo
+            ? `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`
+            : `Bucket atualizado com ${norm.length} registros (salvo localmente; banco compartilhado indisponível).`,
+        );
+      } else {
+        // Formato B: Planejamento semanal
+        const get = (r: Record<string, unknown>, keys: string[]): unknown => {
+          for (const k of Object.keys(r)) {
+            const nk = normalizeHeader(k);
+            for (const key of keys) {
+              if (nk === normalizeHeader(key)) return r[k];
+            }
+          }
+          return null;
+        };
+        const mapped: Row[] = [];
+        let descartadas = 0;
+        const avisos: string[] = [];
+        for (const r of rowsRaw) {
+          const ordem = String(get(r, ["Ordem"]) || "").trim();
+          if (!ordem) {
+            descartadas++;
+            continue;
+          }
+          const nota = String(get(r, ["Nota"]) || "").trim() || null;
+          const textoBreve = String(get(r, ["Texto breve"]) || "").trim() || null;
+          const tagPlanta = String(get(r, ["TAG PLANTA"]) || "").trim() || null;
+          const denomLoc =
+            String(
+              get(r, ["Denominação do loc.instalação"]) ||
+                get(r, ["Denominação do local de instalação"]) ||
+                get(r, ["Denominação do loc instalacao"]) ||
+                "",
+            ).trim() || null;
+          const equip = String(get(r, ["Equipamento"]) || "").trim() || null;
+          const cidade = String(get(r, ["Cidade"]) || "").trim();
+          const bairro = String(get(r, ["Bairro"]) || "").trim() || null;
+          const equipe = String(get(r, ["EQUIPE_ROTA"]) || "").trim();
+          const sup = String(get(r, ["SUP"]) || "").trim() || "Baixada 2";
+          const seq = get(r, ["SEQUENCIA_ROTA"]) as unknown;
+          const dataProg = String(get(r, ["DATA_PROGRAMADA"]) || "").trim();
+          const tipoAtv = String(
+            get(r, ["Tipo atividad.manut."]) || get(r, ["Tipo de atividade"]) || "",
+          ).trim();
+          const prioridade = String(get(r, ["Prioridade"]) || "").trim() || null;
+          const lat = get(r, ["LATITUDE"]);
+          const lon = get(r, ["LONGITIDE"]);
+          const diasAtraso = get(r, ["DIAS  EM ATRASO"]) || get(r, ["DIAS EM ATRASO"]);
+          const statusSis = String(get(r, ["Status do sistema"]) || "")
+            .trim()
+            .toUpperCase();
+          const criadoPor = String(get(r, ["Criado por"]) || "").trim() || null;
+          const dataBaseInicio = get(r, ["Data-base do início"]) || get(r, ["Data-base do inicio"]);
+          const dataBaseFim = get(r, ["Data-base do fim"]);
+
+          const rowOut: Record<string, string | null> = {
+            "Ordem de Manutenção": ordem,
+            NOTA: nota,
+            "Status da Atividade": null,
+            "Início do SLA": null,
+            "Fim do SLA": null,
+            "TEXTO BREVE": textoBreve,
+            "TEXTO LONGO": null,
+            PLANTA: denomLoc || tagPlanta || null,
+            Endereço: null,
+            BAIRRO: bairro,
+            Cidade: cidade,
+            "Coordenada Y": lat != null && lat !== "" ? String(lat) : null,
+            "Coordenada X": lon != null && lon !== "" ? String(lon) : null,
+            PRIORIDADE: prioridade,
+            "LOCAL INSTALAÇÃO": null,
+            "DESCRIÇÃO LOCAL INSTALAÇÃO": null,
+            EQUIPAMENTO: equip,
+            "DESCRIÇÃO EQUIPAMENTO": null,
+            "Tipo de Atividade": tipoAtv || null,
+            CRIADO_POR: criadoPor,
+            "STATUS SISTEMA": statusSis,
+            "CENTRO TRABALHO": null,
+            "TIPO ATIVID.PM": null,
+            Estado: "RJ",
+            "Bucket de Origem da OS": "Planejamento",
+          };
+
+          mapped.push(rowOut as unknown as Row);
+        }
+        const linhasLidas = rowsRaw.length;
+        const linhasImportadas = mapped.length;
+        const linhasDescartadas = descartadas;
+        const avisosList = avisos;
+        const previewText = `Tipo: Planejamento semanal\nArquivo: ${name}\nLinhas lidas: ${linhasLidas}\nLinhas importadas: ${linhasImportadas}\nLinhas descartadas: ${linhasDescartadas}\nAvisos: ${avisosList.length ? avisosList.join("; ") : "nenhum"}`;
+        if (
+          !confirm(
+            `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?\n\n${previewText}`,
+          )
+        ) {
+          return;
+        }
+        let dbSalvo = false;
+        try {
+          const { error } = await supabase
+            .from("backlog_dados")
+            .upsert(
+              { id: 1, dados: mapped, atualizado_em: new Date().toISOString() },
+              { onConflict: "id" },
+            );
+          if (error) throw error;
+          dbSalvo = true;
+        } catch (dbErr) {
+          console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        lastSharedDados.current = JSON.stringify(mapped);
+        setDataPlano(mapped);
+        try {
+          localStorage.setItem(STORAGE_KEY_PLANO, JSON.stringify(mapped));
+        } catch {
+          // ignore
+        }
+        try {
+          localStorage.setItem(STORAGE_KEY_ACTIVE, "planejamento");
+        } catch {
+          // ignore
+        }
+        setHasCustomData(true);
+        const agora = new Date();
+        setImportMeta({
+          tipo: "planejamento",
+          arquivo: name,
+          linhasLidas,
+          linhasImportadas,
+          linhasDescartadas,
+          avisos: avisosList,
+          atualizadoEm: `${String(agora.getDate()).padStart(2, "0")}/${String(agora.getMonth() + 1).padStart(2, "0")}/${agora.getFullYear()} ${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
+        });
+        alert(
+          dbSalvo
+            ? `Dados atualizados com ${mapped.length} registros.`
+            : `Dados atualizados com ${mapped.length} registros (salvo localmente; banco compartilhado indisponível).`,
+        );
+      }
     } catch (err) {
-      console.error("Erro ao importar bucket:", err);
+      console.error("Erro ao importar:", err);
       alert("Falha ao ler o arquivo." + (err instanceof Error ? ` Detalhe: ${err.message}` : ""));
     }
   };
@@ -2135,16 +2460,59 @@ function BacklogPage() {
                 Backlog BI
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Bucket Field/SAP · {data.length} O.S. · atualizado {fmtDate(now)}
+                {importType === "planejamento"
+                  ? `Planejamento semanal · ${dataFiltrada.length} O.S. (${dataPlano.length} total)`
+                  : `Bucket Field/SAP · ${dataBucket.length} O.S.`}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:justify-center">
+              <div
+                className="inline-flex rounded-md border border-slate-300 dark:border-slate-600 overflow-hidden"
+                title="Bucket = O.S. não agendadas do Field; Planejamento = rota programada por equipe e data"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportType("bucket");
+                    try {
+                      localStorage.setItem("backlog:importType", "bucket");
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className={`px-3 py-2 text-[11px] ${importType === "bucket" ? "bg-[#0b3a73] text-white" : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"}`}
+                >
+                  Bucket do Field
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportType("planejamento");
+                    try {
+                      localStorage.setItem("backlog:importType", "planejamento");
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className={`px-3 py-2 text-[11px] border-l border-slate-300 dark:border-slate-600 ${importType === "planejamento" ? "bg-[#0b3a73] text-white" : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"}`}
+                >
+                  Planejamento semanal
+                </button>
+              </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
               >
-                <Upload className="h-4 w-4" /> Importar bucket do Field
+                <Upload className="h-4 w-4" /> Importar
               </button>
+              {importType === "planejamento" && dataPlano.length > 0 && (
+                <button
+                  onClick={() => setMostrarSomenteProgramaveis((v) => !v)}
+                  className={`inline-flex min-h-11 items-center gap-1 rounded-md px-3 py-2 text-[13px] font-semibold shadow ${mostrarSomenteProgramaveis ? "bg-[#f59e0b] text-white" : "border border-slate-300 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"}`}
+                >
+                  Mostrar somente ordens programáveis
+                </button>
+              )}
               <button
                 onClick={() => setRouteDialogOpen(true)}
                 className="inline-flex min-h-11 items-center gap-1 rounded-md bg-gradient-to-r from-[#f59e0b] to-[#ef4444] px-3 py-2 text-[13px] font-semibold text-white shadow hover:opacity-95"
@@ -2155,9 +2523,19 @@ function BacklogPage() {
               {hasCustomData && (
                 <button
                   onClick={async () => {
-                    await supabase.from("backlog_dados").delete().eq("id", 1);
                     localStorage.removeItem(STORAGE_KEY);
-                    setData(DATA);
+                    setDataBucket([]);
+                    setDataPlano([]);
+                    try {
+                      localStorage.removeItem(STORAGE_KEY_BUCKET);
+                    } catch {
+                      // ignore
+                    }
+                    try {
+                      localStorage.removeItem(STORAGE_KEY_PLANO);
+                    } catch {
+                      // ignore
+                    }
                     setHasCustomData(false);
                   }}
                   className="rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
@@ -3853,7 +4231,7 @@ function BacklogPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.xlsx,.xls"
+            accept={importType === "bucket" ? ".csv" : ".xlsx,.xls"}
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
