@@ -560,6 +560,8 @@ export type LinhaTecnico = {
   tecId: number;
   nome: string;
   participadas: number;
+  /** Chaves das O.S. que dão origem ao número acima (drill lista exatamente estas). */
+  osParticipadas: Set<string>;
   /** O.S. com atividade própria do colaborador no período. */
   proprias: number;
   diasTrabalhados: number;
@@ -1019,7 +1021,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
     // Só técnicos que estão registrados em equipe em algum dia do período.
     const membros = new Set<number>();
     const equipeDias = new Map<number, Map<string, number>>();
-    const participadas = new Map<number, number>();
+    const participadas = new Map<number, Set<string>>();
     const hhMin = new Map<number, number>();
     const diasSet = new Map<number, Set<string>>();
 
@@ -1042,7 +1044,11 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
         const eqSet = new Set<number>();
         for (const e of minhasEqs) for (const t of e.tecnicos) eqSet.add(t);
         const osEq = osDia.filter((os) => os.participantes.some((t) => eqSet.has(t)));
-        participadas.set(tec, (participadas.get(tec) || 0) + osEq.length);
+        // Conjunto em vez de soma: O.S. concluída em mais de um dia do período
+        // vale 1 vez só (senão a contagem por dia passava da lista de O.S.).
+        const minhasOs = participadas.get(tec) || new Set<string>();
+        participadas.set(tec, minhasOs);
+        for (const os of osEq) minhasOs.add(os.key);
         // HH da equipe/unidade de equipe na qual o colaborador participou no dia:
         // quando o horário é apontado sob um integrante, todos da equipe recebem.
         let hhDia = 0;
@@ -1087,15 +1093,17 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       if (meta <= 0 && metaTotal > 0 && totalDiasTrabalhados > 0) {
         meta = metaTotal * ((diasSet.get(tec)?.size || 0) / totalDiasTrabalhados);
       }
+      const minhasOs = participadas.get(tec) || new Set<string>();
       linhas.push({
         tecId: tec,
         nome: recursosMap.get(tec) || `Técnico ${tec}`,
-        participadas: participadas.get(tec) || 0,
+        participadas: minhasOs.size,
+        osParticipadas: minhasOs,
         proprias: proprias.get(tec) || 0,
         diasTrabalhados: diasSet.get(tec)?.size || 0,
         hhMin: hhMin.get(tec) || 0,
         meta,
-        pct: meta > 0 ? ((participadas.get(tec) || 0) / meta) * 100 : null,
+        pct: meta > 0 ? (minhasOs.size / meta) * 100 : null,
         cor: getEquipeColor(pred).hex,
       });
     }
@@ -2095,7 +2103,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
                       className="cursor-pointer border-t transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
                       onClick={() =>
                         abrirDrill(`O.S. do técnico ${tec.nome}`, (os) =>
-                          os.participantes.includes(tec.tecId),
+                          tec.osParticipadas.has(os.key),
                         )
                       }
                     >
