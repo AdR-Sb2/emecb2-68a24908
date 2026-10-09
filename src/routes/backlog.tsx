@@ -840,7 +840,8 @@ function BacklogPage() {
     plano: Row[],
     tipo: "bucket" | "planejamento",
     ok: { bucket: boolean; plano: boolean },
-  ): Promise<boolean> => {
+  ): Promise<string | null> => {
+    // null = salvo no banco; string = motivo da falha (mostrado ao usuário).
     let bucketFinal: Row[] | null = ok.bucket && bucket.length ? bucket : null;
     let planoFinal: Row[] | null = ok.plano && plano.length ? plano : null;
     try {
@@ -873,7 +874,7 @@ function BacklogPage() {
     };
     const normalizado = parseDadosCompartilhados(payload);
     lastSharedDados.current = normalizado ? JSON.stringify(normalizado) : "";
-    let dbSalvo = false;
+    let erroDb: string | null = null;
     try {
       const { error } = await supabase
         .from("backlog_dados")
@@ -882,15 +883,18 @@ function BacklogPage() {
           { onConflict: "id" },
         );
       if (error) throw error;
-      dbSalvo = true;
     } catch (dbErr) {
+      erroDb =
+        typeof dbErr === "object" && dbErr !== null && "message" in dbErr
+          ? String((dbErr as { message: unknown }).message)
+          : String(dbErr);
       console.warn(
-        "Falha ao salvar no banco compartilhado (rode a migration 00096 no SQL Editor); mantendo local:",
+        "Falha ao salvar no banco compartilhado (confira a migration 00096 no SQL Editor); mantendo local:",
         dbErr,
       );
     }
     lastLocalWriteAt.current = Date.now();
-    return dbSalvo;
+    return erroDb;
   };
 
   // ---------- Status da Execução (coluna editável da tabela) ----------
@@ -930,7 +934,9 @@ function BacklogPage() {
     const ok = { bucket: bucketCustom || ehBucket, plano: planoCustom || !ehBucket };
     if (statusTimer.current) window.clearTimeout(statusTimer.current);
     statusTimer.current = window.setTimeout(() => {
-      void persistirCompartilhado(nextBucket, nextPlano, importType, ok);
+      void persistirCompartilhado(nextBucket, nextPlano, importType, ok).then((erro) => {
+        if (erro) console.warn("Status não foi publicado para a equipe:", erro);
+      });
     }, 600);
   };
 
@@ -1710,7 +1716,7 @@ function BacklogPage() {
         }
         setDataBucket(norm);
         setBucketCustom(true);
-        const dbSalvo = await persistirCompartilhado(norm, dataPlano, "bucket", {
+        const erroDb = await persistirCompartilhado(norm, dataPlano, "bucket", {
           bucket: true,
           plano: planoCustom,
         });
@@ -1725,9 +1731,9 @@ function BacklogPage() {
           atualizadoEm: `${String(agora.getDate()).padStart(2, "0")}/${String(agora.getMonth() + 1).padStart(2, "0")}/${agora.getFullYear()} ${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
         });
         alert(
-          dbSalvo
-            ? `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`
-            : `Bucket atualizado com ${norm.length} registros (salvo localmente; banco compartilhado indisponível — rode a migration 00096 no SQL Editor do Supabase).`,
+          erroDb
+            ? `Bucket salvo localmente com ${norm.length} registros, mas NÃO foi publicado para a equipe.\n\nBanco: ${erroDb}\n\nRode no SQL Editor:\nALTER TABLE backlog_dados DISABLE ROW LEVEL SECURITY;`
+            : `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`,
         );
       } else {
         // Formato B: Planejamento semanal
@@ -1911,7 +1917,7 @@ function BacklogPage() {
         } catch {
           // ignore
         }
-        const dbSalvo = await persistirCompartilhado(dataBucket, mapped, "planejamento", {
+        const erroDb = await persistirCompartilhado(dataBucket, mapped, "planejamento", {
           bucket: bucketCustom,
           plano: true,
         });
@@ -1927,9 +1933,9 @@ function BacklogPage() {
           atualizadoEm: `${String(agora.getDate()).padStart(2, "0")}/${String(agora.getMonth() + 1).padStart(2, "0")}/${agora.getFullYear()} ${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
         });
         alert(
-          dbSalvo
-            ? `Dados atualizados com ${mapped.length} registros. Agora todos os usuários veem estes dados.`
-            : `Dados atualizados com ${mapped.length} registros (salvo localmente; banco compartilhado indisponível — rode a migration 00096 no SQL Editor do Supabase).`,
+          erroDb
+            ? `Dados salvos localmente com ${mapped.length} registros, mas NÃO foram publicados para a equipe.\n\nBanco: ${erroDb}\n\nRode no SQL Editor:\nALTER TABLE backlog_dados DISABLE ROW LEVEL SECURITY;`
+            : `Dados atualizados com ${mapped.length} registros. Agora todos os usuários veem estes dados.`,
         );
       }
     } catch (err) {

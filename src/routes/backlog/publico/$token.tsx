@@ -121,13 +121,24 @@ function PublicoBacklogPage() {
         .maybeSingle();
       if (!error && data?.dados) {
         const bruto = data.dados;
-        if (Array.isArray(bruto)) {
+        let temBucket = false;
+        let temPlano = false;
+        if (Array.isArray(bruto) && bruto.length) {
           setBucket(bruto as Rec[]);
+          temBucket = true;
         } else if (bruto && typeof bruto === "object") {
           const o = bruto as { bucket?: unknown; plano?: unknown };
-          if (Array.isArray(o.bucket)) setBucket(o.bucket as Rec[]);
-          if (Array.isArray(o.plano)) setPlano(o.plano as Rec[]);
+          if (Array.isArray(o.bucket) && o.bucket.length) {
+            setBucket(o.bucket as Rec[]);
+            temBucket = true;
+          }
+          if (Array.isArray(o.plano) && o.plano.length) {
+            setPlano(o.plano as Rec[]);
+            temPlano = true;
+          }
         }
+        // Só um dos dois existe → abre já no que tem dado.
+        if (!temBucket && temPlano) setFonte("planejamento");
         setAtualizadoEm(data.atualizado_em ?? null);
       }
       setLoading(false);
@@ -322,7 +333,9 @@ function PublicoBacklogPage() {
               {linhas.length === 0 && (
                 <tr>
                   <td colSpan={10} className="px-3 py-6 text-center text-slate-400">
-                    Nenhuma O.S. com os filtros atuais.
+                    {bucket.length === 0 && plano.length === 0
+                      ? "Nenhum dado publicado ainda — quem importa o arquivo no Backlog BI aparece aqui."
+                      : "Nenhuma O.S. com os filtros atuais."}
                   </td>
                 </tr>
               )}
