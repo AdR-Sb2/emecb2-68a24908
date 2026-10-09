@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -34,6 +34,8 @@ import {
   StickyNote,
   Plus,
   ClipboardList,
+  Share2,
+  Link2Off,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { OsInfoIcon } from "@/components/os-info-icon";
@@ -70,8 +72,16 @@ export const Route = createFileRoute("/backlog")({
       },
     ],
   }),
-  component: BacklogPage,
+  component: BacklogLayout,
 });
+
+// /backlog/publico/$token é rota filha: nesse caso deixamos a página
+// pública renderizar sozinha (mesmo padrão de produtividade/cronograma).
+function BacklogLayout() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/backlog/publico/")) return <Outlet />;
+  return <BacklogPage />;
+}
 
 type Row = {
   "Ordem de Manutenção": string | null;
@@ -94,6 +104,8 @@ type Row = {
   PRIORIDADE: string | null;
   "DESCRIÇÃO EQUIPAMENTO": string | null;
   "Tipo de Atividade": string | null;
+  /** Editável na tabela — acompanha o dataset, portanto é compartilhado. */
+  "Status da Execução"?: string | null;
 };
 
 const DATA = rawData as unknown as Row[];
@@ -150,6 +162,53 @@ const STORAGE_KEY = "backlog_data_v1";
 const STORAGE_KEY_PLANO = "backlog_data_plano_v1";
 const STORAGE_KEY_ACTIVE = "backlog_import_active_v1";
 const VIEW_STORAGE_KEY = "backlog_saved_views_v1";
+
+// ---------- status de execução da O.S. (editável na tabela) ----------
+type StatusExecucao = "Pendente" | "Executada" | "Cancelada";
+const STATUS_EXECUCAO_OPCOES: StatusExecucao[] = ["Pendente", "Executada", "Cancelada"];
+const COL_STATUS_EXEC = "Status da Execução";
+
+function statusExecucaoDe(r: Row): StatusExecucao {
+  const v = String(r[COL_STATUS_EXEC] ?? "").trim();
+  return v === "Executada" || v === "Cancelada" ? v : "Pendente";
+}
+
+function statusExecucaoCor(v: unknown): string {
+  if (v === "Executada") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (v === "Cancelada") return "border-slate-300 bg-slate-100 text-slate-500";
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+// ---------- payload compartilhado (Supabase) ----------
+// `backlog_dados.dados` guarda os DOIS datasets importados (Bucket e
+// Planejamento) para que quem abrir a página veja o que todo mundo importou.
+// Formato legado (array puro) é lido como Bucket.
+type DadosCompartilhados = {
+  v: 2;
+  bucket: Row[] | null;
+  plano: Row[] | null;
+  importType?: "bucket" | "planejamento";
+};
+
+function parseDadosCompartilhados(bruto: unknown): DadosCompartilhados | null {
+  if (Array.isArray(bruto)) {
+    return bruto.length ? { v: 2, bucket: bruto as Row[], plano: null } : null;
+  }
+  if (bruto && typeof bruto === "object") {
+    const o = bruto as Partial<DadosCompartilhados>;
+    const bucket = Array.isArray(o.bucket) && o.bucket.length ? (o.bucket as Row[]) : null;
+    const plano = Array.isArray(o.plano) && o.plano.length ? (o.plano as Row[]) : null;
+    if (!bucket && !plano) return null;
+    return {
+      v: 2,
+      bucket,
+      plano,
+      importType:
+        o.importType === "bucket" || o.importType === "planejamento" ? o.importType : undefined,
+    };
+  }
+  return null;
+}
 
 // ---------- colunas fixas da planilha de Planejamento semanal ----------
 // A planilha é enviada com essas posições fixas (planilha Excel, colunas E, N e T).
@@ -316,6 +375,7 @@ type Enriched = {
   faixa: Faixa;
   responsabilidade: Responsabilidade;
   equipe: Equipe;
+  statusExec: StatusExecucao;
   lat: number | null;
   lon: number | null;
 };
@@ -356,6 +416,7 @@ function enrich(rows: Row[], now: Date): Enriched[] {
       faixa: toFaixa(diasAberto),
       responsabilidade,
       equipe,
+      statusExec: statusExecucaoDe(r),
       lat: parseLat(r["Coordenada Y"]),
       lon: parseLon(r["Coordenada X"]),
     };
@@ -534,7 +595,11 @@ function BacklogPage() {
   const [backlogTab, setBacklogTab] = useState<"backlog" | "planejamento">("backlog");
   const [dataBucket, setDataBucket] = useState<Row[]>(DATA);
   const [dataPlano, setDataPlano] = useState<Row[]>([]);
-  const [hasCustomData, setHasCustomData] = useState(false);
+  // Marca o que já foi importado/carregado de verdade por dataset: o dataset
+  // de exemplo (DATA) nunca é publicado no banco compartilhado.
+  const [bucketCustom, setBucketCustom] = useState(false);
+  const [planoCustom, setPlanoCustom] = useState(false);
+  const hasCustomData = bucketCustom || planoCustom;
   const [mostrarSomenteProgramaveis, setMostrarSomenteProgramaveis] = useState(false);
   const [importType, setImportType] = useState<"bucket" | "planejamento">(() => {
     try {
@@ -564,27 +629,110 @@ function BacklogPage() {
   // Marca quando o usuário importou localmente: evita que o polling do
   // Supabase desfaça a importação quando o upsert falha (RLS/offline).
   const lastLocalWriteAt = useRef<number>(0);
+  // true quando a pessoa escolheu o dataset na mão (não deve ser "puxada"
+  // da equipe no carregamento seguinte).
+  const tipoEscolhidoRef = useRef(false);
+
+  const escolherTipo = (t: "bucket" | "planejamento") => {
+    tipoEscolhidoRef.current = true;
+    setImportType(t);
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE, t);
+    } catch {
+      // ignore
+    }
+  };
+
+  // ---------- link público do Backlog (mesmo esquema do Dashboard) ----------
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("field_config")
+          .select("backlog_link_publico_token")
+          .eq("id", 1)
+          .maybeSingle();
+        if (!error) setLinkToken(data?.backlog_link_publico_token || null);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  const gerarLinkPublico = async () => {
+    const token = crypto.randomUUID();
+    const url = `${window.location.origin}/backlog/publico/${token}`;
+    try {
+      const { error } = await supabase
+        .from("field_config")
+        .upsert({ id: 1, backlog_link_publico_token: token }, { onConflict: "id" });
+      if (error) throw error;
+      setLinkToken(token);
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      toast.success("Link público copiado!", {
+        description: "Qualquer pessoa com o link vê o Backlog sem login.",
+        action: { label: "Abrir", onClick: () => window.open(url, "_blank") },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const faltaColuna = msg.includes("backlog_link_publico_token");
+      console.error("Erro ao gerar link público:", err);
+      toast.error(
+        faltaColuna
+          ? "Coluna backlog_link_publico_token ainda não existe no Supabase."
+          : "Não foi possível gerar o link." + (msg ? ` (${msg})` : ""),
+        faltaColuna
+          ? {
+              description: "Rode a migration 00096 no SQL Editor do Supabase.",
+            }
+          : undefined,
+      );
+    }
+  };
+
+  const revogarLinkPublico = async () => {
+    try {
+      const { error } = await supabase
+        .from("field_config")
+        .update({ backlog_link_publico_token: null })
+        .eq("id", 1);
+      if (error) throw error;
+      setLinkToken(null);
+      toast.success("Link público revogado.");
+    } catch (err) {
+      console.error("Erro ao revogar link público:", err);
+      toast.error("Não foi possível revogar o link.");
+    }
+  };
 
   useEffect(() => {
     (async () => {
-      let bucketCarregado = false;
+      let compartilhado = false;
+      let remoto: DadosCompartilhados | null = null;
       try {
         const { data, error } = await supabase
           .from("backlog_dados")
           .select("dados")
           .eq("id", 1)
           .single();
-        const arr = (error ? null : data?.dados) as Row[] | null;
-        if (Array.isArray(arr) && arr.length) {
-          setDataBucket(arr);
-          setHasCustomData(true);
-          lastSharedDados.current = JSON.stringify(arr);
-          bucketCarregado = true;
+        remoto = error ? null : parseDadosCompartilhados(data?.dados);
+        if (remoto) {
+          lastSharedDados.current = JSON.stringify(remoto);
+          compartilhado = true;
+          if (remoto.bucket) {
+            setDataBucket(remoto.bucket);
+            setBucketCustom(true);
+          }
+          if (remoto.plano) {
+            setDataPlano(remoto.plano);
+            setPlanoCustom(true);
+          }
         }
       } catch {
-        // ignore
+        // tabela ainda não criada no deploy → segue com o dado local
       }
-      if (!bucketCarregado) {
+      if (!compartilhado) {
         // Chave nova; a chave legada guarda o mesmo bucket de versões antigas.
         for (const key of [STORAGE_KEY_BUCKET, STORAGE_KEY]) {
           try {
@@ -593,8 +741,7 @@ function BacklogPage() {
               const parsed = JSON.parse(raw) as Row[];
               if (Array.isArray(parsed) && parsed.length) {
                 setDataBucket(parsed);
-                setHasCustomData(true);
-                bucketCarregado = true;
+                setBucketCustom(true);
                 break;
               }
             }
@@ -609,17 +756,24 @@ function BacklogPage() {
           const parsed = JSON.parse(raw) as Row[];
           if (Array.isArray(parsed) && parsed.length) {
             setDataPlano(parsed);
+            setPlanoCustom(true);
           }
         }
       } catch {
         // ignore
       }
       try {
-        const t = localStorage.getItem(STORAGE_KEY_ACTIVE);
-        if (t === "bucket" || t === "planejamento") setImportType(t);
+        const t =
+          localStorage.getItem(STORAGE_KEY_ACTIVE) || localStorage.getItem("backlog:importType");
+        if (t === "bucket" || t === "planejamento") {
+          setImportType(t);
+          tipoEscolhidoRef.current = true;
+        }
       } catch {
         // ignore
       }
+      // Quem nunca escolheu o dataset vê o que a equipe acabou de importar.
+      if (!tipoEscolhidoRef.current && remoto?.importType) setImportType(remoto.importType);
     })();
   }, []);
 
@@ -645,18 +799,26 @@ function BacklogPage() {
           .eq("id", 1)
           .single();
         if (error) return;
-        const arr = data?.dados as Row[] | null;
-        if (!Array.isArray(arr) || arr.length === 0) return;
+        const bruto = data?.dados;
+        const payload = parseDadosCompartilhados(bruto);
+        if (!payload) return;
         // Não desfaz uma importação local: só aceita dado remoto mais recente.
         if (lastLocalWriteAt.current > 0) {
           const remoto = Date.parse(data?.atualizado_em ?? "");
           if (!Number.isFinite(remoto) || remoto <= lastLocalWriteAt.current) return;
         }
-        const sig = JSON.stringify(arr);
+        const sig = JSON.stringify(payload);
         if (sig !== lastSharedDados.current) {
           lastSharedDados.current = sig;
-          setDataBucket(arr);
-          setHasCustomData(true);
+          if (payload.bucket) {
+            setDataBucket(payload.bucket);
+            setBucketCustom(true);
+          }
+          if (payload.plano) {
+            setDataPlano(payload.plano);
+            setPlanoCustom(true);
+          }
+          if (!tipoEscolhidoRef.current && payload.importType) setImportType(payload.importType);
         }
       } catch {
         // tabela ainda não criada no deploy → segue sem sincronizar
@@ -670,6 +832,107 @@ function BacklogPage() {
       window.removeEventListener("focus", carregar);
     };
   }, []);
+
+  // Publica os DOIS datasets no Supabase e mantém o localStorage em dia.
+  // `ok` diz o que pode ser publicado — o dataset de exemplo nunca é publicado.
+  const persistirCompartilhado = async (
+    bucket: Row[],
+    plano: Row[],
+    tipo: "bucket" | "planejamento",
+    ok: { bucket: boolean; plano: boolean },
+  ): Promise<boolean> => {
+    let bucketFinal: Row[] | null = ok.bucket && bucket.length ? bucket : null;
+    let planoFinal: Row[] | null = ok.plano && plano.length ? plano : null;
+    try {
+      if (bucket.length) localStorage.setItem(STORAGE_KEY_BUCKET, JSON.stringify(bucket));
+      if (plano.length) localStorage.setItem(STORAGE_KEY_PLANO, JSON.stringify(plano));
+    } catch {
+      // ignore
+    }
+    // Preserva o dataset que NÃO estamos substituindo: quem importa só o
+    // Planejamento não apaga o Bucket da equipe (e vice-versa).
+    if (!bucketFinal || !planoFinal) {
+      try {
+        const { data } = await supabase
+          .from("backlog_dados")
+          .select("dados")
+          .eq("id", 1)
+          .maybeSingle();
+        const atual = parseDadosCompartilhados(data?.dados);
+        if (!bucketFinal && atual?.bucket) bucketFinal = atual.bucket;
+        if (!planoFinal && atual?.plano) planoFinal = atual.plano;
+      } catch {
+        // tabela ainda não criada no deploy → segue sem mesclar
+      }
+    }
+    const payload: DadosCompartilhados = {
+      v: 2,
+      bucket: bucketFinal,
+      plano: planoFinal,
+      importType: tipo,
+    };
+    const normalizado = parseDadosCompartilhados(payload);
+    lastSharedDados.current = normalizado ? JSON.stringify(normalizado) : "";
+    let dbSalvo = false;
+    try {
+      const { error } = await supabase
+        .from("backlog_dados")
+        .upsert(
+          { id: 1, dados: payload, atualizado_em: new Date().toISOString() },
+          { onConflict: "id" },
+        );
+      if (error) throw error;
+      dbSalvo = true;
+    } catch (dbErr) {
+      console.warn(
+        "Falha ao salvar no banco compartilhado (rode a migration 00096 no SQL Editor); mantendo local:",
+        dbErr,
+      );
+    }
+    lastLocalWriteAt.current = Date.now();
+    return dbSalvo;
+  };
+
+  // ---------- Status da Execução (coluna editável da tabela) ----------
+  const statusTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (statusTimer.current) window.clearTimeout(statusTimer.current);
+    },
+    [],
+  );
+  const alterarStatusExecucao = (om: string, novo: StatusExecucao) => {
+    const alvo = String(om || "").trim();
+    const upd = (arr: Row[]) =>
+      arr.map((r) =>
+        String(r["Ordem de Manutenção"] || "").trim() === alvo
+          ? { ...r, [COL_STATUS_EXEC]: novo }
+          : r,
+      );
+    const ehBucket = importType === "bucket";
+    const nextBucket = ehBucket ? upd(dataBucket) : dataBucket;
+    const nextPlano = ehBucket ? dataPlano : upd(dataPlano);
+    if (ehBucket) {
+      setDataBucket(nextBucket);
+      setBucketCustom(true);
+    } else {
+      setDataPlano(nextPlano);
+      setPlanoCustom(true);
+    }
+    try {
+      localStorage.setItem(
+        ehBucket ? STORAGE_KEY_BUCKET : STORAGE_KEY_PLANO,
+        JSON.stringify(ehBucket ? nextBucket : nextPlano),
+      );
+    } catch {
+      // ignore
+    }
+    const ok = { bucket: bucketCustom || ehBucket, plano: planoCustom || !ehBucket };
+    if (statusTimer.current) window.clearTimeout(statusTimer.current);
+    statusTimer.current = window.setTimeout(() => {
+      void persistirCompartilhado(nextBucket, nextPlano, importType, ok);
+    }, 600);
+  };
 
   // Recalcula "agora" a cada minuto para atualizar SLA/Dias em aberto.
   useEffect(() => {
@@ -1358,15 +1621,6 @@ function BacklogPage() {
       }
 
       // Validação por tipo selecionado
-      const setTipo = (t: "bucket" | "planejamento") => {
-        setImportType(t);
-        try {
-          localStorage.setItem("backlog:importType", t);
-        } catch {
-          // ignore
-        }
-      };
-
       // Detecta o formato a partir do arquivo (e não do modo selecionado),
       // sincronizando o modo com o que realmente foi enviado.
       const formatoA = isFormatoA(headersAll);
@@ -1398,7 +1652,7 @@ function BacklogPage() {
           tipo = "planejamento";
         }
       }
-      // O modo só é trocado (setTipo) quando a importação efetivamente
+      // O modo só é trocado (escolherTipo) quando a importação efetivamente
       // conclui, para não deixar a tela vazia se o usuário cancelar.
 
       if (tipo === "bucket") {
@@ -1454,29 +1708,13 @@ function BacklogPage() {
         ) {
           return;
         }
-        let dbSalvo = false;
-        try {
-          const { error } = await supabase
-            .from("backlog_dados")
-            .upsert(
-              { id: 1, dados: norm, atualizado_em: new Date().toISOString() },
-              { onConflict: "id" },
-            );
-          if (error) throw error;
-          dbSalvo = true;
-        } catch (dbErr) {
-          console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
-        }
-        try {
-          localStorage.setItem(STORAGE_KEY_BUCKET, JSON.stringify(norm));
-        } catch {
-          // ignore
-        }
-        lastSharedDados.current = JSON.stringify(norm);
         setDataBucket(norm);
-        setTipo("bucket");
-        lastLocalWriteAt.current = Date.now();
-        setHasCustomData(true);
+        setBucketCustom(true);
+        const dbSalvo = await persistirCompartilhado(norm, dataPlano, "bucket", {
+          bucket: true,
+          plano: planoCustom,
+        });
+        escolherTipo("bucket");
         const agora = new Date();
         setImportMeta({
           tipo: "bucket",
@@ -1489,7 +1727,7 @@ function BacklogPage() {
         alert(
           dbSalvo
             ? `Bucket atualizado com ${norm.length} registros. Agora todos os usuários veem estes dados.`
-            : `Bucket atualizado com ${norm.length} registros (salvo localmente; banco compartilhado indisponível).`,
+            : `Bucket atualizado com ${norm.length} registros (salvo localmente; banco compartilhado indisponível — rode a migration 00096 no SQL Editor do Supabase).`,
         );
       } else {
         // Formato B: Planejamento semanal
@@ -1666,34 +1904,18 @@ function BacklogPage() {
         ) {
           return;
         }
-        let dbSalvo = false;
-        try {
-          const { error } = await supabase
-            .from("backlog_dados")
-            .upsert(
-              { id: 1, dados: mapped, atualizado_em: new Date().toISOString() },
-              { onConflict: "id" },
-            );
-          if (error) throw error;
-          dbSalvo = true;
-        } catch (dbErr) {
-          console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
-        }
+        setDataPlano(mapped);
+        setPlanoCustom(true);
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
         } catch {
           // ignore
         }
-        lastSharedDados.current = JSON.stringify(mapped);
-        setDataPlano(mapped);
-        try {
-          localStorage.setItem(STORAGE_KEY_PLANO, JSON.stringify(mapped));
-        } catch {
-          // ignore
-        }
-        setTipo("planejamento");
-        lastLocalWriteAt.current = Date.now();
-        setHasCustomData(true);
+        const dbSalvo = await persistirCompartilhado(dataBucket, mapped, "planejamento", {
+          bucket: bucketCustom,
+          plano: true,
+        });
+        escolherTipo("planejamento");
         const agora = new Date();
         setImportMeta({
           tipo: "planejamento",
@@ -1706,8 +1928,8 @@ function BacklogPage() {
         });
         alert(
           dbSalvo
-            ? `Dados atualizados com ${mapped.length} registros.`
-            : `Dados atualizados com ${mapped.length} registros (salvo localmente; banco compartilhado indisponível).`,
+            ? `Dados atualizados com ${mapped.length} registros. Agora todos os usuários veem estes dados.`
+            : `Dados atualizados com ${mapped.length} registros (salvo localmente; banco compartilhado indisponível — rode a migration 00096 no SQL Editor do Supabase).`,
         );
       }
     } catch (err) {
@@ -1887,9 +2109,10 @@ function BacklogPage() {
   const ROUTE_COLORS = ["#0b3a73", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
 
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
-  const [rbSlaBefore, setRbSlaBefore] = useState<string>("");
   const [rbTipos, setRbTipos] = useState<string[]>([]);
   const [rbResps, setRbResps] = useState<string[]>(["Baixada 2"]);
+  const [rbStatus, setRbStatus] = useState<string[]>(["Pendente"]);
+  const [rbSomenteProgramaveis, setRbSomenteProgramaveis] = useState<boolean>(false);
   const [rbStart, setRbStart] = useState<string>("");
   const [rbMaxStops, setRbMaxStops] = useState<number>(20);
   const [rbTolerance, setRbTolerance] = useState<number>(3);
@@ -1923,12 +2146,12 @@ function BacklogPage() {
   }, [allPlantas.length]);
 
   // Cascade filters for Montar Rota dialog — cada dropdown só mostra opções compatíveis
-  type RbFilterKey = "tipo" | "resp" | "elevatoria" | "cidade";
+  type RbFilterKey = "tipo" | "resp" | "elevatoria" | "cidade" | "status";
   const applyRbFilters = (rows: Enriched[], skip?: RbFilterKey) => {
-    const slaLimit = rbSlaBefore ? new Date(rbSlaBefore) : null;
     return rows.filter((e) => {
-      if (slaLimit && (!e.fimSla || e.fimSla >= slaLimit)) return false;
       if (e.lat === null || e.lon === null) return false;
+      if (rbSomenteProgramaveis && !bucketOms.has(e.om)) return false;
+      if (skip !== "status" && rbStatus.length && !rbStatus.includes(e.statusExec)) return false;
       if (skip !== "tipo" && rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || ""))
         return false;
       if (skip !== "resp" && rbResps.length && !rbResps.includes(e.responsabilidade)) return false;
@@ -1949,13 +2172,13 @@ function BacklogPage() {
         ),
       ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, rbResps, rbElevatorias, rbCidades, rbSlaBefore],
+    [enriched, rbResps, rbStatus, rbSomenteProgramaveis, bucketOms, rbElevatorias, rbCidades],
   );
   const rbOptResps = useMemo(
     () =>
       Array.from(new Set(applyRbFilters(enriched, "resp").map((e) => e.responsabilidade))).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, rbTipos, rbElevatorias, rbCidades, rbSlaBefore],
+    [enriched, rbTipos, rbStatus, rbSomenteProgramaveis, bucketOms, rbElevatorias, rbCidades],
   );
   const rbOptElevatorias = useMemo(
     () =>
@@ -1967,7 +2190,7 @@ function BacklogPage() {
         ),
       ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, rbTipos, rbResps, rbCidades, rbSlaBefore],
+    [enriched, rbTipos, rbStatus, rbSomenteProgramaveis, bucketOms, rbResps, rbCidades],
   );
   const rbOptCidades = useMemo(
     () =>
@@ -1979,7 +2202,7 @@ function BacklogPage() {
         ),
       ).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched, rbTipos, rbResps, rbElevatorias, rbSlaBefore],
+    [enriched, rbTipos, rbStatus, rbSomenteProgramaveis, bucketOms, rbResps, rbElevatorias],
   );
 
   type GeneratedRoute = {
@@ -2000,6 +2223,7 @@ function BacklogPage() {
     totalOs: number;
     limitConfig: { max: number; tolerance: number };
     color?: string;
+    nome: string;
   };
   const [generatedRoutes, setGeneratedRoutes] = useState<GeneratedRoute[]>([]);
 
@@ -2181,10 +2405,6 @@ function BacklogPage() {
 
   const generateRoute = () => {
     setRouteError("");
-    if (!rbSlaBefore) {
-      setRouteError("Informe a data/hora limite do Fim do SLA.");
-      return;
-    }
     if (!rbStart) {
       setRouteError("Selecione o ponto de partida.");
       return;
@@ -2198,15 +2418,13 @@ function BacklogPage() {
       return;
     }
 
-    const slaLimit = new Date(rbSlaBefore);
-    if (isNaN(slaLimit.getTime())) {
-      setRouteError("Data/hora limite inválida.");
-      return;
-    }
+    // Referência de urgência: quanto mais antigo o Fim do SLA, maior o atraso.
+    const refSla = new Date();
 
     // 1) candidatos (filtros globais)
     const candidates = enriched.filter((e) => {
-      if (!e.fimSla || e.fimSla >= slaLimit) return false;
+      if (rbStatus.length && !rbStatus.includes(e.statusExec)) return false;
+      if (rbSomenteProgramaveis && !bucketOms.has(e.om)) return false;
       if (rbTipos.length && !rbTipos.includes(e.r["Tipo de Atividade"] || "")) return false;
       if (rbResps.length && !rbResps.includes(e.responsabilidade)) return false;
       if (rbElevatorias.length && !rbElevatorias.includes(e.planta)) return false;
@@ -2218,7 +2436,17 @@ function BacklogPage() {
       return true;
     });
     if (!candidates.length) {
-      setRouteError("Nenhuma O.S. atende aos critérios informados.");
+      const detalhes: string[] = [];
+      if (rbSomenteProgramaveis)
+        detalhes.push(
+          bucketOms.size
+            ? "somente ordens programáveis"
+            : "nenhuma O.S. programada (import o Bucket)",
+        );
+      if (rbStatus.length) detalhes.push(`status: ${rbStatus.join(", ")}`);
+      setRouteError(
+        `Nenhuma O.S. atende aos critérios informados${detalhes.length ? ` — ${detalhes.join(" · ")}` : "."}`,
+      );
       return;
     }
 
@@ -2259,7 +2487,7 @@ function BacklogPage() {
         lat: number;
         lon: number;
         oss: Enriched[];
-        oldestFimSla: Date;
+        oldestFimSla: Date | null;
       };
       const groupMap = new Map<string, Group>();
       for (const e of activeCandidates) {
@@ -2270,23 +2498,23 @@ function BacklogPage() {
             lat: e.lat!,
             lon: e.lon!,
             oss: [e],
-            oldestFimSla: e.fimSla!,
+            oldestFimSla: e.fimSla,
           });
         } else {
           cur.oss.push(e);
-          if (e.fimSla! < cur.oldestFimSla) cur.oldestFimSla = e.fimSla!;
+          if (e.fimSla && (!cur.oldestFimSla || e.fimSla < cur.oldestFimSla))
+            cur.oldestFimSla = e.fimSla;
         }
       }
       const groups = Array.from(groupMap.values());
       if (!groups.length) break;
 
       // 4) Nearest-neighbor — prioridade é a distância, urgência é desempate
-      const maxDaysAtraso = Math.max(
-        1,
-        ...groups.map((g) =>
-          Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000),
-        ),
-      );
+      const diasAtraso = (g: Group) =>
+        g.oldestFimSla
+          ? Math.max(0, (refSla.getTime() - g.oldestFimSla.getTime()) / 86_400_000)
+          : 0;
+      const maxDaysAtraso = Math.max(1, ...groups.map(diasAtraso));
       const remaining = new Set(groups.map((g) => g.planta));
       const orderedGroups: Group[] = [];
       let cursor: { lat: number; lon: number } = startPt;
@@ -2297,8 +2525,7 @@ function BacklogPage() {
         for (const g of groups) {
           if (!remaining.has(g.planta)) continue;
           const d = haversineKm(cursor, g);
-          const days = Math.max(0, (slaLimit.getTime() - g.oldestFimSla.getTime()) / 86_400_000);
-          const norm = days / maxDaysAtraso;
+          const norm = diasAtraso(g) / maxDaysAtraso;
           // Penaliza severamente saltos > 10 km (inadmissível)
           const hopPenalty = d > 10 ? (d - 10) * 100 : 0;
           // Urgência conta muito pouco no score (máximo ~0.5 km de desconto)
@@ -2366,6 +2593,7 @@ function BacklogPage() {
       const etaMin = Math.round((totalKm / AVG_KMH) * 60);
 
       routesList.push({
+        nome: `Rota ${routesList.length + 1}`,
         start: { lat: startPt.lat, lon: startPt.lon, label: rbStart },
         stops,
         details,
@@ -2392,6 +2620,11 @@ function BacklogPage() {
 
   const clearRoute = () => setGeneratedRoutes([]);
 
+  const renomearRota = (idx: number, nome: string) =>
+    setGeneratedRoutes((prev) =>
+      prev.map((r, i) => (i === idx ? { ...r, nome: nome.trim() || `Rota ${i + 1}` } : r)),
+    );
+
   const exportRouteCSV = (routeIdx?: number) => {
     if (!generatedRoutes.length) return;
     const headers = [
@@ -2415,7 +2648,7 @@ function BacklogPage() {
       for (const d of route.details) {
         for (const os of d.oss) {
           rows.push([
-            `Rota ${rIdx + 1}`,
+            route.nome,
             String(d.ordem),
             d.planta,
             d.cidade,
@@ -2448,7 +2681,7 @@ function BacklogPage() {
     const route = generatedRoutes[routeIdx];
     if (!route) return "";
     return [
-      `*ROTA ${routeIdx + 1}*`,
+      `*${route.nome.toUpperCase()}*`,
       "",
       ...route.details.flatMap((d) => [
         `• Parada ${d.ordem}: ${d.plantaShort} (${d.oss.length} O.S.)`,
@@ -2476,7 +2709,9 @@ function BacklogPage() {
   const copyRoute = async (rIdx: number) => {
     try {
       await navigator.clipboard.writeText(routeText(rIdx));
-      alert(`Resumo da Rota ${rIdx + 1} copiado! Cole no WhatsApp.`);
+      alert(
+        `Resumo de "${generatedRoutes[rIdx]?.nome ?? `Rota ${rIdx + 1}`}" copiado! Cole no WhatsApp.`,
+      );
     } catch {
       alert("Não foi possível copiar.");
     }
@@ -2638,28 +2873,14 @@ function BacklogPage() {
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    setImportType("bucket");
-                    try {
-                      localStorage.setItem("backlog:importType", "bucket");
-                    } catch {
-                      // ignore
-                    }
-                  }}
+                  onClick={() => escolherTipo("bucket")}
                   className={`px-3 py-2 text-[11px] ${importType === "bucket" ? "bg-[#0b3a73] text-white" : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"}`}
                 >
                   Bucket do Field
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setImportType("planejamento");
-                    try {
-                      localStorage.setItem("backlog:importType", "planejamento");
-                    } catch {
-                      // ignore
-                    }
-                  }}
+                  onClick={() => escolherTipo("planejamento")}
                   className={`px-3 py-2 text-[11px] border-l border-slate-300 dark:border-slate-600 ${importType === "planejamento" ? "bg-[#0b3a73] text-white" : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"}`}
                 >
                   Planejamento semanal
@@ -2686,6 +2907,23 @@ function BacklogPage() {
               >
                 <RouteIcon className="h-4 w-4" /> Montar Rota
               </button>
+              {linkToken ? (
+                <button
+                  onClick={revogarLinkPublico}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  title={`Link público ativo — clique para revogar ( /backlog/publico/${linkToken} )`}
+                >
+                  <Link2Off className="h-4 w-4" /> Link Ativo
+                </button>
+              ) : (
+                <button
+                  onClick={gerarLinkPublico}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white px-3 py-2 text-[13px] font-semibold text-[#0b3a73] shadow hover:bg-[#eaf3fb] dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+                  title="Gerar link público (sem login) para o Backlog"
+                >
+                  <Share2 className="h-4 w-4" /> Link
+                </button>
+              )}
               {hasCustomData && (
                 <button
                   onClick={async () => {
@@ -2702,7 +2940,8 @@ function BacklogPage() {
                     } catch {
                       // ignore
                     }
-                    setHasCustomData(false);
+                    setBucketCustom(false);
+                    setPlanoCustom(false);
                   }}
                   className="rounded border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-2 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
@@ -3263,21 +3502,7 @@ function BacklogPage() {
                 </DialogTitle>
               </DialogHeader>
               <div className="grid gap-3 py-2 text-sm">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      Fim SLA anterior a *
-                    </span>
-                    <input
-                      type="datetime-local"
-                      value={rbSlaBefore}
-                      onChange={(e) => setRbSlaBefore(e.target.value)}
-                      className="min-h-11 rounded-md border border-slate-300 dark:border-slate-600 px-2 text-[14px] shadow-sm"
-                    />
-                    <span className="text-[10px] text-slate-400 dark:text-slate-400">
-                      critério de corte e de urgência (mais antigo = mais prioritário)
-                    </span>
-                  </label>
+                <div className="grid gap-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                       Ponto de partida *
@@ -3300,7 +3525,7 @@ function BacklogPage() {
                   </label>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <MultiSelect
                     label="Tipo de Atividade *"
                     options={rbOptTipos}
@@ -3313,6 +3538,25 @@ function BacklogPage() {
                     value={rbResps}
                     onChange={setRbResps}
                   />
+                  <MultiSelect
+                    label="Status *"
+                    options={STATUS_EXECUCAO_OPCOES}
+                    value={rbStatus}
+                    onChange={setRbStatus}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Switch
+                    checked={rbSomenteProgramaveis}
+                    onCheckedChange={setRbSomenteProgramaveis}
+                  />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Montar rota somente com ordens programáveis
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    (O.S. que também estão no Bucket do Field)
+                  </span>
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-3">
@@ -3534,7 +3778,7 @@ function BacklogPage() {
                         className="h-2 w-2 rounded-full inline-block shrink-0"
                         style={{ backgroundColor: route.color || "#0b3a73" }}
                       />
-                      Rota {rIdx + 1}
+                      {route.nome}
                     </button>
                   );
                 })}
@@ -3573,9 +3817,15 @@ function BacklogPage() {
                           style={{ color: activeRoute.color || "#0b3a73" }}
                         />
                         <div>
-                          <div className="text-sm font-bold">
-                            Detalhes da Rota {activeRouteTab + 1}
-                          </div>
+                          <input
+                            value={activeRoute.nome}
+                            onChange={(ev) =>
+                              renomearRota(generatedRoutes.indexOf(activeRoute), ev.target.value)
+                            }
+                            title="Clique para renomear esta rota"
+                            aria-label="Nome da rota"
+                            className="w-52 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-[#0b3a73] hover:border-slate-300 focus:border-[#1f7ad6] focus:bg-white focus:outline-none dark:text-white dark:hover:border-slate-600 dark:focus:bg-slate-800"
+                          />
                           <div className="text-[11px] text-slate-600 dark:text-slate-300">
                             {activeRoute.totalOs} / {activeRoute.limitConfig.max} O.S. em{" "}
                             {activeRoute.stops.length} paradas
@@ -3601,13 +3851,13 @@ function BacklogPage() {
                           onClick={() => exportRouteCSV(activeRouteTab)}
                           className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
                         >
-                          <Download className="h-3 w-3" /> CSV Rota {activeRouteTab + 1}
+                          <Download className="h-3 w-3" /> CSV {activeRoute.nome}
                         </button>
                         <button
                           onClick={() => copyRoute(activeRouteTab)}
                           className="inline-flex items-center gap-1 rounded border border-[#0b3a73] bg-white dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb] cursor-pointer"
                         >
-                          <CopyIcon className="h-3 w-3" /> Copiar Rota {activeRouteTab + 1}
+                          <CopyIcon className="h-3 w-3" /> Copiar {activeRoute.nome}
                         </button>
                       </div>
                     </div>
@@ -3885,6 +4135,7 @@ function BacklogPage() {
                     <th className="px-2 py-2 font-semibold">SLA</th>
                     <th className="px-2 py-2 font-semibold">Resp.</th>
                     <th className="px-2 py-2 font-semibold">Equipe</th>
+                    <th className="px-2 py-2 font-semibold">Status</th>
                     <th className="px-2 py-2 font-semibold">Observação</th>
                     <th className="px-2 py-2 font-semibold">Comentários</th>
                   </tr>
@@ -4059,6 +4310,22 @@ function BacklogPage() {
                           <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                         )}
                       </td>
+                      <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                        <select
+                          value={e.statusExec}
+                          onChange={(ev) =>
+                            alterarStatusExecucao(e.om, ev.target.value as StatusExecucao)
+                          }
+                          title="Status de execução da O.S. — vale para toda a equipe"
+                          className={`min-h-7 cursor-pointer rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm ${statusExecucaoCor(e.statusExec)}`}
+                        >
+                          {STATUS_EXECUCAO_OPCOES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="min-w-[160px] px-2 py-1">
                         <input
                           value={obsUnica[e.om] ?? ""}
@@ -4123,6 +4390,7 @@ function BacklogPage() {
                       <th className="px-2 py-2 font-semibold">SLA</th>
                       <th className="px-2 py-2 font-semibold">Resp.</th>
                       <th className="px-2 py-2 font-semibold">Equipe</th>
+                      <th className="px-2 py-2 font-semibold">Status</th>
                       <th className="px-2 py-2 font-semibold">Observação</th>
                       <th className="px-2 py-2 font-semibold">Comentários</th>
                     </tr>
@@ -4302,6 +4570,22 @@ function BacklogPage() {
                           ) : (
                             <span className="text-slate-500 dark:text-slate-400">{e.equipe}</span>
                           )}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1 text-[12px]">
+                          <select
+                            value={e.statusExec}
+                            onChange={(ev) =>
+                              alterarStatusExecucao(e.om, ev.target.value as StatusExecucao)
+                            }
+                            title="Status de execução da O.S. — vale para toda a equipe"
+                            className={`min-h-7 cursor-pointer rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm ${statusExecucaoCor(e.statusExec)}`}
+                          >
+                            {STATUS_EXECUCAO_OPCOES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td className="min-w-[160px] px-2 py-1">
                           <input

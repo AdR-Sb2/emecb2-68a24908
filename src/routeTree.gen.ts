@@ -33,6 +33,7 @@ import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as TestesRouteImport } from './routes/testes'
 import { Route as ApiEquipeOverrideRouteImport } from './routes/api/equipe-override'
 import { Route as ElevatoriasIdRouteImport } from './routes/elevatorias_.$id'
+import { Route as BacklogPublicoTokenRouteImport } from './routes/backlog/publico/$token'
 import { Route as CronogramaPublicoTokenRouteImport } from './routes/cronograma/publico/$token'
 import { Route as ElevatoriasPublicoTokenRouteImport } from './routes/elevatorias/publico/$token'
 import { Route as ProdutividadePublicoTokenRouteImport } from './routes/produtividade/publico/$token'
@@ -157,6 +158,11 @@ const ElevatoriasIdRoute = ElevatoriasIdRouteImport.update({
   path: '/elevatorias/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BacklogPublicoTokenRoute = BacklogPublicoTokenRouteImport.update({
+  id: '/publico/$token',
+  path: '/publico/$token',
+  getParentRoute: () => BacklogRoute,
+} as any)
 const CronogramaPublicoTokenRoute = CronogramaPublicoTokenRouteImport.update({
   id: '/publico/$token',
   path: '/publico/$token',
@@ -178,7 +184,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/analitico': typeof AnaliticoRoute
-  '/backlog': typeof BacklogRoute
+  '/backlog': typeof BacklogRouteWithChildren
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
   '/elevatorias/$id': typeof ElevatoriasIdRoute
+  '/backlog/publico/$token': typeof BacklogPublicoTokenRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
   '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
   '/produtividade/publico/$token': typeof ProdutividadePublicoTokenRoute
@@ -207,7 +214,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/analitico': typeof AnaliticoRoute
-  '/backlog': typeof BacklogRoute
+  '/backlog': typeof BacklogRouteWithChildren
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
   '/elevatorias/$id': typeof ElevatoriasIdRoute
+  '/backlog/publico/$token': typeof BacklogPublicoTokenRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
   '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
   '/produtividade/publico/$token': typeof ProdutividadePublicoTokenRoute
@@ -237,7 +245,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/analitico': typeof AnaliticoRoute
-  '/backlog': typeof BacklogRoute
+  '/backlog': typeof BacklogRouteWithChildren
   '/bloqueado': typeof BloqueadoRoute
   '/cronograma': typeof CronogramaRouteWithChildren
   '/dashboard': typeof DashboardRoute
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/testes': typeof TestesRoute
   '/api/equipe-override': typeof ApiEquipeOverrideRoute
   '/elevatorias_/$id': typeof ElevatoriasIdRoute
+  '/backlog/publico/$token': typeof BacklogPublicoTokenRoute
   '/cronograma/publico/$token': typeof CronogramaPublicoTokenRoute
   '/elevatorias/publico/$token': typeof ElevatoriasPublicoTokenRoute
   '/produtividade/publico/$token': typeof ProdutividadePublicoTokenRoute
@@ -289,6 +298,7 @@ export interface FileRouteTypes {
     | '/testes'
     | '/api/equipe-override'
     | '/elevatorias/$id'
+    | '/backlog/publico/$token'
     | '/cronograma/publico/$token'
     | '/elevatorias/publico/$token'
     | '/produtividade/publico/$token'
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/testes'
     | '/api/equipe-override'
     | '/elevatorias/$id'
+    | '/backlog/publico/$token'
     | '/cronograma/publico/$token'
     | '/elevatorias/publico/$token'
     | '/produtividade/publico/$token'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/testes'
     | '/api/equipe-override'
     | '/elevatorias_/$id'
+    | '/backlog/publico/$token'
     | '/cronograma/publico/$token'
     | '/elevatorias/publico/$token'
     | '/produtividade/publico/$token'
@@ -356,7 +368,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AnaliticoRoute: typeof AnaliticoRoute
-  BacklogRoute: typeof BacklogRoute
+  BacklogRoute: typeof BacklogRouteWithChildren
   BloqueadoRoute: typeof BloqueadoRoute
   CronogramaRoute: typeof CronogramaRouteWithChildren
   DashboardRoute: typeof DashboardRoute
@@ -549,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ElevatoriasIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/backlog/publico/$token': {
+      id: '/backlog/publico/$token'
+      path: '/publico/$token'
+      fullPath: '/backlog/publico/$token'
+      preLoaderRoute: typeof BacklogPublicoTokenRouteImport
+      parentRoute: typeof BacklogRoute
+    }
     '/cronograma/publico/$token': {
       id: '/cronograma/publico/$token'
       path: '/publico/$token'
@@ -572,6 +591,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface BacklogRouteChildren {
+  BacklogPublicoTokenRoute: typeof BacklogPublicoTokenRoute
+}
+
+const BacklogRouteChildren: BacklogRouteChildren = {
+  BacklogPublicoTokenRoute: BacklogPublicoTokenRoute,
+}
+
+const BacklogRouteWithChildren =
+  BacklogRoute._addFileChildren(BacklogRouteChildren)
 
 interface CronogramaRouteChildren {
   CronogramaPublicoTokenRoute: typeof CronogramaPublicoTokenRoute
@@ -613,7 +643,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AnaliticoRoute: AnaliticoRoute,
-  BacklogRoute: BacklogRoute,
+  BacklogRoute: BacklogRouteWithChildren,
   BloqueadoRoute: BloqueadoRoute,
   CronogramaRoute: CronogramaRouteWithChildren,
   DashboardRoute: DashboardRoute,
