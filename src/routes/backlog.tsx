@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Bar,
@@ -120,6 +120,15 @@ type BacklogObservacao = {
 };
 const EQUIPE_OVERRIDES = rawEquipeOverrides as Record<string, string>;
 const RESP_OVERRIDES = rawEquipeOverrides as Record<string, string>;
+const RESP_VALIDAS: Responsabilidade[] = [
+  "Planta Inativa",
+  "Não atendemos",
+  "CDA",
+  "Baixada 1",
+  "Baixada 2",
+  "Outra SUP",
+  "Ainda não identificado",
+];
 
 const plantaToElevatoriaMap = new Map<string, string>();
 (elevatoriasData as Array<{ PLANTA: string | null; ELEVATORIAS: string | null }>).forEach(
@@ -966,23 +975,36 @@ export function BacklogPage() {
       // ignore
     }
   }, [equipeOverrides]);
-  // Carrega overrides do Supabase (persiste pra todo mundo)
-  useEffect(() => {
-    supabase
-      .from("equipe_overrides")
-      .select("*")
-      .then(({ data, error }) => {
-        if (error) return;
-        if (data?.length) {
-          const map: Record<string, Equipe> = {};
-          data.forEach((row: { om: string; equipe: string }) => {
-            if (row.equipe === "EMEC" || row.equipe === "Automação") {
-              map[row.om] = row.equipe;
-            }
-          });
-          setEquipeOverrides((prev) => ({ ...prev, ...map }) as Record<string, Equipe>);
+  // Carrega/propaga as mudanças de equipe feitas por outras pessoas (inclusive
+  // no link público). Comparamos com a última resposta do servidor: só o que
+  // sumiu DAS LINHAS DO BANCO é removido, então entradas que existem apenas no
+  // localStorage desta máquina não são apagadas.
+  const equipeServRef = useRef<Record<string, Equipe> | null>(null);
+  const recarregarEquipeOverrides = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from("equipe_overrides").select("*");
+      if (error) return;
+      const servidor: Record<string, Equipe> = {};
+      for (const row of (data ?? []) as { om: string; equipe: string }[]) {
+        if (row.equipe === "EMEC" || row.equipe === "Automação") {
+          servidor[row.om] = row.equipe as Equipe;
         }
+      }
+      const anterior = equipeServRef.current;
+      equipeServRef.current = servidor;
+      setEquipeOverrides((prev) => {
+        const next = { ...prev } as Record<string, Equipe>;
+        if (anterior) {
+          for (const om of Object.keys(anterior)) {
+            if (!(om in servidor)) delete next[om];
+          }
+        }
+        for (const [om, eq] of Object.entries(servidor)) next[om] = eq;
+        return next;
       });
+    } catch {
+      // sem rede — mantém o estado local
+    }
   }, []);
 
   const [responsabilidadeOverrides, setResponsabilidadeOverrides] = useState<
@@ -1003,33 +1025,32 @@ export function BacklogPage() {
       // ignore
     }
   }, [responsabilidadeOverrides]);
-  useEffect(() => {
-    supabase
-      .from("responsabilidade_overrides")
-      .select("*")
-      .then(({ data, error }) => {
-        if (error) return;
-        if (data?.length) {
-          const map: Record<string, Responsabilidade> = {};
-          data.forEach((row: { om: string; responsabilidade: string }) => {
-            const valid: Responsabilidade[] = [
-              "Planta Inativa",
-              "Não atendemos",
-              "CDA",
-              "Baixada 1",
-              "Baixada 2",
-              "Outra SUP",
-              "Ainda não identificado",
-            ];
-            if (valid.includes(row.responsabilidade as Responsabilidade)) {
-              map[row.om] = row.responsabilidade as Responsabilidade;
-            }
-          });
-          setResponsabilidadeOverrides(
-            (prev) => ({ ...prev, ...map }) as Record<string, Responsabilidade>,
-          );
+  const respServRef = useRef<Record<string, Responsabilidade> | null>(null);
+  const recarregarRespOverrides = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from("responsabilidade_overrides").select("*");
+      if (error) return;
+      const servidor: Record<string, Responsabilidade> = {};
+      for (const row of (data ?? []) as { om: string; responsabilidade: string }[]) {
+        if (RESP_VALIDAS.includes(row.responsabilidade as Responsabilidade)) {
+          servidor[row.om] = row.responsabilidade as Responsabilidade;
         }
+      }
+      const anterior = respServRef.current;
+      respServRef.current = servidor;
+      setResponsabilidadeOverrides((prev) => {
+        const next = { ...prev } as Record<string, Responsabilidade>;
+        if (anterior) {
+          for (const om of Object.keys(anterior)) {
+            if (!(om in servidor)) delete next[om];
+          }
+        }
+        for (const [om, resp] of Object.entries(servidor)) next[om] = resp;
+        return next;
       });
+    } catch {
+      // sem rede — mantém o estado local
+    }
   }, []);
 
   const enriched = useMemo(
@@ -1056,6 +1077,76 @@ export function BacklogPage() {
   const [obsUnica, setObsUnica] = useState<Record<string, string>>({});
   const obsUnicaLoaded = useRef<Set<string>>(new Set());
   const obsUnicaTimer = useRef<Record<string, { id: number; valor: string }>>({});
+
+  // OMs visíveis, lidos no momento do disparo — assim o intervalo não precisa
+  // ser recriado toda vez que o filtro/ordenacao muda.
+  const omsVisiveisRef = useRef<string[]>([]);
+
+  // Busca as observações (e a nota única) das O.S. visíveis e SUBSTITUI o que
+  // tínhamos: uma observação apagada ou editada por outra pessoa some/altera aqui.
+  const carregarObservacoes = useCallback(async () => {
+    const oms = omsVisiveisRef.current;
+    if (!oms.length) return;
+    const mapa: Record<string, BacklogObservacao[]> = {};
+    for (const om of oms) mapa[om] = [];
+    for (let i = 0; i < oms.length; i += 200) {
+      const chunk = oms.slice(i, i + 200);
+      const { data, error } = await supabase
+        .from("backlog_observacoes")
+        .select("*, profiles:autor_id(nome_completo)")
+        .in("om", chunk)
+        .order("criado_em", { ascending: false, nullsFirst: false });
+      if (error) return; // falhou no meio → não sobrescreve o que já temos
+      for (const r of data ?? []) {
+        const obs = {
+          ...(r as Omit<BacklogObservacao, "autor_nome">),
+          autor_nome: (r.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
+        };
+        (mapa[obs.om] ??= []).push(obs);
+      }
+    }
+    setObsPorOm((prev) => ({ ...prev, ...mapa }));
+  }, []);
+
+  const carregarObsUnica = useCallback(async () => {
+    const oms = omsVisiveisRef.current;
+    if (!oms.length) return;
+    const mapa: Record<string, string> = {};
+    for (const om of oms) mapa[om] = "";
+    for (let i = 0; i < oms.length; i += 200) {
+      const chunk = oms.slice(i, i + 200);
+      const { data, error } = await supabase
+        .from("backlog_obs_unica")
+        .select("om, obs")
+        .in("om", chunk);
+      if (error) return;
+      for (const r of data ?? []) mapa[r.om] = r.obs ?? "";
+      for (const om of chunk) obsUnicaLoaded.current.add(om);
+    }
+    setObsUnica((prev) => ({ ...prev, ...mapa }));
+  }, []);
+
+  // Propagação em tempo real: equipe, responsabilidade, observações e nota
+  // única são relidos a cada 20s (e ao voltar para a aba), então uma alteração
+  // feita no link público aparece na tela normal e vice-versa.
+  useEffect(() => {
+    const sincronizar = () => {
+      void recarregarEquipeOverrides();
+      void recarregarRespOverrides();
+      void carregarObservacoes();
+      void carregarObsUnica();
+    };
+    // Na montagem carrega só os overrides: as observações já são buscadas pelo
+    // efeito "carrega o que falta" logo abaixo, então não duplica a chamada.
+    void recarregarEquipeOverrides();
+    void recarregarRespOverrides();
+    const id = setInterval(sincronizar, 20_000);
+    window.addEventListener("focus", sincronizar);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", sincronizar);
+    };
+  }, [recarregarEquipeOverrides, recarregarRespOverrides, carregarObservacoes, carregarObsUnica]);
 
   // ---------- filtros ----------
   const [fPlantas, setFPlantas] = useState<string[]>([]);
@@ -1354,6 +1445,7 @@ export function BacklogPage() {
     });
     return arr;
   }, [filtered, sortKey, sortDir]);
+  omsVisiveisRef.current = Array.from(new Set(sortedRows.map((e) => e.om).filter(Boolean)));
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else {
@@ -1445,7 +1537,8 @@ export function BacklogPage() {
         const { data, error } = await supabase
           .from("backlog_observacoes")
           .select("*, profiles:autor_id(nome_completo)")
-          .in("om", chunk);
+          .in("om", chunk)
+          .order("criado_em", { ascending: false, nullsFirst: false });
         if (error) {
           console.warn("Falha ao carregar observações do backlog", error);
           break;
@@ -2833,26 +2926,30 @@ export function BacklogPage() {
               icon: <RouteIcon className="h-3.5 w-3.5" />,
             },
           ] as const
-        ).map((t) => {
-          const isActive = backlogTab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setBacklogTab(t.id as typeof backlogTab)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[2px] cursor-pointer ${
-                isActive
-                  ? "bg-white dark:bg-slate-800 border-[#0b3a73] text-[#0b3a73] dark:text-white"
-                  : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-850 hover:bg-white/40"
-              }`}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          );
-        })}
+        )
+          // No link público fica só o Backlog — quem está só consultando não
+          // precisa do módulo de Planejamento.
+          .filter((t) => !emRotaPublica || t.id === "backlog")
+          .map((t) => {
+            const isActive = backlogTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setBacklogTab(t.id as typeof backlogTab)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition border-b-2 -mb-[2px] cursor-pointer ${
+                  isActive
+                    ? "bg-white dark:bg-slate-800 border-[#0b3a73] text-[#0b3a73] dark:text-white"
+                    : "text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-850 hover:bg-white/40"
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            );
+          })}
       </div>
 
-      {backlogTab === "planejamento" ? (
+      {!emRotaPublica && backlogTab === "planejamento" ? (
         <Suspense
           fallback={
             <div className="mb-4 rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -2935,7 +3032,7 @@ export function BacklogPage() {
                     <Share2 className="h-4 w-4" /> Link
                   </button>
                 ))}
-              {hasCustomData && (
+              {!emRotaPublica && hasCustomData && (
                 <button
                   onClick={async () => {
                     localStorage.removeItem(STORAGE_KEY);
@@ -4214,10 +4311,11 @@ export function BacklogPage() {
                                   { om: e.om, responsabilidade: val },
                                   { ignoreDuplicates: false },
                                 )
-                                .then(
-                                  ({ error }) =>
-                                    error && console.warn("Falha ao salvar resp", error),
-                                );
+                                .then(({ error }) => {
+                                  if (!error) return;
+                                  console.warn("Falha ao salvar resp", error);
+                                  toast.error("Responsabilidade não foi salva: " + error.message);
+                                });
                             }}
                             className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
                           >
@@ -4249,11 +4347,13 @@ export function BacklogPage() {
                                   .from("responsabilidade_overrides")
                                   .delete()
                                   .eq("om", e.om)
-                                  .then(
-                                    ({ error }) =>
-                                      error &&
-                                      console.warn("Falha ao remover resp override", error),
-                                  );
+                                  .then(({ error }) => {
+                                    if (!error) return;
+                                    console.warn("Falha ao remover resp override", error);
+                                    toast.error(
+                                      "Não consegui reverter a responsabilidade: " + error.message,
+                                    );
+                                  });
                               }}
                               className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
                               title="Reverter ao cálculo automático"
@@ -4367,7 +4467,6 @@ export function BacklogPage() {
               </table>
             </div>
           </div>
-
           {/* Dialog da Tabela Expandida */}
           <Dialog open={tableExpanded} onOpenChange={setTableExpanded}>
             <DialogContent className="max-w-7xl">
@@ -4471,10 +4570,11 @@ export function BacklogPage() {
                                     { om: e.om, responsabilidade: val },
                                     { ignoreDuplicates: false },
                                   )
-                                  .then(
-                                    ({ error }) =>
-                                      error && console.warn("Falha ao salvar resp", error),
-                                  );
+                                  .then(({ error }) => {
+                                    if (!error) return;
+                                    console.warn("Falha ao salvar resp", error);
+                                    toast.error("Responsabilidade não foi salva: " + error.message);
+                                  });
                               }}
                               className="min-h-7 rounded border px-1.5 py-0.5 text-[11px] font-medium shadow-sm cursor-pointer border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
                             >
@@ -4506,11 +4606,14 @@ export function BacklogPage() {
                                     .from("responsabilidade_overrides")
                                     .delete()
                                     .eq("om", e.om)
-                                    .then(
-                                      ({ error }) =>
-                                        error &&
-                                        console.warn("Falha ao remover resp override", error),
-                                    );
+                                    .then(({ error }) => {
+                                      if (!error) return;
+                                      console.warn("Falha ao remover resp override", error);
+                                      toast.error(
+                                        "Não consegui reverter a responsabilidade: " +
+                                          error.message,
+                                      );
+                                    });
                                 }}
                                 className="rounded bg-slate-100 dark:bg-slate-700 px-1 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer"
                                 title="Reverter ao cálculo automático"
@@ -4629,7 +4732,6 @@ export function BacklogPage() {
               </div>
             </DialogContent>
           </Dialog>
-
           {/* Dialog Observações da O.S. */}
           <Dialog open={obsDialogOm !== null} onOpenChange={(o) => !o && setObsDialogOm(null)}>
             <DialogContent className="max-w-md">
@@ -4688,7 +4790,6 @@ export function BacklogPage() {
               )}
             </DialogContent>
           </Dialog>
-
           <input
             ref={fileInputRef}
             type="file"
@@ -4700,7 +4801,6 @@ export function BacklogPage() {
               e.target.value = "";
             }}
           />
-
           <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
             Águas do Rio · Eletromecânica · Backlog Field/SAP
           </p>
