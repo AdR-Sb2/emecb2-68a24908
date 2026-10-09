@@ -89,6 +89,8 @@ type Row = {
   "Coordenada Y": string | null;
   "Coordenada X": string | null;
   "Bucket de Origem da OS": string | null;
+  /** Somente no Planejamento semanal — origem da responsabilidade (SUP). */
+  SUP?: string | null;
   PRIORIDADE: string | null;
   "DESCRIÇÃO EQUIPAMENTO": string | null;
   "Tipo de Atividade": string | null;
@@ -148,6 +150,67 @@ const STORAGE_KEY = "backlog_data_v1";
 const STORAGE_KEY_PLANO = "backlog_data_plano_v1";
 const STORAGE_KEY_ACTIVE = "backlog_import_active_v1";
 const VIEW_STORAGE_KEY = "backlog_saved_views_v1";
+
+// ---------- colunas fixas da planilha de Planejamento semanal ----------
+// A planilha é enviada com essas posições fixas (planilha Excel, colunas E, N e T).
+const COL_PLANO_INICIO_SLA = "E";
+const COL_PLANO_ELEVATORIA = "N";
+const COL_PLANO_TIPO_ORDEM = "T";
+// Chaves sintéticas gravadas em cada linha lida do XLSX (leitura por posição).
+const KEY_PLANO_INICIO_SLA = "__col_E_inicio_sla";
+const KEY_PLANO_ELEVATORIA = "__col_N_elevatoria";
+const KEY_PLANO_TIPO_ORDEM = "__col_T_tipo_ordem";
+
+// Converte o código de "Tipo de ordem" (SAP) da planilha de Planejamento no
+// mesmo vocabulário de "Tipo de Atividade" usado pelo Bucket do Field.
+const TIPO_ORDEM_PARA_ATIVIDADE: Record<string, string> = {
+  ZTPF: "MANUTENÇÃO PREVENTIVA POR FREQUÊNCIA",
+  ZTRE: "MANUTENÇÃO PREVENTIVA POR FREQUÊNCIA",
+  ZTPD: "MANUTENÇÃO PREDITIVA",
+  ZTPR: "MANUTENÇÃO PREDITIVA",
+  ZTPC: "MANUTENÇÃO PREVENTIVA POR CONDIÇÃO",
+  ZNTE: "MANUTENÇÃO CORRETIVA EMERGENCIAL",
+  ZNTP: "MANUTENÇÃO CORRETIVA PROGRAMADA",
+  ZNTS: "SERVIÇOS",
+  ZTEN: "ENGENHARIA DE MANUTENÇÃO",
+  ZTCO: "CONTROLE OPERACIONAL",
+};
+
+function tipoAtividadeDeOrdem(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const up = s.toUpperCase();
+  return TIPO_ORDEM_PARA_ATIVIDADE[up] ?? s;
+}
+
+// Normaliza um valor de data vindo da planilha (Date, serial do Excel ou
+// texto) para "DD/MM/YYYY HH:MM", formato que `parseFieldDate` entende.
+function formatarDataPlanilha(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) return null;
+    return `${String(v.getDate()).padStart(2, "0")}/${String(v.getMonth() + 1).padStart(2, "0")}/${v.getFullYear()} ${String(v.getHours()).padStart(2, "0")}:${String(v.getMinutes()).padStart(2, "0")}`;
+  }
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 86_400_000);
+    if (Number.isNaN(d.getTime())) return null;
+    return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  }
+  const s = String(v).trim();
+  return s || null;
+}
+
+// Retorna o primeiro valor que não esteja vazio (usado para alternar entre a
+// leitura por posição da coluna e a leitura por nome do cabeçalho).
+function primeiroValor(...vals: unknown[]): unknown {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    return v;
+  }
+  return null;
+}
 
 const BLUE = "#1f7ad6";
 const BLUE_DARK = "#0b3a73";
@@ -469,7 +532,7 @@ function ComboboxSearch({
 function BacklogPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [backlogTab, setBacklogTab] = useState<"backlog" | "planejamento">("backlog");
-  const [dataBucket, setDataBucket] = useState<Row[]>([]);
+  const [dataBucket, setDataBucket] = useState<Row[]>(DATA);
   const [dataPlano, setDataPlano] = useState<Row[]>([]);
   const [hasCustomData, setHasCustomData] = useState(false);
   const [mostrarSomenteProgramaveis, setMostrarSomenteProgramaveis] = useState(false);
@@ -498,9 +561,13 @@ function BacklogPage() {
 
   // Assinatura dos dados compartilhados — evita re-render quando nada mudou.
   const lastSharedDados = useRef<string>("");
+  // Marca quando o usuário importou localmente: evita que o polling do
+  // Supabase desfaça a importação quando o upsert falha (RLS/offline).
+  const lastLocalWriteAt = useRef<number>(0);
 
   useEffect(() => {
     (async () => {
+      let bucketCarregado = false;
       try {
         const { data, error } = await supabase
           .from("backlog_dados")
@@ -512,21 +579,29 @@ function BacklogPage() {
           setDataBucket(arr);
           setHasCustomData(true);
           lastSharedDados.current = JSON.stringify(arr);
+          bucketCarregado = true;
         }
       } catch {
         // ignore
       }
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY_BUCKET);
-        if (raw) {
-          const parsed = JSON.parse(raw) as Row[];
-          if (Array.isArray(parsed) && parsed.length) {
-            setDataBucket(parsed);
-            setHasCustomData(true);
+      if (!bucketCarregado) {
+        // Chave nova; a chave legada guarda o mesmo bucket de versões antigas.
+        for (const key of [STORAGE_KEY_BUCKET, STORAGE_KEY]) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw) as Row[];
+              if (Array.isArray(parsed) && parsed.length) {
+                setDataBucket(parsed);
+                setHasCustomData(true);
+                bucketCarregado = true;
+                break;
+              }
+            }
+          } catch {
+            // ignore
           }
         }
-      } catch {
-        // ignore
       }
       try {
         const raw = localStorage.getItem(STORAGE_KEY_PLANO);
@@ -566,12 +641,17 @@ function BacklogPage() {
       try {
         const { data, error } = await supabase
           .from("backlog_dados")
-          .select("dados")
+          .select("dados, atualizado_em")
           .eq("id", 1)
           .single();
         if (error) return;
         const arr = data?.dados as Row[] | null;
         if (!Array.isArray(arr) || arr.length === 0) return;
+        // Não desfaz uma importação local: só aceita dado remoto mais recente.
+        if (lastLocalWriteAt.current > 0) {
+          const remoto = Date.parse(data?.atualizado_em ?? "");
+          if (!Number.isFinite(remoto) || remoto <= lastLocalWriteAt.current) return;
+        }
         const sig = JSON.stringify(arr);
         if (sig !== lastSharedDados.current) {
           lastSharedDados.current = sig;
@@ -1147,16 +1227,6 @@ function BacklogPage() {
     setObsEnviando(false);
   };
 
-  const TIPO_MAP: Record<string, string> = {
-    ELE: "ELE",
-    MEC: "MEC",
-    AUT: "AUT",
-    TER: "TER",
-    OUT: "OUT",
-    INP: "INP",
-    INS: "INS",
-  };
-
   function normalizeHeader(s: string): string {
     return s
       .replace(/^\uFEFF/, "")
@@ -1198,27 +1268,11 @@ function BacklogPage() {
       const name = file.name;
       const nameLower = name.toLowerCase();
       const isCSV = nameLower.endsWith(".csv");
-      const isXLSX = nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls");
 
       let rowsRaw: Record<string, unknown>[];
       let headersAll: string[] = [];
 
       if (isCSV) {
-        if (importType !== "bucket") {
-          if (
-            !confirm(
-              "Este arquivo parece ser do tipo Bucket do Field (CSV). Trocar para essa opção?",
-            )
-          ) {
-            return;
-          }
-          setImportType("bucket");
-          try {
-            localStorage.setItem("backlog:importType", "bucket");
-          } catch {
-            // ignore
-          }
-        }
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter(Boolean);
         if (lines.length < 2) {
@@ -1249,10 +1303,53 @@ function BacklogPage() {
           wb.Sheets[
             wb.SheetNames.find((s) => s.toUpperCase().includes("PLANEJAMENTO")) || wb.SheetNames[0]
           ];
-        rowsRaw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-        if (rowsRaw.length > 0) {
-          headersAll = Object.keys(rowsRaw[0]);
+        // Lê como grade bruta: o Planejamento é distribuído com colunas
+        // fixas (E = Início do SLA, N = Elevatória, T = Tipo de ordem),
+        // então lemos por posição além de pelo nome do cabeçalho.
+        const ref = ws["!ref"];
+        const range = XLSX.utils.decode_range(ref ?? "A1");
+        const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+          header: 1,
+          raw: true,
+          defval: null,
+        });
+        const startCol = range.s.c;
+        const colIdx = (letter: string): number => {
+          let n = 0;
+          for (const ch of letter.toUpperCase()) {
+            if (ch < "A" || ch > "Z") continue;
+            n = n * 26 + (ch.charCodeAt(0) - 64);
+          }
+          return n > 0 ? n - 1 - startCol : -1;
+        };
+        const idxE = colIdx(COL_PLANO_INICIO_SLA);
+        const idxN = colIdx(COL_PLANO_ELEVATORIA);
+        const idxT = colIdx(COL_PLANO_TIPO_ORDEM);
+        // Primeira linha não vazia = cabeçalho.
+        let headerIdx = 0;
+        while (
+          headerIdx < grid.length &&
+          (grid[headerIdx] ?? []).every((c) => c === null || String(c).trim() === "")
+        ) {
+          headerIdx++;
         }
+        const headers = (grid[headerIdx] ?? []).map((c) =>
+          c === null || c === undefined ? "" : String(c).trim(),
+        );
+        rowsRaw = grid
+          .slice(headerIdx + 1)
+          .filter((cells) => (cells ?? []).some((c) => c !== null && String(c ?? "").trim() !== ""))
+          .map((cells) => {
+            const r: Record<string, unknown> = {};
+            headers.forEach((h, i) => {
+              if (h) r[h] = cells[i] ?? null;
+            });
+            if (idxE >= 0) r[KEY_PLANO_INICIO_SLA] = cells[idxE] ?? null;
+            if (idxN >= 0) r[KEY_PLANO_ELEVATORIA] = cells[idxN] ?? null;
+            if (idxT >= 0) r[KEY_PLANO_TIPO_ORDEM] = cells[idxT] ?? null;
+            return r;
+          });
+        headersAll = headers;
       }
 
       if (!rowsRaw.length) {
@@ -1261,61 +1358,50 @@ function BacklogPage() {
       }
 
       // Validação por tipo selecionado
-      if (importType === "bucket") {
-        if (isXLSX) {
-          if (isFormatoB(headersAll)) {
-            const swap = confirm(
-              "Este arquivo parece ser um Planejamento semanal. Trocar para essa opção?",
-            );
-            if (!swap) return;
-            setImportType("planejamento");
-            try {
-              localStorage.setItem("backlog:importType", "planejamento");
-            } catch {
-              // ignore
-            }
-          } else {
-            alert("Este arquivo não corresponde ao formato Bucket do Field (CSV).");
-            return;
-          }
+      const setTipo = (t: "bucket" | "planejamento") => {
+        setImportType(t);
+        try {
+          localStorage.setItem("backlog:importType", t);
+        } catch {
+          // ignore
         }
-        if (!isFormatoA(headersAll)) {
-          const faltando = [];
-          const set = new Set(headersAll.map(normalizeHeader));
-          if (!set.has("id do recurso")) faltando.push("ID do Recurso");
-          if (!set.has("ordem de manutencao")) faltando.push("Ordem de Manutenção");
-          if (!set.has("inicio do sla")) faltando.push("Início do SLA");
-          alert("Formato inválido para Bucket do Field. Colunas faltantes: " + faltando.join(", "));
-          return;
+      };
+
+      // Detecta o formato a partir do arquivo (e não do modo selecionado),
+      // sincronizando o modo com o que realmente foi enviado.
+      const formatoA = isFormatoA(headersAll);
+      const formatoB = isFormatoB(headersAll);
+      let tipo: "bucket" | "planejamento" = importType;
+
+      if (!formatoA && !formatoB) {
+        const set = new Set(headersAll.map(normalizeHeader));
+        const faltandoA = ["id do recurso", "ordem de manutencao", "inicio do sla"]
+          .filter((h) => !set.has(h))
+          .map((h) => h.toUpperCase());
+        const faltandoB = ["sequencia_rota", "data_programada", "equipe_rota"]
+          .filter((h) => !set.has(h))
+          .map((h) => h.toUpperCase());
+        alert(
+          "Formato não reconhecido. O arquivo não corresponde ao Bucket do Field (CSV) nem ao Planejamento semanal (XLSX).\n" +
+            `Bucket faltando: ${faltandoA.join(", ")}\nPlanejamento faltando: ${faltandoB.join(", ")}`,
+        );
+        return;
+      }
+      if (formatoA && !formatoB) {
+        if (tipo !== "bucket") {
+          if (!confirm("Este arquivo é do Bucket do Field (CSV). Trocar para essa opção?")) return;
+          tipo = "bucket";
         }
-      } else if (importType === "planejamento") {
-        if (isCSV) {
-          const swap = confirm(
-            "Este arquivo parece ser um CSV (Bucket do Field). Trocar para essa opção?",
-          );
-          if (!swap) return;
-          setImportType("bucket");
-          try {
-            localStorage.setItem("backlog:importType", "bucket");
-          } catch {
-            // ignore
-          }
-          // process as bucket after? but easier to re-trigger; for now process
-        }
-        if (!isFormatoB(headersAll)) {
-          const faltando = [];
-          const set = new Set(headersAll.map(normalizeHeader));
-          if (!set.has("sequencia_rota")) faltando.push("SEQUENCIA_ROTA");
-          if (!set.has("data_programada")) faltando.push("DATA_PROGRAMADA");
-          if (!set.has("equipe_rota")) faltando.push("EQUIPE_ROTA");
-          alert(
-            "Formato inválido para Planejamento semanal. Colunas faltantes: " + faltando.join(", "),
-          );
-          return;
+      } else if (formatoB && !formatoA) {
+        if (tipo !== "planejamento") {
+          if (!confirm("Este arquivo é um Planejamento semanal. Trocar para essa opção?")) return;
+          tipo = "planejamento";
         }
       }
+      // O modo só é trocado (setTipo) quando a importação efetivamente
+      // conclui, para não deixar a tela vazia se o usuário cancelar.
 
-      if (importType === "bucket") {
+      if (tipo === "bucket") {
         // Usa lógica existente: normaliza datas de Início/Fim SLA
         const dateFieldMap: Record<string, string> = {};
         for (const name of ["Início do SLA", "Fim do SLA"]) {
@@ -1388,11 +1474,8 @@ function BacklogPage() {
         }
         lastSharedDados.current = JSON.stringify(norm);
         setDataBucket(norm);
-        try {
-          localStorage.setItem(STORAGE_KEY_ACTIVE, "bucket");
-        } catch {
-          // ignore
-        }
+        setTipo("bucket");
+        lastLocalWriteAt.current = Date.now();
         setHasCustomData(true);
         const agora = new Date();
         setImportMeta({
@@ -1421,6 +1504,10 @@ function BacklogPage() {
         };
         const mapped: Row[] = [];
         let descartadas = 0;
+        let semTipoOrdem = 0;
+        let semInicioSla = 0;
+        let semElevatoria = 0;
+        let amostra = "";
         const avisos: string[] = [];
         for (const r of rowsRaw) {
           const ordem = String(get(r, ["Ordem"]) || "").trim();
@@ -1445,9 +1532,31 @@ function BacklogPage() {
           const sup = String(get(r, ["SUP"]) || "").trim() || "Baixada 2";
           const seq = get(r, ["SEQUENCIA_ROTA"]) as unknown;
           const dataProg = String(get(r, ["DATA_PROGRAMADA"]) || "").trim();
-          const tipoAtv = String(
-            get(r, ["Tipo atividad.manut."]) || get(r, ["Tipo de atividade"]) || "",
-          ).trim();
+          // Coluna T = "Tipo de ordem" (código SAP, ex.: ZTPF, ZTPD).
+          const tipoOrdem = primeiroValor(
+            r[KEY_PLANO_TIPO_ORDEM],
+            get(r, ["Tipo de ordem"]),
+            get(r, ["Tipo atividad.manut."]),
+            get(r, ["Tipo de atividade"]),
+          );
+          const tipoAtv = tipoAtividadeDeOrdem(tipoOrdem);
+          // Coluna E = "Início do SLA".
+          const inicioSla = formatarDataPlanilha(
+            primeiroValor(
+              r[KEY_PLANO_INICIO_SLA],
+              get(r, ["Início do SLA"]),
+              get(r, ["Inicio do SLA"]),
+            ),
+          );
+          // Coluna N = elevatória (nome).
+          const elevNome =
+            String(
+              primeiroValor(
+                r[KEY_PLANO_ELEVATORIA],
+                get(r, ["Elevatória"]),
+                get(r, ["Elevatoria"]),
+              ) ?? "",
+            ).trim() || null;
           const prioridade = String(get(r, ["Prioridade"]) || "").trim() || null;
           const lat = get(r, ["LATITUDE"]);
           const lon = get(r, ["LONGITIDE"]);
@@ -1459,15 +1568,58 @@ function BacklogPage() {
           const dataBaseInicio = get(r, ["Data-base do início"]) || get(r, ["Data-base do inicio"]);
           const dataBaseFim = get(r, ["Data-base do fim"]);
 
+          // PLANTA = código da planta + nome da elevatória (coluna N), para
+          // que tanto a coluna "Planta" quanto a "Elevatória" da tabela
+          // sejam preenchidas — a Elevatória é derivada de PLANTA.
+          const basePlanta = tagPlanta || denomLoc || "";
+          let plantaFinal: string | null = basePlanta || null;
+          if (elevNome) {
+            const alnum = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+            const aBase = alnum(basePlanta);
+            const aNome = alnum(elevNome);
+            if (!basePlanta) {
+              plantaFinal = elevNome;
+            } else if (aNome && aBase.includes(aNome)) {
+              plantaFinal = basePlanta; // a base já contém o nome
+            } else if (aBase && aNome.startsWith(aBase)) {
+              // o nome traz o código no início → base + restante do nome
+              let restantes = aBase.length;
+              let i = 0;
+              while (i < elevNome.length && restantes > 0) {
+                if (/[A-Za-z0-9]/.test(elevNome[i])) restantes--;
+                i++;
+              }
+              const restante = elevNome
+                .slice(i)
+                .replace(/^[\s\-–:.,]+/, "")
+                .trim();
+              plantaFinal = restante ? `${basePlanta} - ${restante}` : basePlanta;
+            } else if (aBase && aNome.includes(aBase)) {
+              plantaFinal = elevNome; // o nome já contém o código
+            } else {
+              plantaFinal = `${basePlanta} - ${elevNome}`;
+            }
+          }
+
+          if (!amostra) {
+            amostra =
+              `O.S. ${ordem}\n` +
+              `  Tipo de ordem (col. ${COL_PLANO_TIPO_ORDEM}): ${String(tipoOrdem ?? "(vazio)")}` +
+              ` → ${tipoAtv ?? "(vazio)"}\n` +
+              `  Início do SLA (col. ${COL_PLANO_INICIO_SLA}): ${inicioSla ?? "(vazio)"}\n` +
+              `  Elevatória (col. ${COL_PLANO_ELEVATORIA}): ${elevNome ?? "(vazio)"}\n` +
+              `  PLANTA: ${plantaFinal ?? "(vazio)"}`;
+          }
+
           const rowOut: Record<string, string | null> = {
             "Ordem de Manutenção": ordem,
             NOTA: nota,
             "Status da Atividade": null,
-            "Início do SLA": null,
+            "Início do SLA": inicioSla,
             "Fim do SLA": null,
             "TEXTO BREVE": textoBreve,
             "TEXTO LONGO": null,
-            PLANTA: denomLoc || tagPlanta || null,
+            PLANTA: plantaFinal,
             Endereço: null,
             BAIRRO: bairro,
             Cidade: cidade,
@@ -1485,15 +1637,28 @@ function BacklogPage() {
             "TIPO ATIVID.PM": null,
             Estado: "RJ",
             "Bucket de Origem da OS": "Planejamento",
+            SUP: sup,
           };
 
+          if (!tipoAtv) semTipoOrdem++;
+          if (!inicioSla) semInicioSla++;
+          if (!elevNome) semElevatoria++;
           mapped.push(rowOut as unknown as Row);
+        }
+        if (semTipoOrdem) {
+          avisos.push(`${semTipoOrdem} O.S. sem "Tipo de ordem" (coluna ${COL_PLANO_TIPO_ORDEM})`);
+        }
+        if (semInicioSla) {
+          avisos.push(`${semInicioSla} O.S. sem "Início do SLA" (coluna ${COL_PLANO_INICIO_SLA})`);
+        }
+        if (semElevatoria) {
+          avisos.push(`${semElevatoria} O.S. sem elevatória (coluna ${COL_PLANO_ELEVATORIA})`);
         }
         const linhasLidas = rowsRaw.length;
         const linhasImportadas = mapped.length;
         const linhasDescartadas = descartadas;
         const avisosList = avisos;
-        const previewText = `Tipo: Planejamento semanal\nArquivo: ${name}\nLinhas lidas: ${linhasLidas}\nLinhas importadas: ${linhasImportadas}\nLinhas descartadas: ${linhasDescartadas}\nAvisos: ${avisosList.length ? avisosList.join("; ") : "nenhum"}`;
+        const previewText = `Tipo: Planejamento semanal\nArquivo: ${name}\nLinhas lidas: ${linhasLidas}\nLinhas importadas: ${linhasImportadas}\nLinhas descartadas: ${linhasDescartadas}\nAvisos: ${avisosList.length ? avisosList.join("; ") : "nenhum"}\n\nConferência das colunas fixas:\n${amostra || "(sem linhas)"}`;
         if (
           !confirm(
             `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?\n\n${previewText}`,
@@ -1514,7 +1679,11 @@ function BacklogPage() {
         } catch (dbErr) {
           console.warn("Falha ao salvar no banco compartilhado; mantendo local:", dbErr);
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        } catch {
+          // ignore
+        }
         lastSharedDados.current = JSON.stringify(mapped);
         setDataPlano(mapped);
         try {
@@ -1522,11 +1691,8 @@ function BacklogPage() {
         } catch {
           // ignore
         }
-        try {
-          localStorage.setItem(STORAGE_KEY_ACTIVE, "planejamento");
-        } catch {
-          // ignore
-        }
+        setTipo("planejamento");
+        lastLocalWriteAt.current = Date.now();
         setHasCustomData(true);
         const agora = new Date();
         setImportMeta({
