@@ -590,7 +590,9 @@ function ComboboxSearch({
 }
 
 // ---------- página ----------
-function BacklogPage() {
+// Exportada para /backlog/publico/$token — a página pública é ESTA página,
+// apenas protegida pelo token (mesmos botões de importar/exportar/rota).
+export function BacklogPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [backlogTab, setBacklogTab] = useState<"backlog" | "planejamento">("backlog");
   const [dataBucket, setDataBucket] = useState<Row[]>(DATA);
@@ -1045,6 +1047,8 @@ function BacklogPage() {
 
   // ---------- observações por O.S. ----------
   const { user, profile } = useAuth();
+  const location = useLocation();
+  const emRotaPublica = location.pathname.startsWith("/backlog/publico/");
   const [obsPorOm, setObsPorOm] = useState<Record<string, BacklogObservacao[]>>({});
   const [obsDialogOm, setObsDialogOm] = useState<string | null>(null);
   const [novoObsTexto, setNovoObsTexto] = useState("");
@@ -2913,23 +2917,24 @@ function BacklogPage() {
               >
                 <RouteIcon className="h-4 w-4" /> Montar Rota
               </button>
-              {linkToken ? (
-                <button
-                  onClick={revogarLinkPublico}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                  title={`Link público ativo — clique para revogar ( /backlog/publico/${linkToken} )`}
-                >
-                  <Link2Off className="h-4 w-4" /> Link Ativo
-                </button>
-              ) : (
-                <button
-                  onClick={gerarLinkPublico}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white px-3 py-2 text-[13px] font-semibold text-[#0b3a73] shadow hover:bg-[#eaf3fb] dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
-                  title="Gerar link público (sem login) para o Backlog"
-                >
-                  <Share2 className="h-4 w-4" /> Link
-                </button>
-              )}
+              {!emRotaPublica &&
+                (linkToken ? (
+                  <button
+                    onClick={revogarLinkPublico}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    title={`Link público ativo — clique para revogar ( /backlog/publico/${linkToken} )`}
+                  >
+                    <Link2Off className="h-4 w-4" /> Link Ativo
+                  </button>
+                ) : (
+                  <button
+                    onClick={gerarLinkPublico}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white px-3 py-2 text-[13px] font-semibold text-[#0b3a73] shadow hover:bg-[#eaf3fb] dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+                    title="Gerar link público (sem login) para o Backlog"
+                  >
+                    <Share2 className="h-4 w-4" /> Link
+                  </button>
+                ))}
               {hasCustomData && (
                 <button
                   onClick={async () => {
