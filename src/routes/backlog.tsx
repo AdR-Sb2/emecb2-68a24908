@@ -611,7 +611,9 @@ export function BacklogPage() {
   const [bucketCustom, setBucketCustom] = useState(false);
   const [planoCustom, setPlanoCustom] = useState(false);
   const hasCustomData = bucketCustom || planoCustom;
-  const [mostrarSomenteProgramaveis, setMostrarSomenteProgramaveis] = useState(false);
+  // No Planejamento semanal dá pra cruzar com o Bucket do Field:
+  // "todas" | "programaveis" (O.M. que também está no Bucket) | "fora" (não está).
+  const [filtroBucket, setFiltroBucket] = useState<"todas" | "programaveis" | "fora">("todas");
   const [importType, setImportType] = useState<"bucket" | "planejamento">(() => {
     try {
       return (localStorage.getItem("backlog:importType") as "bucket" | "planejamento") || "bucket";
@@ -792,12 +794,19 @@ export function BacklogPage() {
     () => new Set(dataBucket.map((r) => String(r["Ordem de Manutenção"] || "").trim())),
     [dataBucket],
   );
+  const planoNoBucket = useMemo(
+    () =>
+      dataPlano.filter((r) => bucketOms.has(String(r["Ordem de Manutenção"] || "").trim())).length,
+    [dataPlano, bucketOms],
+  );
+  const planoForaBucket = dataPlano.length - planoNoBucket;
   const dataFiltrada = useMemo(() => {
-    if (importType === "planejamento" && mostrarSomenteProgramaveis) {
-      return data.filter((r) => bucketOms.has(String(r["Ordem de Manutenção"] || "").trim()));
-    }
-    return data;
-  }, [data, importType, mostrarSomenteProgramaveis, bucketOms]);
+    if (importType !== "planejamento" || filtroBucket === "todas") return data;
+    return data.filter((r) => {
+      const dentro = bucketOms.has(String(r["Ordem de Manutenção"] || "").trim());
+      return filtroBucket === "programaveis" ? dentro : !dentro;
+    });
+  }, [data, importType, filtroBucket, bucketOms]);
 
   // Sincroniza automaticamente com o bucket compartilhado (quando outra
   // pessoa faz upload, todos recebem sem precisar importar ou recarregar).
@@ -2969,7 +2978,11 @@ export function BacklogPage() {
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {importType === "planejamento"
-                  ? `Planejamento semanal · ${dataFiltrada.length} O.S. (${dataPlano.length} total)`
+                  ? filtroBucket === "programaveis"
+                    ? `Planejamento semanal · ${dataFiltrada.length} O.S. que também estão no Bucket (de ${dataPlano.length})`
+                    : filtroBucket === "fora"
+                      ? `Planejamento semanal · ${dataFiltrada.length} O.S. sem O.M. no Bucket (de ${dataPlano.length})`
+                      : `Planejamento semanal · ${dataFiltrada.length} O.S. (${planoNoBucket} no Bucket · ${planoForaBucket} sem O.M.)`
                   : `Bucket Field/SAP · ${dataBucket.length} O.S.`}
               </p>
             </div>
@@ -3000,12 +3013,30 @@ export function BacklogPage() {
                 <Upload className="h-4 w-4" /> Importar
               </button>
               {importType === "planejamento" && dataPlano.length > 0 && (
-                <button
-                  onClick={() => setMostrarSomenteProgramaveis((v) => !v)}
-                  className={`inline-flex min-h-11 items-center gap-1 rounded-md px-3 py-2 text-[13px] font-semibold shadow ${mostrarSomenteProgramaveis ? "bg-[#f59e0b] text-white" : "border border-slate-300 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"}`}
+                <div
+                  className="inline-flex rounded-md border border-slate-300 dark:border-slate-600 overflow-hidden"
+                  title="Programáveis = O.M. do Planejamento que também estão no Bucket do Field"
                 >
-                  Mostrar somente ordens programáveis
-                </button>
+                  {(
+                    [
+                      ["todas", `Todas (${dataPlano.length})`],
+                      ["programaveis", `Programáveis (${planoNoBucket})`],
+                      ["fora", `Sem O.M. no Bucket (${planoForaBucket})`],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => setFiltroBucket(id)}
+                      className={`px-3 py-2 text-[11px] font-semibold cursor-pointer ${
+                        filtroBucket === id
+                          ? "bg-[#f59e0b] text-white"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                      } ${id === "todas" ? "" : "border-l border-slate-300 dark:border-slate-600"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               )}
               <button
                 onClick={() => setRouteDialogOpen(true)}
