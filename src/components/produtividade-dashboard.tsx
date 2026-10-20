@@ -142,6 +142,8 @@ export type OsAgrupada = {
   participantes: number[];
   hhPorTecnico: Record<number, number>;
   atividades: FieldAtividade[];
+  /** O.S. com alguma atividade desvinculada de todo técnico. */
+  desvinculada: boolean;
 };
 
 type Metricas = {
@@ -446,6 +448,7 @@ function agruparAtividades(
         participantes: [],
         hhPorTecnico: {},
         atividades: [],
+        desvinculada: false,
       };
       mapa.set(key, os);
     }
@@ -460,10 +463,16 @@ function agruparAtividades(
     if (!os.planta && a.planta) os.planta = a.planta;
     if (!os.area && a.area_trabalho) os.area = a.area_trabalho;
 
-    if (!os.tecnicos.includes(a.id_recurso)) os.tecnicos.push(a.id_recurso);
-    const integrantes = integrantesPorRecursoDia.get(a.dia_id)?.get(a.id_recurso);
-    for (const tecnico of integrantes?.size ? integrantes : [a.id_recurso]) {
-      if (!os.participantes.includes(tecnico)) os.participantes.push(tecnico);
+    if (a.id_recurso == null) {
+      // O.S. desvinculada de todo técnico: continua contando no período,
+      // mas sem atribuição de equipe/técnico.
+      if (os.om > 0) os.desvinculada = true;
+    } else {
+      if (!os.tecnicos.includes(a.id_recurso)) os.tecnicos.push(a.id_recurso);
+      const integrantes = integrantesPorRecursoDia.get(a.dia_id)?.get(a.id_recurso);
+      for (const tecnico of integrantes?.size ? integrantes : [a.id_recurso]) {
+        if (!os.participantes.includes(tecnico)) os.participantes.push(tecnico);
+      }
     }
 
     for (const eq of equipesPorDia.get(a.dia_id) || []) {
@@ -492,8 +501,13 @@ function agruparAtividades(
       os.suspensa = statuses.length > 0 && statuses.every((s) => s === "suspenso");
       os.cancelada = statuses.length > 0 && statuses.every((s) => s === "cancelado");
     }
+    let hhSemVinculo = 0;
     for (const a of os.atividades) {
       const duracao = Number(a.duracao_min) || 0;
+      if (a.id_recurso == null) {
+        hhSemVinculo += duracao;
+        continue;
+      }
       const integrantes = integrantesPorRecursoDia.get(a.dia_id)?.get(a.id_recurso);
       const tecnicos = integrantes?.size ? integrantes : new Set([a.id_recurso]);
       for (const tecnico of tecnicos) {
@@ -501,13 +515,14 @@ function agruparAtividades(
       }
     }
     if (os.concluida) {
-      os.hh = Object.values(os.hhPorTecnico).reduce((total, hh) => total + hh, 0);
+      os.hh = Object.values(os.hhPorTecnico).reduce((total, hh) => total + hh, 0) + hhSemVinculo;
     }
     if (!os.categoria) os.categoria = "Outros";
     os.datas.sort();
   }
-  // Só O.S. vinculadas a pelo menos uma equipe (ordens sem equipe não entram).
-  return lista.filter((os) => os.equipes.length > 0);
+  // Só O.S. vinculadas a pelo menos uma equipe, ou desvinculadas de um ID
+  // (estas continuam contando no total do período).
+  return lista.filter((os) => os.equipes.length > 0 || os.desvinculada);
 }
 
 function calcularMetricas(osList: OsAgrupada[], tecnicoId?: number): Metricas {
@@ -1244,6 +1259,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
       for (const a of os.atividades) {
         if ((Number(a.duracao_min) || 0) <= 0) continue;
         if (tecnicoFiltradoId !== undefined && a.id_recurso !== tecnicoFiltradoId) continue;
+        if (a.id_recurso == null) continue;
         ids.add(a.id_recurso);
       }
     }
@@ -2428,7 +2444,9 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           <TabelaOs
             linhas={equipeDetalheOs}
             nomeEquipe={nomeDaEquipe}
-            nomeTecnico={(id) => recursosMap.get(id) || `Técnico ${id}`}
+            nomeTecnico={(id) =>
+              id == null ? "Sem vínculo" : recursosMap.get(id) || `Técnico ${id}`
+            }
             onSelecionar={(os) => setOsDetalhe(os)}
           />
         </DialogContent>
@@ -2447,7 +2465,9 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
           <TabelaOs
             linhas={drillOs}
             nomeEquipe={nomeDaEquipe}
-            nomeTecnico={(id) => recursosMap.get(id) || `Técnico ${id}`}
+            nomeTecnico={(id) =>
+              id == null ? "Sem vínculo" : recursosMap.get(id) || `Técnico ${id}`
+            }
             onSelecionar={(os) => setOsDetalhe(os)}
           />
         </DialogContent>
@@ -2465,7 +2485,9 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
             <DetalheOs
               os={osDetalhe}
               nomeEquipe={nomeDaEquipe}
-              nomeTecnico={(id) => recursosMap.get(id) || `Técnico ${id}`}
+              nomeTecnico={(id) =>
+                id == null ? "Sem vínculo" : recursosMap.get(id) || `Técnico ${id}`
+              }
             />
           )}
         </DialogContent>
@@ -2817,9 +2839,9 @@ function DetalheOs({
   }, [os.atividades, buscaAtividade, tecnicoFiltro, statusFiltro, nomeTecnico]);
   const filtroCls =
     "h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground";
-  const tecnicos = [...new Set(os.atividades.map((atividade) => atividade.id_recurso))].sort(
-    (a, b) => nomeTecnico(a).localeCompare(nomeTecnico(b), "pt-BR"),
-  );
+  const tecnicos = [...new Set(os.atividades.map((atividade) => atividade.id_recurso))]
+    .filter((id): id is number => id != null)
+    .sort((a, b) => nomeTecnico(a).localeCompare(nomeTecnico(b), "pt-BR"));
   const statusAtividades = [
     ...new Set(os.atividades.map((atividade) => normalizeStatus(atividade.status)).filter(Boolean)),
   ];
@@ -2869,6 +2891,11 @@ function DetalheOs({
           Técnicos envolvidos
         </div>
         <div className="flex flex-wrap gap-1.5">
+          {os.participantes.length === 0 && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">
+              Sem vínculo
+            </span>
+          )}
           {os.participantes.map((t) => (
             <span
               key={t}

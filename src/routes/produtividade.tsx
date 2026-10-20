@@ -29,6 +29,8 @@ import {
   Pencil,
   Share2,
   Link2Off,
+  Link2,
+  ArrowLeftRight,
   MapPin,
   AlertTriangle,
   Settings,
@@ -479,7 +481,10 @@ function SummaryCards({
   tecnicosEmEquipe: Set<number>;
 }) {
   const tecnicas = atividades.filter(
-    (a) => !isAtividadeAdministrativa(a.tipo_atividade) && tecnicosEmEquipe.has(a.id_recurso),
+    (a) =>
+      !isAtividadeAdministrativa(a.tipo_atividade) &&
+      // O.S. desvinculada de um ID continua contando no total do dia.
+      (a.id_recurso == null || tecnicosEmEquipe.has(a.id_recurso)),
   );
   const { exec, susp, canc } = dedupOS(tecnicas);
   const mediaOS = numEquipes > 0 ? (exec / numEquipes).toFixed(1) : "0";
@@ -516,6 +521,204 @@ function SummaryCards({
         </Card>
       ))}
     </div>
+  );
+}
+
+// ─── Vínculos de O.S. (transferir / desvincular) ──────────────
+
+type VinculoOS = {
+  key: string;
+  om: number;
+  tecnico: number | null;
+  texto: string;
+  status: string;
+};
+
+const STATUS_OS_LABEL: Record<string, string> = {
+  concluido: "Concluída",
+  suspenso: "Suspensa",
+  cancelado: "Cancelada",
+};
+
+function statusOS(statuses: string[], fallback: string): string {
+  if (statuses.includes("concluido")) return "concluido";
+  if (statuses.length > 0 && statuses.every((s) => s === "suspenso")) return "suspenso";
+  if (statuses.length > 0 && statuses.every((s) => s === "cancelado")) return "cancelado";
+  return fallback;
+}
+
+function VinculosOSCard({
+  atividades,
+  recursosMap,
+  onAlterar,
+}: {
+  atividades: FieldAtividade[];
+  recursosMap: Map<number, string>;
+  onAlterar: (om: number, deTec: number | null, paraTec: number | null) => Promise<void>;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState<string | null>(null);
+
+  const { linhas, semVinculo, tecnicos } = useMemo(() => {
+    const mapa = new Map<string, VinculoOS>();
+    const statusPorOm = new Map<number, string[]>();
+    const tecSet = new Set<number>();
+    for (const a of atividades) {
+      if (a.id_recurso) tecSet.add(a.id_recurso);
+      if (!a.ordem_manutencao || isAtividadeAdministrativa(a.tipo_atividade)) continue;
+      const om = a.ordem_manutencao;
+      const st = normalizeStatus(a.status);
+      const arr = statusPorOm.get(om);
+      if (arr) arr.push(st);
+      else statusPorOm.set(om, [st]);
+      const tecnico = a.id_recurso || null;
+      const key = `${om}:${tecnico ?? "sem"}`;
+      if (!mapa.has(key)) {
+        mapa.set(key, {
+          key,
+          om,
+          tecnico,
+          texto: a.texto_breve || a.tipo_atividade || "",
+          status: st,
+        });
+      }
+    }
+    const lista = [...mapa.values()]
+      .map((l) => ({ ...l, status: statusOS(statusPorOm.get(l.om) || [l.status], l.status) }))
+      .sort((a, b) => b.om - a.om || (a.tecnico ?? 0) - (b.tecnico ?? 0));
+    const ordem = (a: number, b: number) =>
+      (recursosMap.get(a) || String(a)).localeCompare(recursosMap.get(b) || String(b), "pt-BR");
+    return {
+      linhas: lista,
+      semVinculo: lista.filter((l) => l.tecnico === null).length,
+      tecnicos: [...tecSet].sort(ordem),
+    };
+  }, [atividades, recursosMap]);
+
+  const executar = async (linha: VinculoOS, paraTec: number | null) => {
+    setSalvando(linha.key);
+    try {
+      await onAlterar(linha.om, linha.tecnico, paraTec);
+    } finally {
+      setSalvando(null);
+    }
+  };
+
+  const nomeTecnico = (id: number) => recursosMap.get(id) || `Técnico ${id}`;
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-sm font-semibold">
+            Vínculos de O.S.
+            <span className="ml-2 text-[11px] font-normal text-slate-500">
+              {linhas.length} O.S./técnico(s) · {semVinculo} sem vínculo
+            </span>
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={() => setAberto((v) => !v)}
+          >
+            <ArrowLeftRight className="mr-1 h-3.5 w-3.5" />
+            {aberto ? "Ocultar" : "Transferir / Desvincular"}
+            <ChevronDown className={`ml-1 h-3.5 w-3.5 ${aberto ? "rotate-180" : ""}`} />
+          </Button>
+        </div>
+      </CardHeader>
+      {aberto && (
+        <CardContent>
+          {linhas.length === 0 ? (
+            <p className="text-xs text-slate-400">
+              Nenhuma O.S. com ordem de manutenção neste dia.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-slate-500">
+                    <th className="pb-1 pr-2 font-semibold">O.S.</th>
+                    <th className="pb-1 pr-2 font-semibold">Descrição</th>
+                    <th className="pb-1 pr-2 font-semibold">Status</th>
+                    <th className="pb-1 pr-2 font-semibold">Técnico (ID)</th>
+                    <th className="pb-1 font-semibold">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhas.map((l) => (
+                    <tr
+                      key={l.key}
+                      className="border-b border-slate-50 dark:border-slate-700/50 align-top"
+                    >
+                      <td className="py-1.5 pr-2 font-mono text-slate-700 dark:text-slate-200">
+                        {l.om}
+                      </td>
+                      <td className="max-w-[220px] truncate py-1.5 pr-2 text-slate-600">
+                        {l.texto || "—"}
+                      </td>
+                      <td className="py-1.5 pr-2 text-slate-600">
+                        {STATUS_OS_LABEL[l.status] || l.status || "—"}
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        {l.tecnico === null ? (
+                          <Badge variant="outline" className="text-[10px] text-amber-700">
+                            Sem vínculo
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {nomeTecnico(l.tecnico)}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <select
+                            className="rounded border border-slate-200 px-1 py-0.5 text-[10px]"
+                            value=""
+                            disabled={salvando === l.key}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (!v) return;
+                              void executar(l, parseInt(v, 10));
+                            }}
+                          >
+                            <option value="">
+                              {l.tecnico === null ? "Vincular a…" : "Transferir para…"}
+                            </option>
+                            {tecnicos
+                              .filter((t) => t !== l.tecnico)
+                              .map((t) => (
+                                <option key={t} value={t}>
+                                  {nomeTecnico(t)}
+                                </option>
+                              ))}
+                          </select>
+                          {l.tecnico !== null && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1.5 text-[10px] text-red-500 hover:text-red-700"
+                              disabled={salvando === l.key}
+                              onClick={() => void executar(l, null)}
+                              title="Remove o técnico da O.S. — a O.S. continua contando no total"
+                            >
+                              <Link2Off className="h-3 w-3" />
+                              Desvincular
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
@@ -1218,8 +1421,22 @@ function UploadModal({
       if (fromIdx >= 0) {
         next[fromIdx].tecnicos = next[fromIdx].tecnicos.filter((t) => t !== recurso);
       }
-      next[toIdx].tecnicos.push(recurso);
-      next[toIdx].tecnicos.sort((a, b) => a - b);
+      if (!next[toIdx].tecnicos.includes(recurso)) {
+        next[toIdx].tecnicos.push(recurso);
+        next[toIdx].tecnicos.sort((a, b) => a - b);
+      }
+      return next;
+    });
+  };
+
+  // Adiciona sem tirar da equipe atual — permite o mesmo ID em duas equipes no dia.
+  const addTecnico = (recurso: number, toIdx: number) => {
+    setEquipes((prev) => {
+      const next = prev.map((e) => ({ ...e, tecnicos: [...e.tecnicos] }));
+      if (!next[toIdx].tecnicos.includes(recurso)) {
+        next[toIdx].tecnicos.push(recurso);
+        next[toIdx].tecnicos.sort((a, b) => a - b);
+      }
       return next;
     });
   };
@@ -1511,6 +1728,28 @@ function UploadModal({
                         Arraste técnicos para esta equipe
                       </span>
                     )}
+                    <select
+                      className="rounded border border-dashed border-slate-300 px-1 py-0.5 text-[10px] text-slate-500"
+                      value=""
+                      onChange={(e) => {
+                        const r = parseInt(e.target.value, 10);
+                        if (!Number.isFinite(r)) return;
+                        addTecnico(r, eqIdx);
+                      }}
+                      title="Adiciona sem tirar da equipe atual (o mesmo técnico pode estar em duas equipes)"
+                    >
+                      <option value="">+ Adicionar técnico</option>
+                      {recursos
+                        .filter((r) => !eq.tecnicos.includes(r))
+                        .map((r) => (
+                          <option key={r} value={r}>
+                            {recursosMap.get(r) || r}
+                            {equipes.some((e2, i2) => i2 !== eqIdx && e2.tecnicos.includes(r))
+                              ? " (também em outra equipe)"
+                              : ""}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </div>
               ))}
@@ -1711,6 +1950,46 @@ function DayDetail({
     }
   };
 
+  const nomeTecnico = (id: number) => recursosMap.get(id) || `Técnico ${id}`;
+
+  const alterarVinculo = async (om: number, deTec: number | null, paraTec: number | null) => {
+    try {
+      const base = supabase
+        .from("field_atividades")
+        .update({ id_recurso: paraTec })
+        .eq("dia_id", dia.id)
+        .eq("ordem_manutencao", om);
+      const { data, error } = await (
+        deTec === null ? base.is("id_recurso", null) : base.eq("id_recurso", deTec)
+      ).select("id");
+      if (error) throw new Error(error.message);
+      // RLS/anon pode bloquear a escrita sem retornar erro: detecta 0 linhas.
+      if (!data || data.length === 0) {
+        throw new Error(
+          "Nenhuma O.S. atualizada — faça login para editar a Produtividade (RLS bloqueia escrita sem sessão).",
+        );
+      }
+      setAtividades((prev) =>
+        prev.map((a) =>
+          a.dia_id === dia.id && a.ordem_manutencao === om && (a.id_recurso || null) === deTec
+            ? { ...a, id_recurso: paraTec as number }
+            : a,
+        ),
+      );
+      if (paraTec === null) {
+        toast.success(`O.S. ${om} desvinculada — continua no total do dia`);
+      } else {
+        toast.success(
+          `O.S. ${om}: ${
+            deTec === null ? "sem vínculo" : nomeTecnico(deTec)
+          } → ${nomeTecnico(paraTec)}`,
+        );
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao atualizar vínculo da O.S.");
+    }
+  };
+
   const dateStr = new Date(dia.data + "T12:00:00").toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
@@ -1760,6 +2039,13 @@ function DayDetail({
         tecnicosEmEquipe={new Set(equipes.flatMap((eq) => eq.tecnicos))}
       />
 
+      {/* Vínculos de O.S. */}
+      <VinculosOSCard
+        atividades={atividades}
+        recursosMap={recursosMap}
+        onAlterar={alterarVinculo}
+      />
+
       {/* Map */}
       <MapLoadError
         fallback={
@@ -1806,7 +2092,11 @@ function DayDetail({
                           );
                         })()}
                       </td>
-                      <td className="pr-3 py-1">{recursosMap.get(a.id_recurso) || a.id_recurso}</td>
+                      <td className="pr-3 py-1">
+                        {a.id_recurso == null
+                          ? "Sem vínculo"
+                          : recursosMap.get(a.id_recurso) || a.id_recurso}
+                      </td>
                       <td className="pr-3 py-1">{a.status}</td>
                       <td className="pr-3 py-1 whitespace-nowrap">
                         {a.inicio || "—"} ~ {a.fim || "—"}
