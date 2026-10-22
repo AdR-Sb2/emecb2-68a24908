@@ -36,6 +36,7 @@ import {
   ClipboardList,
   Share2,
   Link2Off,
+  RotateCcw,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { OsInfoIcon } from "@/components/os-info-icon";
@@ -173,18 +174,24 @@ const STORAGE_KEY_ACTIVE = "backlog_import_active_v1";
 const VIEW_STORAGE_KEY = "backlog_saved_views_v1";
 
 // ---------- status de execução da O.S. (editável na tabela) ----------
-type StatusExecucao = "Pendente" | "Executada" | "Cancelada";
-const STATUS_EXECUCAO_OPCOES: StatusExecucao[] = ["Pendente", "Executada", "Cancelada"];
+type StatusExecucao = "Pendente" | "Executada" | "Cancelada" | "Programada";
+const STATUS_EXECUCAO_OPCOES: StatusExecucao[] = [
+  "Pendente",
+  "Executada",
+  "Cancelada",
+  "Programada",
+];
 const COL_STATUS_EXEC = "Status da Execução";
 
 function statusExecucaoDe(r: Row): StatusExecucao {
   const v = String(r[COL_STATUS_EXEC] ?? "").trim();
-  return v === "Executada" || v === "Cancelada" ? v : "Pendente";
+  return v === "Executada" || v === "Cancelada" || v === "Programada" ? v : "Pendente";
 }
 
 function statusExecucaoCor(v: unknown): string {
   if (v === "Executada") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (v === "Cancelada") return "border-slate-300 bg-slate-100 text-slate-500";
+  if (v === "Programada") return "border-blue-200 bg-blue-50 text-blue-700";
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
@@ -960,6 +967,45 @@ export function BacklogPage() {
     }, 600);
   };
 
+  // ---------- Resetar programadas (Programada → Pendente) ----------
+  const [confirmResetProg, setConfirmResetProg] = useState(false);
+  const qtdProgramadas = (arr: Row[]) =>
+    arr.filter((r) => statusExecucaoDe(r) === "Programada").length;
+
+  const resetarProgramadas = async () => {
+    const upd = (arr: Row[]) =>
+      arr.map((r) =>
+        String(r[COL_STATUS_EXEC] ?? "").trim() === "Programada"
+          ? { ...r, [COL_STATUS_EXEC]: "Pendente" }
+          : r,
+      );
+    const nextBucket = upd(dataBucket);
+    const nextPlano = upd(dataPlano);
+    const antes = qtdProgramadas(dataBucket) + qtdProgramadas(dataPlano);
+    const depois = qtdProgramadas(nextBucket) + qtdProgramadas(nextPlano);
+    setConfirmResetProg(false);
+    if (antes === depois) {
+      toast.info("Nenhuma O.S. com status Programada.");
+      return;
+    }
+    setDataBucket(nextBucket);
+    setDataPlano(nextPlano);
+    setBucketCustom(true);
+    setPlanoCustom(true);
+    try {
+      localStorage.setItem(STORAGE_KEY_BUCKET, JSON.stringify(nextBucket));
+      localStorage.setItem(STORAGE_KEY_PLANO, JSON.stringify(nextPlano));
+    } catch {
+      // ignore
+    }
+    const erro = await persistirCompartilhado(nextBucket, nextPlano, importType, {
+      bucket: true,
+      plano: true,
+    });
+    if (erro) toast.error(`${antes} O.S. resetadas só neste navegador: ${erro}`);
+    else toast.success(`${antes} O.S. programadas voltaram para Pendente.`);
+  };
+
   // Recalcula "agora" a cada minuto para atualizar SLA/Dias em aberto.
   useEffect(() => {
     if (!autoRefresh) return;
@@ -1161,6 +1207,7 @@ export function BacklogPage() {
   const [fPlantas, setFPlantas] = useState<string[]>([]);
   const [fResp, setFResp] = useState<string[]>(["Baixada 2"]);
   const [fStatus, setFStatus] = useState<string>("TODOS");
+  const [fStatusExec, setFStatusExec] = useState<string>("TODAS");
   const [fEquipe, setFEquipe] = useState<string>("TODAS");
   const [fCidade, setFCidade] = useState<string>("TODAS");
   const [fFaixa, setFFaixa] = useState<string>("TODAS");
@@ -1180,6 +1227,7 @@ export function BacklogPage() {
     | "planta"
     | "resp"
     | "status"
+    | "statusExec"
     | "equipe"
     | "cidade"
     | "faixa"
@@ -1200,6 +1248,7 @@ export function BacklogPage() {
           e.r["TEXTO BREVE"],
           e.r.Cidade,
           e.r["Status da Atividade"],
+          e.statusExec,
           e.responsabilidade,
           e.equipe,
           e.r["Tipo de Atividade"],
@@ -1224,6 +1273,8 @@ export function BacklogPage() {
         (e.r["Status da Atividade"] || "").trim() !== fStatus
       )
         return false;
+      if (skip !== "statusExec" && fStatusExec !== "TODAS" && e.statusExec !== fStatusExec)
+        return false;
       if (skip !== "equipe" && fEquipe !== "TODAS" && e.equipe !== fEquipe) return false;
       if (skip !== "cidade" && fCidade !== "TODAS" && e.r.Cidade !== fCidade) return false;
       if (skip !== "faixa" && fFaixa !== "TODAS" && e.faixa !== fFaixa) return false;
@@ -1243,6 +1294,7 @@ export function BacklogPage() {
       fPlantas,
       fResp,
       fStatus,
+      fStatusExec,
       fEquipe,
       fCidade,
       fFaixa,
@@ -1281,6 +1333,28 @@ export function BacklogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [enriched, fPlantas, fResp, fEquipe, fCidade, fFaixa, fTipo, onlyLate, onlyEmerg, fSlaBefore],
   );
+  // Contagem por Status da Execução com os demais filtros aplicados
+  // (o próprio filtro fica de fora para as opções continuarem aparecendo).
+  const QTD_STATUS_EXEC = useMemo(() => {
+    const mapa = new Map<string, number>(STATUS_EXECUCAO_OPCOES.map((s) => [s, 0]));
+    for (const e of applyFilters(enriched, "statusExec")) {
+      mapa.set(e.statusExec, (mapa.get(e.statusExec) ?? 0) + 1);
+    }
+    return mapa;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    enriched,
+    fPlantas,
+    fResp,
+    fStatus,
+    fEquipe,
+    fCidade,
+    fFaixa,
+    fTipo,
+    onlyLate,
+    onlyEmerg,
+    fSlaBefore,
+  ]);
   const OPT_EQUIPE = useMemo(
     () => uniq(applyFilters(enriched, "equipe").map((e) => e.equipe)).sort(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2124,6 +2198,7 @@ export function BacklogPage() {
       fPlantas,
       fResp,
       fStatus,
+      fStatusExec,
       fEquipe,
       fCidade,
       fFaixa,
@@ -2145,6 +2220,7 @@ export function BacklogPage() {
       fPlantas: string[];
       fResp: string[];
       fStatus: string;
+      fStatusExec?: string;
       fEquipe: string;
       fCidade: string;
       fFaixa: string;
@@ -2167,6 +2243,7 @@ export function BacklogPage() {
     setFPlantas(v.fPlantas);
     setFResp(v.fResp);
     setFStatus(v.fStatus);
+    setFStatusExec(v.fStatusExec || "TODAS");
     setFEquipe(v.fEquipe);
     setFCidade(v.fCidade);
     setFFaixa(v.fFaixa);
@@ -2180,6 +2257,7 @@ export function BacklogPage() {
     setFPlantas([]);
     setFResp([]);
     setFStatus("TODOS");
+    setFStatusExec("TODAS");
     setFEquipe("TODAS");
     setFCidade("TODAS");
     setFFaixa("TODAS");
@@ -3087,6 +3165,48 @@ export function BacklogPage() {
                   restaurar exemplo
                 </button>
               )}
+              {!emRotaPublica && (
+                <button
+                  onClick={() => setConfirmResetProg(true)}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  title="Todas as O.S. com status Programada voltam para Pendente (Bucket e Planejamento)"
+                >
+                  <RotateCcw className="h-4 w-4" /> Resetar programadas
+                </button>
+              )}
+              <Dialog open={confirmResetProg} onOpenChange={setConfirmResetProg}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Resetar O.S. programadas?</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p>
+                      Todas as O.S. com status{" "}
+                      <span className="font-bold text-blue-700">Programada</span> voltam para{" "}
+                      <span className="font-bold text-amber-700">Pendente</span> — sem mudar
+                      Pendentes, Executadas e Canceladas.
+                    </p>
+                    <p className="text-[13px]">
+                      Bucket: <strong>{qtdProgramadas(dataBucket)}</strong> · Planejamento:{" "}
+                      <strong>{qtdProgramadas(dataPlano)}</strong>
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      onClick={() => setConfirmResetProg(false)}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => void resetarProgramadas()}
+                      className="rounded-md border border-[#1f7ad6] bg-[#0b3a73] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#1f7ad6]"
+                    >
+                      Resetar
+                    </button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <button
                 onClick={exportCSV}
                 className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
@@ -3245,6 +3365,25 @@ export function BacklogPage() {
                   {OPT_STATUS.map((p) => (
                     <option key={p} value={p}>
                       {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Status da Execução
+                </label>
+                <select
+                  value={fStatusExec}
+                  onChange={(e) => setFStatusExec(e.target.value)}
+                  title="Pendente, Executada, Cancelada ou Programada"
+                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
+                >
+                  <option value="TODAS">Todas</option>
+                  {STATUS_EXECUCAO_OPCOES.map((s) => (
+                    <option key={s} value={s}>
+                      {s} ({QTD_STATUS_EXEC.get(s) ?? 0})
                     </option>
                   ))}
                 </select>
