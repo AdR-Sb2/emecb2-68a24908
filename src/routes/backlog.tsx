@@ -440,18 +440,33 @@ function enrich(rows: Row[], now: Date): Enriched[] {
 }
 
 // ---------- multi-select simples ----------
+// Views antigas guardavam filtro único como string; agora são listas.
+function paraLista(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  if (typeof v === "string" && v && v !== "TODOS" && v !== "TODAS") return [v];
+  return [];
+}
+
+/** Clique no gráfico adiciona/tira o valor do filtro (multisseleção). */
+function alternarSelecao(prev: string[], nome: string): string[] {
+  return prev.includes(nome) ? prev.filter((v) => v !== nome) : [...prev, nome];
+}
+
 function MultiSelect({
   label,
   options,
   value,
   onChange,
   hideInlineLabel,
+  format,
 }: {
   label: string;
   options: string[];
   value: string[];
   onChange: (v: string[]) => void;
   hideInlineLabel?: boolean;
+  /** Rótulo de exibição (a opção continua valendo o valor cru). */
+  format?: (o: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const toggle = (o: string) => {
@@ -473,7 +488,9 @@ function MultiSelect({
             {value.length === 0
               ? "Todos"
               : value.length === 1
-                ? value[0]
+                ? format
+                  ? format(value[0])
+                  : value[0]
                 : `${value.length} selecionados`}
           </span>
         </span>
@@ -1206,12 +1223,12 @@ export function BacklogPage() {
   // ---------- filtros ----------
   const [fPlantas, setFPlantas] = useState<string[]>([]);
   const [fResp, setFResp] = useState<string[]>(["Baixada 2"]);
-  const [fStatus, setFStatus] = useState<string>("TODOS");
-  const [fStatusExec, setFStatusExec] = useState<string>("TODAS");
-  const [fEquipe, setFEquipe] = useState<string>("TODAS");
-  const [fCidade, setFCidade] = useState<string>("TODAS");
-  const [fFaixa, setFFaixa] = useState<string>("TODAS");
-  const [fTipo, setFTipo] = useState<string>("TODOS");
+  const [fStatus, setFStatus] = useState<string[]>([]);
+  const [fStatusExec, setFStatusExec] = useState<string[]>([]);
+  const [fEquipe, setFEquipe] = useState<string[]>([]);
+  const [fCidade, setFCidade] = useState<string[]>([]);
+  const [fFaixa, setFFaixa] = useState<string[]>([]);
+  const [fTipo, setFTipo] = useState<string[]>([]);
   const [fSearch, setFSearch] = useState("");
   const [onlyLate, setOnlyLate] = useState(false);
   const [onlyEmerg, setOnlyEmerg] = useState(false);
@@ -1269,16 +1286,17 @@ export function BacklogPage() {
       if (skip !== "resp" && fResp.length && !fResp.includes(e.responsabilidade)) return false;
       if (
         skip !== "status" &&
-        fStatus !== "TODOS" &&
-        (e.r["Status da Atividade"] || "").trim() !== fStatus
+        fStatus.length &&
+        !fStatus.includes((e.r["Status da Atividade"] || "").trim())
       )
         return false;
-      if (skip !== "statusExec" && fStatusExec !== "TODAS" && e.statusExec !== fStatusExec)
+      if (skip !== "statusExec" && fStatusExec.length && !fStatusExec.includes(e.statusExec))
         return false;
-      if (skip !== "equipe" && fEquipe !== "TODAS" && e.equipe !== fEquipe) return false;
-      if (skip !== "cidade" && fCidade !== "TODAS" && e.r.Cidade !== fCidade) return false;
-      if (skip !== "faixa" && fFaixa !== "TODAS" && e.faixa !== fFaixa) return false;
-      if (skip !== "tipo" && fTipo !== "TODOS" && e.r["Tipo de Atividade"] !== fTipo) return false;
+      if (skip !== "equipe" && fEquipe.length && !fEquipe.includes(e.equipe)) return false;
+      if (skip !== "cidade" && fCidade.length && !fCidade.includes(e.r.Cidade || "")) return false;
+      if (skip !== "faixa" && fFaixa.length && !fFaixa.includes(e.faixa)) return false;
+      if (skip !== "tipo" && fTipo.length && !fTipo.includes(e.r["Tipo de Atividade"] || ""))
+        return false;
       if (skip !== "late" && onlyLate && e.slaStatus !== "ATRASADO") return false;
       if (skip !== "emerg" && onlyEmerg && (e.r.PRIORIDADE || "").toUpperCase() !== "EMERGÊNCIA")
         return false;
@@ -1488,7 +1506,8 @@ export function BacklogPage() {
   }, [filtered]);
   const applyEmergPendente = () => {
     setOnlyEmerg(true);
-    setFStatus(OPT_STATUS.find((s) => s.toLowerCase().includes("pendente")) || "TODOS");
+    const pend = OPT_STATUS.find((s) => s.toLowerCase().includes("pendente"));
+    setFStatus(pend ? [pend] : []);
   };
 
   // ---------- ordenação da tabela ----------
@@ -2219,11 +2238,12 @@ export function BacklogPage() {
       name: string;
       fPlantas: string[];
       fResp: string[];
-      fStatus: string;
-      fStatusExec?: string;
-      fEquipe: string;
-      fCidade: string;
-      fFaixa: string;
+      /** Views antigas guardavam um único valor (string); as novas guardam lista. */
+      fStatus?: string | string[];
+      fStatusExec?: string | string[];
+      fEquipe?: string | string[];
+      fCidade?: string | string[];
+      fFaixa?: string | string[];
       onlyLate: boolean;
       onlyEmerg: boolean;
       fSlaBefore: string;
@@ -2240,13 +2260,13 @@ export function BacklogPage() {
   const loadView = (n: string) => {
     const v = savedViews.find((x) => x.name === n);
     if (!v) return;
-    setFPlantas(v.fPlantas);
-    setFResp(v.fResp);
-    setFStatus(v.fStatus);
-    setFStatusExec(v.fStatusExec || "TODAS");
-    setFEquipe(v.fEquipe);
-    setFCidade(v.fCidade);
-    setFFaixa(v.fFaixa);
+    setFPlantas(paraLista(v.fPlantas));
+    setFResp(paraLista(v.fResp));
+    setFStatus(paraLista(v.fStatus));
+    setFStatusExec(paraLista(v.fStatusExec));
+    setFEquipe(paraLista(v.fEquipe));
+    setFCidade(paraLista(v.fCidade));
+    setFFaixa(paraLista(v.fFaixa));
     setOnlyLate(v.onlyLate);
     setOnlyEmerg(v.onlyEmerg);
     setFSlaBefore(v.fSlaBefore);
@@ -2256,11 +2276,12 @@ export function BacklogPage() {
     setFSearch("");
     setFPlantas([]);
     setFResp([]);
-    setFStatus("TODOS");
-    setFStatusExec("TODAS");
-    setFEquipe("TODAS");
-    setFCidade("TODAS");
-    setFFaixa("TODAS");
+    setFStatus([]);
+    setFStatusExec([]);
+    setFEquipe([]);
+    setFCidade([]);
+    setFFaixa([]);
+    setFTipo([]);
     setOnlyLate(false);
     setOnlyEmerg(false);
     setFSlaBefore("");
@@ -3356,109 +3377,80 @@ export function BacklogPage() {
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Status
                 </label>
-                <select
+                <MultiSelect
+                  label="Status"
+                  options={OPT_STATUS}
                   value={fStatus}
-                  onChange={(e) => setFStatus(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                >
-                  <option value="TODOS">Todos</option>
-                  {OPT_STATUS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFStatus}
+                  hideInlineLabel
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Status da Execução
                 </label>
-                <select
+                <MultiSelect
+                  label="Status da Execução"
+                  options={STATUS_EXECUCAO_OPCOES}
                   value={fStatusExec}
-                  onChange={(e) => setFStatusExec(e.target.value)}
-                  title="Pendente, Executada, Cancelada ou Programada"
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                >
-                  <option value="TODAS">Todas</option>
-                  {STATUS_EXECUCAO_OPCOES.map((s) => (
-                    <option key={s} value={s}>
-                      {s} ({QTD_STATUS_EXEC.get(s) ?? 0})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFStatusExec}
+                  hideInlineLabel
+                  format={(o) => `${o} (${QTD_STATUS_EXEC.get(o) ?? 0})`}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Equipe
                 </label>
-                <select
+                <MultiSelect
+                  label="Equipe"
+                  options={OPT_EQUIPE}
                   value={fEquipe}
-                  onChange={(e) => setFEquipe(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                >
-                  <option value="TODAS">Todas</option>
-                  {OPT_EQUIPE.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFEquipe}
+                  hideInlineLabel
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Cidade
                 </label>
-                <select
+                <MultiSelect
+                  label="Cidade"
+                  options={OPT_CIDADE}
                   value={fCidade}
-                  onChange={(e) => setFCidade(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                >
-                  <option value="TODAS">Todas</option>
-                  {OPT_CIDADE.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFCidade}
+                  hideInlineLabel
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Tipo de Atividade
                 </label>
-                <select
+                <MultiSelect
+                  label="Tipo de Atividade"
+                  options={OPT_TIPO}
                   value={fTipo}
-                  onChange={(e) => setFTipo(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                >
-                  <option value="TODOS">Todos</option>
-                  {OPT_TIPO.map((p) => (
-                    <option key={p} value={p}>
-                      {abbreviateAtividade(p)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFTipo}
+                  hideInlineLabel
+                  format={abbreviateAtividade}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Tempo Aberto
                 </label>
-                <select
+                <MultiSelect
+                  label="Tempo Aberto"
+                  options={OPT_FAIXA}
                   value={fFaixa}
-                  onChange={(e) => setFFaixa(e.target.value)}
-                  className="min-h-11 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 text-[14px] shadow-sm focus:border-[#1f7ad6] focus:outline-none cursor-pointer"
-                >
-                  <option value="TODAS">Todas as faixas</option>
-                  {OPT_FAIXA.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setFFaixa}
+                  hideInlineLabel
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -3535,7 +3527,7 @@ export function BacklogPage() {
                     radius={[0, 4, 4, 0]}
                     onClick={(data) => {
                       if (data && data.name) {
-                        setFFaixa((prev) => (prev === data.name ? "TODAS" : data.name));
+                        setFFaixa((prev) => alternarSelecao(prev, data.name));
                       }
                     }}
                     className="cursor-pointer"
@@ -3580,7 +3572,7 @@ export function BacklogPage() {
                                 key={i}
                                 fill={PIE_COLORS[i % PIE_COLORS.length]}
                                 onClick={() => {
-                                  setFTipo((prev) => (prev === d.name ? "TODOS" : d.name));
+                                  setFTipo((prev) => alternarSelecao(prev, d.name));
                                 }}
                                 className="cursor-pointer"
                               />
@@ -3606,14 +3598,12 @@ export function BacklogPage() {
                     <ul className="sm:col-span-3 grid grid-cols-1 gap-1 self-center text-[11px] xl:grid-cols-2">
                       {dataTipoAtividade.map((d, i) => {
                         const pct = totalTipo ? Math.round((d.value / totalTipo) * 100) : 0;
-                        const isSelected = fTipo === d.name;
+                        const isSelected = fTipo.includes(d.name);
                         return (
                           <li key={d.name} className="truncate">
                             <button
                               type="button"
-                              onClick={() =>
-                                setFTipo((prev) => (prev === d.name ? "TODOS" : d.name))
-                              }
+                              onClick={() => setFTipo((prev) => alternarSelecao(prev, d.name))}
                               className={`flex items-center gap-2 truncate text-left w-full hover:bg-slate-50 dark:hover:bg-slate-700 p-1 rounded cursor-pointer transition-colors ${
                                 isSelected
                                   ? "bg-[#eaf3fb] font-semibold text-[#0b3a73] dark:text-white"
@@ -3655,7 +3645,7 @@ export function BacklogPage() {
                     radius={[0, 4, 4, 0]}
                     onClick={(data) => {
                       if (data && data.name) {
-                        setFCidade((prev) => (prev === data.name ? "TODAS" : data.name));
+                        setFCidade((prev) => alternarSelecao(prev, data.name));
                       }
                     }}
                     className="cursor-pointer"
