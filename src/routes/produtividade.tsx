@@ -1465,13 +1465,32 @@ function UploadModal({
       return;
     }
     setIsSaving(true);
+    let createdDiaId: number | null = null;
     try {
+      // Confere direto no banco: a lista em memória pode estar desatualizada (outra aba,
+      // importação parcial anterior etc.). Evita o erro de chave duplicada.
+      const { data: existente, error: checkErr } = await supabase
+        .from("field_dias")
+        .select("id")
+        .eq("data", dataDia)
+        .maybeSingle();
+      if (checkErr) throw new Error(checkErr.message);
+      if (existente) {
+        toast.error(
+          `Já existe um dia cadastrado com a data ${dataDia}. Abra esse dia e use "Excluir dia" antes de importar novamente.`,
+        );
+        await onSaved();
+        setIsSaving(false);
+        return;
+      }
+
       const { data: diaData, error: diaErr } = await supabase
         .from("field_dias")
         .insert({ data: dataDia })
         .select()
         .single();
       if (diaErr || !diaData) throw new Error(diaErr?.message || "Erro ao salvar dia");
+      createdDiaId = diaData.id;
 
       const equipeRows = equipes.map((e) => ({
         dia_id: diaData.id,
@@ -1541,11 +1560,19 @@ function UploadModal({
         }
       }
 
+      createdDiaId = null;
       toast.success("Dia salvo com sucesso!");
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(String(err));
+      // Se o dia foi criado mas algo falhou depois, desfaz para não deixar um dia
+      // órfão que causaria chave duplicada na próxima tentativa.
+      if (createdDiaId != null) {
+        await supabase.from("field_dias").delete().eq("id", createdDiaId);
+        await onSaved();
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg);
       setIsSaving(false);
     }
   };
