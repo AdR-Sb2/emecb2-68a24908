@@ -1457,6 +1457,13 @@ function UploadModal({
       toast.error("Selecione a data do dia.");
       return;
     }
+    // A data pode ter sido trocada à mão depois do arquivo (ou já existir no banco).
+    if (existingDates.has(dataDia)) {
+      toast.error(
+        `Já existe um dia cadastrado com a data ${dataDia}. Abra esse dia e use "Excluir dia" antes de importar novamente.`,
+      );
+      return;
+    }
     setIsSaving(true);
     try {
       const { data: diaData, error: diaErr } = await supabase
@@ -1600,6 +1607,11 @@ function UploadModal({
                     onChange={(e) => setDataDia(e.target.value || null)}
                     className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                   />
+                  {dataDia && existingDates.has(dataDia) && (
+                    <p className="mt-1 text-[11px] text-red-600">
+                      Esta data já foi importada. Exclua o dia existente antes de salvar.
+                    </p>
+                  )}
                 </div>
                 <div className="text-xs text-slate-500">
                   {atividades.length} atividades, {recursos.length} técnicos
@@ -1786,7 +1798,10 @@ function UploadModal({
                 <Button variant="outline" onClick={() => setStep("upload")}>
                   Voltar
                 </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving || (dataDia != null && existingDates.has(dataDia))}
+                >
                   {isSaving ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-1" />
                   ) : (
