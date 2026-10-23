@@ -1546,16 +1546,20 @@ function UploadModal({
       if (eqErr) throw new Error(eqErr.message);
 
       // Capacidade configurada por técnico para este dia
-      const capRows: { dia_id: number; id_recurso: number; capacidade_horas: number }[] = [];
+      // O mesmo técnico pode estar em duas equipes; não duplicar (PK dia_id,id_recurso)
+      const capMap = new Map<number, number>();
       for (const e of equipes) {
         for (const t of e.tecnicos) {
-          capRows.push({
-            dia_id: diaData.id,
-            id_recurso: t,
-            capacidade_horas: capacidades[t] ?? CAPACIDADE_PADRAO_HORAS,
-          });
+          if (!capMap.has(t)) {
+            capMap.set(t, capacidades[t] ?? CAPACIDADE_PADRAO_HORAS);
+          }
         }
       }
+      const capRows = Array.from(capMap.entries()).map(([id_recurso, capacidade_horas]) => ({
+        dia_id: diaData.id,
+        id_recurso,
+        capacidade_horas,
+      }));
       if (capRows.length > 0) {
         const { error: capErr } = await supabase.from("field_capacidade_dia").insert(capRows);
         if (capErr) throw new Error(capErr.message);
@@ -1621,10 +1625,14 @@ function UploadModal({
         await onSaved();
       }
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("field_dias_data_key") || msg.includes("duplicate key")) {
+      if (msg.includes("field_dias_data_key")) {
         toast.error(
           "Já existe um dia cadastrado com essa data. Atualize a lista ou exclua o dia existente e tente novamente.",
         );
+      } else if (msg.includes("field_capacidade_dia")) {
+        toast.error("Erro ao salvar capacidades por técnico. Tente novamente.");
+      } else if (msg.includes("duplicate key")) {
+        toast.error("Erro de chave duplicada ao salvar o dia. Atualize a lista e tente novamente.");
       } else {
         toast.error(msg);
       }
