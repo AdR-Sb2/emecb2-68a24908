@@ -1467,29 +1467,74 @@ function UploadModal({
     setIsSaving(true);
     let createdDiaId: number | null = null;
     try {
-      // Confere direto no banco: a lista em memória pode estar desatualizada (outra aba,
-      // importação parcial anterior etc.). Evita o erro de chave duplicada.
-      const { data: existente, error: checkErr } = await supabase
+      // Tenta pegar/criar o dia de forma atômica. Em caso de corrida, trata o erro
+      // de chave duplicada (23505) diretamente e aborta com mensagem amigável.
+      const { data: upserted, error: upsertErr } = await supabase
         .from("field_dias")
-        .select("id")
-        .eq("data", dataDia)
+        .upsert({ data: dataDia }, { onConflict: "data", ignoreDuplicates: false })
+        .select()
         .maybeSingle();
-      if (checkErr) throw new Error(checkErr.message);
-      if (existente) {
-        toast.error(
-          `Já existe um dia cadastrado com a data ${dataDia}. Abra esse dia e use "Excluir dia" antes de importar novamente.`,
-        );
-        await onSaved();
-        setIsSaving(false);
-        return;
+
+      let diaData = upserted as { id: number; data: string } | null;
+      if (upsertErr) {
+        const msg = upsertErr.message || "";
+        // Se houver conflito de unique, recupera o registro existente
+        if (
+          upsertErr.code === "23505" ||
+          msg.includes("duplicate") ||
+          msg.includes("field_dias_data_key")
+        ) {
+          const { data: existente } = await supabase
+            .from("field_dias")
+            .select("*")
+            .eq("data", dataDia)
+            .maybeSingle();
+          if (existente) {
+            toast.error(
+              `Já existe um dia cadastrado com a data ${dataDia}. Abra esse dia e use "Excluir dia" antes de importar novamente.`,
+            );
+            await onSaved();
+            setIsSaving(false);
+            return;
+          }
+        }
+        throw new Error(upsertErr.message || "Erro ao salvar dia");
       }
 
-      const { data: diaData, error: diaErr } = await supabase
-        .from("field_dias")
-        .insert({ data: dataDia })
-        .select()
-        .single();
-      if (diaErr || !diaData) throw new Error(diaErr?.message || "Erro ao salvar dia");
+      if (!diaData) {
+        // Fallback: busca ou tenta insert
+        const { data: existente } = await supabase
+          .from("field_dias")
+          .select("*")
+          .eq("data", dataDia)
+          .maybeSingle();
+        if (existente) {
+          toast.error(
+            `Já existe um dia cadastrado com a data ${dataDia}. Abra esse dia e use "Excluir dia" antes de importar novamente.`,
+          );
+          await onSaved();
+          setIsSaving(false);
+          return;
+        }
+        const { data: inserted, error: diaErr } = await supabase
+          .from("field_dias")
+          .insert({ data: dataDia })
+          .select()
+          .single();
+        if (diaErr) {
+          if (diaErr.code === "23505" || (diaErr.message || "").includes("duplicate")) {
+            toast.error(
+              `Já existe um dia cadastrado com a data ${dataDia}. Abra esse dia e use "Excluir dia" antes de importar novamente.`,
+            );
+            await onSaved();
+            setIsSaving(false);
+            return;
+          }
+          throw new Error(diaErr.message || "Erro ao salvar dia");
+        }
+        diaData = inserted as { id: number; data: string };
+      }
+
       createdDiaId = diaData.id;
 
       const equipeRows = equipes.map((e) => ({
@@ -1568,11 +1613,21 @@ function UploadModal({
       // Se o dia foi criado mas algo falhou depois, desfaz para não deixar um dia
       // órfão que causaria chave duplicada na próxima tentativa.
       if (createdDiaId != null) {
-        await supabase.from("field_dias").delete().eq("id", createdDiaId);
+        try {
+          await supabase.from("field_dias").delete().eq("id", createdDiaId);
+        } catch {
+          // ignore
+        }
         await onSaved();
       }
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(msg);
+      if (msg.includes("field_dias_data_key") || msg.includes("duplicate key")) {
+        toast.error(
+          "Já existe um dia cadastrado com essa data. Atualize a lista ou exclua o dia existente e tente novamente.",
+        );
+      } else {
+        toast.error(msg);
+      }
       setIsSaving(false);
     }
   };
