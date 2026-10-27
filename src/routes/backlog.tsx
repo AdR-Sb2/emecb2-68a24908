@@ -188,6 +188,38 @@ function statusExecucaoDe(r: Row): StatusExecucao {
   return v === "Executada" || v === "Cancelada" || v === "Programada" ? v : "Pendente";
 }
 
+
+// Chave única da nota: texto, sem espaços (preserva zeros à esquerda).
+function chaveOM(v: unknown): string {
+  return String(v ?? "").replace(/\s+/g, "").replace(/\.0+$/, "");
+}
+
+// Reimportação: Status da Execução já salvo no banco prevalece sobre a planilha
+// (exceto quando o salvo é vazio/Pendente e a planilha traz um valor).
+function preservarStatusExec(novas: Row[], ...antigas: Row[][]) {
+  const salvo = new Map<string, string>();
+  for (const arr of antigas)
+    for (const r of arr) {
+      const v = String(r[COL_STATUS_EXEC] ?? "").trim();
+      const k = chaveOM(r["Ordem de Manutenção"]);
+      if (k && v && v !== "Pendente") salvo.set(k, v);
+    }
+  const existentes = new Set(antigas.flat().map((r) => chaveOM(r["Ordem de Manutenção"])));
+  let novasQtd = 0;
+  let atualizadas = 0;
+  let preservadas = 0;
+  const rows = novas.map((r) => {
+    const k = chaveOM(r["Ordem de Manutenção"]);
+    if (!existentes.has(k)) novasQtd++;
+    else atualizadas++;
+    const v = salvo.get(k);
+    if (!v) return r;
+    preservadas++;
+    return { ...r, [COL_STATUS_EXEC]: v } as Row;
+  });
+  return { rows, novas: novasQtd, atualizadas, preservadas };
+}
+
 function statusExecucaoCor(v: unknown): string {
   if (v === "Executada") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (v === "Cancelada") return "border-slate-300 bg-slate-100 text-slate-500";
@@ -1125,17 +1157,22 @@ export function BacklogPage() {
     }
   }, []);
 
+  const equipeOverridesNorm = useMemo(() => {
+    const m = new Map<string, Equipe>();
+    for (const [k, v] of Object.entries(equipeOverrides)) m.set(chaveOM(k), v);
+    return m;
+  }, [equipeOverrides]);
   const enriched = useMemo(
     () =>
       enrich(dataFiltrada, now).map((e) => {
-        const eqOverride = equipeOverrides[e.om];
+        const eqOverride = equipeOverrides[e.om] ?? equipeOverridesNorm.get(chaveOM(e.om));
         const respOverride = responsabilidadeOverrides[e.om];
         let result = e;
         if (eqOverride) result = { ...result, equipe: eqOverride };
         if (respOverride) result = { ...result, responsabilidade: respOverride };
         return result;
       }),
-    [dataFiltrada, now, equipeOverrides, responsabilidadeOverrides],
+    [dataFiltrada, now, equipeOverrides, equipeOverridesNorm, responsabilidadeOverrides],
   );
 
   // ---------- observações por O.S. ----------
@@ -1903,12 +1940,14 @@ export function BacklogPage() {
           }
           return out;
         }) as Row[];
+        const pres = preservarStatusExec(norm as Row[], dataBucket, dataPlano);
+        norm = pres.rows;
         const linhasLidas = norm.length;
         const linhasImportadas = norm.length;
         const linhasDescartadas = 0;
         if (
           !confirm(
-            `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?`,
+            `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?\n\n${pres.novas} notas novas · ${pres.atualizadas} atualizadas · ${pres.preservadas} com Status preservado do banco (Equipe sempre preservada)`,
           )
         ) {
           return;
@@ -2097,6 +2136,8 @@ export function BacklogPage() {
         if (semElevatoria) {
           avisos.push(`${semElevatoria} O.S. sem elevatória (coluna ${COL_PLANO_ELEVATORIA})`);
         }
+        const presP = preservarStatusExec(mapped, dataPlano, dataBucket);
+        mapped.splice(0, mapped.length, ...presP.rows);
         const linhasLidas = rowsRaw.length;
         const linhasImportadas = mapped.length;
         const linhasDescartadas = descartadas;
@@ -2104,7 +2145,7 @@ export function BacklogPage() {
         const previewText = `Tipo: Planejamento semanal\nArquivo: ${name}\nLinhas lidas: ${linhasLidas}\nLinhas importadas: ${linhasImportadas}\nLinhas descartadas: ${linhasDescartadas}\nAvisos: ${avisosList.length ? avisosList.join("; ") : "nenhum"}\n\nConferência das colunas fixas:\n${amostra || "(sem linhas)"}`;
         if (
           !confirm(
-            `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?\n\n${previewText}`,
+            `Esta importação substituirá os ${linhasImportadas} registros atuais. Deseja continuar?\n\n${presP.novas} notas novas · ${presP.atualizadas} atualizadas · ${presP.preservadas} com Status preservado do banco (Equipe sempre preservada)\n\n${previewText}`,
           )
         ) {
           return;
