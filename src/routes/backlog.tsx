@@ -1922,7 +1922,7 @@ export function BacklogPage() {
           const time = hh ? `${hh[1]}:${hh[2]}` : "00:00";
           return `${String(a).padStart(2, "0")}/${String(b).padStart(2, "0")}/${y} ${time}`;
         }
-        const norm = rowsRaw.map((r) => {
+        let norm = rowsRaw.map((r) => {
           const out: Record<string, unknown> = {};
           for (const [k, v] of Object.entries(r)) {
             const key = k.replace(/\n/g, "").trim();
