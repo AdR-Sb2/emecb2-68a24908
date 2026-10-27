@@ -10,6 +10,7 @@ import {
   Search,
   X,
   Download,
+  Loader2,
   Upload,
   Filter,
   Star,
@@ -722,6 +723,118 @@ function EstoquePage() {
     filtroAguardandoRetirada,
     filtroBuscaCompra,
   ]);
+
+  const [exportandoCompras, setExportandoCompras] = useState(false);
+  const exportarComprasXlsx = async () => {
+    const linhas = comprasFiltradas;
+    if (!linhas.length) {
+      toast.warning("Nenhuma compra para exportar com os filtros atuais.");
+      return;
+    }
+    setExportandoCompras(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Compras");
+      const dt = (v: string | null | undefined) => {
+        if (!v) return null;
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+        return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+      };
+      const dias = (a: string | null | undefined, b: string | null | undefined) =>
+        a && b ? Math.floor((new Date(b).getTime() - new Date(a).getTime()) / 86400000) : null;
+      const cols = [
+        { header: "Requisição", key: "req", tipo: "txt" },
+        { header: "Pedido", key: "ped", tipo: "txt" },
+        { header: "Item", key: "item", tipo: "txt" },
+        { header: "Cód. SAP", key: "sap", tipo: "txt" },
+        { header: "Descrição", key: "desc", tipo: "txt" },
+        { header: "Qtde", key: "qtd", tipo: "num" },
+        { header: "Status Geral", key: "status", tipo: "txt" },
+        { header: "Fornecedor", key: "forn", tipo: "txt" },
+        { header: "Chegou?", key: "chegou", tipo: "txt" },
+        { header: "Retirado?", key: "ret", tipo: "txt" },
+        { header: "Data de Chegada", key: "dchegada", tipo: "data" },
+        { header: "Vlr Unit.", key: "vu", tipo: "moeda" },
+        { header: "Vlr Total", key: "vt", tipo: "moeda" },
+        { header: "Data prevista", key: "dprev", tipo: "data" },
+        { header: "Dias aberto", key: "daberto", tipo: "num" },
+        { header: "Dias p/ retirar", key: "dretirar", tipo: "num" },
+        { header: "Solicitante", key: "solic", tipo: "txt" },
+        { header: "Data criação RC", key: "dcria", tipo: "data" },
+      ];
+      ws.columns = cols.map((c) => ({ header: c.header, key: c.key }));
+      for (const c of linhas) {
+        const ateHoje = c.chegou && c.data_chegou ? c.data_chegou : new Date().toISOString();
+        ws.addRow({
+          req: c.requisicao != null ? String(c.requisicao) : "",
+          ped: c.pedido ?? "",
+          item: c.item_rc != null ? String(c.item_rc) : "",
+          sap: c.cod_sap ?? "",
+          desc: c.descricao_material ?? "",
+          qtd: c.qtde_rc != null ? Number(c.qtde_rc) : null,
+          status: c.status_geral || "Sem status",
+          forn: c.fornecedor ?? "",
+          chegou: c.chegou ? "Sim" : "Não",
+          ret: c.foi_retirado ? "Sim" : "Não",
+          dchegada: dt(c.data_chegou),
+          vu: c.valor_unitario != null ? Number(c.valor_unitario) : null,
+          vt: c.valor_total != null ? Number(c.valor_total) : null,
+          dprev: dt(c.data_prevista),
+          daberto: dias(c.dt_criacao_rc, ateHoje),
+          dretirar: c.chegou && c.foi_retirado ? dias(c.data_chegou, c.data_retirado) : null,
+          solic: c.solicitante ?? "",
+          dcria: dt(c.dt_criacao_rc),
+        });
+      }
+      cols.forEach((c, i) => {
+        const col = ws.getColumn(i + 1);
+        if (c.tipo === "txt") col.numFmt = "@";
+        if (c.tipo === "data") col.numFmt = "dd/mm/yyyy";
+        if (c.tipo === "moeda") col.numFmt = '"R$" #,##0.00';
+        let w = c.header.length;
+        col.eachCell({ includeEmpty: false }, (cell) => {
+          const v = cell.value;
+          const len = v instanceof Date ? 10 : String(v ?? "").length;
+          if (len > w) w = len;
+        });
+        col.width = Math.min(Math.max(w + 2, 8), 50);
+      });
+      const head = ws.getRow(1);
+      head.font = { bold: true, color: { argb: "FF1E293B" } };
+      head.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
+      ws.eachRow((row) =>
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+        }),
+      );
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const hoje = new Date();
+      const nome = `compras_${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nome;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${linhas.length} compras exportadas.`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Não foi possível exportar as compras.");
+    } finally {
+      setExportandoCompras(false);
+    }
+  };
 
   const handleToggleChegou = async (id: number, current: boolean) => {
     if (!current) {
@@ -3552,6 +3665,20 @@ function EstoquePage() {
               className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               <Upload className="h-4 w-4" /> Atualizar Pedidos
+            </button>
+          )}
+          {aba === "compras" && (
+            <button
+              onClick={exportarComprasXlsx}
+              disabled={exportandoCompras}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              {exportandoCompras ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {exportandoCompras ? "Exportando..." : "Exportar"}
             </button>
           )}
           {aba !== "estoque_sap" && (

@@ -188,10 +188,11 @@ function statusExecucaoDe(r: Row): StatusExecucao {
   return v === "Executada" || v === "Cancelada" || v === "Programada" ? v : "Pendente";
 }
 
-
 // Chave única da nota: texto, sem espaços (preserva zeros à esquerda).
 function chaveOM(v: unknown): string {
-  return String(v ?? "").replace(/\s+/g, "").replace(/\.0+$/, "");
+  return String(v ?? "")
+    .replace(/\s+/g, "")
+    .replace(/\.0+$/, "");
 }
 
 // Reimportação: Status da Execução já salvo no banco prevalece sobre a planilha
