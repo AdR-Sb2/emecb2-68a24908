@@ -417,28 +417,80 @@ function parseCsvData(rows: Record<string, unknown>[]): {
   return { atividades, recursos, data: dataDia };
 }
 
-function parseFieldDate(raw: string): string | null {
-  if (!raw) return null;
-  const d = new Date(raw);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().slice(0, 10);
+// Converte valores vindos de planilhas Excel (Date objects e seriais) para
+// texto legível, preservando datas/horas para os parsers abaixo.
+function excelValueToText(raw: unknown): string {
+  if (raw == null) return "";
+  if (raw instanceof Date) {
+    const h = raw.getHours();
+    const min = raw.getMinutes();
+    const s = raw.getSeconds();
+    if (h || min || s) {
+      return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+    return `${String(raw.getDate()).padStart(2, "0")}/${String(raw.getMonth() + 1).padStart(2, "0")}/${raw.getFullYear()}`;
   }
-  const parts = raw.split(/[/-]/);
+  return String(raw);
+}
+
+// Serial do Excel (dias desde 1899-12-30) -> data UTC.
+function excelSerialToDate(serial: number): Date | null {
+  if (!isFinite(serial) || serial <= 0 || serial > 60000) return null;
+  return new Date(Math.round((serial - 25569) * 86400 * 1000));
+}
+
+function parseFieldDate(raw: unknown): string | null {
+  if (!raw) return null;
+  if (raw instanceof Date) {
+    const y = raw.getFullYear();
+    if (y > 1900) {
+      return `${y}-${String(raw.getMonth() + 1).padStart(2, "0")}-${String(raw.getDate()).padStart(2, "0")}`;
+    }
+    // Célula de hora (1899-12-30T...) — não é uma data.
+    return null;
+  }
+  if (typeof raw === "number") {
+    const d = excelSerialToDate(raw);
+    if (d) {
+      const y = d.getUTCFullYear();
+      if (y > 1900) {
+        return `${y}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      }
+    }
+    return null;
+  }
+  const t = excelValueToText(raw).trim();
+  if (!t) return null;
+  const parts = t.split(/[/-]/);
   if (parts.length === 3) {
     const [a, b, c] = parts.map(Number);
     if (a > 1900) return `${a}-${String(b).padStart(2, "0")}-${String(c).padStart(2, "0")}`;
     if (c > 1900) return `${c}-${String(b).padStart(2, "0")}-${String(a).padStart(2, "0")}`;
   }
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().slice(0, 10);
+  }
   return null;
 }
 
-function normalizeTime(raw: string): string | null {
+function normalizeTime(raw: unknown): string | null {
   if (!raw) return null;
-  const t = raw.trim();
+  if (raw instanceof Date) {
+    return `${String(raw.getHours()).padStart(2, "0")}:${String(raw.getMinutes()).padStart(2, "0")}`;
+  }
+  if (typeof raw === "number") {
+    if (raw > 0 && raw < 1) {
+      const totalMin = Math.round(raw * 24 * 60);
+      return `${String(Math.floor(totalMin / 60) % 24).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+    }
+    return null;
+  }
+  const t = excelValueToText(raw).trim();
   if (!t) return null;
   const ampm = t.match(/\b(AM|PM)\b/i);
   const only = t.replace(/\b(AM|PM)\b/i, "").trim();
-  const m = only.match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+  const m = only.match(/(\d{1,2}):(\d{2})/);
   if (!m) return null;
   let h = Number(m[1]);
   const min = m[2];
@@ -450,13 +502,21 @@ function normalizeTime(raw: string): string | null {
   return `${String(h).padStart(2, "0")}:${min}`;
 }
 
-function parseDuracaoMin(raw: string): number | null {
+function parseDuracaoMin(raw: unknown): number | null {
   if (!raw) return null;
-  const t = raw.trim();
+  if (raw instanceof Date) {
+    return raw.getHours() * 60 + raw.getMinutes();
+  }
+  if (typeof raw === "number") {
+    if (raw > 0 && raw < 1) return Math.round(raw * 24 * 60);
+    return Math.round(raw);
+  }
+  const t = excelValueToText(raw).trim();
   if (!t) return null;
-  const m = t.match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
-  if (!m) return null;
-  return Number(m[1]) * 60 + Number(m[2]);
+  const m = t.match(/(\d{1,}):(\d{2})(:(\d{2}))?/);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  const min = parseInt(t, 10);
+  return isNaN(min) ? null : min;
 }
 
 function cleanPlantaCode(raw: string): string {
