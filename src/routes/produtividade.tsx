@@ -1420,7 +1420,9 @@ function UploadModal({
         const buf = await file.arrayBuffer();
         let wb: XLSX.WorkBook;
         try {
-          wb = XLSX.read(buf, { type: "array", cellDates: true });
+          // Sem cellDates: datas/horas vêm como seriais numéricos do Excel,
+          // convertidos depois com matemática exata (imune ao fuso do navegador).
+          wb = XLSX.read(buf, { type: "array" });
         } catch {
           // Fallback: planilhas salvas como HTML/texto (comuns em exports de sistemas)
           const text = new TextDecoder("utf-8").decode(buf);
