@@ -363,8 +363,8 @@ function parseCsvData(rows: Record<string, unknown>[]): {
   let dataDia: string | null = null;
 
   for (const row of rows) {
-    const get = (key: string) =>
-      (row[key] ?? row[key.toLowerCase()] ?? row[key.toUpperCase()] ?? "") as string;
+    const get = (key: string): string =>
+      excelValueToText(row[key] ?? row[key.toLowerCase()] ?? row[key.toUpperCase()] ?? "");
 
     const idRecurso = parseInt(
       String(get("ID do Recurso") || get("Id do Recurso") || get("id_recurso") || "0"),
@@ -1416,7 +1416,14 @@ function UploadModal({
 
       try {
         const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
+        let wb: XLSX.WorkBook;
+        try {
+          wb = XLSX.read(buf, { type: "array", cellDates: true });
+        } catch {
+          // Fallback: planilhas salvas como HTML/texto (comuns em exports de sistemas)
+          const text = new TextDecoder("utf-8").decode(buf);
+          wb = XLSX.read(text, { type: "string" });
+        }
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
 
