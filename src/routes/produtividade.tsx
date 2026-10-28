@@ -363,8 +363,10 @@ function parseCsvData(rows: Record<string, unknown>[]): {
   let dataDia: string | null = null;
 
   for (const row of rows) {
-    const get = (key: string): string =>
-      excelValueToText(row[key] ?? row[key.toLowerCase()] ?? row[key.toUpperCase()] ?? "");
+    // Valor cru da célula (números seriais do Excel passam intactos para os parsers)
+    const get = (key: string): unknown =>
+      row[key] ?? row[key.toLowerCase()] ?? row[key.toUpperCase()] ?? "";
+    const txt = (key: string): string => excelValueToText(get(key));
 
     const idRecurso = parseInt(
       String(get("ID do Recurso") || get("Id do Recurso") || get("id_recurso") || "0"),
@@ -373,7 +375,7 @@ function parseCsvData(rows: Record<string, unknown>[]): {
     if (idRecurso) recursos.add(idRecurso);
 
     const rawDate = get("Data") || get("data");
-    if (rawDate && !dataDia) {
+    if (rawDate !== "" && rawDate != null && !dataDia) {
       const parsed = parseFieldDate(rawDate);
       if (parsed) dataDia = parsed;
     }
