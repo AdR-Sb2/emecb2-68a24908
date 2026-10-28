@@ -380,8 +380,8 @@ function parseCsvData(rows: Record<string, unknown>[]): {
       if (parsed) dataDia = parsed;
     }
 
-    const tipoAtividade = get("Tipo de Atividade") || get("Tipo de atividade") || "";
-    const paradaRaw = get("PARADA") || get("Parada") || "";
+    const tipoAtividade = txt("Tipo de Atividade") || txt("Tipo de atividade") || "";
+    const paradaRaw = txt("PARADA") || txt("Parada") || "";
     const parada = paradaRaw === "X" || paradaRaw.toLowerCase() === "true" || paradaRaw === "1";
 
     atividades.push({
@@ -399,20 +399,20 @@ function parseCsvData(rows: Record<string, unknown>[]): {
         ),
         10,
       ),
-      status: get("Status da Atividade") || get("Status") || "",
+      status: txt("Status da Atividade") || txt("Status") || "",
       tipo_atividade: tipoAtividade,
-      prioridade: get("Prioridade") || "",
-      area_trabalho: get("Área de Trabalho") || get("Area de Trabalho") || "",
-      texto_breve: get("TEXTO BREVE") || get("Texto Breve") || "",
-      centro_trabalho: get("Centro de Trabalho") || get("Centro de trabalho") || "",
-      criticidade: get("Criticidade") || "",
+      prioridade: txt("Prioridade") || "",
+      area_trabalho: txt("Área de Trabalho") || txt("Area de Trabalho") || "",
+      texto_breve: txt("TEXTO BREVE") || txt("Texto Breve") || "",
+      centro_trabalho: txt("Centro de Trabalho") || txt("Centro de trabalho") || "",
+      criticidade: txt("Criticidade") || "",
       parada,
       inicio: normalizeTime(get("INÍCIO") || get("Inicio") || get("início") || ""),
       fim: normalizeTime(get("FIM") || get("Fim") || ""),
       duracao_min: parseDuracaoMin(get("DURAÇÃO") || get("Duracao") || get("Duração") || ""),
-      motivo_paralisacao: get("Motivo da Paralisação") || get("Motivo da paralisação") || "",
-      planta: cleanPlantaCode(get("PLANTA") || get("Planta") || ""),
-      cidade: get("Cidade") || get("CIDADE") || "",
+      motivo_paralisacao: txt("Motivo da Paralisação") || txt("Motivo da paralisação") || "",
+      planta: cleanPlantaCode(txt("PLANTA") || txt("Planta") || ""),
+      cidade: txt("Cidade") || txt("CIDADE") || "",
     });
   }
 
