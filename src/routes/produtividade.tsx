@@ -1739,7 +1739,7 @@ function UploadModal({
         {step === "upload" && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">Selecione o arquivo CSV exportado do FIELD.</p>
-            <Input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} />
+            <Input type="file" accept=".csv,.xlsx,.xls,.xlsm,.ods" onChange={handleFile} />
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         )}
