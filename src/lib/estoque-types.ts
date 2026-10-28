@@ -95,6 +95,10 @@ export interface Compra {
   fornecedor: string | null;
   status_geral: StatusCompra | null;
   dt_criacao_rc: string | null;
+  data_criacao_origem?: "importacao" | "manual" | null;
+  data_criacao_editada_por?: string | null;
+  data_criacao_editada_por_nome?: string | null;
+  data_criacao_editada_em?: string | null;
   dt_aprovacao_rc: string | null;
   dt_criacao_pedido: string | null;
   dt_remessa_pedido: string | null;
