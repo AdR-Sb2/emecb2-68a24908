@@ -26,6 +26,8 @@ Stack: React + TanStack Router (file-based routing) + Supabase + Tailwind + shad
 - RLS is enabled on all tables. Deletes use `.delete().eq("id", id)`.
 
 ### Key patterns
+- Purchase RC date editing uses a shared cell and pure calendar-date helpers; manual-origin dates are omitted from import upserts to preserve user corrections.
+- SAP imports read native spreadsheet numbers and keep CSV numeric text raw until the dedicated numeric parser; this prevents locale formatting from truncating amounts.
 - Inline editing with debounced saves (`src/lib/debounce.ts`)
 - Toast notifications via `sonner`
 - Dialogs via `src/components/ui/dialog.tsx` (shadcn)
