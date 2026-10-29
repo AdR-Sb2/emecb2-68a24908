@@ -2,7 +2,13 @@
 export function diaUTC(iso: string | null | undefined): number | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ""));
   if (!m) return null;
-  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const ano = Number(m[1]);
+  const mes = Number(m[2]) - 1;
+  const dia = Number(m[3]);
+  const data = new Date(Date.UTC(ano, mes, dia));
+  if (data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes || data.getUTCDate() !== dia)
+    return null;
+  return data.getTime();
 }
 
 export function hojeISO(): string {

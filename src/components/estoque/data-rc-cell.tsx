@@ -4,6 +4,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Compra } from "@/lib/estoque-types";
 import { formatarDataPura, hojeISO, validarDataRc } from "@/lib/datas-puras";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface Props {
   compra: Compra;
@@ -31,15 +33,18 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
   const salvar = async (data: string | null) => {
     if (data && (erro || !valor)) return;
     setSalvando(true);
-    const ok = await onSalvar(compra, data, aplicarRc && !!compra.requisicao);
-    setSalvando(false);
-    if (ok) setAberto(false);
+    try {
+      const ok = await onSalvar(compra, data, aplicarRc && !!compra.requisicao);
+      if (ok) setAberto(false);
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const marcador = manual ? (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Hand className="h-3 w-3 text-sky-500" aria-label="Data informada manualmente" />
+        <Hand className="h-3 w-3 text-primary" aria-label="Data informada manualmente" />
       </TooltipTrigger>
       <TooltipContent>
         Informada manualmente
@@ -53,7 +58,7 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
 
   if (!podeEditar) {
     return compra.dt_criacao_rc ? (
-      <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
+      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
         {marcador}
         {formatarDataPura(compra.dt_criacao_rc)}
       </span>
@@ -66,21 +71,23 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
         {marcador}
         <PopoverTrigger asChild>
           {compra.dt_criacao_rc ? (
-            <button
+            <Button
+              variant="ghost"
               type="button"
-              className="group flex items-center gap-1 text-[10px] text-slate-400 hover:text-[#1f7ad6] dark:text-slate-500"
+              className="group h-auto gap-1 p-0 text-[10px] text-muted-foreground hover:text-primary"
               title="Editar data de criação da RC"
             >
               <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100" />
               {formatarDataPura(compra.dt_criacao_rc)}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="ghost"
               type="button"
-              className="text-[10px] text-slate-400 hover:text-[#1f7ad6] hover:underline"
+              className="h-auto p-0 text-[10px] text-muted-foreground hover:text-primary hover:underline"
             >
               + Data da RC
-            </button>
+            </Button>
           )}
         </PopoverTrigger>
       </div>
@@ -96,21 +103,19 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
           className="grid gap-2 text-sm"
         >
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-              Data de criação da RC
-            </span>
-            <input
+            <span className="text-xs font-semibold text-foreground">Data de criação da RC</span>
+            <Input
               type="date"
               autoFocus
               max={hojeISO()}
               value={valor}
               onChange={(e) => setValor(e.target.value)}
-              className="min-h-9 rounded-md border border-slate-300 px-2 text-[13px] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+              className="min-h-9 text-[13px]"
             />
           </label>
-          {erro && <p className="text-[11px] text-red-600">{erro}</p>}
+          {erro && <p className="text-[11px] text-destructive">{erro}</p>}
           {compra.requisicao ? (
-            <label className="flex items-start gap-2 text-[12px] text-slate-600 dark:text-slate-300">
+            <label className="flex items-start gap-2 text-[12px] text-muted-foreground">
               <input
                 type="checkbox"
                 checked={aplicarRc}
@@ -121,33 +126,37 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
               {itensNaRc === 1 ? "item" : "itens"})
             </label>
           ) : (
-            <p className="text-[11px] text-slate-400">Item sem RC: vale só para este item.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Item sem RC: vale só para este item.
+            </p>
           )}
           <div className="flex flex-wrap justify-end gap-2 pt-1">
             {compra.dt_criacao_rc && (
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 disabled={salvando}
                 onClick={() => void salvar(null)}
-                className="mr-auto text-[12px] text-red-600 hover:underline"
+                className="mr-auto h-auto p-0 text-[12px] text-destructive hover:underline"
               >
                 Remover data
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => setAberto(false)}
-              className="rounded-md border border-slate-300 px-2 py-1 text-[12px]"
+              className="h-8 px-2 text-[12px]"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={salvando || !valor || !!erro}
-              className="rounded-md bg-[#0b3a73] px-3 py-1 text-[12px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+              className="h-8 px-3 text-[12px]"
             >
               Salvar
-            </button>
+            </Button>
           </div>
         </form>
       </PopoverContent>
