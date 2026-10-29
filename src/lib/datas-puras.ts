@@ -6,7 +6,8 @@ export function diaUTC(iso: string | null | undefined): number | null {
   const mes = Number(m[2]) - 1;
   const dia = Number(m[3]);
   const data = new Date(Date.UTC(ano, mes, dia));
-  if (data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes || data.getUTCDate() !== dia) return null;
+  if (data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes || data.getUTCDate() !== dia)
+    return null;
   return data.getTime();
 }
 

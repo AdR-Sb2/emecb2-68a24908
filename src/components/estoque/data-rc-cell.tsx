@@ -103,9 +103,7 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
           className="grid gap-2 text-sm"
         >
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-foreground">
-              Data de criação da RC
-            </span>
+            <span className="text-xs font-semibold text-foreground">Data de criação da RC</span>
             <Input
               type="date"
               autoFocus
@@ -128,7 +126,9 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
               {itensNaRc === 1 ? "item" : "itens"})
             </label>
           ) : (
-            <p className="text-[11px] text-muted-foreground">Item sem RC: vale só para este item.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Item sem RC: vale só para este item.
+            </p>
           )}
           <div className="flex flex-wrap justify-end gap-2 pt-1">
             {compra.dt_criacao_rc && (

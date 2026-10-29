@@ -17,8 +17,11 @@ describe("valores SAP", () => {
     expect(numeroSap(matrix[1][0])).toBe(2949);
   });
   it("preserva texto brasileiro em CSV antes da conversão", () => {
-    const wb = XLSX.read('Valor;Quantidade\n2.949,00;1\n', { type: "string", raw: true });
-    const matrix = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true });
+    const wb = XLSX.read("Valor;Quantidade\n2.949,00;1\n", { type: "string", raw: true });
+    const matrix = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], {
+      header: 1,
+      raw: true,
+    });
     expect(numeroSap(matrix[1][0])).toBe(2949);
   });
   it("lê milhares sem centavos e casas decimais", () => {
@@ -29,18 +32,27 @@ describe("valores SAP", () => {
   });
 });
 describe("datas da RC", () => {
-  it("calcula tempo até chegada sem fuso", () => expect(diasEntre("2026-08-05", "2026-08-19")).toBe(14));
+  it("calcula tempo até chegada sem fuso", () =>
+    expect(diasEntre("2026-08-05", "2026-08-19")).toBe(14));
   it("rejeita datas inexistentes", () => expect(diaUTC("2026-02-30")).toBeNull());
   it("rejeita criação futura", () => expect(validarDataRc("2999-01-01")).not.toBeNull());
-  it("rejeita criação posterior à chegada", () => expect(validarDataRc("2026-08-19", "2026-08-05")).not.toBeNull());
+  it("rejeita criação posterior à chegada", () =>
+    expect(validarDataRc("2026-08-19", "2026-08-05")).not.toBeNull());
   it("preserva data manual na importação", () => {
     const row = { dt_criacao_rc: "2026-08-06" };
-    expect(preservarDataRcImportada(row, { data_criacao_origem: "manual", dt_criacao_rc: "2026-08-05" } as Compra)).toBe(true);
+    expect(
+      preservarDataRcImportada(row, {
+        data_criacao_origem: "manual",
+        dt_criacao_rc: "2026-08-05",
+      } as Compra),
+    ).toBe(true);
     expect(row).not.toHaveProperty("dt_criacao_rc");
   });
   it("permite próxima importação após remoção da data", () => {
     const row = { dt_criacao_rc: "2026-08-06" };
-    expect(preservarDataRcImportada(row, { data_criacao_origem: null, dt_criacao_rc: null } as Compra)).toBe(false);
+    expect(
+      preservarDataRcImportada(row, { data_criacao_origem: null, dt_criacao_rc: null } as Compra),
+    ).toBe(false);
     expect(row.dt_criacao_rc).toBe("2026-08-06");
   });
 });

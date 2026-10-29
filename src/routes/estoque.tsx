@@ -92,9 +92,16 @@ export const Route = createFileRoute("/estoque")({
   head: () => ({
     meta: [
       { title: "Eletromecânica · Estoque e Compras" },
-      { name: "description", content: "Almoxarifado EMEC Baixada 2: estoque SAP, compras e acompanhamento de requisições." },
+      {
+        name: "description",
+        content:
+          "Almoxarifado EMEC Baixada 2: estoque SAP, compras e acompanhamento de requisições.",
+      },
       { property: "og:title", content: "EMEC Baixada 2 · Estoque e Compras" },
-      { property: "og:description", content: "Controle de materiais, compras e requisições da Eletromecânica Baixada 2." },
+      {
+        property: "og:description",
+        content: "Controle de materiais, compras e requisições da Eletromecânica Baixada 2.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -850,41 +857,62 @@ function EstoquePage() {
     }
   };
 
-  const itensNaRc = (compra: Compra) => compra.requisicao == null ? 1 : compras.filter((c) => c.requisicao === compra.requisicao).length;
+  const itensNaRc = (compra: Compra) =>
+    compra.requisicao == null
+      ? 1
+      : compras.filter((c) => c.requisicao === compra.requisicao).length;
 
-  const salvarDataRc = async (compra: Compra, data: string | null, aplicarRc: boolean): Promise<boolean> => {
+  const salvarDataRc = async (
+    compra: Compra,
+    data: string | null,
+    aplicarRc: boolean,
+  ): Promise<boolean> => {
     if (!permissoes.gerenciarCompras || !user) return false;
-    const pertence = (c: Compra) => aplicarRc && compra.requisicao != null ? c.requisicao === compra.requisicao : c.id === compra.id;
+    const pertence = (c: Compra) =>
+      aplicarRc && compra.requisicao != null
+        ? c.requisicao === compra.requisicao
+        : c.id === compra.id;
     const alvos = compras.filter(pertence);
     if (data) {
       for (const c of alvos) {
         const erro = validarDataRc(data, c.chegou ? c.data_chegou : null);
-        if (erro) { toast.error(erro); return false; }
+        if (erro) {
+          toast.error(erro);
+          return false;
+        }
       }
     }
     const patch = {
       dt_criacao_rc: data,
-      data_criacao_origem: data ? "manual" as const : null,
+      data_criacao_origem: data ? ("manual" as const) : null,
       data_criacao_editada_por: data ? user.id : null,
-      data_criacao_editada_por_nome: data ? profile?.nome_completo ?? null : null,
+      data_criacao_editada_por_nome: data ? (profile?.nome_completo ?? null) : null,
       data_criacao_editada_em: data ? new Date().toISOString() : null,
     };
     const anteriores = new Map(alvos.map((c) => [c.id, c]));
-    setCompras((prev) => prev.map((c) => pertence(c) ? { ...c, ...patch } : c));
-    setDialogDetalheCompra((prev) => prev && pertence(prev) ? { ...prev, ...patch } : prev);
+    setCompras((prev) => prev.map((c) => (pertence(c) ? { ...c, ...patch } : c)));
+    setDialogDetalheCompra((prev) => (prev && pertence(prev) ? { ...prev, ...patch } : prev));
     const query = supabase.from("compras").update(patch);
-    const { error } = await (aplicarRc && compra.requisicao != null ? query.eq("requisicao", compra.requisicao) : query.eq("id", compra.id));
+    const { error } = await (aplicarRc && compra.requisicao != null
+      ? query.eq("requisicao", compra.requisicao)
+      : query.eq("id", compra.id));
     if (error) {
       setCompras((prev) => prev.map((c) => anteriores.get(c.id) ?? c));
-      setDialogDetalheCompra((prev) => prev ? anteriores.get(prev.id) ?? prev : prev);
-      toast.error(error.code === "PGRST204" || error.code === "42703" ? "Os campos de edição de data ainda precisam ser ativados na base de Compras." : "Não foi possível salvar a data da RC: " + error.message);
+      setDialogDetalheCompra((prev) => (prev ? (anteriores.get(prev.id) ?? prev) : prev));
+      toast.error(
+        error.code === "PGRST204" || error.code === "42703"
+          ? "Os campos de edição de data ainda precisam ser ativados na base de Compras."
+          : "Não foi possível salvar a data da RC: " + error.message,
+      );
       return false;
     }
     toast.success(data ? "Data da RC atualizada!" : "Data da RC removida!");
     return true;
   };
 
-  const erroChegada = criacaoChegadaInput ? validarDataRc(criacaoChegadaInput, dataChegadaInput) : null;
+  const erroChegada = criacaoChegadaInput
+    ? validarDataRc(criacaoChegadaInput, dataChegadaInput)
+    : null;
   const tempoChegada = diasEntre(criacaoChegadaInput, dataChegadaInput);
 
   const handleToggleChegou = async (id: number, current: boolean) => {
@@ -919,7 +947,10 @@ function EstoquePage() {
     if (!dialogDataChegada || salvandoChegada || !permissoes.gerenciarCompras || !user) return;
     const compra = compras.find((c) => c.id === dialogDataChegada);
     if (!compra) return;
-    if (erroChegada || !dataChegadaInput) { toast.error(erroChegada || "Informe a data de chegada."); return; }
+    if (erroChegada || !dataChegadaInput) {
+      toast.error(erroChegada || "Informe a data de chegada.");
+      return;
+    }
     const qtdeRecebida = parseFloat(chegadaQtdeRecebida) || compra?.qtde_rc || 1;
     const valorUnitario = parseFloat(chegadaValorUnitario) || 0;
     const valorTotal = valorUnitario * qtdeRecebida;
@@ -930,19 +961,20 @@ function EstoquePage() {
       data_chegou: dataChegadaInput,
       valor_unitario: valorUnitario || null,
       valor_total: valorTotal || null,
-      ...(alterouCriacao ? {
-        dt_criacao_rc: criacaoChegadaInput || null,
-        data_criacao_origem: criacaoChegadaInput ? "manual" as const : null,
-        data_criacao_editada_por: criacaoChegadaInput ? user.id : null,
-        data_criacao_editada_por_nome: criacaoChegadaInput ? profile?.nome_completo ?? null : null,
-        data_criacao_editada_em: criacaoChegadaInput ? new Date().toISOString() : null,
-      } : {}),
+      ...(alterouCriacao
+        ? {
+            dt_criacao_rc: criacaoChegadaInput || null,
+            data_criacao_origem: criacaoChegadaInput ? ("manual" as const) : null,
+            data_criacao_editada_por: criacaoChegadaInput ? user.id : null,
+            data_criacao_editada_por_nome: criacaoChegadaInput
+              ? (profile?.nome_completo ?? null)
+              : null,
+            data_criacao_editada_em: criacaoChegadaInput ? new Date().toISOString() : null,
+          }
+        : {}),
     };
     setSalvandoChegada(true);
-    const { error } = await supabase
-      .from("compras")
-      .update(patch)
-      .eq("id", dialogDataChegada);
+    const { error } = await supabase.from("compras").update(patch).eq("id", dialogDataChegada);
     setSalvandoChegada(false);
     if (error) {
       toast.error("Erro: " + error.message);
@@ -1301,8 +1333,15 @@ function EstoquePage() {
     // Leitura fresca e paginada: proteção não depende do estado antigo da tela.
     const existentes = new Map<string, Compra>();
     for (let inicio = 0; ; inicio += 1000) {
-      const { data, error } = await supabase.from("compras").select("*").order("id").range(inicio, inicio + 999);
-      if (error) { toast.error("Não foi possível conferir datas manuais. Importação cancelada."); return; }
+      const { data, error } = await supabase
+        .from("compras")
+        .select("*")
+        .order("id")
+        .range(inicio, inicio + 999);
+      if (error) {
+        toast.error("Não foi possível conferir datas manuais. Importação cancelada.");
+        return;
+      }
       for (const c of (data ?? []) as Compra[]) existentes.set(`${c.requisicao}:${c.item_rc}`, c);
       if (!data || data.length < 1000) break;
     }
@@ -1360,8 +1399,10 @@ function EstoquePage() {
       const { error } = await supabase.from("compras").upsert(row, {
         onConflict: "requisicao,item_rc",
       });
-      if (!error) { importados++; if (preservada) datasPreservadas++; }
-      else ignorados++;
+      if (!error) {
+        importados++;
+        if (preservada) datasPreservadas++;
+      } else ignorados++;
     }
     toast.success(
       `${importados} pedidos importados/atualizados com sucesso!` +
@@ -4560,7 +4601,10 @@ function EstoquePage() {
               </thead>
               <tbody>
                 {comprasFiltradas.map((c) => {
-                  const diasAberto = diasEntre(c.dt_criacao_rc, c.chegou && c.data_chegou ? c.data_chegou : hojeISO());
+                  const diasAberto = diasEntre(
+                    c.dt_criacao_rc,
+                    c.chegou && c.data_chegou ? c.data_chegou : hojeISO(),
+                  );
 
                   const diasParaRetirar =
                     c.chegou && c.data_chegou && c.foi_retirado && c.data_retirado
@@ -4718,7 +4762,12 @@ function EstoquePage() {
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <div className="flex flex-col items-end gap-0.5">
-                          <DataRcCell compra={c} itensNaRc={itensNaRc(c)} podeEditar={permissoes.gerenciarCompras} onSalvar={salvarDataRc} />
+                          <DataRcCell
+                            compra={c}
+                            itensNaRc={itensNaRc(c)}
+                            podeEditar={permissoes.gerenciarCompras}
+                            onSalvar={salvarDataRc}
+                          />
                           {diasAberto !== null ? (
                             <span
                               className={
@@ -4862,7 +4911,12 @@ function EstoquePage() {
               <LabelValor label="Previsão de uso" valor={dialogDetalheCompra.previsao_uso} />
               <div className="grid gap-1">
                 <span className="text-xs text-muted-foreground">Dt. criação RC</span>
-                <DataRcCell compra={dialogDetalheCompra} itensNaRc={itensNaRc(dialogDetalheCompra)} podeEditar={permissoes.gerenciarCompras} onSalvar={salvarDataRc} />
+                <DataRcCell
+                  compra={dialogDetalheCompra}
+                  itensNaRc={itensNaRc(dialogDetalheCompra)}
+                  podeEditar={permissoes.gerenciarCompras}
+                  onSalvar={salvarDataRc}
+                />
               </div>
               <LabelValor label="Dt. aprovação RC" valor={dialogDetalheCompra.dt_aprovacao_rc} />
               <LabelValor
@@ -5015,13 +5069,41 @@ function EstoquePage() {
               />
             </label>
             <div className="grid gap-1">
-              <label className="text-xs font-semibold text-foreground" htmlFor="criacao-rc-chegada">Data de criação da RC</label>
-              {editarCriacaoChegada ? <Input id="criacao-rc-chegada" type="date" max={hojeISO()} value={criacaoChegadaInput} onChange={(e) => setCriacaoChegadaInput(e.target.value)} /> : <div className="flex items-center gap-2"><span>{formatarDataPura(criacaoChegadaInput)}</span><Button variant="ghost" size="sm" onClick={() => setEditarCriacaoChegada(true)}>Alterar</Button></div>}
-              {erroChegada ? <p className="text-xs text-destructive">{erroChegada}</p> : tempoChegada !== null ? <p className="text-xs text-muted-foreground">Tempo até a chegada: {tempoChegada} dias</p> : null}
+              <label className="text-xs font-semibold text-foreground" htmlFor="criacao-rc-chegada">
+                Data de criação da RC
+              </label>
+              {editarCriacaoChegada ? (
+                <Input
+                  id="criacao-rc-chegada"
+                  type="date"
+                  max={hojeISO()}
+                  value={criacaoChegadaInput}
+                  onChange={(e) => setCriacaoChegadaInput(e.target.value)}
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span>{formatarDataPura(criacaoChegadaInput)}</span>
+                  <Button variant="ghost" size="sm" onClick={() => setEditarCriacaoChegada(true)}>
+                    Alterar
+                  </Button>
+                </div>
+              )}
+              {erroChegada ? (
+                <p className="text-xs text-destructive">{erroChegada}</p>
+              ) : tempoChegada !== null ? (
+                <p className="text-xs text-muted-foreground">
+                  Tempo até a chegada: {tempoChegada} dias
+                </p>
+              ) : null}
             </div>
             <Button
               onClick={confirmarChegada}
-              disabled={salvandoChegada || !chegadaValorUnitario.trim() || !dataChegadaInput || !!erroChegada}
+              disabled={
+                salvandoChegada ||
+                !chegadaValorUnitario.trim() ||
+                !dataChegadaInput ||
+                !!erroChegada
+              }
             >
               Confirmar Chegada
             </Button>
@@ -5378,7 +5460,12 @@ function EstoquePage() {
                             <Edit3 className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        <DataRcCell compra={c} itensNaRc={itensNaRc(c)} podeEditar={permissoes.gerenciarCompras} onSalvar={salvarDataRc} />
+                        <DataRcCell
+                          compra={c}
+                          itensNaRc={itensNaRc(c)}
+                          podeEditar={permissoes.gerenciarCompras}
+                          onSalvar={salvarDataRc}
+                        />
                         {permissoes.gerenciarFila ? (
                           <span
                             onClick={handleBadgeClick}

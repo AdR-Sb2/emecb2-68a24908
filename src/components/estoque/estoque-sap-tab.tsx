@@ -1573,7 +1573,11 @@ export default function EstoqueSapTab() {
                     . Deseja substituir pelo novo snapshot?
                   </p>
                   <div className="mt-2 flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setConfirmarDuplicada(false)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmarDuplicada(false)}
+                    >
                       Cancelar
                     </Button>
                     <Button
@@ -1615,7 +1619,6 @@ export default function EstoqueSapTab() {
           )}
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }
