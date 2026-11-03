@@ -44,16 +44,18 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
   const marcador = manual ? (
     <TooltipProvider>
       <Tooltip>
-      <TooltipTrigger asChild>
-        <Hand className="h-3 w-3 text-primary" aria-label="Data informada manualmente" />
-      </TooltipTrigger>
-      <TooltipContent>
-        Informada manualmente
-        {compra.data_criacao_editada_por_nome ? ` por ${compra.data_criacao_editada_por_nome}` : ""}
-        {compra.data_criacao_editada_em
-          ? ` em ${new Date(compra.data_criacao_editada_em).toLocaleDateString("pt-BR")}`
-          : ""}
-      </TooltipContent>
+        <TooltipTrigger asChild>
+          <Hand className="h-3 w-3 text-primary" aria-label="Data informada manualmente" />
+        </TooltipTrigger>
+        <TooltipContent>
+          Informada manualmente
+          {compra.data_criacao_editada_por_nome
+            ? ` por ${compra.data_criacao_editada_por_nome}`
+            : ""}
+          {compra.data_criacao_editada_em
+            ? ` em ${new Date(compra.data_criacao_editada_em).toLocaleDateString("pt-BR")}`
+            : ""}
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   ) : null;
