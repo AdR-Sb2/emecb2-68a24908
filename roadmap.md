@@ -5,4 +5,4 @@
 - [x] Corrigir leitura de números da planilha SAP e testar 2.949,00 = 2949 (10 testes passaram).
 - [x] Verificar compilação e página pública: sem erros de execução, estoque direciona ao login.
 - [ ] Validar edição e importação autenticadas: sessão da base externa indisponível; requer teste do usuário na prévia.
-- [ ] Corrigir e verificar falha ao renderizar indicador de data manual após salvar a RC.
+- [x] Corrigir indicador de data manual: reproduzido erro de TooltipProvider e verificado editor sem falha após correção; 10 testes passaram.
