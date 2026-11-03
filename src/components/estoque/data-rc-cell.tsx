@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Hand, Pencil } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Compra } from "@/lib/estoque-types";
 import { formatarDataPura, hojeISO, validarDataRc } from "@/lib/datas-puras";
 import { Button } from "@/components/ui/button";
@@ -42,18 +42,22 @@ export function DataRcCell({ compra, itensNaRc, podeEditar, onSalvar }: Props) {
   };
 
   const marcador = manual ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Hand className="h-3 w-3 text-primary" aria-label="Data informada manualmente" />
-      </TooltipTrigger>
-      <TooltipContent>
-        Informada manualmente
-        {compra.data_criacao_editada_por_nome ? ` por ${compra.data_criacao_editada_por_nome}` : ""}
-        {compra.data_criacao_editada_em
-          ? ` em ${new Date(compra.data_criacao_editada_em).toLocaleDateString("pt-BR")}`
-          : ""}
-      </TooltipContent>
-    </Tooltip>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Hand className="h-3 w-3 text-primary" aria-label="Data informada manualmente" />
+        </TooltipTrigger>
+        <TooltipContent>
+          Informada manualmente
+          {compra.data_criacao_editada_por_nome
+            ? ` por ${compra.data_criacao_editada_por_nome}`
+            : ""}
+          {compra.data_criacao_editada_em
+            ? ` em ${new Date(compra.data_criacao_editada_em).toLocaleDateString("pt-BR")}`
+            : ""}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   ) : null;
 
   if (!podeEditar) {
