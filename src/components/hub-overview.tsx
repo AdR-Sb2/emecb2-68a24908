@@ -179,9 +179,9 @@ function KpiCard({
   const deltaGood = kpi.delta !== null && kpi.delta !== 0 && kpi.delta > 0 === positiveIsGood;
   const DeltaIcon = kpi.delta !== null && kpi.delta < 0 ? ArrowDownRight : ArrowUpRight;
   return (
-    <article className="relative min-w-0 overflow-hidden rounded-[14px] border border-[#dce7f5] bg-gradient-to-br from-white via-white to-[#f7faff] p-3.5 shadow-[0_8px_22px_-13px_rgba(16,54,102,0.42)] transition-shadow hover:shadow-[0_12px_26px_-14px_rgba(16,54,102,0.48)] dark:border-slate-700 dark:bg-slate-900 sm:p-4">
+    <article className="group relative flex min-h-[190px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_5px_18px_-10px_rgba(15,45,85,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.32)] dark:border-slate-700 dark:bg-slate-900 sm:p-5">
       <div className="flex items-start gap-3">
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${color}`}>
           <Icon className="h-5 w-5" />
         </span>
         <h3 className="min-h-10 pt-0.5 text-sm font-semibold leading-5 text-[#25466f] dark:text-slate-200">
@@ -193,7 +193,7 @@ function KpiCard({
       ) : (
         <>
           <p
-            className={`mt-2 text-2xl font-bold tracking-tight sm:text-[1.8rem] ${
+            className={`mt-3 text-[1.75rem] font-bold leading-tight tracking-[-0.035em] sm:text-[1.9rem] ${
               kpi.status === "error"
                 ? "text-red-600 dark:text-red-400"
                 : alert && (kpi.value ?? 0) > 0
@@ -238,7 +238,7 @@ function KpiCard({
           <Sparkline values={kpi.trend} color={alert ? "#f97316" : "#1f7ad8"} />
           <Link
             to={href}
-            className="relative z-[1] mt-3 inline-flex w-full items-center justify-end gap-1 text-xs font-semibold text-[#1768c4] hover:text-[#0b3a73] dark:text-blue-300"
+            className="relative z-[1] mt-auto inline-flex w-full items-center justify-end gap-1 border-t border-slate-100 pt-3 text-xs font-semibold text-[#1768c4] transition-colors hover:text-[#0b3a73] dark:border-slate-800 dark:text-blue-300"
           >
             Ver detalhes <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -720,7 +720,7 @@ export function HubOverview({
 
   return (
     <>
-      <section className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           title="O.S. Executadas (mês atual)"
           kpi={kpis.executadas}
@@ -760,10 +760,10 @@ export function HubOverview({
           alert
         />
       </section>
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">{children}</div>
         {atividades === undefined ? (
-          <aside className="rounded-xl border border-[#e1e9f4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <aside className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_5px_18px_-12px_rgba(15,45,85,0.24)] dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-3 h-5 w-40 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
             <div className="space-y-4">
               {[0, 1, 2].map((item) => (
@@ -775,7 +775,7 @@ export function HubOverview({
             </div>
           </aside>
         ) : atividades === null ? (
-          <aside className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          <aside className="rounded-2xl border border-red-200 bg-red-50/80 p-5 text-sm text-red-700 shadow-sm dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
             <h2 className="mb-2 text-base font-bold">Atividades Recentes</h2>
             Não foi possível carregar as atividades recentes.
           </aside>
@@ -792,7 +792,7 @@ export function HubOverview({
                 const Icon = activityIcon(`${activity.tipo} ${activity.mensagem}`);
                 return (
                   <li key={activity.id} className="flex gap-3 py-3 first:pt-1 last:pb-1">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-blue-950 dark:text-blue-300">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-blue-950 dark:text-blue-300">
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0">
@@ -829,8 +829,8 @@ export function HubWelcome() {
   }, []);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(now);
   return (
-    <div className="flex items-center gap-4">
-      <div className="h-12 w-1 shrink-0 rounded-full bg-cyan-300" />
+    <div className="flex items-center gap-4 sm:gap-5">
+      <div className="h-14 w-1 shrink-0 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.45)]" />
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Bem-vindo ao Hub Operacional!
