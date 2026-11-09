@@ -595,7 +595,7 @@ function Index() {
 
   return (
     <div id="hub-top" className="min-h-screen bg-[#f4f7fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[68px] flex-col bg-gradient-to-b from-[#082b55] via-[#06264d] to-[#041b3a] px-2 py-4 text-white shadow-[8px_0_30px_-20px_rgba(3,20,45,0.65)] lg:w-64 lg:px-4 lg:py-6">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[68px] flex-col sm:flex bg-gradient-to-b from-[#082b55] via-[#06264d] to-[#041b3a] px-2 py-4 text-white shadow-[8px_0_30px_-20px_rgba(3,20,45,0.65)] lg:w-64 lg:px-4 lg:py-6">
         <div className="mb-5 flex items-center justify-center lg:mb-8 lg:justify-start">
           <img
             src={logoHeader}
