@@ -794,7 +794,10 @@ function Index() {
             <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full border-[28px] border-white/10" />
             <div className="relative flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20">
-                {categoriaSelecionada && <categoriaSelecionada.icon className="h-6 w-6" />}
+                {categoriaSelecionada && (() => {
+                  const CategoryIcon = categoriaSelecionada.icon;
+                  return <CategoryIcon className="h-6 w-6" />;
+                })()}
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">Hub Operacional</p>
