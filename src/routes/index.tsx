@@ -1,16 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Boxes,
   ArrowRight,
   FileText,
   ClipboardList,
-  MoreHorizontal,
   Shield,
   LogOut,
   Loader2,
-  User,
   Package,
   CalendarCheck,
   BookOpen,
@@ -22,6 +20,9 @@ import {
   Wrench,
   Search,
   Home,
+  BarChart3,
+  ChevronDown,
+  Cog,
 } from "lucide-react";
 import {
   Dialog,
@@ -34,6 +35,7 @@ import logoHeader from "@/assets/logo-branca.png";
 import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
 import { getPermissoesCargo, temPermissao } from "../lib/permissoes";
+import { HubOverview, HubWelcome } from "@/components/hub-overview";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -109,6 +111,90 @@ function Index() {
   const [fichaChoiceOpen, setFichaChoiceOpen] = useState(false);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
   const [busca, setBusca] = useState("");
+  const [buscaRemota, setBuscaRemota] = useState("");
+  const [resultadosRemotos, setResultadosRemotos] = useState<
+    { tipo: "O.S." | "Equipamento"; titulo: string; detalhe: string; destino: string }[]
+  >([]);
+  const [erroBuscaRemota, setErroBuscaRemota] = useState(false);
+  const [carregandoBuscaRemota, setCarregandoBuscaRemota] = useState(false);
+  const [horaAtual, setHoraAtual] = useState(() => new Date());
+  const [openOsCount, setOpenOsCount] = useState<number | null>(null);
+  const updateOpenOsCount = useCallback((count: number | null) => setOpenOsCount(count), []);
+  const canViewRecords = temPermissao(permissoes, "registros", "visualizar");
+  const canViewEquipment = temPermissao(permissoes, "estoque", "equipamentos_ver");
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setHoraAtual(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBuscaRemota(busca.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [busca]);
+
+  useEffect(() => {
+    let active = true;
+    const term = buscaRemota
+      .replace(/[%,_*()"]/g, " ")
+      .replaceAll("\\", " ")
+      .trim();
+    if (term.length < 2) {
+      setResultadosRemotos([]);
+      setErroBuscaRemota(false);
+      setCarregandoBuscaRemota(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setCarregandoBuscaRemota(true);
+    void Promise.all([
+      canViewRecords
+        ? supabase
+            .from("registros_atendimento")
+            .select("ordem,texto_breve,planta")
+            .or(`ordem.ilike.%${term}%,texto_breve.ilike.%${term}%,planta.ilike.%${term}%`)
+            .limit(5)
+        : Promise.resolve({ data: [], error: null }),
+      canViewEquipment
+        ? supabase
+            .from("equipamentos")
+            .select("tag,descricao")
+            .or(`tag.ilike.%${term}%,descricao.ilike.%${term}%`)
+            .limit(5)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+      .then(([osRes, equipamentoRes]) => {
+        if (!active) return;
+        setErroBuscaRemota(!!osRes.error || !!equipamentoRes.error);
+        setResultadosRemotos([
+          ...(osRes.data || []).map((row) => ({
+            tipo: "O.S." as const,
+            titulo: `O.S. ${row.ordem || "sem número"}`,
+            detalhe: row.texto_breve || row.planta || "Registro de atendimento",
+            destino: "/registros",
+          })),
+          ...(equipamentoRes.data || []).map((row) => ({
+            tipo: "Equipamento" as const,
+            titulo: row.tag,
+            detalhe: row.descricao,
+            destino: "/estoque",
+          })),
+        ]);
+        setCarregandoBuscaRemota(false);
+      })
+      .catch((error: unknown) => {
+        console.error("Erro na busca global do HUB:", error);
+        if (!active) return;
+        setErroBuscaRemota(true);
+        setCarregandoBuscaRemota(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [buscaRemota, canViewEquipment, canViewRecords]);
 
   useEffect(() => {
     if (loading) return;
@@ -166,90 +252,298 @@ function Index() {
     hasPanel("plano_manutencao") || hasPanel("ficha_elevatoria") || hasPanel("estoque");
   const shouldShowProcedimentos = hasPanel("procedimentos");
   const canAdmin = hasPanel("admin");
-  const matchesTool = (...termos: string[]) =>
-    !busca.trim() ||
-    termos.some((termo) =>
-      termo.toLocaleLowerCase("pt-BR").includes(busca.trim().toLocaleLowerCase("pt-BR")),
-    );
-  const ferramentasBusca = [
+  const categorias = [
     {
-      visivel: shouldShowDashboard,
-      termos: ["Dashboard", "Painéis de automação", "testes", "medições"],
-    },
-    { visivel: shouldShowSistema, termos: ["Sistemas", "Hubs administrativos e operacionais"] },
-    {
-      visivel: shouldShowRelatorio,
-      termos: ["Relatório", "Técnico", "Planta", "Unidade", "WhatsApp"],
-    },
-    { visivel: shouldShowBacklog, termos: ["Backlog BI", "Field", "SAP", "SLA", "mapa"] },
-    { visivel: true, termos: ["Produtividade", "Acompanhamento diário", "equipe de manutenção"] },
-    {
-      visivel: shouldShowEscala,
-      termos: ["Escala de Trabalho", "Equipe", "plantões", "escala semanal"],
+      id: "operacao",
+      nome: "Operação",
+      descricao: "Acesse as ferramentas operacionais.",
+      icon: Activity,
+      color: "bg-blue-100 text-blue-600",
     },
     {
-      visivel: shouldShowEstoque,
-      termos: ["Almoxarifado", "Estoque", "materiais", "compras", "pedidos"],
-    },
-    { visivel: shouldShowOI, termos: ["Ordem de Início", "Relatório Fotográfico", "DOCX"] },
-    {
-      visivel: shouldShowManuais,
-      termos: ["Manuais", "Normas", "manuais técnicos", "procedimentos"],
+      id: "planejamento",
+      nome: "Planejamento",
+      descricao: "Organize e acompanhe o planejamento.",
+      icon: CalendarRange,
+      color: "bg-emerald-100 text-emerald-600",
     },
     {
-      visivel: shouldShowCronograma,
-      termos: ["Cronograma", "Planejamento", "instalações", "obras", "manutenções"],
+      id: "ativos",
+      nome: "Ativos e Recursos",
+      descricao: "Gerencie os ativos da operação.",
+      icon: Cog,
+      color: "bg-violet-100 text-violet-600",
     },
     {
-      visivel: shouldShowProcedimentos,
-      termos: ["Procedimentos", "operacionais", "passo-a-passo", "PDF"],
+      id: "documentacao",
+      nome: "Documentação",
+      descricao: "Consulte manuais e procedimentos.",
+      icon: BookOpen,
+      color: "bg-orange-100 text-orange-600",
     },
     {
-      visivel: shouldShowFichaElevatoria,
-      termos: ["Ficha da Elevatória", "Ficha técnica", "equipamentos", "elétrica", "hidráulica"],
+      id: "analises",
+      nome: "Análises",
+      descricao: "Acompanhe indicadores e dashboards.",
+      icon: BarChart3,
+      color: "bg-teal-100 text-teal-600",
     },
     {
-      visivel: shouldShowPlanoManutencao,
-      termos: ["Plano de Manutenção", "equipamentos", "planos ativos", "pendências"],
+      id: "relatorios",
+      nome: "Relatórios",
+      descricao: "Gere relatórios e exporte dados.",
+      icon: FileText,
+      color: "bg-sky-100 text-sky-600",
     },
   ];
-  const temResultadoBusca = ferramentasBusca.some(
-    ({ visivel, termos }) => visivel && matchesTool(...termos),
+  const ferramentas = [
+    {
+      key: "backlog",
+      nome: "Backlog BI",
+      descricao: "O.S. do Field/SAP: SLA, mapa e programação semanal.",
+      categoria: "operacao",
+      icon: ClipboardList,
+      visible: shouldShowBacklog,
+      to: "/backlog",
+    },
+    {
+      key: "oi",
+      nome: "Ordem de Início",
+      descricao: "Relatório Fotográfico — gerar DOCX direto no navegador.",
+      categoria: "operacao",
+      icon: FileImage,
+      visible: shouldShowOI,
+      to: "/oi",
+    },
+    {
+      key: "produtividade",
+      nome: "Produtividade",
+      descricao: "Acompanhamento diário da equipe de manutenção.",
+      categoria: "operacao",
+      icon: Activity,
+      visible: true,
+      to: "/produtividade",
+    },
+    {
+      key: "cronograma",
+      nome: "Cronograma",
+      descricao: "Planejamento de instalações, obras e manutenções.",
+      categoria: "planejamento",
+      icon: CalendarRange,
+      visible: shouldShowCronograma,
+      to: "/cronograma",
+    },
+    {
+      key: "escala",
+      nome: "Escala de Trabalho",
+      descricao: "Equipe, plantões e escala semanal de trabalho.",
+      categoria: "planejamento",
+      icon: CalendarCheck,
+      visible: shouldShowEscala,
+      to: "/escala",
+    },
+    {
+      key: "plano_manutencao",
+      nome: "Plano de Manutenção",
+      descricao: "Equipamentos, planos ativos e pendências.",
+      categoria: "planejamento",
+      icon: Wrench,
+      visible: shouldShowPlanoManutencao,
+      to: "/plano-manutencao",
+    },
+    {
+      key: "ficha_elevatoria",
+      nome: "Ficha da Elevatória",
+      descricao: "Ficha técnica de elevatórias e equipamentos.",
+      categoria: "ativos",
+      icon: Building2,
+      visible: shouldShowFichaElevatoria,
+      onClick: () => setFichaChoiceOpen(true),
+    },
+    {
+      key: "estoque",
+      nome: "Almoxarifado",
+      descricao: "Estoque de materiais, entrada/saída, compras e pedidos.",
+      categoria: "ativos",
+      icon: Package,
+      visible: shouldShowEstoque,
+      to: "/estoque",
+    },
+    {
+      key: "sistemas",
+      nome: "Sistemas",
+      descricao: "Hubs administrativos e operacionais.",
+      categoria: "ativos",
+      icon: Boxes,
+      visible: shouldShowSistema,
+      onClick: () => setSysOpen(true),
+    },
+    {
+      key: "manuais",
+      nome: "Manuais",
+      descricao: "Normas e manuais técnicos.",
+      categoria: "documentacao",
+      icon: BookOpen,
+      visible: shouldShowManuais,
+      to: "/manuais",
+    },
+    {
+      key: "procedimentos",
+      nome: "Procedimentos",
+      descricao: "Procedimentos operacionais passo-a-passo com PDF.",
+      categoria: "documentacao",
+      icon: ListChecks,
+      visible: shouldShowProcedimentos,
+      to: "/procedimentos",
+    },
+    {
+      key: "dashboard",
+      nome: "Dashboard",
+      descricao: "Painéis de automação, testes e medições.",
+      categoria: "analises",
+      icon: LayoutDashboard,
+      visible: shouldShowDashboard,
+      onClick: () => setDashOpen(true),
+    },
+    {
+      key: "relatorio",
+      nome: "Relatório",
+      descricao: "Relatórios técnicos e de Planta/Unidade.",
+      categoria: "relatorios",
+      icon: FileText,
+      visible: shouldShowRelatorio,
+      to: "/relatorio",
+    },
+  ];
+  const ferramentasVisiveis = ferramentas.filter(
+    (tool) =>
+      tool.visible &&
+      (!busca.trim() ||
+        tool.nome.toLocaleLowerCase("pt-BR").includes(busca.trim().toLocaleLowerCase("pt-BR"))),
   );
+  const categoriasVisiveis = categorias.filter((category) =>
+    ferramentasVisiveis.some((tool) => tool.categoria === category.id),
+  );
+  const renderTool = (tool: (typeof ferramentas)[number], delay: number, sidebar = false) => {
+    const Icon = tool.icon;
+    const color = getCardColor(tool.key);
+    const content = sidebar ? (
+      <>
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="hidden truncate lg:inline">{tool.nome}</span>
+        {tool.key === "backlog" && openOsCount !== null && openOsCount > 0 && (
+          <span className="hidden min-w-5 rounded-full bg-[#1f5bd8] px-1.5 py-0.5 text-center text-[10px] font-bold text-white lg:inline">
+            {openOsCount}
+          </span>
+        )}
+      </>
+    ) : (
+      <>
+        <CardIcon chave={tool.key} icon={Icon} />
+        <CardTitle>{tool.nome}</CardTitle>
+        <CardDesc>{tool.descricao}</CardDesc>
+        <CardCta>{tool.onClick ? "Abrir opções" : "Abrir ferramenta"}</CardCta>
+      </>
+    );
+    if (tool.onClick && sidebar) {
+      return (
+        <button
+          key={tool.key}
+          type="button"
+          onClick={tool.onClick}
+          title={tool.nome}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs text-blue-50/80 transition hover:bg-white/10 hover:text-white"
+        >
+          {content}
+        </button>
+      );
+    }
+    if (tool.onClick) {
+      return (
+        <CardButton key={tool.key} onClick={tool.onClick} chave={tool.key} delay={delay}>
+          {content}
+        </CardButton>
+      );
+    }
+    return sidebar ? (
+      <Link
+        key={tool.key}
+        to={tool.to || "/"}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-blue-50/80 transition hover:bg-white/10 hover:text-white ${color.icon}`}
+        title={tool.nome}
+      >
+        {content}
+      </Link>
+    ) : (
+      <CardLink key={tool.key} to={tool.to || "/"} chave={tool.key} delay={delay}>
+        {content}
+      </CardLink>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#f2f6fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
       <style>{animations}</style>
 
-      <aside className="relative z-20 flex w-full items-center justify-between bg-gradient-to-b from-[#062955] to-[#041b3a] px-4 py-3 text-white shadow-lg lg:fixed lg:inset-y-0 lg:left-0 lg:w-[250px] lg:flex-col lg:items-stretch lg:px-5 lg:py-7 lg:shadow-xl">
-        <div className="flex min-w-0 items-center gap-3 lg:flex-col lg:items-start lg:gap-8">
-          <div className="flex h-10 shrink-0 items-center justify-center lg:h-16 lg:w-full lg:justify-start">
-            <div className="flex h-full items-center justify-center">
-              <img
-                src={logoHeader}
-                alt="Águas do Rio"
-                className="h-10 w-auto object-contain lg:h-14"
-                loading="eager"
-              />
-            </div>
-          </div>
-
-          <nav aria-label="Navegação principal" className="flex items-center lg:w-full">
-            <span className="inline-flex items-center gap-2 rounded-xl bg-[#0b4a9d] px-4 py-2.5 text-sm font-semibold shadow-inner lg:w-full">
-              <Home className="h-4 w-4" />
-              Início
-            </span>
-          </nav>
+      <aside className="fixed inset-y-0 left-0 z-30 flex w-[68px] flex-col bg-gradient-to-b from-[#062955] to-[#041b3a] px-2 py-4 text-white shadow-xl lg:w-64 lg:px-4 lg:py-6">
+        <div className="mb-5 flex items-center justify-center lg:mb-8 lg:justify-start">
+          <img
+            src={logoHeader}
+            alt="Águas do Rio"
+            className="h-9 w-auto object-contain lg:h-14"
+            loading="eager"
+          />
         </div>
-        <div className="hidden items-center gap-2 border-t border-white/10 pt-5 text-xs text-cyan-100/80 lg:flex">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
-          Sistema operacional · Águas do Rio
+        <nav aria-label="Navegação principal" className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <Link
+            to="/"
+            title="Início"
+            className="flex items-center gap-3 rounded-xl bg-[#0b4a9d] px-3 py-2.5 text-sm font-semibold shadow-inner"
+          >
+            <Home className="h-4 w-4 shrink-0" />
+            <span className="hidden lg:inline">Início</span>
+          </Link>
+          {categorias.map((category) => {
+            const CategoryIcon = category.icon;
+            const items = ferramentasVisiveis.filter((tool) => tool.categoria === category.id);
+            if (!items.length) return null;
+            return (
+              <div key={category.id} className="space-y-1">
+                <a
+                  href={`#categoria-${category.id}`}
+                  title={category.nome}
+                  className="flex items-center gap-2 px-2 py-1 text-[11px] font-semibold text-cyan-100/65 hover:text-white"
+                >
+                  <CategoryIcon className="h-4 w-4 shrink-0 lg:hidden" />
+                  <span className="hidden lg:inline">{category.nome}</span>
+                  <ChevronDown className="ml-auto hidden h-3 w-3 lg:block" />
+                </a>
+                {items.map((tool, index) => renderTool(tool, index, true))}
+              </div>
+            );
+          })}
+        </nav>
+        <div className="mt-4 border-t border-white/15 pt-3">
+          {canAdmin && (
+            <Link
+              to="/admin"
+              title="Painel Administrativo"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-blue-50/80 hover:bg-white/10 hover:text-white"
+            >
+              <Shield className="h-4 w-4 shrink-0" />
+              <span className="hidden lg:inline">Painel Administrativo</span>
+            </Link>
+          )}
+          <div className="hidden items-center gap-2 px-3 pt-2 text-[11px] text-cyan-100/80 lg:flex">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            Sistema Online
+          </div>
         </div>
       </aside>
 
-      <div className="min-h-screen lg:ml-[250px]">
+      <div className="min-h-screen ml-[68px] lg:ml-64">
         <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/90 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-7 lg:px-9">
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-9">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -257,6 +551,92 @@ function Index() {
               <p className="text-xs text-[#45658e] dark:text-slate-400 sm:text-sm">
                 Eletromecânica
               </p>
+            </div>
+            <div className="relative order-3 w-full sm:order-none sm:mx-4 sm:max-w-sm sm:flex-1">
+              <label className="flex items-center gap-2 rounded-full border border-[#d5e0ee] bg-white px-3.5 py-2 text-[#45658e] shadow-sm focus-within:border-[#3286d2] focus-within:ring-2 focus-within:ring-[#3286d2]/15 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                <Search className="h-4 w-4 shrink-0" />
+                <input
+                  type="search"
+                  value={busca}
+                  onChange={(event) => setBusca(event.target.value)}
+                  placeholder="Buscar ferramenta, O.S. ou equipamento..."
+                  aria-label="Buscar ferramenta, O.S. ou equipamento"
+                  className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
+                />
+              </label>
+              {busca.trim().length >= 2 && (
+                <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  {ferramentasVisiveis.slice(0, 5).map((tool) => {
+                    const Icon = tool.icon;
+                    const content = (
+                      <>
+                        <Icon className="h-4 w-4 text-[#1f5bd8]" />
+                        <span className="truncate">{tool.nome}</span>
+                      </>
+                    );
+                    return tool.onClick ? (
+                      <button
+                        key={tool.key}
+                        onClick={() => {
+                          tool.onClick?.();
+                          setBusca("");
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-slate-800"
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      <Link
+                        key={tool.key}
+                        to={tool.to || "/"}
+                        onClick={() => setBusca("")}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-slate-800"
+                      >
+                        {content}
+                      </Link>
+                    );
+                  })}
+                  {carregandoBuscaRemota && (
+                    <p className="px-3 py-2 text-xs text-slate-500">
+                      Buscando O.S. e equipamentos…
+                    </p>
+                  )}
+                  {erroBuscaRemota && (
+                    <p className="px-3 py-2 text-xs text-red-600">
+                      Não foi possível consultar O.S. e equipamentos.
+                    </p>
+                  )}
+                  {!carregandoBuscaRemota &&
+                    resultadosRemotos.map((result, index) => (
+                      <Link
+                        key={`${result.tipo}-${result.titulo}-${index}`}
+                        to={result.destino}
+                        onClick={() => setBusca("")}
+                        className="flex items-start gap-2 rounded-lg px-3 py-2 hover:bg-blue-50 dark:hover:bg-slate-800"
+                      >
+                        <span className="mt-0.5 text-[10px] font-bold uppercase text-slate-400">
+                          {result.tipo}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold">
+                            {result.titulo}
+                          </span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {result.detalhe}
+                          </span>
+                        </span>
+                      </Link>
+                    ))}
+                  {!carregandoBuscaRemota &&
+                    !erroBuscaRemota &&
+                    ferramentasVisiveis.length === 0 &&
+                    resultadosRemotos.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-slate-500">
+                        Nenhuma ferramenta, O.S. ou equipamento encontrado.
+                      </p>
+                    )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="hidden border-l border-[#d4deed] pl-3 text-right sm:block">
@@ -289,232 +669,130 @@ function Index() {
 
         <main className="relative mx-auto min-h-[calc(100vh-65px)] max-w-[1440px] overflow-hidden px-4 pb-8 pt-5 sm:px-7 sm:pt-7 lg:px-9 lg:pt-8">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-7 flex min-h-[132px] items-center overflow-hidden rounded-2xl bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
+          <section className="relative mb-5 flex min-h-[118px] items-center overflow-hidden rounded-2xl bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-5 py-5 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
-            <div className="relative mr-5 hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-cyan-100 shadow-inner sm:flex">
-              <Activity className="h-8 w-8" />
+            <svg
+              viewBox="0 0 520 150"
+              preserveAspectRatio="xMidYMid slice"
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[48%] opacity-40 lg:block"
+            >
+              <defs>
+                <linearGradient id="hub-pipe" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stopColor="#52b9ff" />
+                  <stop offset="0.5" stopColor="#0875cc" />
+                  <stop offset="1" stopColor="#034584" />
+                </linearGradient>
+              </defs>
+              <path d="M25 92h390" fill="none" stroke="#bce6ff" strokeWidth="48" opacity=".35" />
+              <path d="M25 88h390" fill="none" stroke="url(#hub-pipe)" strokeWidth="38" />
+              <path d="M25 77h390" fill="none" stroke="#a9ddff" strokeWidth="3" opacity=".55" />
+              <path
+                d="M180 87v-55h115v55M194 31v-9h87v9"
+                fill="none"
+                stroke="url(#hub-pipe)"
+                strokeWidth="24"
+              />
+              <path
+                d="M164 67h148M164 58h148"
+                fill="none"
+                stroke="#c3eaff"
+                strokeWidth="5"
+                opacity=".5"
+              />
+              <path d="M86 111v39m272-39v39" stroke="#c2e9ff" strokeWidth="13" opacity=".55" />
+              <path d="M69 145h34m238 0h34" stroke="#c2e9ff" strokeWidth="5" opacity=".55" />
+              <path d="M25 104h390" stroke="#032f62" strokeWidth="4" opacity=".45" />
+            </svg>
+            <div className="relative z-[1]">
+              <HubWelcome />
             </div>
-            <div className="relative border-l-0 sm:border-l sm:border-white/30 sm:pl-6">
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                Bem-vindo{profile?.nome_completo ? `, ${profile.nome_completo.split(" ")[0]}` : ""}!
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm text-blue-50/90 sm:text-base">
-                Acesse rapidamente as principais ferramentas da Eletromecânica.
-              </p>
-            </div>
-            <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[25%] bg-gradient-to-l from-cyan-300/10 to-transparent lg:block" />
           </section>
 
-          <section className="relative">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="h-7 w-1 rounded-full bg-[#00a3d9]" />
-                <div>
-                  <h2 className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white">
-                    Acesso Rápido
+          <HubOverview
+            userId={user?.id}
+            onOpenCount={updateOpenOsCount}
+            canViewRecords={canViewRecords}
+            canViewInventory={shouldShowEstoque}
+          >
+            <>
+              <section className="mb-5">
+                <div className="mb-3 flex items-center gap-3">
+                  <span className="h-7 w-1 rounded-full bg-[#1f5bd8]" />
+                  <h2 className="text-lg font-bold text-[#0b2b55] dark:text-white">
+                    Ferramentas por Categoria
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Ferramentas e módulos disponíveis para você
-                  </p>
                 </div>
-              </div>
-              <label className="flex w-full items-center gap-2 rounded-xl border border-[#cbd9ed] bg-white px-3 py-2.5 text-[#45658e] shadow-sm transition focus-within:border-[#3286d2] focus-within:ring-2 focus-within:ring-[#3286d2]/15 sm:w-64 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                <Search className="h-4 w-4 shrink-0" />
-                <input
-                  type="search"
-                  value={busca}
-                  onChange={(event) => setBusca(event.target.value)}
-                  placeholder="Buscar ferramenta..."
-                  aria-label="Buscar ferramenta"
-                  className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
-                />
-              </label>
-            </div>
-            {/* Loading */}
-            {loadingPaineis ? (
-              <div className="flex min-h-56 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-[#1f7ad6] dark:text-[#38bdf8]" />
-              </div>
-            ) : busca.trim() && !temResultadoBusca ? (
-              <div className="rounded-xl border border-dashed border-[#cbd9ed] bg-white/70 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
-                Nenhuma ferramenta encontrada para “{busca}”.
-              </div>
-            ) : (
-              /* ===== GRADE DE CARDS ===== */
-              <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {/* Dashboard */}
-                {shouldShowDashboard &&
-                  matchesTool("Dashboard", "Painéis de automação", "testes", "medições") && (
-                    <CardButton onClick={() => setDashOpen(true)} chave="dashboard" delay={0}>
-                      <CardIcon chave="dashboard" icon={LayoutDashboard} />
-                      <CardTitle>Dashboard</CardTitle>
-                      <CardDesc>Painéis de automação, testes e medições.</CardDesc>
-                      <CardCta>Escolher painel</CardCta>
-                    </CardButton>
-                  )}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {categoriasVisiveis.map((category) => {
+                    const Icon = category.icon;
+                    return (
+                      <a
+                        key={category.id}
+                        href={`#categoria-${category.id}`}
+                        className="group flex min-h-[92px] items-center gap-3 rounded-xl border border-[#e1e9f4] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 sm:p-4"
+                      >
+                        <span
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${category.color}`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-bold text-[#102f5c] dark:text-white">
+                            {category.nome}
+                          </span>
+                          <span className="mt-1 line-clamp-2 block text-xs text-slate-500 dark:text-slate-400">
+                            {category.descricao}
+                          </span>
+                        </span>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-[#1768c4] transition group-hover:translate-x-1" />
+                      </a>
+                    );
+                  })}
+                </div>
+              </section>
 
-                {/* Sistema */}
-                {shouldShowSistema &&
-                  matchesTool("Sistemas", "Hubs administrativos e operacionais") && (
-                    <CardButton onClick={() => setSysOpen(true)} chave="sistemas" delay={1}>
-                      <CardIcon chave="sistemas" icon={Boxes} />
-                      <CardTitle>Sistemas</CardTitle>
-                      <CardDesc>Hubs administrativos e operacionais.</CardDesc>
-                      <CardCta>Escolher sistemas</CardCta>
-                    </CardButton>
-                  )}
+              {loadingPaineis ? (
+                <div className="flex min-h-40 items-center justify-center">
+                  <Loader2 className="h-7 w-7 animate-spin text-[#1f7ad6]" />
+                </div>
+              ) : busca.trim() && ferramentasVisiveis.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#cbd9ed] bg-white/70 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
+                  Nenhuma ferramenta encontrada para “{busca}”.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {categoriasVisiveis.map((category) => {
+                    const categoryTools = ferramentasVisiveis.filter(
+                      (tool) => tool.categoria === category.id,
+                    );
+                    const Icon = category.icon;
+                    return (
+                      <section
+                        key={category.id}
+                        id={`categoria-${category.id}`}
+                        className="scroll-mt-24"
+                      >
+                        <div className="mb-3 flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-[#1f5bd8]" />
+                          <h3 className="text-sm font-bold text-[#25466f] dark:text-slate-200">
+                            {category.nome}
+                          </h3>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {categoryTools.map((tool, index) =>
+                            renderTool(tool, index + category.id.length),
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          </HubOverview>
 
-                {/* Relatório Técnico */}
-                {shouldShowRelatorio &&
-                  matchesTool("Relatório", "Técnico", "Planta", "Unidade", "WhatsApp") && (
-                    <CardLink to="/relatorio" chave="relatorio" delay={2}>
-                      <CardIcon chave="relatorio" icon={FileText} />
-                      <CardTitle>Relatório</CardTitle>
-                      <CardDesc>Técnico e de Planta/Unidade para WhatsApp.</CardDesc>
-                      <CardCta>Abrir relatórios</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* Backlog BI */}
-                {shouldShowBacklog && matchesTool("Backlog BI", "Field", "SAP", "SLA", "mapa") && (
-                  <CardLink to="/backlog" chave="backlog" delay={3}>
-                    <CardIcon chave="backlog" icon={ClipboardList} />
-                    <CardTitle>Backlog BI</CardTitle>
-                    <CardDesc>O.S. do Field/SAP: SLA, mapa e programação semanal.</CardDesc>
-                    <CardCta>Abrir backlog</CardCta>
-                  </CardLink>
-                )}
-
-                {/* Produtividade de Campo */}
-                {matchesTool("Produtividade", "Acompanhamento diário", "equipe de manutenção") && (
-                  <CardLink to="/produtividade" chave="produtividade" delay={4}>
-                    <CardIcon chave="produtividade" icon={Activity} />
-                    <CardTitle>Produtividade</CardTitle>
-                    <CardDesc>Acompanhamento diário da equipe de manutenção.</CardDesc>
-                    <CardCta>Abrir produtividade</CardCta>
-                  </CardLink>
-                )}
-
-                {/* Escala de Trabalho */}
-                {shouldShowEscala &&
-                  matchesTool("Escala de Trabalho", "Equipe", "plantões", "escala semanal") && (
-                    <CardLink to="/escala" chave="escala" delay={4}>
-                      <CardIcon chave="escala" icon={CalendarCheck} />
-                      <CardTitle>Escala de Trabalho</CardTitle>
-                      <CardDesc>Equipe, plantões e escala semanal de trabalho.</CardDesc>
-                      <CardCta>Abrir escala</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* Estoque / Almoxarifado */}
-                {shouldShowEstoque &&
-                  matchesTool("Almoxarifado", "Estoque", "materiais", "compras", "pedidos") && (
-                    <CardLink to="/estoque" chave="estoque" delay={5}>
-                      <CardIcon chave="estoque" icon={Package} />
-                      <CardTitle>Almoxarifado</CardTitle>
-                      <CardDesc>Estoque de materiais, entrada/saída, compras e pedidos.</CardDesc>
-                      <CardCta>Abrir estoque</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* OI — Ordem de Início */}
-                {shouldShowOI &&
-                  matchesTool("Ordem de Início", "Relatório Fotográfico", "DOCX") && (
-                    <CardLink to="/oi" chave="oi" delay={6}>
-                      <CardIcon chave="oi" icon={FileImage} />
-                      <CardTitle>Ordem de Início</CardTitle>
-                      <CardDesc>Relatório Fotográfico — gerar DOCX direto no navegador.</CardDesc>
-                      <CardCta>Abrir gerador</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* Manuais */}
-                {shouldShowManuais &&
-                  matchesTool("Manuais", "Normas", "manuais técnicos", "procedimentos") && (
-                    <CardLink to="/manuais" chave="manuais" delay={7}>
-                      <CardIcon chave="manuais" icon={BookOpen} />
-                      <CardTitle>Manuais</CardTitle>
-                      <CardDesc>Normas, manuais técnicos e procedimentos.</CardDesc>
-                      <CardCta>Abrir manuais</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* Cronograma */}
-                {shouldShowCronograma &&
-                  matchesTool(
-                    "Cronograma",
-                    "Planejamento",
-                    "instalações",
-                    "obras",
-                    "manutenções",
-                  ) && (
-                    <CardLink to="/cronograma" chave="cronograma" delay={8}>
-                      <CardIcon chave="cronograma" icon={CalendarRange} />
-                      <CardTitle>Cronograma</CardTitle>
-                      <CardDesc>
-                        Planejamento e cronograma de instalações, obras e manutenções.
-                      </CardDesc>
-                      <CardCta>Abrir cronograma</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* Procedimentos */}
-                {shouldShowProcedimentos &&
-                  matchesTool("Procedimentos", "operacionais", "passo-a-passo", "PDF") && (
-                    <CardLink to="/procedimentos" chave="procedimentos" delay={9}>
-                      <CardIcon chave="procedimentos" icon={ListChecks} />
-                      <CardTitle>Procedimentos</CardTitle>
-                      <CardDesc>Procedimentos operacionais passo-a-passo com PDF.</CardDesc>
-                      <CardCta>Abrir procedimentos</CardCta>
-                    </CardLink>
-                  )}
-
-                {/* Ficha da Elevatória */}
-                {shouldShowFichaElevatoria &&
-                  matchesTool(
-                    "Ficha da Elevatória",
-                    "Ficha técnica",
-                    "equipamentos",
-                    "elétrica",
-                    "hidráulica",
-                  ) && (
-                    <CardButton
-                      onClick={() => setFichaChoiceOpen(true)}
-                      chave="ficha_elevatoria"
-                      delay={9}
-                    >
-                      <CardIcon chave="ficha_elevatoria" icon={Building2} />
-                      <CardTitle>Ficha da Elevatória</CardTitle>
-                      <CardDesc>
-                        Ficha técnica completa de elevatórias, equipamentos, elétrica e hidráulica.
-                      </CardDesc>
-                      <CardCta>Escolher módulo</CardCta>
-                    </CardButton>
-                  )}
-
-                {/* Plano de Manutenção */}
-                {shouldShowPlanoManutencao &&
-                  matchesTool(
-                    "Plano de Manutenção",
-                    "equipamentos",
-                    "planos ativos",
-                    "pendências",
-                  ) && (
-                    <CardLink to="/plano-manutencao" chave="plano_manutencao" delay={9}>
-                      <CardIcon chave="plano_manutencao" icon={Wrench} />
-                      <CardTitle>Plano de Manutenção</CardTitle>
-                      <CardDesc>
-                        Cadastre equipamentos, acompanhe planos ativos e identifique pendências.
-                      </CardDesc>
-                      <CardCta>Abrir plano</CardCta>
-                    </CardLink>
-                  )}
-              </div>
-            )}
-          </section>
-
-          {/* Footer */}
           <footer className="relative mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#dce5f1] pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
             <span className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -522,7 +800,15 @@ function Index() {
               <span className="mx-1 text-slate-300">|</span>
               Águas do Rio · Eletromecânica
             </span>
-            <span>Hub Operacional</span>
+            <span>
+              {new Intl.DateTimeFormat("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              }).format(horaAtual)}
+            </span>
           </footer>
         </main>
       </div>
@@ -752,30 +1038,6 @@ function CardLink({
     >
       {children}
     </Link>
-  );
-}
-
-function CardDisabled({ delay }: { delay: number }) {
-  return (
-    <div
-      className="group flex animate-card cursor-not-allowed flex-col items-start gap-4 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-6 text-left xl:p-5 opacity-60 shadow-sm dark:border-slate-600 dark:bg-slate-800/50"
-      style={{ animationDelay: `${delay * 80}ms` }}
-    >
-      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400 shadow-sm dark:bg-slate-700 dark:text-slate-500">
-        <MoreHorizontal className="h-7 w-7" />
-      </div>
-      <div>
-        <h2 className="text-lg font-semibold text-slate-400 dark:text-slate-500">
-          Outros Sistemas
-        </h2>
-        <p className="text-sm leading-relaxed text-slate-400 dark:text-slate-500">
-          Novos módulos serão adicionados aqui.
-        </p>
-      </div>
-      <span className="mt-auto inline-flex items-center rounded-full border border-slate-300 bg-slate-100/70 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-400">
-        Em breve
-      </span>
-    </div>
   );
 }
 
