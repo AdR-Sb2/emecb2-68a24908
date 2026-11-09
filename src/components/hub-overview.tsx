@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
 import {
   Activity,
   AlertTriangle,
@@ -242,12 +241,12 @@ function KpiCard({
           <div className="mt-2 h-9 w-full shrink-0 overflow-hidden rounded-md bg-slate-50/70 px-1 dark:bg-slate-800/40">
             <Sparkline values={kpi.trend} color={alert ? "#f97316" : "#1f7ad8"} />
           </div>
-          <Link
-            to={href}
+          <a
+            href={href}
             className="relative z-[1] mt-auto inline-flex w-full items-center justify-end gap-1 border-t border-slate-100 pt-3 text-xs font-semibold text-[#1768c4] transition-colors hover:text-[#0b3a73] dark:border-slate-800 dark:text-blue-300"
           >
             Ver detalhes <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          </a>
         </>
       )}
     </article>
