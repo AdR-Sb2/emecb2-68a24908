@@ -448,16 +448,16 @@ function Index() {
       <>
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 -z-10 w-[48%] bg-cover bg-center opacity-90 transition-transform duration-500 group-hover:scale-105"
+          className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[48%] bg-cover bg-center opacity-90 transition-transform duration-500 group-hover:scale-105"
           style={{ backgroundImage: `url("${categoryImages[category.id] || categoryImages.operacao}")` }}
         />
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-white via-white/95 via-55% to-white/15 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900/25" />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-white via-white/95 via-55% to-white/15 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900/25" />
         <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${category.color}`}
+          className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${category.color}`}
         >
           <Icon className="h-5 w-5" />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="relative z-10 min-w-0 flex-1">
           <span className="block text-base font-bold text-[#102f5c] dark:text-white">
             {category.nome}
           </span>
@@ -468,7 +468,7 @@ function Index() {
             Começar por: {firstTool.nome}
           </span>
         </span>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[#1768c4] shadow-sm ring-1 ring-blue-100 transition group-hover:translate-x-1 dark:bg-slate-800">
+        <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[#1768c4] shadow-sm ring-1 ring-blue-100 transition group-hover:translate-x-1 dark:bg-slate-800">
           <ArrowRight className="h-4 w-4" />
         </span>
       </>
