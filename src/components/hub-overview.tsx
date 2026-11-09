@@ -20,6 +20,8 @@ import { isOrdemServico } from "@/lib/produtividade-os";
 import { contarOsExecutadasNoPeriodo, type FieldAtividade, type FieldDia, type FieldEquipe } from "@/components/produtividade-dashboard";
 import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
 import { supabase } from "@/lib/supabase";
+import rawBacklogData from "@/data/backlog.json";
+import { computeResponsabilidade } from "@/data/responsabilidade-rules";
 
 type KpiStatus = "loading" | "ready" | "error";
 type Kpi = {
@@ -354,30 +356,61 @@ export function HubOverview({
       }
       const today = new Date();
       const todayIso = dataISO(today);
-      const activeRes = await supabase
-        .from("registros_atendimento")
-        .select("id", { count: "exact", head: true })
-        .in("status_simplificado", ACTIVE_OS_STATUSES);
-      if (activeRes.error) {
-        onOpenCount?.(null);
-        update("abertas", { value: null, delta: null, trend: [] }, activeRes.error);
-        update("atrasadas", { value: null, delta: null, trend: [] }, activeRes.error);
-        return;
-      }
-      if (activeRes.count === null) {
-        const error = new Error("A consulta de O.S. abertas não retornou uma contagem.");
+      const [{ data: backlogConfig, error: backlogError }, { data: responsibilityRows, error: responsibilityError }] =
+        await Promise.all([
+          supabase.from("backlog_dados").select("dados").eq("id", 1).maybeSingle(),
+          supabase.from("responsabilidade_overrides").select("om,responsabilidade"),
+        ]);
+      if (backlogError || responsibilityError) {
+        const error = backlogError || responsibilityError;
         onOpenCount?.(null);
         update("abertas", { value: null, delta: null, trend: [] }, error);
         update("atrasadas", { value: null, delta: null, trend: [] }, error);
         return;
       }
-      onOpenCount?.(activeRes.count);
+      const shared = backlogConfig?.dados as { bucket?: unknown } | unknown[] | null;
+      const backlogRows = Array.isArray(shared)
+        ? shared as Record<string, unknown>[]
+        : shared && typeof shared === "object" && Array.isArray((shared as { bucket?: unknown }).bucket)
+          ? (shared as { bucket: Record<string, unknown>[] }).bucket
+          : rawBacklogData as Record<string, unknown>[];
+      const responsibilityByOm = new Map(
+        (responsibilityRows || []).map((row) => [String(row.om), String(row.responsabilidade)]),
+      );
+      const correctiveTypes = new Set([
+        "MANUTENÇÃO CORRETIVA EMERGENCIAL",
+        "MANUTENÇÃO CORRETIVA PROGRAMADA",
+      ]);
+      const openStatuses = new Set(["PENDENTE", "ABERTA", "LIBERADA"]);
+      const correctiveOrders = new Set<string>();
+      for (const row of backlogRows) {
+        const om = String(row["Ordem de Manutenção"] ?? "").trim();
+        if (!om) continue;
+        const tipo = String(row["Tipo de Atividade"] ?? "").trim().toLocaleUpperCase("pt-BR");
+        const status = String(row["Status da Atividade"] ?? "").trim().toLocaleUpperCase("pt-BR");
+        if (!correctiveTypes.has(tipo) || !openStatuses.has(status)) continue;
+        const responsabilidade =
+          responsibilityByOm.get(om) ||
+          computeResponsabilidade({
+            om,
+            planta: String(row.PLANTA ?? ""),
+            textoBreve: String(row["TEXTO BREVE"] ?? ""),
+          });
+        if (responsabilidade === "Baixada 2") correctiveOrders.add(om.replace(/\s+/g, ""));
+      }
+      const correctiveCount = correctiveOrders.size;
+      onOpenCount?.(correctiveCount);
       update("abertas", {
-        value: activeRes.count,
+        value: correctiveCount,
         delta: null,
         trend: [],
-        note: "Status SAP: Aberta + Liberada.",
+        note: "Backlog · Corretivas emergenciais e programadas · Baixada 2.",
       });
+
+      const activeRes = await supabase
+        .from("registros_atendimento")
+        .select("id", { count: "exact", head: true })
+        .in("status_simplificado", ACTIVE_OS_STATUSES);
 
       const overdue: { id: number; fim_sla: string | null }[] = [];
       let overdueError: unknown = null;
@@ -731,14 +764,14 @@ export function HubOverview({
           kpi={kpis.executadas}
           icon={CheckSquare}
           color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
-          href="/registros"
+          href="/produtividade?aba=dashboard&periodo=mes"
         />
         <KpiCard
-          title="O.S. Abertas / Pendentes"
+          title="Corretivas Abertas / Pendentes"
           kpi={kpis.abertas}
           icon={Clock3}
           color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
-          href="/registros"
+          href="/backlog?hubFiltro=corretivas"
           alert
         />
         <KpiCard
