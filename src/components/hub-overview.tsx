@@ -130,7 +130,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
       viewBox="0 0 100 36"
       preserveAspectRatio="none"
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-4 bottom-8 h-10 w-[calc(100%-2rem)] opacity-20"
+      className="pointer-events-none absolute inset-x-4 bottom-8 h-10 w-[calc(100%-2rem)] opacity-45"
     >
       <polyline
         fill="none"
@@ -165,7 +165,7 @@ function KpiCard({
   const deltaGood = kpi.delta !== null && kpi.delta >= 0 === positiveIsGood;
   const DeltaIcon = kpi.delta !== null && kpi.delta < 0 ? ArrowDownRight : ArrowUpRight;
   return (
-    <article className="relative min-w-0 overflow-hidden rounded-xl border border-[#e1e9f4] bg-white p-3.5 shadow-[0_6px_18px_-12px_rgba(16,54,102,0.4)] dark:border-slate-700 dark:bg-slate-900 sm:p-4">
+    <article className="relative min-w-0 overflow-hidden rounded-[14px] border border-[#dce7f5] bg-gradient-to-br from-white via-white to-[#f7faff] p-3.5 shadow-[0_8px_22px_-13px_rgba(16,54,102,0.42)] transition-shadow hover:shadow-[0_12px_26px_-14px_rgba(16,54,102,0.48)] dark:border-slate-700 dark:bg-slate-900 sm:p-4">
       <div className="flex items-start gap-3">
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}>
           <Icon className="h-5 w-5" />
@@ -623,10 +623,10 @@ export function HubOverview({
           alert
         />
       </section>
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_310px]">
         <div className="min-w-0">{children}</div>
         {atividades && atividades.length > 0 && (
-          <aside className="rounded-xl border border-[#e1e9f4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <aside className="rounded-[14px] border border-[#dce7f5] bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-[0_8px_22px_-14px_rgba(16,54,102,0.4)] dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-bold text-[#102f5c] dark:text-white">Atividades Recentes</h2>
               <span className="text-xs text-slate-500">Recentes</span>
@@ -636,7 +636,7 @@ export function HubOverview({
                 const Icon = activityIcon(`${activity.tipo} ${activity.mensagem}`);
                 return (
                   <li key={activity.id} className="flex gap-3 py-3 first:pt-1 last:pb-1">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-blue-950 dark:text-blue-300">
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0">
