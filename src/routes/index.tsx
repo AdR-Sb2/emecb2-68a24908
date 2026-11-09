@@ -435,11 +435,11 @@ function Index() {
     if (!firstTool) return null;
     const Icon = category.icon;
     const cardClass =
-      "group flex min-h-[112px] items-center gap-4 rounded-xl border border-[#e1e9f4] bg-white p-4 text-left shadow-sm transition hover:border-[#cbd7e6] hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800";
+      "group flex min-h-[126px] items-center gap-4 rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-[0_5px_18px_-12px_rgba(15,45,85,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800";
     const content = (
       <>
         <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${category.color}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${category.color}`}
         >
           <Icon className="h-5 w-5" />
         </span>
@@ -487,8 +487,8 @@ function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f2f6fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-[68px] flex-col bg-gradient-to-b from-[#062955] to-[#041b3a] px-2 py-4 text-white shadow-xl lg:w-64 lg:px-4 lg:py-6">
+    <div className="min-h-screen bg-[#f4f7fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
+      <aside className="fixed inset-y-0 left-0 z-30 flex w-[68px] flex-col bg-gradient-to-b from-[#082b55] via-[#06264d] to-[#041b3a] px-2 py-4 text-white shadow-[8px_0_30px_-20px_rgba(3,20,45,0.65)] lg:w-64 lg:px-4 lg:py-6">
         <div className="mb-5 flex items-center justify-center lg:mb-8 lg:justify-start">
           <img
             src={logoHeader}
@@ -546,8 +546,8 @@ function Index() {
       </aside>
 
       <div className="ml-[68px] flex min-h-screen flex-col lg:ml-64">
-        <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/90 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex w-full max-w-none flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-8">
+        <header className="sticky top-0 z-20 border-b border-[#d9e3f2]/80 bg-white/95 shadow-[0_4px_18px_-14px_rgba(12,44,82,0.32)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
+          <div className="mx-auto flex w-full max-w-none flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-7 lg:px-8">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -676,9 +676,9 @@ function Index() {
           </div>
         </header>
 
-        <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-4 pb-6 pt-5 sm:px-7 sm:pt-6 lg:px-7 lg:pt-6">
+        <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-4 pb-7 pt-6 sm:px-7 sm:pt-7 lg:px-8 lg:pt-7">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-5 flex min-h-[124px] items-center overflow-hidden rounded-[15px] border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-5 py-5 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
+          <section className="relative mb-6 flex min-h-[136px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:px-9">
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
             <svg
@@ -736,13 +736,13 @@ function Index() {
                 </div>
               ) : (
                 <section className="mb-5">
-                  <div className="mb-3 flex items-center gap-3">
+                  <div className="mb-4 flex items-center gap-3">
                     <span className="h-7 w-1 rounded-full bg-[#45658e]" />
                     <h2 className="text-lg font-bold text-[#0b2b55] dark:text-white">
                       Ferramentas por Categoria
                     </h2>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {categoriasVisiveis.map(renderCategoryCard)}
                   </div>
                 </section>
