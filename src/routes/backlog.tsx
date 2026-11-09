@@ -1348,7 +1348,7 @@ export function BacklogPage() {
       if (
         skip !== "status" &&
         fStatus.length &&
-        !fStatus.includes((e.r["Status da Atividade"] || "").trim())
+        !fStatus.some((status) => status.toLocaleLowerCase("pt-BR") === (e.r["Status da Atividade"] || "").trim().toLocaleLowerCase("pt-BR"))
       )
         return false;
       if (skip !== "statusExec" && fStatusExec.length && !fStatusExec.includes(e.statusExec))
