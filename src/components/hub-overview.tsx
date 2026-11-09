@@ -182,9 +182,9 @@ function KpiCard({
   const deltaGood = kpi.delta !== null && kpi.delta !== 0 && kpi.delta > 0 === positiveIsGood;
   const DeltaIcon = kpi.delta !== null && kpi.delta < 0 ? ArrowDownRight : ArrowUpRight;
   return (
-    <article className="group relative flex min-h-[190px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_5px_18px_-10px_rgba(15,45,85,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.32)] dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+    <article className="group relative flex min-h-[172px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_5px_18px_-10px_rgba(15,45,85,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.32)] dark:border-slate-700 dark:bg-slate-900 sm:p-4">
       <div className="flex items-start gap-3">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${color}`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${color}`}>
           <Icon className="h-5 w-5" />
         </span>
         <h3 className="min-h-10 pt-0.5 text-sm font-semibold leading-5 text-[#25466f] dark:text-slate-200">
@@ -238,7 +238,7 @@ function KpiCard({
           {kpi.delta !== null && kpi.note && (
             <p className="mt-1 line-clamp-2 min-h-8 max-h-8 overflow-hidden text-xs leading-4 text-slate-500 dark:text-slate-400">{kpi.note}</p>
           )}
-          <div className="mt-2 h-9 w-full shrink-0 overflow-hidden rounded-md bg-slate-50/70 px-1 dark:bg-slate-800/40">
+          <div className="mt-1.5 h-7 w-full shrink-0 overflow-hidden rounded-md bg-slate-50/70 px-1 dark:bg-slate-800/40">
             <Sparkline values={kpi.trend} color={alert ? "#f97316" : "#1f7ad8"} />
           </div>
           <a
@@ -769,7 +769,7 @@ export function HubOverview({
 
   return (
     <>
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <KpiCard
           title="O.S. Executadas (mês atual)"
           kpi={kpis.executadas}
@@ -809,7 +809,7 @@ export function HubOverview({
           alert
         />
       </section>
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:gap-5">
         <div className="min-w-0">{children}</div>
         {atividades === undefined ? (
           <aside className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_5px_18px_-12px_rgba(15,45,85,0.24)] dark:border-slate-700 dark:bg-slate-900">
