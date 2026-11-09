@@ -6,13 +6,17 @@ import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  Bell,
+  CalendarDays,
+  CalendarRange,
   CheckSquare,
   Clock3,
+  MessageSquare,
   Package,
   TrendingUp,
+  Wrench,
 } from "lucide-react";
 import { isOrdemServico } from "@/lib/produtividade-os";
-import { metaProporcional, useProdutividadeConfig } from "@/lib/produtividade-config";
 import { supabase } from "@/lib/supabase";
 
 type KpiStatus = "loading" | "ready" | "error";
@@ -21,6 +25,8 @@ type Kpi = {
   value: number | null;
   delta: number | null;
   trend: number[];
+  precision?: number;
+  unit?: string;
   note?: string;
 };
 
@@ -41,7 +47,7 @@ const EMPTY_KPI: Kpi = {
   trend: [],
 };
 const ACTIVE_OS_STATUSES = ["Aberta", "Liberada"];
-const COMPLETED_OS_STATUSES = ["Encerrada", "Encerrada Técnica"];
+const COMPLETED_ACTIVITY_STATUSES = ["concluído", "concluido"];
 
 function dataISO(date: Date) {
   const ano = date.getFullYear();
@@ -74,7 +80,18 @@ function percentChange(current: number, previous: number) {
 
 function parseSlaDate(value: string | null): Date | null {
   if (!value) return null;
-  const parsed = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  const raw = value.trim();
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?/);
+  if (iso) {
+    const year = Number(iso[1]);
+    const month = Number(iso[2]);
+    const day = Number(iso[3]);
+    const date = new Date(year, month - 1, day, Number(iso[4] || 0), Number(iso[5] || 0));
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+      ? date
+      : null;
+  }
+  const parsed = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
   if (!parsed) {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
@@ -92,10 +109,6 @@ function parseSlaDate(value: string | null): Date | null {
     : null;
 }
 
-function toTrend(values: number[]) {
-  return values.length > 14 ? values.slice(-14) : values;
-}
-
 function relativeTime(value: string, now: number) {
   const minutes = Math.max(0, Math.floor((now - new Date(value).getTime()) / 60_000));
   if (minutes < 1) return "agora";
@@ -106,11 +119,12 @@ function relativeTime(value: string, now: number) {
   return `há ${days} ${days === 1 ? "dia" : "dias"}`;
 }
 
-function pretty(value: number | null, percent = false) {
+function pretty(value: number | null, precision = 0) {
   if (value === null) return "Sem dados";
   return `${new Intl.NumberFormat("pt-BR", {
-    maximumFractionDigits: percent ? 0 : 0,
-  }).format(value)}${percent ? "%" : ""}`;
+    maximumFractionDigits: precision,
+    minimumFractionDigits: precision,
+  }).format(value)}`;
 }
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
@@ -162,7 +176,7 @@ function KpiCard({
   alert?: boolean;
 }) {
   const positiveIsGood = !alert;
-  const deltaGood = kpi.delta !== null && kpi.delta >= 0 === positiveIsGood;
+  const deltaGood = kpi.delta !== null && kpi.delta !== 0 && kpi.delta > 0 === positiveIsGood;
   const DeltaIcon = kpi.delta !== null && kpi.delta < 0 ? ArrowDownRight : ArrowUpRight;
   return (
     <article className="relative min-w-0 overflow-hidden rounded-xl border border-[#e1e9f4] bg-white p-3.5 shadow-[0_6px_18px_-12px_rgba(16,54,102,0.4)] dark:border-slate-700 dark:bg-slate-900 sm:p-4">
@@ -170,29 +184,39 @@ function KpiCard({
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}>
           <Icon className="h-5 w-5" />
         </span>
-        <h3 className="min-h-10 pt-0.5 text-xs font-semibold leading-4 text-[#25466f] dark:text-slate-200 sm:text-sm">
+        <h3 className="min-h-10 pt-0.5 text-sm font-semibold leading-5 text-[#25466f] dark:text-slate-200">
           {title}
         </h3>
       </div>
       {kpi.status === "loading" ? (
         <div className="mt-3 h-9 animate-pulse rounded-md bg-slate-100 dark:bg-slate-800" />
-      ) : kpi.status === "error" ? (
-        <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
-          Não foi possível carregar
-        </p>
       ) : (
         <>
           <p
             className={`mt-2 text-2xl font-bold tracking-tight sm:text-[1.8rem] ${
-              alert && (kpi.value ?? 0) > 0 ? "text-orange-600" : "text-[#102f5c] dark:text-white"
+              kpi.status === "error"
+                ? "text-red-600 dark:text-red-400"
+                : alert && (kpi.value ?? 0) > 0
+                  ? "text-orange-600"
+                  : "text-[#102f5c] dark:text-white"
             }`}
           >
-            {pretty(kpi.value, percent)}
+            {kpi.value === null
+              ? "Sem dados"
+              : `${pretty(kpi.value, kpi.precision)}${kpi.unit ? ` ${kpi.unit}` : percent ? "%" : ""}`}
           </p>
           <div className="mt-0.5 flex min-h-5 items-center gap-1 text-xs">
-            {kpi.delta === null ? (
-              <span className="text-slate-500 dark:text-slate-400">
-                {kpi.note || "Sem base para comparação"}
+            {kpi.delta === 0 ? (
+              <span className="text-slate-500 dark:text-slate-400">— Estável</span>
+            ) : kpi.delta === null ? (
+              <span
+                className={
+                  kpi.status === "error"
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-slate-500 dark:text-slate-400"
+                }
+              >
+                {kpi.note || "—"}
               </span>
             ) : (
               <span
@@ -201,10 +225,16 @@ function KpiCard({
                 }`}
               >
                 <DeltaIcon className="h-3.5 w-3.5" />
-                {Math.abs(kpi.delta).toFixed(0)}%
+                {new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(
+                  Math.abs(kpi.delta),
+                )}
+                %
               </span>
             )}
           </div>
+          {kpi.delta !== null && kpi.note && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{kpi.note}</p>
+          )}
           <Sparkline values={kpi.trend} color={alert ? "#f97316" : "#1f7ad8"} />
           <Link
             to={href}
@@ -219,11 +249,20 @@ function KpiCard({
 }
 
 function activityIcon(tipo: string) {
-  const value = tipo.toLowerCase();
+  const value = tipo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (value.includes("mencao") || value.includes("coment") || value.includes("mensagem"))
+    return MessageSquare;
+  if (value.includes("alerta") || value.includes("prioridade")) return Bell;
   if (value.includes("estoque") || value.includes("material") || value.includes("compra"))
     return Package;
-  if (value.includes("escala") || value.includes("plant")) return Clock3;
+  if (value.includes("escala") || value.includes("plant")) return CalendarDays;
   if (value.includes("os") || value.includes("ordem")) return CheckSquare;
+  if (value.includes("cronograma") || value.includes("prazo") || value.includes("etapa"))
+    return CalendarRange;
+  if (value.includes("manutenc") || value.includes("equipamento")) return Wrench;
   return Activity;
 }
 
@@ -240,7 +279,6 @@ export function HubOverview({
   canViewInventory: boolean;
   children: ReactNode;
 }) {
-  const { data: config, isLoading: loadingConfig, isError: configError } = useProdutividadeConfig();
   const [kpis, setKpis] = useState<Kpis>({
     executadas: { ...EMPTY_KPI },
     abertas: { ...EMPTY_KPI },
@@ -268,21 +306,33 @@ export function HubOverview({
     setAtividades(undefined);
     const update = (key: KpiKey, value: Omit<Kpi, "status">, error?: unknown) => {
       if (!active) return;
+      if (error) {
+        console.error(`Erro ao carregar o KPI "${key}" no Hub:`, error);
+        const reason =
+          error instanceof Error
+            ? error.message
+            : typeof error === "object" && error !== null && "message" in error
+              ? String(error.message)
+              : "Erro ao consultar a fonte de dados.";
+        setKpis((current) => ({
+          ...current,
+          [key]: {
+            ...EMPTY_KPI,
+            status: "error",
+            note: reason,
+          },
+        }));
+        return;
+      }
       setKpis((current) => ({
         ...current,
-        [key]: error ? { ...EMPTY_KPI, status: "error" } : { ...value, status: "ready" },
+        [key]: { ...value, status: "ready" },
       }));
     };
 
-    const loadOs = async () => {
+    const loadOpenOsAndSla = async () => {
       if (!canViewRecords) {
         onOpenCount?.(null);
-        update("executadas", {
-          value: null,
-          delta: null,
-          trend: [],
-          note: "Sem acesso aos registros.",
-        });
         update("abertas", {
           value: null,
           delta: null,
@@ -299,17 +349,31 @@ export function HubOverview({
       }
       const today = new Date();
       const todayIso = dataISO(today);
-      const currentStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const previousStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const previousEnd = shiftMonth(today, -1);
-      const trendStart = new Date(today);
-      trendStart.setDate(today.getDate() - 13);
-      const rangeStart = dataISO(previousStart);
-
       const activeRes = await supabase
         .from("registros_atendimento")
         .select("id", { count: "exact", head: true })
         .in("status_simplificado", ACTIVE_OS_STATUSES);
+      if (activeRes.error) {
+        onOpenCount?.(null);
+        update("abertas", { value: null, delta: null, trend: [] }, activeRes.error);
+        update("atrasadas", { value: null, delta: null, trend: [] }, activeRes.error);
+        return;
+      }
+      if (activeRes.count === null) {
+        const error = new Error("A consulta de O.S. abertas não retornou uma contagem.");
+        onOpenCount?.(null);
+        update("abertas", { value: null, delta: null, trend: [] }, error);
+        update("atrasadas", { value: null, delta: null, trend: [] }, error);
+        return;
+      }
+      onOpenCount?.(activeRes.count);
+      update("abertas", {
+        value: activeRes.count,
+        delta: null,
+        trend: [],
+        note: "Status SAP: Aberta + Liberada.",
+      });
+
       const overdue: { id: number; fim_sla: string | null }[] = [];
       let overdueError: unknown = null;
       let overdueFrom = 0;
@@ -331,122 +395,81 @@ export function HubOverview({
         overdueFrom += 1000;
       }
 
-      const closed: {
-        id: number;
-        status_simplificado: string | null;
-        data_entrada: string | null;
-        data_modificacao: string | null;
-      }[] = [];
-      let closedError: unknown = null;
-      let from = 0;
-      for (;;) {
-        const { data, error } = await supabase
-          .from("registros_atendimento")
-          .select("id,status_simplificado,data_entrada,data_modificacao")
-          .in("status_simplificado", COMPLETED_OS_STATUSES)
-          .or(
-            `and(data_modificacao.gte.${rangeStart},data_modificacao.lte.${todayIso}),and(data_modificacao.is.null,data_entrada.gte.${rangeStart},data_entrada.lte.${todayIso})`,
-          )
-          .order("id")
-          .range(from, from + 999);
-        if (error) {
-          closedError = error;
-          break;
-        }
-        if (!data?.length) break;
-        closed.push(...data);
-        if (data.length < 1000) break;
-        from += 1000;
-      }
-
-      if (closedError) update("executadas", { value: null, delta: null, trend: [] }, closedError);
-      else {
-        const effectiveDate = (row: {
-          data_entrada: string | null;
-          data_modificacao: string | null;
-        }) => row.data_modificacao || row.data_entrada;
-        const currentCount = closed.filter((row) => {
-          const date = effectiveDate(row);
-          return !!date && date >= dataISO(currentStart) && date <= todayIso;
-        }).length;
-        const previousCount = closed.filter((row) => {
-          const date = effectiveDate(row);
-          return !!date && date >= rangeStart && date <= dataISO(previousEnd);
-        }).length;
-        const byDay = new Map<string, number>();
-        for (const row of closed) {
-          const date = effectiveDate(row);
-          if (date && date >= dataISO(trendStart) && date <= todayIso) {
-            byDay.set(date, (byDay.get(date) || 0) + 1);
-          }
-        }
-        update("executadas", {
-          value: currentCount,
-          delta: percentChange(currentCount, previousCount),
-          trend: daysBetween(trendStart, today).map((date) => byDay.get(date) || 0),
-        });
-      }
-
-      if (activeRes.error) {
-        onOpenCount?.(null);
-        update("abertas", { value: null, delta: null, trend: [] }, activeRes.error);
+      if (overdueError) {
+        update("atrasadas", { value: null, delta: null, trend: [] }, overdueError);
       } else {
-        onOpenCount?.(activeRes.count ?? 0);
-        update("abertas", {
-          value: activeRes.count ?? 0,
+        const validDeadlines = overdue
+          .map((row) => parseSlaDate(row.fim_sla))
+          .filter((date): date is Date => date !== null);
+        if (activeRes.count > 0 && validDeadlines.length === 0) {
+          update("atrasadas", {
+            value: null,
+            delta: null,
+            trend: [],
+            note: "Sem prazos de SLA registrados nas O.S. abertas.",
+          });
+          return;
+        }
+        update("atrasadas", {
+          value:
+            activeRes.count === 0
+              ? 0
+              : validDeadlines.filter((due) => dataISO(due) < todayIso).length,
           delta: null,
           trend: [],
-          note: "Sem histórico diário de status.",
+          note: activeRes.count === 0 ? "Nenhuma O.S. aberta ou liberada no SAP." : undefined,
         });
       }
-
-      if (overdueError) update("atrasadas", { value: null, delta: null, trend: [] }, overdueError);
-      else
-        update("atrasadas", {
-          value: overdue.filter((row) => {
-            const due = parseSlaDate(row.fim_sla);
-            return due !== null && dataISO(due) < todayIso;
-          }).length,
-          delta: null,
-          trend: [],
-          note: "Sem histórico de status anteriores.",
-        });
     };
 
     const loadProductivity = async () => {
-      if (loadingConfig) return;
-      if (configError) {
-        update("produtividade", { value: null, delta: null, trend: [] }, configError);
-        return;
-      }
       const today = new Date();
+      const todayIso = dataISO(today);
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
       const previousStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const previousEnd = shiftMonth(today, -1);
+      const trendStart = new Date(today);
+      trendStart.setDate(today.getDate() - 13);
       const { data: dayRows, error: daysError } = await supabase
         .from("field_dias")
         .select("id,data")
         .gte("data", dataISO(previousStart))
-        .lte("data", dataISO(today))
+        .lte("data", todayIso)
         .order("data");
       if (daysError) {
+        update("executadas", { value: null, delta: null, trend: [] }, daysError);
         update("produtividade", { value: null, delta: null, trend: [] }, daysError);
         return;
       }
       const days = dayRows || [];
+      const currentDays = days.filter(
+        (day) => day.data >= dataISO(monthStart) && day.data <= todayIso,
+      );
+      if (currentDays.length === 0) {
+        const note = "Não há cargas de Produtividade para o mês atual.";
+        update("executadas", { value: null, delta: null, trend: [], note });
+        update("produtividade", { value: null, delta: null, trend: [], note });
+        return;
+      }
       const dayIds = days.map((row) => row.id);
-      const activities: Array<{ dia_id: number; ordem_manutencao: number; status: string }> = [];
+      const activities: Array<{
+        dia_id: number;
+        id_recurso: number | null;
+        ordem_manutencao: number | null;
+        status: string | null;
+      }> = [];
       for (let offset = 0; offset < dayIds.length; offset += 200) {
         const ids = dayIds.slice(offset, offset + 200);
         let from = 0;
         for (;;) {
           const { data, error } = await supabase
             .from("field_atividades")
-            .select("dia_id,ordem_manutencao,status")
+            .select("dia_id,id_recurso,ordem_manutencao,status")
             .in("dia_id", ids)
             .order("id")
             .range(from, from + 999);
           if (error) {
+            update("executadas", { value: null, delta: null, trend: [] }, error);
             update("produtividade", { value: null, delta: null, trend: [] }, error);
             return;
           }
@@ -457,54 +480,156 @@ export function HubOverview({
         }
       }
       const dayById = new Map(days.map((day) => [day.id, day.data]));
-      const completedByMonth = new Map<string, Set<number>>();
       const completedByDate = new Map<string, Set<number>>();
       for (const activity of activities) {
-        const status = activity.status.toLowerCase().trim();
-        if (status !== "concluído" && status !== "concluido") continue;
+        const status = (activity.status || "").toLowerCase().trim();
+        if (!COMPLETED_ACTIVITY_STATUSES.includes(status)) continue;
         const order = Number(activity.ordem_manutencao);
         if (!isOrdemServico(order)) continue;
         const date = dayById.get(activity.dia_id);
         if (!date) continue;
-        const month = date.slice(0, 7);
-        const monthSet = completedByMonth.get(month) || new Set<number>();
-        monthSet.add(order);
-        completedByMonth.set(month, monthSet);
         const dateSet = completedByDate.get(date) || new Set<number>();
         dateSet.add(order);
         completedByDate.set(date, dateSet);
       }
-      const configValue = config;
-      const currentDays = daysBetween(monthStart, today);
-      const previousDays = daysBetween(
-        previousStart,
-        new Date(previousEnd.getFullYear(), previousEnd.getMonth(), previousEnd.getDate()),
+      const ordersBetween = (start: string, end: string) => {
+        const orders = new Set<number>();
+        for (const [date, dateOrders] of completedByDate) {
+          if (date >= start && date <= end) {
+            for (const order of dateOrders) orders.add(order);
+          }
+        }
+        return orders;
+      };
+      const currentOrders = ordersBetween(dataISO(monthStart), todayIso);
+      const previousOrders = ordersBetween(dataISO(previousStart), dataISO(previousEnd));
+      const currentCount = currentOrders.size;
+      const previousCount = previousOrders.size;
+      const executionDelta = percentChange(currentCount, previousCount);
+      const previousDays = days.filter(
+        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
       );
-      const currentGoal = configValue ? metaProporcional(configValue, currentDays) : 0;
-      const previousGoal = configValue ? metaProporcional(configValue, previousDays) : 0;
-      if (currentGoal <= 0) {
+      update("executadas", {
+        value: currentCount,
+        delta: executionDelta,
+        trend: daysBetween(trendStart, today).map((date) => completedByDate.get(date)?.size || 0),
+        note:
+          executionDelta === null
+            ? "Sem base no período equivalente para calcular a variação."
+            : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
+      });
+
+      const currentDayIds = currentDays.map((day) => day.id);
+      const teams: Array<{
+        id: number;
+        dia_id: number;
+        nome_equipe: string;
+        tecnicos: unknown;
+      }> = [];
+      for (let offset = 0; offset < currentDayIds.length; offset += 200) {
+        const ids = currentDayIds.slice(offset, offset + 200);
+        let from = 0;
+        for (;;) {
+          const { data, error } = await supabase
+            .from("field_equipes")
+            .select("id,dia_id,nome_equipe,tecnicos")
+            .in("dia_id", ids)
+            .order("id")
+            .range(from, from + 999);
+          if (error) {
+            update("produtividade", { value: null, delta: null, trend: [] }, error);
+            return;
+          }
+          if (!data?.length) break;
+          teams.push(...data);
+          if (data.length < 1000) break;
+          from += 1000;
+        }
+      }
+
+      const teamsByDay = new Map<string, { diaId: number; recursos: Set<number> }>();
+      for (const team of teams) {
+        const normalizedName = team.nome_equipe.trim().toLocaleLowerCase("pt-BR");
+        const key = `${team.dia_id}:${normalizedName || `id-${team.id}`}`;
+        const teamDay = teamsByDay.get(key) || {
+          diaId: team.dia_id,
+          recursos: new Set<number>(),
+        };
+        if (Array.isArray(team.tecnicos)) {
+          for (const resource of team.tecnicos) {
+            const id = Number(resource);
+            if (Number.isFinite(id)) teamDay.recursos.add(id);
+          }
+        }
+        teamsByDay.set(key, teamDay);
+      }
+
+      const activitiesByDay = new Map<number, typeof activities>();
+      for (const activity of activities) {
+        const dayActivities = activitiesByDay.get(activity.dia_id) || [];
+        dayActivities.push(activity);
+        activitiesByDay.set(activity.dia_id, dayActivities);
+      }
+      const dailyTeamCounts = new Map<string, { os: number; teams: number }>();
+      for (const teamDay of teamsByDay.values()) {
+        const date = dayById.get(teamDay.diaId);
+        if (!date || date < dataISO(monthStart) || date > todayIso) continue;
+        const orders = new Set<number>();
+        for (const activity of activitiesByDay.get(teamDay.diaId) || []) {
+          const status = (activity.status || "").toLowerCase().trim();
+          const order = Number(activity.ordem_manutencao);
+          if (
+            activity.id_recurso !== null &&
+            teamDay.recursos.has(Number(activity.id_recurso)) &&
+            COMPLETED_ACTIVITY_STATUSES.includes(status) &&
+            isOrdemServico(order)
+          ) {
+            orders.add(order);
+          }
+        }
+        const daily = dailyTeamCounts.get(date) || { os: 0, teams: 0 };
+        daily.os += orders.size;
+        daily.teams += 1;
+        dailyTeamCounts.set(date, daily);
+      }
+      if (teamsByDay.size === 0) {
         update("produtividade", {
           value: null,
           delta: null,
           trend: [],
-          note: "Meta mensal não configurada.",
+          note: "Não há equipes registradas na Produtividade neste mês.",
         });
         return;
       }
-      const currentMonth = dataISO(today).slice(0, 7);
-      const previousMonth = dataISO(previousStart).slice(0, 7);
-      const currentPercent = ((completedByMonth.get(currentMonth)?.size || 0) / currentGoal) * 100;
-      const previousPercent =
-        previousGoal > 0
-          ? ((completedByMonth.get(previousMonth)?.size || 0) / previousGoal) * 100
-          : 0;
-      const seriesStart = new Date(today);
-      seriesStart.setDate(today.getDate() - 13);
+
+      const totalTeamOrders = [...dailyTeamCounts.values()].reduce((sum, day) => sum + day.os, 0);
+      const monthKey = todayIso.slice(0, 7);
+      const { data: monthlyGoal, error: goalError } = await supabase
+        .from("field_metas_mensais")
+        .select("meta")
+        .eq("mes", monthKey)
+        .maybeSingle();
+      let note = "Meta mensal não configurada.";
+      if (goalError) {
+        console.error("Erro ao consultar a meta mensal da Produtividade no Hub:", goalError);
+        note = "Meta mensal indisponível.";
+      } else {
+        const goal = Number(monthlyGoal?.meta);
+        if (Number.isFinite(goal) && goal > 0) {
+          const percentOfGoal = Math.round((currentCount / goal) * 100);
+          note = `${percentOfGoal}% da meta mensal · ${pretty(currentCount)} de ${pretty(goal)} O.S.`;
+        }
+      }
       update("produtividade", {
-        value: currentPercent,
-        delta: percentChange(currentPercent, previousPercent),
-        trend: daysBetween(seriesStart, today).map((date) => completedByDate.get(date)?.size || 0),
-        note: "O.S. executadas / meta proporcional",
+        value: totalTeamOrders / teamsByDay.size,
+        precision: 1,
+        unit: "O.S./equipe/dia",
+        delta: null,
+        trend: daysBetween(trendStart, today).map((date) => {
+          const daily = dailyTeamCounts.get(date);
+          return daily?.teams ? daily.os / daily.teams : 0;
+        }),
+        note,
       });
     };
 
@@ -536,11 +661,19 @@ export function HubOverview({
         if (page.length < 1000) break;
         from += 1000;
       }
+      if (data.length === 0) {
+        update("estoque", {
+          value: null,
+          delta: null,
+          trend: [],
+          note: "Nenhum material ativo cadastrado no almoxarifado.",
+        });
+        return;
+      }
       update("estoque", {
         value: data.filter((row) => Number(row.saldo_atual) < Number(row.estoque_minimo)).length,
         delta: null,
         trend: [],
-        note: "Sem histórico de saldo mínimo.",
       });
     };
 
@@ -556,16 +689,21 @@ export function HubOverview({
         .order("criado_em", { ascending: false })
         .limit(4);
       if (!active) return;
-      setAtividades(error ? null : ((data || []) as RecentActivity[]));
+      if (error) {
+        console.error("Erro ao consultar notificações recentes do HUB:", error);
+        setAtividades(null);
+      } else {
+        setAtividades((data || []) as RecentActivity[]);
+      }
     };
 
-    void loadOs().catch((error: unknown) => {
+    void loadOpenOsAndSla().catch((error: unknown) => {
       onOpenCount?.(null);
-      update("executadas", { value: null, delta: null, trend: [] }, error);
       update("abertas", { value: null, delta: null, trend: [] }, error);
       update("atrasadas", { value: null, delta: null, trend: [] }, error);
     });
     void loadProductivity().catch((error: unknown) => {
+      update("executadas", { value: null, delta: null, trend: [] }, error);
       update("produtividade", { value: null, delta: null, trend: [] }, error);
     });
     void loadInventory().catch((error: unknown) => {
@@ -578,7 +716,7 @@ export function HubOverview({
     return () => {
       active = false;
     };
-  }, [canViewInventory, canViewRecords, config, configError, loadingConfig, onOpenCount, userId]);
+  }, [canViewInventory, canViewRecords, onOpenCount, userId]);
 
   return (
     <>
@@ -587,14 +725,14 @@ export function HubOverview({
           title="O.S. Executadas (mês atual)"
           kpi={kpis.executadas}
           icon={CheckSquare}
-          color="bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"
+          color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
           href="/registros"
         />
         <KpiCard
           title="O.S. Abertas / Pendentes"
           kpi={kpis.abertas}
           icon={Clock3}
-          color="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
+          color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
           href="/registros"
           alert
         />
@@ -602,15 +740,14 @@ export function HubOverview({
           title="Produtividade da Equipe"
           kpi={kpis.produtividade}
           icon={TrendingUp}
-          color="bg-violet-100 text-violet-600 dark:bg-violet-950 dark:text-violet-300"
+          color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
           href="/produtividade"
-          percent
         />
         <KpiCard
           title="O.S. Atrasadas (SLA vencido)"
           kpi={kpis.atrasadas}
           icon={AlertTriangle}
-          color="bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"
+          color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
           href="/backlog"
           alert
         />
@@ -618,17 +755,36 @@ export function HubOverview({
           title="Itens Abaixo do Estoque Mínimo"
           kpi={kpis.estoque}
           icon={Package}
-          color="bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300"
+          color="bg-slate-100 text-[#245b8f] dark:bg-slate-800 dark:text-blue-300"
           href="/estoque"
           alert
         />
       </section>
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">{children}</div>
-        {atividades && atividades.length > 0 && (
+        {atividades === undefined ? (
+          <aside className="rounded-xl border border-[#e1e9f4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-3 h-5 w-40 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+            <div className="space-y-4">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="flex gap-3">
+                  <span className="h-8 w-8 animate-pulse rounded-full bg-slate-100 dark:bg-slate-800" />
+                  <span className="h-10 flex-1 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                </div>
+              ))}
+            </div>
+          </aside>
+        ) : atividades === null ? (
+          <aside className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+            <h2 className="mb-2 text-base font-bold">Atividades Recentes</h2>
+            Não foi possível carregar as atividades recentes.
+          </aside>
+        ) : atividades.length > 0 ? (
           <aside className="rounded-xl border border-[#e1e9f4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-bold text-[#102f5c] dark:text-white">Atividades Recentes</h2>
+              <h2 className="text-base font-bold text-[#102f5c] dark:text-white">
+                Atividades Recentes
+              </h2>
               <span className="text-xs text-slate-500">Recentes</span>
             </div>
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -652,10 +808,12 @@ export function HubOverview({
               })}
             </ul>
           </aside>
-        )}
-        {atividades === null && (
-          <aside className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-            Não foi possível carregar as atividades recentes.
+        ) : (
+          <aside className="rounded-xl border border-[#e1e9f4] bg-white p-4 text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+            <h2 className="mb-2 text-base font-bold text-[#102f5c] dark:text-white">
+              Atividades Recentes
+            </h2>
+            Sem atividades recentes.
           </aside>
         )}
       </div>
