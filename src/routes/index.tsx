@@ -533,7 +533,7 @@ function Index() {
     if (!firstTool) return null;
     const Icon = category.icon;
     const cardClass =
-      "group relative isolate flex min-h-[132px] items-center gap-4 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-[0_5px_18px_-12px_rgba(15,45,85,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900";
+      "group relative isolate flex min-h-[116px] items-center gap-3 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 text-left shadow-[0_5px_18px_-12px_rgba(15,45,85,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900";
     const categoryImages: Record<string, string> = {
       operacao: "https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=900&q=85",
       planejamento: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=85",
@@ -681,7 +681,7 @@ function Index() {
 
       <div className="ml-0 flex min-h-screen flex-col pb-20 sm:ml-[68px] sm:pb-0 lg:ml-64">
         <header className="sticky top-0 z-20 border-b border-[#d9e3f2]/80 bg-white/95 shadow-[0_4px_18px_-14px_rgba(12,44,82,0.32)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex w-full max-w-none flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-7 lg:px-8">
+          <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-7 2xl:px-9">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -810,9 +810,9 @@ function Index() {
           </div>
         </header>
 
-        <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-3 pb-24 pt-4 sm:px-7 sm:pb-7 sm:pt-7 lg:px-8 lg:pt-7">
+        <main className="relative mx-auto flex w-full max-w-[1800px] flex-1 flex-col overflow-hidden px-3 pb-24 pt-4 sm:px-6 sm:pb-7 sm:pt-6 lg:px-7 lg:pt-6 2xl:px-9">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-5 flex min-h-[180px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-4 py-5 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:mb-6 sm:min-h-[150px] sm:px-9 sm:py-6">
+          <section className="relative mb-4 flex min-h-[160px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-4 py-4 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:mb-5 sm:min-h-[136px] sm:px-7 sm:py-5 2xl:min-h-[148px] 2xl:px-9">
             <img aria-hidden="true" src="https://assets.website-files.com/601431572b2178db2d32c0f9/614d24b0dea064b511734405_IMG_0620_reduced-p-3200.jpeg" alt="" className="pointer-events-none absolute inset-y-0 right-0 h-full w-full object-cover object-center opacity-75 saturate-125 sm:w-[68%] sm:opacity-100" />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#062955]/55 via-[#0b4b91]/70 to-[#062955]/95 sm:bg-gradient-to-r sm:from-[#062955] sm:via-[#0b4b91]/78 sm:via-42% sm:to-[#0b4b91]/5" />
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
@@ -878,7 +878,7 @@ function Index() {
                       Ferramentas por Categoria
                     </h2>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:gap-4 2xl:grid-cols-4">
                     {categoriasVisiveis.map(renderCategoryCard)}
                   </div>
                 </section>
