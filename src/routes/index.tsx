@@ -547,7 +547,7 @@ function Index() {
 
       <div className="ml-[68px] flex min-h-screen flex-col lg:ml-64">
         <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/90 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex w-full max-w-[1740px] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-9">
+          <div className="mx-auto flex w-full max-w-none flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-8">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -676,9 +676,9 @@ function Index() {
           </div>
         </header>
 
-        <main className="relative mx-auto flex w-full max-w-[1740px] flex-1 flex-col overflow-hidden px-4 pb-6 pt-5 sm:px-7 sm:pt-7 lg:px-9 lg:pt-8">
+        <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-4 pb-6 pt-5 sm:px-7 sm:pt-6 lg:px-7 lg:pt-6">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-5 flex min-h-[118px] items-center overflow-hidden rounded-2xl bg-gradient-to-r from-[#123455] via-[#214b70] to-[#39627a] px-5 py-5 text-white shadow-[0_12px_28px_-18px_rgba(16,54,102,0.55)] sm:px-8">
+          <section className="relative mb-5 flex min-h-[124px] items-center overflow-hidden rounded-[15px] border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-5 py-5 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
             <svg
