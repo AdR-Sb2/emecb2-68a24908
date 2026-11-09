@@ -435,9 +435,23 @@ function Index() {
     if (!firstTool) return null;
     const Icon = category.icon;
     const cardClass =
-      "group flex min-h-[126px] items-center gap-4 rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-[0_5px_18px_-12px_rgba(15,45,85,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800";
+      "group relative isolate flex min-h-[132px] items-center gap-4 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-[0_5px_18px_-12px_rgba(15,45,85,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900";
+    const categoryImages: Record<string, string> = {
+      operacao: "https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=900&q=85",
+      planejamento: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=85",
+      ativos: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=85",
+      documentacao: "https://images.unsplash.com/photo-1455390582262-044cmao7a8d?auto=format&fit=crop&w=900&q=85",
+      analises: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=85",
+      relatorios: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=85",
+    };
     const content = (
       <>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 -z-10 w-[48%] bg-cover bg-center opacity-90 transition-transform duration-500 group-hover:scale-105"
+          style={{ backgroundImage: `url("${categoryImages[category.id] || categoryImages.operacao}")` }}
+        />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-white via-white/95 via-55% to-white/15 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900/25" />
         <span
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${category.color}`}
         >
@@ -447,14 +461,16 @@ function Index() {
           <span className="block text-base font-bold text-[#102f5c] dark:text-white">
             {category.nome}
           </span>
-          <span className="mt-1 block text-sm leading-5 text-slate-600 dark:text-slate-400">
+          <span className="mt-1 block text-sm leading-5 text-slate-600 dark:text-slate-300">
             {category.descricao}
           </span>
           <span className="mt-2 block text-xs font-semibold text-[#45658e] dark:text-blue-300">
             Começar por: {firstTool.nome}
           </span>
         </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-[#45658e] transition group-hover:translate-x-1 dark:text-slate-300" />
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[#1768c4] shadow-sm ring-1 ring-blue-100 transition group-hover:translate-x-1 dark:bg-slate-800">
+          <ArrowRight className="h-4 w-4" />
+        </span>
       </>
     );
     if (firstTool.onClick) {
@@ -678,7 +694,9 @@ function Index() {
 
         <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-4 pb-7 pt-6 sm:px-7 sm:pt-7 lg:px-8 lg:pt-7">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-6 flex min-h-[136px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:px-9">
+          <section className="relative mb-6 flex min-h-[150px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:px-9">
+            <img aria-hidden="true" src="https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=1800&q=90" alt="" className="pointer-events-none absolute inset-y-0 right-0 h-full w-[62%] object-cover object-center opacity-90" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#062955] via-[#0b4b91]/95 via-48% to-[#0b4b91]/10" />
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
             <svg
