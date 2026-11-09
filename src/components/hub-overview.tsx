@@ -17,6 +17,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { isOrdemServico } from "@/lib/produtividade-os";
+import { contarOsExecutadasNoPeriodo, type FieldAtividade, type FieldDia, type FieldEquipe } from "@/components/produtividade-dashboard";
+import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
 import { supabase } from "@/lib/supabase";
 
 type KpiStatus = "loading" | "ready" | "error";
@@ -281,6 +283,7 @@ export function HubOverview({
   canViewInventory: boolean;
   children: ReactNode;
 }) {
+  const aliases = useEquipeAliases();
   const [kpis, setKpis] = useState<Kpis>({
     executadas: { ...EMPTY_KPI },
     abertas: { ...EMPTY_KPI },
@@ -428,15 +431,16 @@ export function HubOverview({
       const today = new Date();
       const todayIso = dataISO(today);
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEndIso = dataISO(new Date(today.getFullYear(), today.getMonth() + 1, 0));
       const previousStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const previousEnd = shiftMonth(today, -1);
       const trendStart = new Date(today);
       trendStart.setDate(today.getDate() - 13);
       const { data: dayRows, error: daysError } = await supabase
         .from("field_dias")
-        .select("id,data")
+        .select("*")
         .gte("data", dataISO(previousStart))
-        .lte("data", todayIso)
+        .lte("data", monthEndIso)
         .order("data");
       if (daysError) {
         update("executadas", { value: null, delta: null, trend: [] }, daysError);
@@ -445,7 +449,7 @@ export function HubOverview({
       }
       const days = dayRows || [];
       const currentDays = days.filter(
-        (day) => day.data >= dataISO(monthStart) && day.data <= todayIso,
+        (day) => day.data >= dataISO(monthStart) && day.data <= monthEndIso,
       );
       if (currentDays.length === 0) {
         const note = "Não há cargas de Produtividade para o mês atual.";
@@ -454,19 +458,14 @@ export function HubOverview({
         return;
       }
       const dayIds = days.map((row) => row.id);
-      const activities: Array<{
-        dia_id: number;
-        id_recurso: number | null;
-        ordem_manutencao: number | null;
-        status: string | null;
-      }> = [];
+      const activities: FieldAtividade[] = [];
       for (let offset = 0; offset < dayIds.length; offset += 200) {
         const ids = dayIds.slice(offset, offset + 200);
         let from = 0;
         for (;;) {
           const { data, error } = await supabase
             .from("field_atividades")
-            .select("dia_id,id_recurso,ordem_manutencao,status")
+            .select("*")
             .in("dia_id", ids)
             .order("id")
             .range(from, from + 999);
@@ -503,25 +502,7 @@ export function HubOverview({
         }
         return orders;
       };
-      const currentOrders = ordersBetween(dataISO(monthStart), todayIso);
-      const previousOrders = ordersBetween(dataISO(previousStart), dataISO(previousEnd));
-      const currentCount = currentOrders.size;
-      const previousCount = previousOrders.size;
-      const executionDelta = percentChange(currentCount, previousCount);
-      const previousDays = days.filter(
-        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
-      );
-      update("executadas", {
-        value: currentCount,
-        delta: executionDelta,
-        trend: daysBetween(trendStart, today).map((date) => completedByDate.get(date)?.size || 0),
-        note:
-          executionDelta === null
-            ? "Sem base no período equivalente para calcular a variação."
-            : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
-      });
-
-      const currentDayIds = currentDays.map((day) => day.id);
+      const currentDayIds = days.map((day) => day.id);
       const teams: Array<{
         id: number;
         dia_id: number;
@@ -548,6 +529,34 @@ export function HubOverview({
           from += 1000;
         }
       }
+
+      const previousDays = days.filter(
+        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
+      );
+      const currentCount = contarOsExecutadasNoPeriodo(
+        currentDays as FieldDia[],
+        activities,
+        teams as FieldEquipe[],
+        aliases.equipes,
+        aliases.integrantes,
+      );
+      const previousCount = contarOsExecutadasNoPeriodo(
+        previousDays as FieldDia[],
+        activities,
+        teams as FieldEquipe[],
+        aliases.equipes,
+        aliases.integrantes,
+      );
+      const executionDelta = percentChange(currentCount, previousCount);
+      update("executadas", {
+        value: currentCount,
+        delta: executionDelta,
+        trend: daysBetween(trendStart, today).map((date) => completedByDate.get(date)?.size || 0),
+        note:
+          executionDelta === null
+            ? "Sem base no período equivalente para calcular a variação."
+            : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
+      });
 
       const teamsByDay = new Map<string, { diaId: number; recursos: Set<number> }>();
       for (const team of teams) {
