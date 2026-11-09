@@ -381,7 +381,7 @@ export function HubOverview({
         "MANUTENÇÃO CORRETIVA EMERGENCIAL",
         "MANUTENÇÃO CORRETIVA PROGRAMADA",
       ]);
-      const openStatuses = new Set(["PENDENTE", "ABERTA", "LIBERADA"]);
+      const openStatuses = new Set(["PENDENTE"]);
       const correctiveOrders = new Set<string>();
       for (const row of backlogRows) {
         const om = String(row["Ordem de Manutenção"] ?? "").trim();
@@ -411,6 +411,18 @@ export function HubOverview({
         .from("registros_atendimento")
         .select("id", { count: "exact", head: true })
         .in("status_simplificado", ACTIVE_OS_STATUSES);
+      if (activeRes.error) {
+        update("atrasadas", { value: null, delta: null, trend: [] }, activeRes.error);
+        return;
+      }
+      if (activeRes.count === null) {
+        update(
+          "atrasadas",
+          { value: null, delta: null, trend: [] },
+          new Error("A consulta de O.S. com SLA não retornou uma contagem."),
+        );
+        return;
+      }
 
       const overdue: { id: number; fim_sla: string | null }[] = [];
       let overdueError: unknown = null;
