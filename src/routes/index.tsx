@@ -543,7 +543,7 @@ function Index() {
 
       <div className="min-h-screen ml-[68px] lg:ml-[230px]">
         <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/95 shadow-[0_4px_18px_-14px_rgba(16,54,102,0.45)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-8 lg:py-3.5">
+          <div className="mx-auto flex w-full max-w-none flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-8 lg:py-3.5">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -667,7 +667,7 @@ function Index() {
           </div>
         </header>
 
-        <main className="relative mx-auto min-h-[calc(100vh-65px)] max-w-[1600px] overflow-hidden px-4 pb-8 pt-5 sm:px-7 sm:pt-6 lg:px-7 lg:pt-6">
+        <main className="relative mx-auto min-h-[calc(100vh-65px)] w-full max-w-none overflow-hidden px-4 pb-8 pt-5 sm:px-7 sm:pt-6 lg:px-7 lg:pt-6">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
           <section className="relative mb-5 flex min-h-[124px] items-center overflow-hidden rounded-[15px] border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-5 py-5 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
