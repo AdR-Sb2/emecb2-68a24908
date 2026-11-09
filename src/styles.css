@@ -147,3 +147,67 @@
     display: none !important;
   }
 }
+
+
+/* Scrollbars: acabamento consistente em toda a aplicação */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(76, 112, 153, 0.52) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(125, 166, 207, 0.48) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9bb8d7 0%, #527ba8 100%);
+  background-clip: content-box;
+  transition: background 180ms ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6f9bc8 0%, #245b8f 100%);
+  background-clip: content-box;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #718eae 0%, #426487 100%);
+  background-clip: content-box;
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #83b7e8 0%, #4b91d0 100%);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (max-width: 640px) {
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-width: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
