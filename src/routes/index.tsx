@@ -482,11 +482,11 @@ function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f2f6fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-[linear-gradient(135deg,#f4f8ff_0%,#eaf2ff_55%,#f7faff_100%)] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
       <style>{animations}</style>
 
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-[68px] flex-col bg-gradient-to-b from-[#062955] to-[#041b3a] px-2 py-4 text-white shadow-xl lg:w-64 lg:px-4 lg:py-6">
-        <div className="mb-5 flex items-center justify-center lg:mb-8 lg:justify-start">
+      <aside className="fixed inset-y-0 left-0 z-30 flex w-[68px] flex-col bg-gradient-to-b from-[#082b59] via-[#06234b] to-[#041a38] px-2 py-4 text-white shadow-[8px_0_28px_-18px_rgba(4,27,58,0.8)] lg:w-[230px] lg:px-4 lg:py-6">
+        <div className="mb-5 flex items-center justify-center border-b border-white/10 pb-5 lg:mb-8 lg:justify-start lg:pb-6">
           <img
             src={logoHeader}
             alt="Águas do Rio"
@@ -498,7 +498,7 @@ function Index() {
           <Link
             to="/"
             title="Início"
-            className="flex items-center gap-3 rounded-xl bg-[#0b4a9d] px-3 py-2.5 text-sm font-semibold shadow-inner"
+            className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#1261c4] to-[#0b4a9d] px-3 py-2.5 text-sm font-semibold shadow-[0_6px_18px_-10px_rgba(0,100,220,0.9)] ring-1 ring-white/10"
           >
             <Home className="h-4 w-4 shrink-0" />
             <span className="hidden lg:inline">Início</span>
@@ -541,9 +541,9 @@ function Index() {
         </div>
       </aside>
 
-      <div className="min-h-screen ml-[68px] lg:ml-64">
-        <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/90 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-9">
+      <div className="min-h-screen ml-[68px] lg:ml-[230px]">
+        <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/95 shadow-[0_4px_18px_-14px_rgba(16,54,102,0.45)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
+          <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-8 lg:py-3.5">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -667,9 +667,9 @@ function Index() {
           </div>
         </header>
 
-        <main className="relative mx-auto min-h-[calc(100vh-65px)] max-w-[1440px] overflow-hidden px-4 pb-8 pt-5 sm:px-7 sm:pt-7 lg:px-9 lg:pt-8">
+        <main className="relative mx-auto min-h-[calc(100vh-65px)] max-w-[1600px] overflow-hidden px-4 pb-8 pt-5 sm:px-7 sm:pt-6 lg:px-7 lg:pt-6">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-5 flex min-h-[118px] items-center overflow-hidden rounded-2xl bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-5 py-5 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
+          <section className="relative mb-5 flex min-h-[124px] items-center overflow-hidden rounded-[15px] border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-5 py-5 text-white shadow-[0_16px_34px_-18px_rgba(0,45,116,0.8)] sm:px-8">
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
             <svg
