@@ -431,6 +431,7 @@ export function HubOverview({
       const today = new Date();
       const todayIso = dataISO(today);
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEndIso = dataISO(new Date(today.getFullYear(), today.getMonth() + 1, 0));
       const previousStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const previousEnd = shiftMonth(today, -1);
       const trendStart = new Date(today);
@@ -439,7 +440,7 @@ export function HubOverview({
         .from("field_dias")
         .select("*")
         .gte("data", dataISO(previousStart))
-        .lte("data", todayIso)
+        .lte("data", monthEndIso)
         .order("data");
       if (daysError) {
         update("executadas", { value: null, delta: null, trend: [] }, daysError);
@@ -448,7 +449,7 @@ export function HubOverview({
       }
       const days = dayRows || [];
       const currentDays = days.filter(
-        (day) => day.data >= dataISO(monthStart) && day.data <= todayIso,
+        (day) => day.data >= dataISO(monthStart) && day.data <= monthEndIso,
       );
       if (currentDays.length === 0) {
         const note = "Não há cargas de Produtividade para o mês atual.";
