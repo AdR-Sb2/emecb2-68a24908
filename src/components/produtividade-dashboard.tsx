@@ -620,9 +620,11 @@ type Alerta = { nivel: "ok" | "atencao" | "critico"; texto: string; detalhe: str
 
 export function DashboardComparacao({
   diaInicial,
+  periodoInicial,
   mostrarExportacao = false,
 }: {
   diaInicial?: string;
+  periodoInicial?: "mes";
   mostrarExportacao?: boolean;
 }) {
   const { user, profile } = useAuth();
@@ -636,7 +638,7 @@ export function DashboardComparacao({
   const [recursosList, setRecursosList] = useState<Array<{ id_recurso: number; nome: string }>>([]);
   const [todasDatas, setTodasDatas] = useState<string[]>([]);
   const [periodo, setPeriodo] = useState<Periodo>(() =>
-    diaInicial ? { type: "day", date: diaInicial } : { type: "7" },
+    periodoInicial === "mes" ? { type: "mes" } : diaInicial ? { type: "day", date: diaInicial } : { type: "7" },
   );
   const [filtroEquipe, setFiltroEquipe] = useState("");
   const [filtroTecnico, setFiltroTecnico] = useState("");
@@ -683,6 +685,10 @@ export function DashboardComparacao({
   useEffect(() => {
     if (diaInicial) setPeriodo({ type: "day", date: diaInicial });
   }, [diaInicial]);
+
+  useEffect(() => {
+    if (periodoInicial === "mes") setPeriodo({ type: "mes" });
+  }, [periodoInicial]);
 
   useEffect(() => {
     let ativo = true;
