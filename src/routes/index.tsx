@@ -23,6 +23,8 @@ import {
   BarChart3,
   ChevronDown,
   Cog,
+  Globe2,
+  ExternalLink,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -58,6 +60,8 @@ type Painel = {
   icone: string;
 };
 
+type PublicLink = { key: string; nome: string; descricao: string; url: string };
+
 function Index() {
   const navigate = useNavigate();
   const { user, profile, loading, signOut } = useAuth();
@@ -67,6 +71,7 @@ function Index() {
   const [sysOpen, setSysOpen] = useState(false);
   const [fichaChoiceOpen, setFichaChoiceOpen] = useState(false);
   const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
+  const [publicLinks, setPublicLinks] = useState<PublicLink[]>([]);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
   const [busca, setBusca] = useState("");
   const [buscaRemota, setBuscaRemota] = useState("");
@@ -171,6 +176,77 @@ function Index() {
   }, [user, profile, loading, navigate]);
 
   useEffect(() => {
+    let active = true;
+    const loadPublicLinks = async () => {
+      const [fieldConfig, elevatoriaConfig, cronogramas] = await Promise.all([
+        supabase
+          .from("field_config")
+          .select("link_publico_token,backlog_link_publico_token")
+          .eq("id", 1)
+          .maybeSingle(),
+        supabase
+          .from("elevatorias_config")
+          .select("link_publico_token")
+          .eq("id", 1)
+          .maybeSingle(),
+        supabase
+          .from("cronograma_projetos")
+          .select("id,nome,link_publico_token")
+          .eq("visibilidade", "publico")
+          .not("link_publico_token", "is", null)
+          .order("criado_em", { ascending: false }),
+      ]);
+      if (!active) return;
+      const origin = window.location.origin;
+      const links: PublicLink[] = [];
+      const backlogToken = fieldConfig.data?.backlog_link_publico_token;
+      const productivityToken = fieldConfig.data?.link_publico_token;
+      const elevatorToken = elevatoriaConfig.data?.link_publico_token;
+      if (backlogToken) {
+        links.push({
+          key: "public-backlog",
+          nome: "Backlog Público",
+          descricao: "Consulta pública das ordens de serviço do Backlog.",
+          url: `${origin}/backlog/publico/${backlogToken}`,
+        });
+      }
+      if (productivityToken) {
+        links.push({
+          key: "public-productivity",
+          nome: "Dashboard de Produtividade",
+          descricao: "Indicadores e acompanhamento da produtividade.",
+          url: `${origin}/produtividade/publico/${productivityToken}`,
+        });
+      }
+      if (elevatorToken) {
+        links.push({
+          key: "public-elevatorias",
+          nome: "Fichas das Elevatórias",
+          descricao: "Consulta pública das fichas técnicas das elevatórias.",
+          url: `${origin}/elevatorias/publico/${elevatorToken}`,
+        });
+      }
+      for (const project of cronogramas.data || []) {
+        if (!project.link_publico_token) continue;
+        links.push({
+          key: `public-cronograma-${project.id}`,
+          nome: `Cronograma · ${project.nome || "Projeto"}`,
+          descricao: "Acompanhamento público do cronograma do projeto.",
+          url: `${origin}/cronograma/publico/${project.link_publico_token}`,
+        });
+      }
+      setPublicLinks(links);
+    };
+    void loadPublicLinks().catch((error) => {
+      console.error("Erro ao carregar links públicos ativos do Hub:", error);
+      if (active) setPublicLinks([]);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!supabaseConfigSummary.isConfigured || !profile?.cargo_id) {
       setLoadingPaineis(false);
       return;
@@ -252,6 +328,13 @@ function Index() {
       descricao: "Gere relatórios e exporte dados.",
       icon: FileText,
       color: "bg-slate-100 text-[#245b8f]",
+    },
+    {
+      id: "links-publicos",
+      nome: "Links Públicos",
+      descricao: "Acesse os painéis e sistemas com compartilhamento público ativo.",
+      icon: Globe2,
+      color: "bg-slate-100 text-[#087e8b]",
     },
   ];
   const ferramentas = [
@@ -372,6 +455,15 @@ function Index() {
       visible: shouldShowRelatorio,
       to: "/relatorio",
     },
+    ...publicLinks.map((link) => ({
+      key: link.key,
+      nome: link.nome,
+      descricao: link.descricao,
+      categoria: "links-publicos",
+      icon: ExternalLink,
+      visible: true,
+      onClick: () => window.open(link.url, "_blank", "noopener,noreferrer"),
+    })),
   ];
   const ferramentasVisiveis = ferramentas.filter(
     (tool) =>

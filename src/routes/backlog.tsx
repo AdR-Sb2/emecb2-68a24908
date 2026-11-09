@@ -1270,6 +1270,29 @@ export function BacklogPage() {
   const [fSearch, setFSearch] = useState("");
   const [onlyLate, setOnlyLate] = useState(false);
   const [onlyEmerg, setOnlyEmerg] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(location.searchStr);
+    if (params.get("hubFiltro") !== "corretivas") return;
+    escolherTipo("bucket");
+    setBacklogTab("backlog");
+    setFPlantas([]);
+    setFResp(["Baixada 2"]);
+    setFStatus(["pendente"]);
+    setFStatusExec([]);
+    setFEquipe([]);
+    setFCidade([]);
+    setFFaixa([]);
+    setFTipo([
+      "MANUTENÇÃO CORRETIVA EMERGENCIAL",
+      "MANUTENÇÃO CORRETIVA PROGRAMADA",
+    ]);
+    setFSearch("");
+    setOnlyLate(false);
+    setOnlyEmerg(false);
+    setFSlaBefore("");
+    setShowFilters(true);
+  }, [location.searchStr]);
+
   const [fSlaBefore, setFSlaBefore] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
@@ -1325,7 +1348,7 @@ export function BacklogPage() {
       if (
         skip !== "status" &&
         fStatus.length &&
-        !fStatus.includes((e.r["Status da Atividade"] || "").trim())
+        !fStatus.some((status) => status.toLocaleLowerCase("pt-BR") === (e.r["Status da Atividade"] || "").trim().toLocaleLowerCase("pt-BR"))
       )
         return false;
       if (skip !== "statusExec" && fStatusExec.length && !fStatusExec.includes(e.statusExec))
