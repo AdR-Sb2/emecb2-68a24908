@@ -502,28 +502,6 @@ export function HubOverview({
         return orders;
       };
       const previousOrders = ordersBetween(dataISO(previousStart), dataISO(previousEnd));
-      const currentCount = contarOsExecutadasNoPeriodo(
-        currentDays as FieldDia[],
-        activities,
-        teams as FieldEquipe[],
-        aliases.equipes,
-        aliases.integrantes,
-      );
-      const previousCount = previousOrders.size;
-      const executionDelta = percentChange(currentCount, previousCount);
-      const previousDays = days.filter(
-        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
-      );
-      update("executadas", {
-        value: currentCount,
-        delta: executionDelta,
-        trend: daysBetween(trendStart, today).map((date) => completedByDate.get(date)?.size || 0),
-        note:
-          executionDelta === null
-            ? "Sem base no período equivalente para calcular a variação."
-            : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
-      });
-
       const currentDayIds = currentDays.map((day) => day.id);
       const teams: Array<{
         id: number;
@@ -551,6 +529,28 @@ export function HubOverview({
           from += 1000;
         }
       }
+
+      const currentCount = contarOsExecutadasNoPeriodo(
+        currentDays as FieldDia[],
+        activities,
+        teams as FieldEquipe[],
+        aliases.equipes,
+        aliases.integrantes,
+      );
+      const previousCount = previousOrders.size;
+      const executionDelta = percentChange(currentCount, previousCount);
+      const previousDays = days.filter(
+        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
+      );
+      update("executadas", {
+        value: currentCount,
+        delta: executionDelta,
+        trend: daysBetween(trendStart, today).map((date) => completedByDate.get(date)?.size || 0),
+        note:
+          executionDelta === null
+            ? "Sem base no período equivalente para calcular a variação."
+            : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
+      });
 
       const teamsByDay = new Map<string, { diaId: number; recursos: Set<number> }>();
       for (const team of teams) {
