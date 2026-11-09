@@ -2667,7 +2667,7 @@ function ProdutividadePage() {
         </TabsContent>
 
         <TabsContent value="dashboard">
-          <DashboardComparacao />
+          <DashboardComparacao mostrarExportacao />
         </TabsContent>
       </Tabs>
 

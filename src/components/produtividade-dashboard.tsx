@@ -19,6 +19,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
+  Download,
   Flame,
   GitMerge,
   Hammer,
@@ -53,6 +54,7 @@ import {
 import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
 import { useAuth } from "@/lib/auth";
 import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
+import { toast } from "sonner";
 import {
   UnificarEquipesDialog,
   type EquipeGerenciavel,
@@ -591,7 +593,13 @@ type Alerta = { nivel: "ok" | "atencao" | "critico"; texto: string; detalhe: str
 
 // ─── Dashboard ────────────────────────────────────────────────
 
-export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
+export function DashboardComparacao({
+  diaInicial,
+  mostrarExportacao = false,
+}: {
+  diaInicial?: string;
+  mostrarExportacao?: boolean;
+}) {
   const { user, profile } = useAuth();
   const aliases = useEquipeAliases();
   const { data: config } = useProdutividadeConfig();
@@ -617,6 +625,7 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   const [equipeDetalhe, setEquipeDetalhe] = useState<LinhaEquipe | null>(null);
   const [cmpIdx, setCmpIdx] = useState(0);
   const [rotacaoPausada, setRotacaoPausada] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [drill, setDrill] = useState<{
     titulo: string;
     subtitulo: string;
@@ -1357,6 +1366,76 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
   const abrirDrill = (titulo: string, filtro: (os: OsAgrupada) => boolean) =>
     setDrill({ titulo, subtitulo: `${periodoTexto} · ${datasPeriodo.length} dia(s)`, filtro });
 
+  const exportarOsExecutadas = async () => {
+    const linhas = osFiltrado
+      .filter((os) => os.concluida)
+      .sort((a, b) => (a.datas[0] || "").localeCompare(b.datas[0] || "") || a.om - b.om);
+
+    if (linhas.length === 0) {
+      toast.warning("Nenhuma O.S. executada encontrada no período e filtros selecionados.");
+      return;
+    }
+
+    setExportando(true);
+    try {
+      const { default: ExcelJS } = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "EMEC Baixada 2";
+      const worksheet = workbook.addWorksheet("O.S. Executadas");
+      worksheet.columns = [
+        { header: "Data(s)", key: "datas", width: 24 },
+        { header: "O.S.", key: "om", width: 16 },
+        { header: "Equipe(s)", key: "equipes", width: 32 },
+        { header: "Técnico(s)", key: "tecnicos", width: 36 },
+        { header: "Categoria", key: "categoria", width: 28 },
+        { header: "Atividade", key: "atividade", width: 55 },
+        { header: "Planta", key: "planta", width: 32 },
+        { header: "HH", key: "hh", width: 12 },
+      ];
+      worksheet.addRows(
+        linhas.map((os) => ({
+          datas: os.datas.map(formatDataBR).join(", "),
+          om: os.om || "",
+          equipes: os.equipes.map(nomeDaEquipe).join(" / ") || "Sem equipe",
+          tecnicos:
+            os.tecnicos.map((id) => recursosMap.get(id) || `Técnico ${id}`).join(" / ") ||
+            "Sem vínculo",
+          categoria: os.categoria,
+          atividade: os.texto || "",
+          planta: os.planta || "",
+          hh: formatMinutos(os.hh),
+        })),
+      );
+      worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF002D74" },
+      };
+      worksheet.autoFilter = { from: "A1", to: "H1" };
+      worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `os-executadas-${datasPeriodo[0] || hojeISO()}-${datasPeriodo.at(-1) || hojeISO()}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      toast.success(`${linhas.length} O.S. executadas exportadas.`);
+    } catch (error) {
+      console.error("Falha ao exportar O.S. executadas:", error);
+      toast.error("Não foi possível exportar as O.S. executadas.");
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ── Barra de filtros ───────────────────────────────── */}
@@ -1521,6 +1600,22 @@ export function DashboardComparacao({ diaInicial }: { diaInicial?: string }) {
               )}
               Atualizar
             </Button>
+            {mostrarExportacao && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px]"
+                disabled={loading || exportando}
+                onClick={() => void exportarOsExecutadas()}
+              >
+                {exportando ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-3.5 w-3.5" />
+                )}
+                Exportar O.S. executadas
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
