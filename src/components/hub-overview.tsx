@@ -501,9 +501,7 @@ export function HubOverview({
         }
         return orders;
       };
-      const previousOrders = ordersBetween(dataISO(previousStart), dataISO(previousEnd));
-      const previousCount = previousOrders.size;
-      const currentDayIds = currentDays.map((day) => day.id);
+      const currentDayIds = days.map((day) => day.id);
       const teams: Array<{
         id: number;
         dia_id: number;
@@ -531,6 +529,9 @@ export function HubOverview({
         }
       }
 
+      const previousDays = days.filter(
+        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
+      );
       const currentCount = contarOsExecutadasNoPeriodo(
         currentDays as FieldDia[],
         activities,
@@ -538,10 +539,14 @@ export function HubOverview({
         aliases.equipes,
         aliases.integrantes,
       );
-      const executionDelta = percentChange(currentCount, previousCount);
-      const previousDays = days.filter(
-        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
+      const previousCount = contarOsExecutadasNoPeriodo(
+        previousDays as FieldDia[],
+        activities,
+        teams as FieldEquipe[],
+        aliases.equipes,
+        aliases.integrantes,
       );
+      const executionDelta = percentChange(currentCount, previousCount);
       update("executadas", {
         value: currentCount,
         delta: executionDelta,
