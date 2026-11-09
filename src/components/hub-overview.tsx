@@ -503,20 +503,6 @@ export function HubOverview({
       };
       const previousOrders = ordersBetween(dataISO(previousStart), dataISO(previousEnd));
       const previousCount = previousOrders.size;
-      const executionDelta = percentChange(0, previousCount);
-      const previousDays = days.filter(
-        (day) => day.data >= dataISO(previousStart) && day.data <= dataISO(previousEnd),
-      );
-      update("executadas", {
-        value: currentCount,
-        delta: executionDelta,
-        trend: daysBetween(trendStart, today).map((date) => completedByDate.get(date)?.size || 0),
-        note:
-          executionDelta === null
-            ? "Sem base no período equivalente para calcular a variação."
-            : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
-      });
-
       const currentDayIds = currentDays.map((day) => day.id);
       const teams: Array<{
         id: number;
