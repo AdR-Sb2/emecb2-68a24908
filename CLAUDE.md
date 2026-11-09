@@ -307,3 +307,18 @@ RLS deve permanecer DESABILITADO em todas as tabelas. Controle de acesso e via a
    - Adicionar CardLink no grid
 4. Executar migration manualmente no SQL Editor do Supabase
 5. Rodar NOTIFY pgrst, reload schema apos migration
+
+## Backlog: reimportacao preserva Equipe/Status
+- Chave da nota: `chaveOM` (texto, sem espacos, sem converter para numero) em `src/routes/backlog.tsx`.
+- Equipe fica em `equipe_overrides` (por OM) e nunca e apagada pela importacao; lookup tambem pela chave normalizada.
+- "Status da Execucao" fica dentro das linhas de `backlog_dados`; `preservarStatusExec` reaplica o valor salvo (Bucket + Planejamento) nas linhas novas — planilha so preenche quando o salvo e vazio/Pendente. Confirmacao mostra novas/atualizadas/preservadas.
+
+## Estoque > Compras: Exportar Excel
+- Botao "Exportar" (`exportarComprasXlsx` em `src/routes/estoque.tsx`) gera `compras_AAAA-MM-DD.xlsx` via ExcelJS dinamico a partir de `comprasFiltradas` (respeita busca/filtros; lista ja vem inteira do banco). Codigos como texto, datas dd/mm/aaaa, valores R$.
+
+## Compras: data de criação da RC
+- `compras.dt_criacao_rc` é por item; `DataRcCell` permite alterar todos os itens da mesma RC em uma atualização. Mesma permissão de gerenciar compras.
+- `scripts/compras_data_rc_manual.sql` adiciona origem, autor/nome e instante da edição; aplicar na base usada pelo app (não na instância vazia).
+- Origem manual prevalece nas reimportações; remover data limpa origem/autor e permite a próxima importação preencher. O resumo conta datas divergentes preservadas.
+- `diasEntre` usa dias de calendário sem fuso: Dias aberto para em `data_chegou`; exportação usa o mesmo cálculo. O modal de chegada permite corrigir/preencher criação e mostra a duração antes de confirmar.
+- Importação SAP usa valores numéricos nativos (`raw: true`) e `numeroSap` para texto pt-BR; `2.949,00` é 2949.

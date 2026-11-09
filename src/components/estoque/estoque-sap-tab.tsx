@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import { supabase } from "@/lib/supabase";
+import { numeroSap as numeroSeguro } from "@/lib/estoque-sap-numeros";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -127,18 +128,6 @@ function normalizarCabecalho(valor: unknown) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-}
-
-function numeroSeguro(valor: unknown): number {
-  if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
-  let texto = String(valor ?? "")
-    .trim()
-    .replace(/\s/g, "");
-  if (!texto) return 0;
-  if (texto.startsWith("(") && texto.endsWith(")")) texto = `-${texto.slice(1, -1)}`;
-  if (texto.includes(",")) texto = texto.replace(/\./g, "").replace(",", ".");
-  const numero = Number(texto);
-  return Number.isFinite(numero) ? numero : 0;
 }
 
 function parsearPlanilha(rows: unknown[][]): { linhas: LinhaImportada[]; ignoradas: number } {
@@ -658,12 +647,13 @@ export default function EstoqueSapTab() {
   const parsearArquivo = async (file: File) => {
     try {
       const XLSX = await import("xlsx");
-      const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: false });
+      // CSV/texto: não deixar o leitor transformar 2.949,00 em 2.949 antes do parser.
+      const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: false, raw: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       if (!sheet) throw new Error("A planilha não contém uma aba válida.");
       const matrix = XLSX.utils.sheet_to_json(sheet, {
         header: 1,
-        raw: false,
+        raw: true,
         defval: "",
       }) as unknown[][];
       const parsed = parsearPlanilha(matrix);
@@ -1583,7 +1573,11 @@ export default function EstoqueSapTab() {
                     . Deseja substituir pelo novo snapshot?
                   </p>
                   <div className="mt-2 flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setConfirmarDuplicada(false)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmarDuplicada(false)}
+                    >
                       Cancelar
                     </Button>
                     <Button
@@ -1625,7 +1619,6 @@ export default function EstoqueSapTab() {
           )}
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

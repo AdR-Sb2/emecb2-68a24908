@@ -10,6 +10,7 @@ import {
   Search,
   X,
   Download,
+  Loader2,
   Upload,
   Filter,
   Star,
@@ -37,6 +38,11 @@ import logoHeader from "@/assets/logo-branca.png";
 const LazyEquipamentosTab = lazy(() => import("@/components/estoque/equipamentos-tab"));
 const LazyEstoqueSapTab = lazy(() => import("@/components/estoque/estoque-sap-tab"));
 import { supabase } from "@/lib/supabase";
+import { DataRcCell } from "@/components/estoque/data-rc-cell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { diasEntre, hojeISO, formatarDataPura, validarDataRc } from "@/lib/datas-puras";
+import { preservarDataRcImportada } from "@/lib/estoque-datas-rc";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
@@ -84,7 +90,21 @@ import {
 
 export const Route = createFileRoute("/estoque")({
   head: () => ({
-    meta: [{ title: "Eletromecânica · Estoque e Compras" }],
+    meta: [
+      { title: "Eletromecânica · Estoque e Compras" },
+      {
+        name: "description",
+        content:
+          "Almoxarifado EMEC Baixada 2: estoque SAP, compras e acompanhamento de requisições.",
+      },
+      { property: "og:title", content: "EMEC Baixada 2 · Estoque e Compras" },
+      {
+        property: "og:description",
+        content: "Controle de materiais, compras e requisições da Eletromecânica Baixada 2.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   component: EstoquePage,
 });
@@ -306,6 +326,9 @@ function EstoquePage() {
   const [dataRetiradaInput, setDataRetiradaInput] = useState("");
   const [dialogDataChegada, setDialogDataChegada] = useState<number | null>(null);
   const [dataChegadaInput, setDataChegadaInput] = useState("");
+  const [criacaoChegadaInput, setCriacaoChegadaInput] = useState("");
+  const [editarCriacaoChegada, setEditarCriacaoChegada] = useState(false);
+  const [salvandoChegada, setSalvandoChegada] = useState(false);
   const [chegadaValorUnitario, setChegadaValorUnitario] = useState<string>("");
   const [chegadaQtdeRecebida, setChegadaQtdeRecebida] = useState<string>("");
   const [filtroStatusCompra, setFiltroStatusCompra] = useState<string>("TODOS");
@@ -723,11 +746,182 @@ function EstoquePage() {
     filtroBuscaCompra,
   ]);
 
+  const [exportandoCompras, setExportandoCompras] = useState(false);
+  const exportarComprasXlsx = async () => {
+    const linhas = comprasFiltradas;
+    if (!linhas.length) {
+      toast.warning("Nenhuma compra para exportar com os filtros atuais.");
+      return;
+    }
+    setExportandoCompras(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Compras");
+      const dt = (v: string | null | undefined) => {
+        if (!v) return null;
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+        return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+      };
+      const dias = diasEntre;
+      const cols = [
+        { header: "Requisição", key: "req", tipo: "txt" },
+        { header: "Pedido", key: "ped", tipo: "txt" },
+        { header: "Item", key: "item", tipo: "txt" },
+        { header: "Cód. SAP", key: "sap", tipo: "txt" },
+        { header: "Descrição", key: "desc", tipo: "txt" },
+        { header: "Qtde", key: "qtd", tipo: "num" },
+        { header: "Status Geral", key: "status", tipo: "txt" },
+        { header: "Fornecedor", key: "forn", tipo: "txt" },
+        { header: "Chegou?", key: "chegou", tipo: "txt" },
+        { header: "Retirado?", key: "ret", tipo: "txt" },
+        { header: "Data de Chegada", key: "dchegada", tipo: "data" },
+        { header: "Vlr Unit.", key: "vu", tipo: "moeda" },
+        { header: "Vlr Total", key: "vt", tipo: "moeda" },
+        { header: "Data prevista", key: "dprev", tipo: "data" },
+        { header: "Dias aberto", key: "daberto", tipo: "num" },
+        { header: "Dias p/ retirar", key: "dretirar", tipo: "num" },
+        { header: "Solicitante", key: "solic", tipo: "txt" },
+        { header: "Data criação RC", key: "dcria", tipo: "data" },
+      ];
+      ws.columns = cols.map((c) => ({ header: c.header, key: c.key }));
+      for (const c of linhas) {
+        const ateHoje = c.chegou && c.data_chegou ? c.data_chegou : hojeISO();
+        ws.addRow({
+          req: c.requisicao != null ? String(c.requisicao) : "",
+          ped: c.pedido ?? "",
+          item: c.item_rc != null ? String(c.item_rc) : "",
+          sap: c.cod_sap ?? "",
+          desc: c.descricao_material ?? "",
+          qtd: c.qtde_rc != null ? Number(c.qtde_rc) : null,
+          status: c.status_geral || "Sem status",
+          forn: c.fornecedor ?? "",
+          chegou: c.chegou ? "Sim" : "Não",
+          ret: c.foi_retirado ? "Sim" : "Não",
+          dchegada: dt(c.data_chegou),
+          vu: c.valor_unitario != null ? Number(c.valor_unitario) : null,
+          vt: c.valor_total != null ? Number(c.valor_total) : null,
+          dprev: dt(c.data_prevista),
+          daberto: dias(c.dt_criacao_rc, ateHoje),
+          dretirar: c.chegou && c.foi_retirado ? dias(c.data_chegou, c.data_retirado) : null,
+          solic: c.solicitante ?? "",
+          dcria: dt(c.dt_criacao_rc),
+        });
+      }
+      cols.forEach((c, i) => {
+        const col = ws.getColumn(i + 1);
+        if (c.tipo === "txt") col.numFmt = "@";
+        if (c.tipo === "data") col.numFmt = "dd/mm/yyyy";
+        if (c.tipo === "moeda") col.numFmt = '"R$" #,##0.00';
+        let w = c.header.length;
+        col.eachCell({ includeEmpty: false }, (cell) => {
+          const v = cell.value;
+          const len = v instanceof Date ? 10 : String(v ?? "").length;
+          if (len > w) w = len;
+        });
+        col.width = Math.min(Math.max(w + 2, 8), 50);
+      });
+      const head = ws.getRow(1);
+      head.font = { bold: true, color: { argb: "FF1E293B" } };
+      head.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
+      ws.eachRow((row) =>
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+        }),
+      );
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const hoje = new Date();
+      const nome = `compras_${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nome;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${linhas.length} compras exportadas.`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Não foi possível exportar as compras.");
+    } finally {
+      setExportandoCompras(false);
+    }
+  };
+
+  const itensNaRc = (compra: Compra) =>
+    compra.requisicao == null
+      ? 1
+      : compras.filter((c) => c.requisicao === compra.requisicao).length;
+
+  const salvarDataRc = async (
+    compra: Compra,
+    data: string | null,
+    aplicarRc: boolean,
+  ): Promise<boolean> => {
+    if (!permissoes.gerenciarCompras || !user) return false;
+    const pertence = (c: Compra) =>
+      aplicarRc && compra.requisicao != null
+        ? c.requisicao === compra.requisicao
+        : c.id === compra.id;
+    const alvos = compras.filter(pertence);
+    if (data) {
+      for (const c of alvos) {
+        const erro = validarDataRc(data, c.chegou ? c.data_chegou : null);
+        if (erro) {
+          toast.error(erro);
+          return false;
+        }
+      }
+    }
+    const patch = {
+      dt_criacao_rc: data,
+      data_criacao_origem: data ? ("manual" as const) : null,
+      data_criacao_editada_por: data ? user.id : null,
+      data_criacao_editada_por_nome: data ? (profile?.nome_completo ?? null) : null,
+      data_criacao_editada_em: data ? new Date().toISOString() : null,
+    };
+    const anteriores = new Map(alvos.map((c) => [c.id, c]));
+    setCompras((prev) => prev.map((c) => (pertence(c) ? { ...c, ...patch } : c)));
+    setDialogDetalheCompra((prev) => (prev && pertence(prev) ? { ...prev, ...patch } : prev));
+    const query = supabase.from("compras").update(patch);
+    const { error } = await (aplicarRc && compra.requisicao != null
+      ? query.eq("requisicao", compra.requisicao)
+      : query.eq("id", compra.id));
+    if (error) {
+      setCompras((prev) => prev.map((c) => anteriores.get(c.id) ?? c));
+      setDialogDetalheCompra((prev) => (prev ? (anteriores.get(prev.id) ?? prev) : prev));
+      toast.error(
+        error.code === "PGRST204" || error.code === "42703"
+          ? "Os campos de edição de data ainda precisam ser ativados na base de Compras."
+          : "Não foi possível salvar a data da RC: " + error.message,
+      );
+      return false;
+    }
+    toast.success(data ? "Data da RC atualizada!" : "Data da RC removida!");
+    return true;
+  };
+
+  const erroChegada = criacaoChegadaInput
+    ? validarDataRc(criacaoChegadaInput, dataChegadaInput)
+    : null;
+  const tempoChegada = diasEntre(criacaoChegadaInput, dataChegadaInput);
+
   const handleToggleChegou = async (id: number, current: boolean) => {
     if (!current) {
       setDialogDataChegada(id);
-      setDataChegadaInput(new Date().toISOString().split("T")[0]);
+      setDataChegadaInput(hojeISO());
       const compra = compras.find((c) => c.id === id);
+      setCriacaoChegadaInput(compra?.dt_criacao_rc?.slice(0, 10) ?? "");
+      setEditarCriacaoChegada(!compra?.dt_criacao_rc);
       setChegadaQtdeRecebida(String(compra?.qtde_rc || 1));
       setChegadaValorUnitario("");
       return;
@@ -750,21 +944,38 @@ function EstoquePage() {
   };
 
   const confirmarChegada = async () => {
-    if (!dialogDataChegada) return;
+    if (!dialogDataChegada || salvandoChegada || !permissoes.gerenciarCompras || !user) return;
     const compra = compras.find((c) => c.id === dialogDataChegada);
+    if (!compra) return;
+    if (erroChegada || !dataChegadaInput) {
+      toast.error(erroChegada || "Informe a data de chegada.");
+      return;
+    }
     const qtdeRecebida = parseFloat(chegadaQtdeRecebida) || compra?.qtde_rc || 1;
     const valorUnitario = parseFloat(chegadaValorUnitario) || 0;
     const valorTotal = valorUnitario * qtdeRecebida;
 
-    const { error } = await supabase
-      .from("compras")
-      .update({
-        chegou: true,
-        data_chegou: dataChegadaInput || null,
-        valor_unitario: valorUnitario || null,
-        valor_total: valorTotal || null,
-      })
-      .eq("id", dialogDataChegada);
+    const alterouCriacao = (compra.dt_criacao_rc?.slice(0, 10) ?? "") !== criacaoChegadaInput;
+    const patch: Partial<Compra> = {
+      chegou: true,
+      data_chegou: dataChegadaInput,
+      valor_unitario: valorUnitario || null,
+      valor_total: valorTotal || null,
+      ...(alterouCriacao
+        ? {
+            dt_criacao_rc: criacaoChegadaInput || null,
+            data_criacao_origem: criacaoChegadaInput ? ("manual" as const) : null,
+            data_criacao_editada_por: criacaoChegadaInput ? user.id : null,
+            data_criacao_editada_por_nome: criacaoChegadaInput
+              ? (profile?.nome_completo ?? null)
+              : null,
+            data_criacao_editada_em: criacaoChegadaInput ? new Date().toISOString() : null,
+          }
+        : {}),
+    };
+    setSalvandoChegada(true);
+    const { error } = await supabase.from("compras").update(patch).eq("id", dialogDataChegada);
+    setSalvandoChegada(false);
     if (error) {
       toast.error("Erro: " + error.message);
       return;
@@ -775,10 +986,7 @@ function EstoquePage() {
         c.id === dialogDataChegada
           ? {
               ...c,
-              chegou: true,
-              data_chegou: dataChegadaInput || null,
-              valor_unitario: valorUnitario || null,
-              valor_total: valorTotal || null,
+              ...patch,
             }
           : c,
       ),
@@ -1121,6 +1329,22 @@ function EstoquePage() {
     }
     let importados = 0;
     let ignorados = 0;
+    let datasPreservadas = 0;
+    // Leitura fresca e paginada: proteção não depende do estado antigo da tela.
+    const existentes = new Map<string, Compra>();
+    for (let inicio = 0; ; inicio += 1000) {
+      const { data, error } = await supabase
+        .from("compras")
+        .select("*")
+        .order("id")
+        .range(inicio, inicio + 999);
+      if (error) {
+        toast.error("Não foi possível conferir datas manuais. Importação cancelada.");
+        return;
+      }
+      for (const c of (data ?? []) as Compra[]) existentes.set(`${c.requisicao}:${c.item_rc}`, c);
+      if (!data || data.length < 1000) break;
+    }
     for (const linha of rows) {
       const d = normalizarLinha(headers, linha, ALIASES_IMPORT_COMPRAS);
       const requisicao = Number(d.requisicao) || null;
@@ -1170,14 +1394,19 @@ function EstoquePage() {
       bool("rc_em_fila");
       bool("afeta_saldo");
 
+      const preservada = preservarDataRcImportada(row, existentes.get(`${requisicao}:${item_rc}`));
+
       const { error } = await supabase.from("compras").upsert(row, {
         onConflict: "requisicao,item_rc",
       });
-      if (!error) importados++;
-      else ignorados++;
+      if (!error) {
+        importados++;
+        if (preservada) datasPreservadas++;
+      } else ignorados++;
     }
     toast.success(
       `${importados} pedidos importados/atualizados com sucesso!` +
+        ` ${datasPreservadas} datas manuais preservadas.` +
         (ignorados > 0 ? ` ${ignorados} linha(s) ignorada(s) (sem requisição/item válidos).` : ""),
     );
     await carregarDados();
@@ -3554,6 +3783,20 @@ function EstoquePage() {
               <Upload className="h-4 w-4" /> Atualizar Pedidos
             </button>
           )}
+          {aba === "compras" && (
+            <button
+              onClick={exportarComprasXlsx}
+              disabled={exportandoCompras}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              {exportandoCompras ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {exportandoCompras ? "Exportando..." : "Exportar"}
+            </button>
+          )}
           {aba !== "estoque_sap" && (
             <button
               onClick={carregarDados}
@@ -4358,23 +4601,14 @@ function EstoquePage() {
               </thead>
               <tbody>
                 {comprasFiltradas.map((c) => {
-                  const diasAberto = c.dt_criacao_rc
-                    ? c.chegou && c.data_chegou
-                      ? Math.floor(
-                          (new Date(c.data_chegou).getTime() -
-                            new Date(c.dt_criacao_rc).getTime()) /
-                            86400000,
-                        )
-                      : Math.floor((Date.now() - new Date(c.dt_criacao_rc).getTime()) / 86400000)
-                    : null;
+                  const diasAberto = diasEntre(
+                    c.dt_criacao_rc,
+                    c.chegou && c.data_chegou ? c.data_chegou : hojeISO(),
+                  );
 
                   const diasParaRetirar =
                     c.chegou && c.data_chegou && c.foi_retirado && c.data_retirado
-                      ? Math.floor(
-                          (new Date(c.data_retirado).getTime() -
-                            new Date(c.data_chegou).getTime()) /
-                            86400000,
-                        )
+                      ? diasEntre(c.data_chegou, c.data_retirado)
                       : null;
                   const editando = editandoCompraId === c.id;
                   return (
@@ -4528,11 +4762,12 @@ function EstoquePage() {
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <div className="flex flex-col items-end gap-0.5">
-                          {c.dt_criacao_rc && (
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                              {c.dt_criacao_rc}
-                            </span>
-                          )}
+                          <DataRcCell
+                            compra={c}
+                            itensNaRc={itensNaRc(c)}
+                            podeEditar={permissoes.gerenciarCompras}
+                            onSalvar={salvarDataRc}
+                          />
                           {diasAberto !== null ? (
                             <span
                               className={
@@ -4674,7 +4909,15 @@ function EstoquePage() {
               <LabelValor label="Comprador" valor={dialogDetalheCompra.comprador_cotacao} />
               <LabelValor label="Solicitante" valor={dialogDetalheCompra.solicitante} />
               <LabelValor label="Previsão de uso" valor={dialogDetalheCompra.previsao_uso} />
-              <LabelValor label="Dt. criação RC" valor={dialogDetalheCompra.dt_criacao_rc} />
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Dt. criação RC</span>
+                <DataRcCell
+                  compra={dialogDetalheCompra}
+                  itensNaRc={itensNaRc(dialogDetalheCompra)}
+                  podeEditar={permissoes.gerenciarCompras}
+                  onSalvar={salvarDataRc}
+                />
+              </div>
               <LabelValor label="Dt. aprovação RC" valor={dialogDetalheCompra.dt_aprovacao_rc} />
               <LabelValor
                 label="Dt. criação pedido"
@@ -4825,13 +5068,45 @@ function EstoquePage() {
                 className="min-h-11 rounded-md border border-slate-300 px-2 text-[14px] shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
               />
             </label>
-            <button
+            <div className="grid gap-1">
+              <label className="text-xs font-semibold text-foreground" htmlFor="criacao-rc-chegada">
+                Data de criação da RC
+              </label>
+              {editarCriacaoChegada ? (
+                <Input
+                  id="criacao-rc-chegada"
+                  type="date"
+                  max={hojeISO()}
+                  value={criacaoChegadaInput}
+                  onChange={(e) => setCriacaoChegadaInput(e.target.value)}
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span>{formatarDataPura(criacaoChegadaInput)}</span>
+                  <Button variant="ghost" size="sm" onClick={() => setEditarCriacaoChegada(true)}>
+                    Alterar
+                  </Button>
+                </div>
+              )}
+              {erroChegada ? (
+                <p className="text-xs text-destructive">{erroChegada}</p>
+              ) : tempoChegada !== null ? (
+                <p className="text-xs text-muted-foreground">
+                  Tempo até a chegada: {tempoChegada} dias
+                </p>
+              ) : null}
+            </div>
+            <Button
               onClick={confirmarChegada}
-              disabled={!chegadaValorUnitario.trim()}
-              className="rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#1f7ad6] disabled:opacity-50"
+              disabled={
+                salvandoChegada ||
+                !chegadaValorUnitario.trim() ||
+                !dataChegadaInput ||
+                !!erroChegada
+              }
             >
               Confirmar Chegada
-            </button>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -5185,9 +5460,12 @@ function EstoquePage() {
                             <Edit3 className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        <span className="text-xs text-slate-400 dark:text-slate-500">
-                          {c.dt_criacao_rc || "—"}
-                        </span>
+                        <DataRcCell
+                          compra={c}
+                          itensNaRc={itensNaRc(c)}
+                          podeEditar={permissoes.gerenciarCompras}
+                          onSalvar={salvarDataRc}
+                        />
                         {permissoes.gerenciarFila ? (
                           <span
                             onClick={handleBadgeClick}
