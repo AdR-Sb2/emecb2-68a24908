@@ -683,8 +683,8 @@ function Index() {
         <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-4 pb-7 pt-6 sm:px-7 sm:pt-7 lg:px-8 lg:pt-7">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
           <section className="relative mb-6 flex min-h-[150px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:px-9">
-            <img aria-hidden="true" src="https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=1800&q=90" alt="" className="pointer-events-none absolute inset-y-0 right-0 h-full w-[62%] object-cover object-center opacity-90" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#062955] via-[#0b4b91]/95 via-48% to-[#0b4b91]/10" />
+            <img aria-hidden="true" src="https://assets.website-files.com/601431572b2178db2d32c0f9/614d24b0dea064b511734405_IMG_0620_reduced-p-3200.jpeg" alt="" className="pointer-events-none absolute inset-y-0 right-0 h-full w-[68%] object-cover object-center opacity-100 saturate-125" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#062955] via-[#0b4b91]/78 via-42% to-[#0b4b91]/5" />
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
             <svg
