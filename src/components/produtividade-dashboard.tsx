@@ -554,6 +554,31 @@ function calcularMetricas(osList: OsAgrupada[], tecnicoId?: number): Metricas {
   return m;
 }
 
+
+/** Usa exatamente a apuração do Dashboard para o KPI de O.S. executadas no período. */
+export function contarOsExecutadasNoPeriodo(
+  dias: FieldDia[],
+  atividades: FieldAtividade[],
+  equipes: FieldEquipe[],
+  aliasesEquipes: Parameters<typeof equipeChaveFinal>[1],
+  aliasesIntegrantes: Parameters<typeof equipeChaveFinal>[2],
+): number {
+  const diaPorId = new Map(dias.map((dia) => [dia.id, dia]));
+  const datasPeriodo = new Set(dias.map((dia) => dia.data));
+  const atividadesPeriodo = atividades.filter((atividade) => {
+    const dia = diaPorId.get(atividade.dia_id);
+    return !!dia && datasPeriodo.has(dia.data);
+  });
+  const osPeriodo = agruparAtividades(
+    atividadesPeriodo,
+    diaPorId,
+    equipes,
+    aliasesEquipes,
+    aliasesIntegrantes,
+  );
+  return calcularMetricas(osPeriodo).osExec;
+}
+
 // ─── Linhas de ranking ────────────────────────────────────────
 
 export type LinhaEquipe = {
