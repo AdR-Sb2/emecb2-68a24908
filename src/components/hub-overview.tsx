@@ -144,7 +144,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
       viewBox="0 0 100 36"
       preserveAspectRatio="none"
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-4 bottom-8 h-10 w-[calc(100%-2rem)] opacity-45"
+      className="pointer-events-none block h-full w-full opacity-70"
     >
       <polyline
         fill="none"
@@ -233,9 +233,11 @@ function KpiCard({
             )}
           </div>
           {kpi.delta !== null && kpi.note && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{kpi.note}</p>
+            <p className="mt-1 line-clamp-2 min-h-8 max-h-8 overflow-hidden text-xs leading-4 text-slate-500 dark:text-slate-400">{kpi.note}</p>
           )}
-          <Sparkline values={kpi.trend} color={alert ? "#f97316" : "#1f7ad8"} />
+          <div className="mt-2 h-9 w-full shrink-0 overflow-hidden rounded-md bg-slate-50/70 px-1 dark:bg-slate-800/40">
+            <Sparkline values={kpi.trend} color={alert ? "#f97316" : "#1f7ad8"} />
+          </div>
           <Link
             to={href}
             className="relative z-[1] mt-auto inline-flex w-full items-center justify-end gap-1 border-t border-slate-100 pt-3 text-xs font-semibold text-[#1768c4] transition-colors hover:text-[#0b3a73] dark:border-slate-800 dark:text-blue-300"

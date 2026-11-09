@@ -66,6 +66,7 @@ function Index() {
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
   const [fichaChoiceOpen, setFichaChoiceOpen] = useState(false);
+  const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
   const [busca, setBusca] = useState("");
   const [buscaRemota, setBuscaRemota] = useState("");
@@ -381,6 +382,10 @@ function Index() {
   const categoriasVisiveis = categorias.filter((category) =>
     ferramentasVisiveis.some((tool) => tool.categoria === category.id),
   );
+  const categoriaSelecionada = categorias.find((category) => category.id === categoryChoice);
+  const ferramentasCategoriaSelecionada = categoryChoice
+    ? ferramentasVisiveis.filter((tool) => tool.categoria === categoryChoice)
+    : [];
   const renderTool = (tool: (typeof ferramentas)[number]) => {
     const Icon = tool.icon;
     const content = (
@@ -431,7 +436,8 @@ function Index() {
     .toLocaleUpperCase("pt-BR");
 
   const renderCategoryCard = (category: (typeof categorias)[number]) => {
-    const firstTool = ferramentasVisiveis.find((tool) => tool.categoria === category.id);
+    const categoryTools = ferramentasVisiveis.filter((tool) => tool.categoria === category.id);
+    const firstTool = categoryTools[0];
     if (!firstTool) return null;
     const Icon = category.icon;
     const cardClass =
@@ -454,24 +460,29 @@ function Index() {
         <span className="relative z-10 min-w-0 flex-1">
           <span className="block text-base font-bold text-[#102f5c] dark:text-white">{category.nome}</span>
           <span className="mt-1 block text-sm leading-5 text-slate-600 dark:text-slate-300">{category.descricao}</span>
-          <span className="mt-2 block text-xs font-semibold text-[#45658e] dark:text-blue-300">Começar por: {firstTool.nome}</span>
+          <span className="mt-2 block text-xs font-semibold text-[#45658e] dark:text-blue-300">{categoryTools.length > 1 ? `${categoryTools.length} ferramentas disponíveis · clique para escolher` : `Começar por: ${firstTool.nome}`}</span>
         </span>
         <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[#1768c4] shadow-sm ring-1 ring-blue-100 transition group-hover:translate-x-1 dark:bg-slate-800">
           <ArrowRight className="h-4 w-4" />
         </span>
       </>
     );
-    if (firstTool.onClick) {
+    if (categoryTools.length > 1 || firstTool.onClick) {
       return (
         <button
           key={category.id}
           id={`categoria-${category.id}`}
           type="button"
           onClick={() => {
-            firstTool.onClick?.();
             setBusca("");
+            if (categoryTools.length > 1) {
+              setCategoryChoice(category.id);
+            } else {
+              firstTool.onClick?.();
+            }
           }}
           className={cardClass}
+          aria-haspopup={categoryTools.length > 1 ? "dialog" : undefined}
         >
           {content}
         </button>
@@ -775,6 +786,78 @@ function Index() {
           </footer>
         </main>
       </div>
+
+      {/* ===== DIALOG: FERRAMENTAS DA CATEGORIA ===== */}
+      <Dialog open={!!categoryChoice} onOpenChange={(open) => !open && setCategoryChoice(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-3xl border border-slate-200/80 bg-white p-0 shadow-[0_28px_90px_-28px_rgba(5,35,75,0.45)] dark:border-slate-700 dark:bg-slate-900 sm:max-w-xl">
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#082b55] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white sm:px-7">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full border-[28px] border-white/10" />
+            <div className="relative flex items-center gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20">
+                {categoriaSelecionada && (() => {
+                  const CategoryIcon = categoriaSelecionada.icon;
+                  return <CategoryIcon className="h-6 w-6" />;
+                })()}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">Hub Operacional</p>
+                <DialogTitle className="mt-1 text-xl font-bold text-white">
+                  {categoriaSelecionada?.nome || "Escolha uma ferramenta"}
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-sm text-blue-100">
+                  Selecione qual ferramenta deseja acessar.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-3 p-5 sm:p-6">
+            {ferramentasCategoriaSelecionada.map((tool) => {
+              const ToolIcon = tool.icon;
+              const optionClass = "group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-blue-500 dark:hover:bg-slate-700";
+              const optionContent = (
+                <>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1768c4] ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900">
+                    <ToolIcon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-[#123763] dark:text-white">{tool.nome}</span>
+                    <span className="mt-0.5 block text-sm leading-5 text-slate-500 dark:text-slate-400">{tool.descricao}</span>
+                  </span>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[#1768c4] transition group-hover:translate-x-0.5 dark:bg-slate-700 dark:text-blue-300">
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </>
+              );
+              return tool.onClick ? (
+                <button
+                  key={tool.key}
+                  type="button"
+                  className={optionClass}
+                  onClick={() => {
+                    setCategoryChoice(null);
+                    setBusca("");
+                    tool.onClick?.();
+                  }}
+                >
+                  {optionContent}
+                </button>
+              ) : (
+                <Link
+                  key={tool.key}
+                  to={tool.to || "/"}
+                  className={optionClass}
+                  onClick={() => {
+                    setCategoryChoice(null);
+                    setBusca("");
+                  }}
+                >
+                  {optionContent}
+                </Link>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== DIALOG: DASHBOARDS ===== */}
       <Dialog open={dashOpen} onOpenChange={setDashOpen}>
