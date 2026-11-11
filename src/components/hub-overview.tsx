@@ -451,33 +451,32 @@ export function HubOverview({
         update("produtividade", { value: null, delta: null, trend: [], note });
         return;
       }
-      const dayIds = days.map((row) => row.id);
       const activities: Array<{
         dia_id: number;
         id_recurso: number | null;
         ordem_manutencao: number | null;
         status: string | null;
       }> = [];
-      for (let offset = 0; offset < dayIds.length; offset += 200) {
-        const ids = dayIds.slice(offset, offset + 200);
-        let from = 0;
-        for (;;) {
-          const { data, error } = await supabase
-            .from("field_atividades")
-            .select("dia_id,id_recurso,ordem_manutencao,status")
-            .in("dia_id", ids)
-            .order("id")
-            .range(from, from + 999);
-          if (error) {
-            update("executadas", { value: null, delta: null, trend: [] }, error);
-            update("produtividade", { value: null, delta: null, trend: [] }, error);
-            return;
-          }
-          if (!data?.length) break;
-          activities.push(...data);
-          if (data.length < 1000) break;
-          from += 1000;
+      let from = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from("field_atividades")
+          .select("dia_id,id_recurso,ordem_manutencao,status,field_dias!inner(data)")
+          .gte("field_dias.data", dataISO(previousStart))
+          .lte("field_dias.data", todayIso)
+          .order("id")
+          .range(from, from + 999);
+        if (error) {
+          update("executadas", { value: null, delta: null, trend: [] }, error);
+          update("produtividade", { value: null, delta: null, trend: [] }, error);
+          return;
         }
+        if (!data?.length) break;
+        activities.push(
+          ...data.map(({ field_dias: _dia, ...atividade }) => atividade as (typeof activities)[number]),
+        );
+        if (data.length < 1000) break;
+        from += 1000;
       }
       const dayById = new Map(days.map((day) => [day.id, day.data]));
       const completedByDate = new Map<string, Set<number>>();

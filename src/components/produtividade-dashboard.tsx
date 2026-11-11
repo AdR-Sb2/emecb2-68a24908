@@ -707,6 +707,7 @@ export function DashboardComparacao({
               .from(tabela)
               .select("*")
               .in("dia_id", diaIds)
+              .order("id")
               .range(inicio, inicio + pagina - 1);
             if (error) break;
             if (!data || data.length === 0) break;
@@ -716,8 +717,33 @@ export function DashboardComparacao({
           }
           return linhas;
         };
+        const buscarAtividades = async (): Promise<FieldAtividade[]> => {
+          const linhas: FieldAtividade[] = [];
+          let inicio = 0;
+          for (;;) {
+            const { data, error } = await supabase
+              .from("field_atividades")
+              .select(
+                "id,dia_id,id_recurso,ordem_manutencao,status,tipo_atividade,texto_breve,planta,area_trabalho,inicio,fim,duracao_min,field_dias!inner(data)",
+              )
+              .gte("field_dias.data", inicioJanela)
+              .lte("field_dias.data", fimJanela)
+              .order("id")
+              .range(inicio, inicio + 999);
+            if (error) break;
+            if (!data || data.length === 0) break;
+            linhas.push(
+              ...data.map(
+                ({ field_dias: _dia, ...atividade }) => atividade as unknown as FieldAtividade,
+              ),
+            );
+            if (data.length < 1000) break;
+            inicio += 1000;
+          }
+          return linhas;
+        };
         const [ativs, eqs] = await Promise.all([
-          buscarTudo<FieldAtividade>("field_atividades"),
+          buscarAtividades(),
           buscarTudo<FieldEquipe>("field_equipes"),
         ]);
         if (!ativo) return;
