@@ -23,6 +23,8 @@ import {
   BarChart3,
   ChevronDown,
   Cog,
+  Globe2,
+  ExternalLink,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -58,6 +60,8 @@ type Painel = {
   icone: string;
 };
 
+type PublicLink = { key: string; nome: string; descricao: string; url: string };
+
 function Index() {
   const navigate = useNavigate();
   const { user, profile, loading, signOut } = useAuth();
@@ -66,6 +70,8 @@ function Index() {
   const [dashOpen, setDashOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
   const [fichaChoiceOpen, setFichaChoiceOpen] = useState(false);
+  const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
+  const [publicLinks, setPublicLinks] = useState<PublicLink[]>([]);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
   const [busca, setBusca] = useState("");
   const [buscaRemota, setBuscaRemota] = useState("");
@@ -170,6 +176,77 @@ function Index() {
   }, [user, profile, loading, navigate]);
 
   useEffect(() => {
+    let active = true;
+    const loadPublicLinks = async () => {
+      const [fieldConfig, elevatoriaConfig, cronogramas] = await Promise.all([
+        supabase
+          .from("field_config")
+          .select("link_publico_token,backlog_link_publico_token")
+          .eq("id", 1)
+          .maybeSingle(),
+        supabase
+          .from("elevatorias_config")
+          .select("link_publico_token")
+          .eq("id", 1)
+          .maybeSingle(),
+        supabase
+          .from("cronograma_projetos")
+          .select("id,nome,link_publico_token")
+          .eq("visibilidade", "publico")
+          .not("link_publico_token", "is", null)
+          .order("criado_em", { ascending: false }),
+      ]);
+      if (!active) return;
+      const origin = window.location.origin;
+      const links: PublicLink[] = [];
+      const backlogToken = fieldConfig.data?.backlog_link_publico_token;
+      const productivityToken = fieldConfig.data?.link_publico_token;
+      const elevatorToken = elevatoriaConfig.data?.link_publico_token;
+      if (backlogToken) {
+        links.push({
+          key: "public-backlog",
+          nome: "Backlog Público",
+          descricao: "Consulta pública das ordens de serviço do Backlog.",
+          url: `${origin}/backlog/publico/${backlogToken}`,
+        });
+      }
+      if (productivityToken) {
+        links.push({
+          key: "public-productivity",
+          nome: "Dashboard de Produtividade",
+          descricao: "Indicadores e acompanhamento da produtividade.",
+          url: `${origin}/produtividade/publico/${productivityToken}`,
+        });
+      }
+      if (elevatorToken) {
+        links.push({
+          key: "public-elevatorias",
+          nome: "Fichas das Elevatórias",
+          descricao: "Consulta pública das fichas técnicas das elevatórias.",
+          url: `${origin}/elevatorias/publico/${elevatorToken}`,
+        });
+      }
+      for (const project of cronogramas.data || []) {
+        if (!project.link_publico_token) continue;
+        links.push({
+          key: `public-cronograma-${project.id}`,
+          nome: `Cronograma · ${project.nome || "Projeto"}`,
+          descricao: "Acompanhamento público do cronograma do projeto.",
+          url: `${origin}/cronograma/publico/${project.link_publico_token}`,
+        });
+      }
+      setPublicLinks(links);
+    };
+    void loadPublicLinks().catch((error) => {
+      console.error("Erro ao carregar links públicos ativos do Hub:", error);
+      if (active) setPublicLinks([]);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!supabaseConfigSummary.isConfigured || !profile?.cargo_id) {
       setLoadingPaineis(false);
       return;
@@ -251,6 +328,13 @@ function Index() {
       descricao: "Gere relatórios e exporte dados.",
       icon: FileText,
       color: "bg-slate-100 text-[#245b8f]",
+    },
+    {
+      id: "links-publicos",
+      nome: "Links Públicos",
+      descricao: "Acesse os painéis e sistemas com compartilhamento público ativo.",
+      icon: Globe2,
+      color: "bg-slate-100 text-[#087e8b]",
     },
   ];
   const ferramentas = [
@@ -371,6 +455,15 @@ function Index() {
       visible: shouldShowRelatorio,
       to: "/relatorio",
     },
+    ...publicLinks.map((link) => ({
+      key: link.key,
+      nome: link.nome,
+      descricao: link.descricao,
+      categoria: "links-publicos",
+      icon: ExternalLink,
+      visible: true,
+      onClick: () => window.open(link.url, "_blank", "noopener,noreferrer"),
+    })),
   ];
   const ferramentasVisiveis = ferramentas.filter(
     (tool) =>
@@ -381,6 +474,10 @@ function Index() {
   const categoriasVisiveis = categorias.filter((category) =>
     ferramentasVisiveis.some((tool) => tool.categoria === category.id),
   );
+  const categoriaSelecionada = categorias.find((category) => category.id === categoryChoice);
+  const ferramentasCategoriaSelecionada = categoryChoice
+    ? ferramentasVisiveis.filter((tool) => tool.categoria === categoryChoice)
+    : [];
   const renderTool = (tool: (typeof ferramentas)[number]) => {
     const Icon = tool.icon;
     const content = (
@@ -431,43 +528,53 @@ function Index() {
     .toLocaleUpperCase("pt-BR");
 
   const renderCategoryCard = (category: (typeof categorias)[number]) => {
-    const firstTool = ferramentasVisiveis.find((tool) => tool.categoria === category.id);
+    const categoryTools = ferramentasVisiveis.filter((tool) => tool.categoria === category.id);
+    const firstTool = categoryTools[0];
     if (!firstTool) return null;
     const Icon = category.icon;
     const cardClass =
-      "group flex min-h-[112px] items-center gap-4 rounded-xl border border-[#e1e9f4] bg-white p-4 text-left shadow-sm transition hover:border-[#cbd7e6] hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800";
+      "group relative isolate flex min-h-[132px] items-center gap-4 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 text-left shadow-[0_5px_18px_-12px_rgba(15,45,85,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_28px_-14px_rgba(15,45,85,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245b8f] dark:border-slate-700 dark:bg-slate-900";
+    const categoryImages: Record<string, string> = {
+      operacao: "https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=900&q=85",
+      planejamento: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=85",
+      ativos: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=85",
+      documentacao: "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=900&q=85",
+      analises: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=85",
+      relatorios: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=85",
+    };
     const content = (
       <>
-        <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${category.color}`}
-        >
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[48%] bg-cover bg-center opacity-90 transition-transform duration-500 group-hover:scale-105" style={{ backgroundImage: `url("${categoryImages[category.id] || categoryImages.operacao}")` }} />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-white via-white/95 via-55% to-white/15 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900/25" />
+        <span className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-black/[0.03] ${category.color}`}>
           <Icon className="h-5 w-5" />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-base font-bold text-[#102f5c] dark:text-white">
-            {category.nome}
-          </span>
-          <span className="mt-1 block text-sm leading-5 text-slate-600 dark:text-slate-400">
-            {category.descricao}
-          </span>
-          <span className="mt-2 block text-xs font-semibold text-[#45658e] dark:text-blue-300">
-            Começar por: {firstTool.nome}
-          </span>
+        <span className="relative z-10 min-w-0 flex-1">
+          <span className="block text-base font-bold text-[#102f5c] dark:text-white">{category.nome}</span>
+          <span className="mt-1 block text-sm leading-5 text-slate-600 dark:text-slate-300">{category.descricao}</span>
+          <span className="mt-2 block text-xs font-semibold text-[#45658e] dark:text-blue-300">{categoryTools.length > 1 ? `${categoryTools.length} ferramentas disponíveis · clique para escolher` : `Começar por: ${firstTool.nome}`}</span>
         </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-[#45658e] transition group-hover:translate-x-1 dark:text-slate-300" />
+        <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[#1768c4] shadow-sm ring-1 ring-blue-100 transition group-hover:translate-x-1 dark:bg-slate-800">
+          <ArrowRight className="h-4 w-4" />
+        </span>
       </>
     );
-    if (firstTool.onClick) {
+    if (categoryTools.length > 1 || firstTool.onClick) {
       return (
         <button
           key={category.id}
           id={`categoria-${category.id}`}
           type="button"
           onClick={() => {
-            firstTool.onClick?.();
             setBusca("");
+            if (categoryTools.length > 1) {
+              setCategoryChoice(category.id);
+            } else {
+              firstTool.onClick?.();
+            }
           }}
           className={cardClass}
+          aria-haspopup={categoryTools.length > 1 ? "dialog" : undefined}
         >
           {content}
         </button>
@@ -487,8 +594,8 @@ function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f2f6fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-[68px] flex-col bg-gradient-to-b from-[#062955] to-[#041b3a] px-2 py-4 text-white shadow-xl lg:w-64 lg:px-4 lg:py-6">
+    <div id="hub-top" className="min-h-screen bg-[#f4f7fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[68px] flex-col sm:flex bg-gradient-to-b from-[#082b55] via-[#06264d] to-[#041b3a] px-2 py-4 text-white shadow-[8px_0_30px_-20px_rgba(3,20,45,0.65)] lg:w-64 lg:px-4 lg:py-6">
         <div className="mb-5 flex items-center justify-center lg:mb-8 lg:justify-start">
           <img
             src={logoHeader}
@@ -545,9 +652,36 @@ function Index() {
         </div>
       </aside>
 
-      <div className="ml-[68px] flex min-h-screen flex-col lg:ml-64">
-        <header className="sticky top-0 z-10 border-b border-[#d9e3f2] bg-white/90 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex w-full max-w-[1740px] flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-7 lg:px-9">
+      <nav
+        aria-label="Navegação rápida"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 overflow-x-auto border-t border-slate-200/90 bg-white/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-18px_rgba(15,45,85,0.4)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 sm:hidden"
+      >
+        <a
+          href="#hub-top"
+          className="flex min-w-[58px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-1 text-[10px] font-semibold text-[#245b8f] dark:text-blue-200"
+        >
+          <Home className="h-5 w-5" />
+          Início
+        </a>
+        {categoriasVisiveis.map((category) => {
+          const CategoryIcon = category.icon;
+          return (
+            <a
+              key={category.id}
+              href={`#categoria-${category.id}`}
+              title={category.nome}
+              className="flex min-w-[66px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-1 text-[10px] font-semibold text-slate-500 transition-colors hover:bg-blue-50 hover:text-[#245b8f] dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <CategoryIcon className="h-5 w-5" />
+              <span className="max-w-[72px] truncate">{category.nome}</span>
+            </a>
+          );
+        })}
+      </nav>
+
+      <div className="ml-0 flex min-h-screen flex-col pb-20 sm:ml-[68px] sm:pb-0 lg:ml-64">
+        <header className="sticky top-0 z-20 border-b border-[#d9e3f2]/80 bg-white/95 shadow-[0_4px_18px_-14px_rgba(12,44,82,0.32)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
+          <div className="mx-auto flex w-full max-w-none flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-7 lg:px-8">
             <div>
               <p className="text-lg font-bold tracking-tight text-[#0b2b55] dark:text-white sm:text-xl">
                 Hub Operacional
@@ -676,9 +810,11 @@ function Index() {
           </div>
         </header>
 
-        <main className="relative mx-auto flex w-full max-w-[1740px] flex-1 flex-col overflow-hidden px-4 pb-6 pt-5 sm:px-7 sm:pt-7 lg:px-9 lg:pt-8">
+        <main className="relative mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden px-3 pb-24 pt-4 sm:px-7 sm:pb-7 sm:pt-7 lg:px-8 lg:pt-7">
           <div className="pointer-events-none absolute bottom-0 right-0 h-56 w-[70%] rounded-tl-[100%] bg-gradient-to-tl from-[#dceaff] via-[#eaf2ff]/70 to-transparent dark:from-blue-950/30 dark:via-transparent" />
-          <section className="relative mb-5 flex min-h-[118px] items-center overflow-hidden rounded-2xl bg-gradient-to-r from-[#123455] via-[#214b70] to-[#39627a] px-5 py-5 text-white shadow-[0_12px_28px_-18px_rgba(16,54,102,0.55)] sm:px-8">
+          <section className="relative mb-5 flex min-h-[180px] items-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#062955] via-[#0b4b91] to-[#087eb2] px-4 py-5 text-white shadow-[0_18px_38px_-18px_rgba(0,45,116,0.72)] sm:mb-6 sm:min-h-[150px] sm:px-9 sm:py-6">
+            <img aria-hidden="true" src="https://assets.website-files.com/601431572b2178db2d32c0f9/614d24b0dea064b511734405_IMG_0620_reduced-p-3200.jpeg" alt="" className="pointer-events-none absolute inset-y-0 right-0 h-full w-full object-cover object-center opacity-75 saturate-125 sm:w-[68%] sm:opacity-100" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#062955]/55 via-[#0b4b91]/70 to-[#062955]/95 sm:bg-gradient-to-r sm:from-[#062955] sm:via-[#0b4b91]/78 sm:via-42% sm:to-[#0b4b91]/5" />
             <div className="pointer-events-none absolute -right-10 -top-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
             <div className="pointer-events-none absolute right-[18%] top-[-110px] h-72 w-72 rotate-45 rounded-[42px] bg-white/[0.045]" />
             <svg
@@ -736,13 +872,13 @@ function Index() {
                 </div>
               ) : (
                 <section className="mb-5">
-                  <div className="mb-3 flex items-center gap-3">
+                  <div className="mb-4 flex items-center gap-3">
                     <span className="h-7 w-1 rounded-full bg-[#45658e]" />
                     <h2 className="text-lg font-bold text-[#0b2b55] dark:text-white">
                       Ferramentas por Categoria
                     </h2>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                     {categoriasVisiveis.map(renderCategoryCard)}
                   </div>
                 </section>
@@ -769,6 +905,78 @@ function Index() {
           </footer>
         </main>
       </div>
+
+      {/* ===== DIALOG: FERRAMENTAS DA CATEGORIA ===== */}
+      <Dialog open={!!categoryChoice} onOpenChange={(open) => !open && setCategoryChoice(null)}>
+        <DialogContent className="w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-3xl border border-slate-200/80 bg-white p-0 shadow-[0_28px_90px_-28px_rgba(5,35,75,0.45)] dark:border-slate-700 dark:bg-slate-900 sm:max-h-[85vh] sm:w-full sm:max-w-xl">
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#082b55] via-[#0b4b91] to-[#087eb2] px-6 py-6 text-white sm:px-7">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full border-[28px] border-white/10" />
+            <div className="relative flex items-center gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20">
+                {categoriaSelecionada && (() => {
+                  const CategoryIcon = categoriaSelecionada.icon;
+                  return <CategoryIcon className="h-6 w-6" />;
+                })()}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">Hub Operacional</p>
+                <DialogTitle className="mt-1 text-xl font-bold text-white">
+                  {categoriaSelecionada?.nome || "Escolha uma ferramenta"}
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-sm text-blue-100">
+                  Selecione qual ferramenta deseja acessar.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-3 p-5 sm:p-6">
+            {ferramentasCategoriaSelecionada.map((tool) => {
+              const ToolIcon = tool.icon;
+              const optionClass = "group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/70 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-blue-500 dark:hover:bg-slate-700";
+              const optionContent = (
+                <>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1768c4] ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900">
+                    <ToolIcon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-[#123763] dark:text-white">{tool.nome}</span>
+                    <span className="mt-0.5 block text-sm leading-5 text-slate-500 dark:text-slate-400">{tool.descricao}</span>
+                  </span>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[#1768c4] transition group-hover:translate-x-0.5 dark:bg-slate-700 dark:text-blue-300">
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </>
+              );
+              return tool.onClick ? (
+                <button
+                  key={tool.key}
+                  type="button"
+                  className={optionClass}
+                  onClick={() => {
+                    setCategoryChoice(null);
+                    setBusca("");
+                    tool.onClick?.();
+                  }}
+                >
+                  {optionContent}
+                </button>
+              ) : (
+                <Link
+                  key={tool.key}
+                  to={tool.to || "/"}
+                  className={optionClass}
+                  onClick={() => {
+                    setCategoryChoice(null);
+                    setBusca("");
+                  }}
+                >
+                  {optionContent}
+                </Link>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== DIALOG: DASHBOARDS ===== */}
       <Dialog open={dashOpen} onOpenChange={setDashOpen}>

@@ -524,6 +524,31 @@ function calcularMetricas(osList: OsAgrupada[], tecnicoId?: number): Metricas {
   return m;
 }
 
+
+/** Usa exatamente a apuração do Dashboard para o KPI de O.S. executadas no período. */
+export function contarOsExecutadasNoPeriodo(
+  dias: FieldDia[],
+  atividades: FieldAtividade[],
+  equipes: FieldEquipe[],
+  aliasesEquipes: Parameters<typeof equipeChaveFinal>[1],
+  aliasesIntegrantes: Parameters<typeof equipeChaveFinal>[2],
+): number {
+  const diaPorId = new Map(dias.map((dia) => [dia.id, dia]));
+  const datasPeriodo = new Set(dias.map((dia) => dia.data));
+  const atividadesPeriodo = atividades.filter((atividade) => {
+    const dia = diaPorId.get(atividade.dia_id);
+    return !!dia && datasPeriodo.has(dia.data);
+  });
+  const osPeriodo = agruparAtividades(
+    atividadesPeriodo,
+    diaPorId,
+    equipes,
+    aliasesEquipes,
+    aliasesIntegrantes,
+  );
+  return calcularMetricas(osPeriodo).osExec;
+}
+
 // ─── Linhas de ranking ────────────────────────────────────────
 
 export type LinhaEquipe = {
@@ -565,9 +590,11 @@ type Alerta = { nivel: "ok" | "atencao" | "critico"; texto: string; detalhe: str
 
 export function DashboardComparacao({
   diaInicial,
+  periodoInicial,
   mostrarExportacao = false,
 }: {
   diaInicial?: string;
+  periodoInicial?: "mes";
   mostrarExportacao?: boolean;
 }) {
   const { user, profile } = useAuth();
@@ -581,7 +608,7 @@ export function DashboardComparacao({
   const [recursosList, setRecursosList] = useState<Array<{ id_recurso: number; nome: string }>>([]);
   const [todasDatas, setTodasDatas] = useState<string[]>([]);
   const [periodo, setPeriodo] = useState<Periodo>(() =>
-    diaInicial ? { type: "day", date: diaInicial } : { type: "7" },
+    periodoInicial === "mes" ? { type: "mes" } : diaInicial ? { type: "day", date: diaInicial } : { type: "7" },
   );
   const [filtroEquipe, setFiltroEquipe] = useState("");
   const [filtroTecnico, setFiltroTecnico] = useState("");
@@ -628,6 +655,10 @@ export function DashboardComparacao({
   useEffect(() => {
     if (diaInicial) setPeriodo({ type: "day", date: diaInicial });
   }, [diaInicial]);
+
+  useEffect(() => {
+    if (periodoInicial === "mes") setPeriodo({ type: "mes" });
+  }, [periodoInicial]);
 
   useEffect(() => {
     let ativo = true;

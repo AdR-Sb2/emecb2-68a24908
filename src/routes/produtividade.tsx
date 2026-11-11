@@ -2400,12 +2400,16 @@ function DayDetail({
 // ─── Main Page ────────────────────────────────────────────────
 
 function ProdutividadePage() {
+  const location = useLocation();
+  const abrirDashboardDoHub = new URLSearchParams(location.searchStr).get("aba") === "dashboard";
   const [dias, setDias] = useState<FieldDia[]>([]);
   const [recursos, setRecursos] = useState<FieldRecurso[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedDia, setSelectedDia] = useState<FieldDia | null>(null);
-  const [tab, setTab] = useState<"dias" | "dashboard">("dias");
+  const [tab, setTab] = useState<"dias" | "dashboard">(() =>
+    new URLSearchParams(location.searchStr).get("aba") === "dashboard" ? "dashboard" : "dias",
+  );
   const [gerenciarOpen, setGerenciarOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [recursosToSave, setRecursosToSave] = useState<Record<string, string>>({});
@@ -2750,7 +2754,7 @@ function ProdutividadePage() {
         </TabsContent>
 
         <TabsContent value="dashboard">
-          <DashboardComparacao mostrarExportacao />
+          <DashboardComparacao mostrarExportacao periodoInicial={abrirDashboardDoHub ? "mes" : undefined} />
         </TabsContent>
       </Tabs>
 
