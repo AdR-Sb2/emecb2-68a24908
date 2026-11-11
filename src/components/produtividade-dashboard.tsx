@@ -698,22 +698,24 @@ export function DashboardComparacao({
       setDias(diasData);
 
       if (diasData.length > 0) {
-        const diaIds = diasData.map((d) => d.id);
-        const buscarTudo = async <T,>(tabela: string, pagina = 1000): Promise<T[]> => {
-          const linhas: T[] = [];
+        const buscarEquipes = async (): Promise<FieldEquipe[]> => {
+          const linhas: FieldEquipe[] = [];
           let inicio = 0;
           for (;;) {
             const { data, error } = await supabase
-              .from(tabela)
-              .select("*")
-              .in("dia_id", diaIds)
+              .from("field_equipes")
+              .select("id,dia_id,nome_equipe,tecnicos,field_dias!inner(data)")
+              .gte("field_dias.data", inicioJanela)
+              .lte("field_dias.data", fimJanela)
               .order("id")
-              .range(inicio, inicio + pagina - 1);
+              .range(inicio, inicio + 999);
             if (error) break;
             if (!data || data.length === 0) break;
-            linhas.push(...(data as T[]));
-            if (data.length < pagina) break;
-            inicio += pagina;
+            linhas.push(
+              ...data.map(({ field_dias: _dia, ...equipe }) => equipe as unknown as FieldEquipe),
+            );
+            if (data.length < 1000) break;
+            inicio += 1000;
           }
           return linhas;
         };
@@ -742,10 +744,7 @@ export function DashboardComparacao({
           }
           return linhas;
         };
-        const [ativs, eqs] = await Promise.all([
-          buscarAtividades(),
-          buscarTudo<FieldEquipe>("field_equipes"),
-        ]);
+        const [ativs, eqs] = await Promise.all([buscarAtividades(), buscarEquipes()]);
         if (!ativo) return;
         setAtividades(ativs);
         setEquipes(eqs);

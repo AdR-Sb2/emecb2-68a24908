@@ -21,9 +21,11 @@ export function useTema() {
 export function TemaProvider({
   children,
   userId,
+  temaPreferido,
 }: {
   children: ReactNode;
   userId?: string | null;
+  temaPreferido?: string | null;
 }) {
   const [tema, setTema] = useState<Tema>(() => {
     if (typeof localStorage === "undefined") return "light";
@@ -36,21 +38,15 @@ export function TemaProvider({
     document.documentElement.classList.toggle("dark", tema === "dark");
   }, [tema]);
 
-  // Carrega preferência do usuário do banco
+  // Aplica a preferência já carregada no perfil do usuário
   useEffect(() => {
-    if (!userId) return;
-    (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("tema_preferido")
-        .eq("id", userId)
-        .single();
-      if (data?.tema_preferido && data.tema_preferido !== tema) {
-        setTema(data.tema_preferido as Tema);
-        localStorage.setItem("tema_preferido", data.tema_preferido);
-      }
-    })();
-  }, [userId]);
+    if (!temaPreferido) return;
+    setTema((atual) => {
+      if (temaPreferido === atual) return atual;
+      localStorage.setItem("tema_preferido", temaPreferido);
+      return temaPreferido as Tema;
+    });
+  }, [temaPreferido]);
 
   const alternarTema = useCallback(() => {
     setTema((prev) => {

@@ -12,6 +12,7 @@ export type Profile = {
   ultimo_acesso: string | null;
   cargo_nome?: string | null;
   tamanho_pagina_atendimentos?: number | null;
+  tema_preferido?: string | null;
 };
 
 type AuthContextType = {
@@ -41,9 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
   const profileRequestId = useRef(0);
+  const sessionResolvedRef = useRef(false);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = async (userId: string, authUser: User | null = null, attempt = 0) => {
     const requestId = ++profileRequestId.current;
+    lastFetchedUserIdRef.current = userId;
     setProfileLoading(true);
 
     if (!supabaseConfigSummary.isConfigured) {
@@ -76,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn("Não foi possível carregar o perfil:", error.message);
       }
 
-      if (attempt < 3) {
+      if (error && error.code !== "PGRST116" && attempt < 1) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         if (requestId !== profileRequestId.current) return;
         return fetchProfile(userId, authUser, attempt + 1);
@@ -167,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setProfileLoading(false);
       } finally {
+        sessionResolvedRef.current = true;
         setLoading(false);
       }
     };
@@ -179,8 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        fetchProfile(s.user.id, s.user);
+        if (sessionResolvedRef.current && s.user.id !== lastFetchedUserIdRef.current) {
+          fetchProfile(s.user.id, s.user);
+        }
       } else {
+        lastFetchedUserIdRef.current = null;
         setProfile(null);
         setProfileLoading(false);
       }
@@ -199,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     await supabase.auth.signOut();
+    lastFetchedUserIdRef.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);

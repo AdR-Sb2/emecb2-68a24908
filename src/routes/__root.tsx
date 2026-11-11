@@ -132,9 +132,9 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function ThemeInner() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   return (
-    <TemaProvider userId={user?.id}>
+    <TemaProvider userId={user?.id} temaPreferido={profile?.tema_preferido}>
       <Outlet />
       <div className="fixed bottom-4 right-4 z-50 sm:bottom-5 sm:right-5">
         <ThemeToggle />

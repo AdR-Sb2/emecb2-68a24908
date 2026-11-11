@@ -2025,7 +2025,10 @@ function DayDetail({
             "id,dia_id,id_recurso,id_atividade,ordem_manutencao,status,tipo_atividade,texto_breve,planta,area_trabalho,inicio,fim,duracao_min",
           )
           .eq("dia_id", dia.id),
-        supabase.from("field_equipes").select("*").eq("dia_id", dia.id),
+        supabase
+          .from("field_equipes")
+          .select("id,dia_id,nome_equipe,tecnicos")
+          .eq("dia_id", dia.id),
         supabase.from("field_justificativas").select("*").eq("dia_id", dia.id),
         supabase.from("elevatorias").select("planta, nome, latitude, longitude"),
         supabase

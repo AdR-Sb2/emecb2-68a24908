@@ -303,7 +303,6 @@ export function HubOverview({
       atrasadas: { ...EMPTY_KPI },
       estoque: { ...EMPTY_KPI },
     });
-    setAtividades(undefined);
     const update = (key: KpiKey, value: Omit<Kpi, "status">, error?: unknown) => {
       if (!active) return;
       if (error) {
@@ -473,7 +472,9 @@ export function HubOverview({
         }
         if (!data?.length) break;
         activities.push(
-          ...data.map(({ field_dias: _dia, ...atividade }) => atividade as (typeof activities)[number]),
+          ...data.map(
+            ({ field_dias: _dia, ...atividade }) => atividade as (typeof activities)[number],
+          ),
         );
         if (data.length < 1000) break;
         from += 1000;
@@ -518,32 +519,29 @@ export function HubOverview({
             : `Fonte: Produtividade · cargas no período: ${currentDays.length}/${daysBetween(monthStart, today).length} dias; mês anterior: ${previousDays.length}/${daysBetween(previousStart, previousEnd).length}.`,
       });
 
-      const currentDayIds = currentDays.map((day) => day.id);
       const teams: Array<{
         id: number;
         dia_id: number;
         nome_equipe: string;
         tecnicos: unknown;
       }> = [];
-      for (let offset = 0; offset < currentDayIds.length; offset += 200) {
-        const ids = currentDayIds.slice(offset, offset + 200);
-        let from = 0;
-        for (;;) {
-          const { data, error } = await supabase
-            .from("field_equipes")
-            .select("id,dia_id,nome_equipe,tecnicos")
-            .in("dia_id", ids)
-            .order("id")
-            .range(from, from + 999);
-          if (error) {
-            update("produtividade", { value: null, delta: null, trend: [] }, error);
-            return;
-          }
-          if (!data?.length) break;
-          teams.push(...data);
-          if (data.length < 1000) break;
-          from += 1000;
+      let teamsFrom = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from("field_equipes")
+          .select("id,dia_id,nome_equipe,tecnicos,field_dias!inner(data)")
+          .gte("field_dias.data", dataISO(monthStart))
+          .lte("field_dias.data", todayIso)
+          .order("id")
+          .range(teamsFrom, teamsFrom + 999);
+        if (error) {
+          update("produtividade", { value: null, delta: null, trend: [] }, error);
+          return;
         }
+        if (!data?.length) break;
+        teams.push(...data.map(({ field_dias: _dia, ...team }) => team as (typeof teams)[number]));
+        if (data.length < 1000) break;
+        teamsFrom += 1000;
       }
 
       const teamsByDay = new Map<string, { diaId: number; recursos: Set<number> }>();
@@ -676,11 +674,31 @@ export function HubOverview({
       });
     };
 
+    void loadOpenOsAndSla().catch((error: unknown) => {
+      onOpenCount?.(null);
+      update("abertas", { value: null, delta: null, trend: [] }, error);
+      update("atrasadas", { value: null, delta: null, trend: [] }, error);
+    });
+    void loadProductivity().catch((error: unknown) => {
+      update("executadas", { value: null, delta: null, trend: [] }, error);
+      update("produtividade", { value: null, delta: null, trend: [] }, error);
+    });
+    void loadInventory().catch((error: unknown) => {
+      update("estoque", { value: null, delta: null, trend: [] }, error);
+    });
+    return () => {
+      active = false;
+    };
+  }, [canViewInventory, canViewRecords, onOpenCount]);
+
+  useEffect(() => {
+    let active = true;
+    setAtividades(undefined);
+    if (!userId) {
+      setAtividades([]);
+      return;
+    }
     const loadActivities = async () => {
-      if (!userId) {
-        if (active) setAtividades([]);
-        return;
-      }
       const { data, error } = await supabase
         .from("notificacoes")
         .select("id,tipo,mensagem,criado_em")
@@ -695,19 +713,6 @@ export function HubOverview({
         setAtividades((data || []) as RecentActivity[]);
       }
     };
-
-    void loadOpenOsAndSla().catch((error: unknown) => {
-      onOpenCount?.(null);
-      update("abertas", { value: null, delta: null, trend: [] }, error);
-      update("atrasadas", { value: null, delta: null, trend: [] }, error);
-    });
-    void loadProductivity().catch((error: unknown) => {
-      update("executadas", { value: null, delta: null, trend: [] }, error);
-      update("produtividade", { value: null, delta: null, trend: [] }, error);
-    });
-    void loadInventory().catch((error: unknown) => {
-      update("estoque", { value: null, delta: null, trend: [] }, error);
-    });
     void loadActivities().catch((error: unknown) => {
       console.error("Erro ao consultar notificações recentes do HUB:", error);
       if (active) setAtividades(null);
@@ -715,7 +720,7 @@ export function HubOverview({
     return () => {
       active = false;
     };
-  }, [canViewInventory, canViewRecords, onOpenCount, userId]);
+  }, [userId]);
 
   return (
     <>
