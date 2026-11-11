@@ -1118,7 +1118,7 @@ function ElevatoriasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
+    <div translate="no" className="notranslate min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
       {/* Header */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
