@@ -397,7 +397,7 @@ export default function EquipamentosTab() {
   useEffect(() => {
     if (!profile?.cargo_id) return;
     (async () => {
-      const permsMap = await getPermissoesCargo(profile.cargo_id);
+      const permsMap = await getPermissoesCargo(profile.cargo_id, user?.id);
       setPerms({
         ver: temPermissao(permsMap, "estoque", "equipamentos_ver"),
         criar: temPermissao(permsMap, "estoque", "equipamentos_criar"),

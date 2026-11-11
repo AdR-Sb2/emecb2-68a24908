@@ -122,7 +122,7 @@ function PlanoManutencaoPage() {
     if (!profile?.cargo_id) return;
 
     const validarAcesso = async () => {
-      const permissoes = await getPermissoesCargo(profile.cargo_id);
+      const permissoes = await getPermissoesCargo(profile.cargo_id, user?.id);
       const podeVer =
         temPainel(permissoes, "plano_manutencao") ||
         temPainel(permissoes, "ficha_elevatoria") ||

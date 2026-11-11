@@ -203,7 +203,7 @@ function ManuaisPage() {
     (async () => {
       const { getPermissoesCargo, clearPermissoesCache } = await import("../lib/permissoes");
       clearPermissoesCache();
-      const perms = await getPermissoesCargo(profile.cargo_id);
+      const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
       setPermissoes(perms);
     })();
   }, [profile?.cargo_id]);

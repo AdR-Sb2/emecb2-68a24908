@@ -35,7 +35,7 @@ import {
 import logoHeader from "@/assets/logo-branca.png";
 import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
-import { getPermissoesCargo, temPermissao } from "../lib/permissoes";
+import { getCargoPaineis, getPermissoesCargo, temPermissao } from "../lib/permissoes";
 import { HubOverview, HubWelcome } from "@/components/hub-overview";
 
 export const Route = createFileRoute("/")({
@@ -175,20 +175,20 @@ function Index() {
       return;
     }
     (async () => {
-      const [panelsRes, perms] = await Promise.all([
-        supabase
-          .from("cargo_paineis")
-          .select("painel_id, paineis!inner(chave, nome_exibicao, descricao, icone)")
-          .eq("cargo_id", profile.cargo_id),
-        getPermissoesCargo(profile.cargo_id),
-      ]);
-      if (panelsRes.data) {
-        setPaineis(panelsRes.data.map((r: { paineis: unknown }) => r.paineis as unknown as Painel));
+      try {
+        const [panels, perms] = await Promise.all([
+          getCargoPaineis(profile.cargo_id, user?.id),
+          getPermissoesCargo(profile.cargo_id, user?.id),
+        ]);
+        setPaineis(panels.map((r) => r.paineis as unknown as Painel));
+        setPermissoes(perms);
+      } catch (error) {
+        console.warn("Não foi possível carregar os painéis do cargo:", error);
+      } finally {
+        setLoadingPaineis(false);
       }
-      setPermissoes(perms);
-      setLoadingPaineis(false);
     })();
-  }, [profile?.cargo_id]);
+  }, [profile?.cargo_id, user?.id]);
 
   if (loading) return null;
 

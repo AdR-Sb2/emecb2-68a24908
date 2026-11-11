@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 
 type PermissaoRow = {
@@ -7,48 +8,91 @@ type PermissaoRow = {
   is_generic: boolean;
 };
 
-const cache = new Map<string, Set<string> | null>();
+export type CargoPainelRow = {
+  painel_id: number;
+  paineis: {
+    chave: string;
+    nome_exibicao?: string | null;
+    descricao?: string | null;
+    icone?: string | null;
+  };
+};
 
-export async function getPermissoesCargo(
+const configClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: Infinity, retry: false } },
+});
+
+export const permissoesCargoQueryKey = (
+  userId: string | null | undefined,
   cargoId: number | null | undefined,
-): Promise<Map<string, Set<string>>> {
+) => ["cargo_panel_permissions", userId ?? null, cargoId ?? null] as const;
+
+export const cargoPaineisQueryKey = (
+  userId: string | null | undefined,
+  cargoId: number | null | undefined,
+) => ["cargo_paineis", userId ?? null, cargoId ?? null] as const;
+
+async function carregarPermissoes(cargoId: number): Promise<Map<string, Set<string>>> {
   const result = new Map<string, Set<string>>();
-  if (!cargoId) return result;
-
-  const cacheKey = `cargo_${cargoId}`;
-  if (cache.has(cacheKey)) {
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      for (const key of cached) {
-        const panelKey = key.split(".")[0];
-        if (!result.has(panelKey)) result.set(panelKey, new Set());
-        result.get(panelKey)!.add(key);
-      }
-    }
-    return result;
-  }
-
   const { data } = await supabase
     .from("cargo_panel_permissions")
     .select("permission_id, permissions!inner(key, label, panel_key, is_generic)")
     .eq("cargo_id", cargoId);
 
-  if (!data) {
-    cache.set(cacheKey, null);
-    return result;
-  }
+  if (!data) return result;
 
-  const keys = new Set<string>();
   for (const row of data) {
     const p = row.permissions as unknown as PermissaoRow;
-    keys.add(p.key);
     const panelKey = p.panel_key;
     if (!result.has(panelKey)) result.set(panelKey, new Set());
     result.get(panelKey)!.add(p.key);
   }
 
-  cache.set(cacheKey, keys);
   return result;
+}
+
+export async function getPermissoesCargo(
+  cargoId: number | null | undefined,
+  userId: string | null | undefined,
+): Promise<Map<string, Set<string>>> {
+  if (!cargoId) return new Map();
+  return configClient.fetchQuery({
+    queryKey: permissoesCargoQueryKey(userId, cargoId),
+    queryFn: () => carregarPermissoes(cargoId),
+    staleTime: Infinity,
+  });
+}
+
+export async function getCargoPaineis(
+  cargoId: number | null | undefined,
+  userId: string | null | undefined,
+): Promise<CargoPainelRow[]> {
+  if (!cargoId) return [];
+  return configClient.fetchQuery({
+    queryKey: cargoPaineisQueryKey(userId, cargoId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cargo_paineis")
+        .select("painel_id, paineis!inner(chave, nome_exibicao, descricao, icone)")
+        .eq("cargo_id", cargoId);
+      if (error) throw error;
+      return (data || []) as unknown as CargoPainelRow[];
+    },
+    staleTime: Infinity,
+  });
+}
+
+export async function cargoTemPainel(
+  cargoId: number | null | undefined,
+  userId: string | null | undefined,
+  chave: string,
+): Promise<boolean> {
+  try {
+    const paineis = await getCargoPaineis(cargoId, userId);
+    return paineis.some((p) => p.paineis?.chave === chave);
+  } catch {
+    return false;
+  }
 }
 
 export function temPermissao(
@@ -66,5 +110,5 @@ export function temPainel(permissoes: Map<string, Set<string>>, panelKey: string
 }
 
 export function clearPermissoesCache() {
-  cache.clear();
+  configClient.clear();
 }

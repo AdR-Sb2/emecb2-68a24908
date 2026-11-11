@@ -189,7 +189,7 @@ function CronogramaPage() {
       return;
     }
     (async () => {
-      const perms = await getPermissoesCargo(profile.cargo_id);
+      const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
       setPermissoes(perms);
       if (!temPainel(perms, "cronograma") && !temPermissao(perms, "cronograma", "ver")) {
         setLoadingProjetos(false);

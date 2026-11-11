@@ -16,7 +16,7 @@ import logoHeader from "@/assets/logo-branca.png";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
+import { cargoTemPainel, getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import {
   Dialog,
   DialogContent,
@@ -77,19 +77,15 @@ function ProcedimentosPage() {
           navigate({ to: "/", replace: true });
           return;
         }
-        const { data: panelData } = await supabase
-          .from("cargo_paineis")
-          .select("paineis!inner(chave)")
-          .eq("cargo_id", profile.cargo_id)
-          .eq("paineis.chave", "procedimentos")
-          .maybeSingle();
-        if (!panelData) {
+        const [autorizado, perms] = await Promise.all([
+          cargoTemPainel(profile.cargo_id, user?.id, "procedimentos"),
+          getPermissoesCargo(profile.cargo_id, user?.id),
+        ]);
+        if (!autorizado) {
           toast.error("Acesso não autorizado ao painel de Procedimentos");
           navigate({ to: "/", replace: true });
           return;
         }
-
-        const perms = await getPermissoesCargo(profile.cargo_id);
         const ver = temPermissao(perms, "procedimentos", "ver");
         const gerenciar = temPermissao(perms, "procedimentos", "gerenciar");
         setPodeVer(ver);

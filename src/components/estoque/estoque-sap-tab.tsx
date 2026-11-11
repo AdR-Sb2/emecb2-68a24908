@@ -258,7 +258,7 @@ export default function EstoqueSapTab() {
         ativo = false;
       };
     }
-    getPermissoesCargo(profile.cargo_id)
+    getPermissoesCargo(profile.cargo_id, user?.id)
       .then((perms) => {
         if (!ativo) return;
         setPermissoes({

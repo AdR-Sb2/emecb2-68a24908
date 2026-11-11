@@ -24,6 +24,7 @@ import {
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
+import { cargoTemPainel } from "../lib/permissoes";
 import logoHeader from "@/assets/logo-branca.png";
 
 export const Route = createFileRoute("/escala")({
@@ -148,13 +149,8 @@ function EscalaPage() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("cargo_paineis")
-        .select("painel_id, paineis!inner(chave)")
-        .eq("cargo_id", profile.cargo_id)
-        .eq("paineis.chave", "escala_trabalho")
-        .maybeSingle();
-      if (!data) {
+      const autorizado = await cargoTemPainel(profile.cargo_id, user?.id, "escala_trabalho");
+      if (!autorizado) {
         navigate({ to: "/", replace: true });
         return;
       }
@@ -1177,7 +1173,8 @@ function EscalaPage() {
                 onClick={() => setSemanaOffset((p) => p - 1)}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:px-4"
               >
-                <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Semana anterior</span>
+                <ChevronLeft className="h-4 w-4" />{" "}
+                <span className="hidden sm:inline">Semana anterior</span>
               </button>
               <span className="text-center text-xs font-bold text-[#0b3a73] dark:text-white sm:text-sm">
                 {diasSemana[0].toLocaleDateString("pt-BR")} —{" "}
@@ -1187,7 +1184,8 @@ function EscalaPage() {
                 onClick={() => setSemanaOffset((p) => p + 1)}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:px-4"
               >
-                <span className="hidden sm:inline">Próxima semana</span> <ChevronRight className="h-4 w-4" />
+                <span className="hidden sm:inline">Próxima semana</span>{" "}
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 

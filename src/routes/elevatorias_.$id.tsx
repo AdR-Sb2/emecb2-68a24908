@@ -27,7 +27,7 @@ import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui/badge";
 import { ListaRegistros } from "@/components/registros/ListaRegistros";
 import type { PermissoesRegistros } from "@/lib/registros-permissoes";
-import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
+import { cargoTemPainel, getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import type {
   Elevatoria,
   ElevatoriaEquipamento,
@@ -263,19 +263,14 @@ function ElevatoriaFichaPage() {
     if (!profile?.cargo_id || !elevId) return;
     const init = async () => {
       try {
-        const { data: panelData } = await supabase
-          .from("cargo_paineis")
-          .select("paineis!inner(chave)")
-          .eq("cargo_id", profile.cargo_id)
-          .eq("paineis.chave", "ficha_elevatoria")
-          .maybeSingle();
-        if (!panelData) {
+        const autorizado = await cargoTemPainel(profile.cargo_id, user?.id, "ficha_elevatoria");
+        if (!autorizado) {
           toast.error("Acesso não autorizado ao painel Ficha da Elevatória");
           navigate({ to: "/", replace: true });
           return;
         }
 
-        const perms = await getPermissoesCargo(profile.cargo_id);
+        const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
         setPermissoes({
           podeVer: temPermissao(perms, "ficha_elevatoria", "ver"),
           podeEditar: temPermissao(perms, "ficha_elevatoria", "editar"),

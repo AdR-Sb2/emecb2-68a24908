@@ -641,7 +641,7 @@ export function DashboardComparacao({
         ativo = false;
       };
     }
-    getPermissoesCargo(profile.cargo_id)
+    getPermissoesCargo(profile.cargo_id, user?.id)
       .then((permissoes) => {
         if (ativo) {
           setPodeUnificarEquipes(temPermissao(permissoes, "produtividade", "unificar_equipes"));

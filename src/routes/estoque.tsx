@@ -69,7 +69,12 @@ import {
   getCategoriaNome,
   StatusEstoque,
 } from "@/lib/estoque-types";
-import { getPermissoesCargo, temPermissao, clearPermissoesCache } from "@/lib/permissoes";
+import {
+  cargoTemPainel,
+  clearPermissoesCache,
+  getPermissoesCargo,
+  temPermissao,
+} from "@/lib/permissoes";
 import type { PermissoesEstoque } from "@/lib/estoque-permissoes";
 import {
   BarChart,
@@ -412,13 +417,8 @@ function EstoquePage() {
       return;
     }
     (async () => {
-      const { data } = await supabase
-        .from("cargo_paineis")
-        .select("paineis!inner(chave)")
-        .eq("cargo_id", profile.cargo_id)
-        .eq("paineis.chave", "estoque")
-        .maybeSingle();
-      if (!data) {
+      const autorizado = await cargoTemPainel(profile.cargo_id, user?.id, "estoque");
+      if (!autorizado) {
         navigate({ to: "/", replace: true });
         return;
       }
@@ -430,7 +430,7 @@ function EstoquePage() {
     if (!acessoVerificado || !profile?.cargo_id) return;
     setPermissoesLoading(true);
     (async () => {
-      const perms = await getPermissoesCargo(profile.cargo_id);
+      const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
       setPermissoes({
         acessarModulo: perms.has("estoque"),
         registrarEntrada: temPermissao(perms, "estoque", "registrar_entrada"),

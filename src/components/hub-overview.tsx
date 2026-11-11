@@ -17,6 +17,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { isOrdemServico } from "@/lib/produtividade-os";
+import { useProdutividadeConfig } from "@/lib/produtividade-config";
 import { supabase } from "@/lib/supabase";
 
 type KpiStatus = "loading" | "ready" | "error";
@@ -288,6 +289,11 @@ export function HubOverview({
   });
   const [atividades, setAtividades] = useState<RecentActivity[] | null | undefined>(undefined);
   const [now, setNow] = useState(() => Date.now());
+  const {
+    data: produtividadeConfig,
+    isLoading: configLoading,
+    isError: configError,
+  } = useProdutividadeConfig();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -295,6 +301,7 @@ export function HubOverview({
   }, []);
 
   useEffect(() => {
+    if (configLoading) return;
     let active = true;
     setKpis({
       executadas: { ...EMPTY_KPI },
@@ -601,17 +608,11 @@ export function HubOverview({
 
       const totalTeamOrders = [...dailyTeamCounts.values()].reduce((sum, day) => sum + day.os, 0);
       const monthKey = todayIso.slice(0, 7);
-      const { data: monthlyGoal, error: goalError } = await supabase
-        .from("field_metas_mensais")
-        .select("meta")
-        .eq("mes", monthKey)
-        .maybeSingle();
       let note = "Meta mensal não configurada.";
-      if (goalError) {
-        console.error("Erro ao consultar a meta mensal da Produtividade no Hub:", goalError);
+      if (configError) {
         note = "Meta mensal indisponível.";
       } else {
-        const goal = Number(monthlyGoal?.meta);
+        const goal = Number(produtividadeConfig?.metasMensais[monthKey] ?? 0);
         if (Number.isFinite(goal) && goal > 0) {
           const percentOfGoal = Math.round((currentCount / goal) * 100);
           note = `${percentOfGoal}% da meta mensal · ${pretty(currentCount)} de ${pretty(goal)} O.S.`;
@@ -689,7 +690,14 @@ export function HubOverview({
     return () => {
       active = false;
     };
-  }, [canViewInventory, canViewRecords, onOpenCount]);
+  }, [
+    canViewInventory,
+    canViewRecords,
+    onOpenCount,
+    configLoading,
+    configError,
+    produtividadeConfig,
+  ]);
 
   useEffect(() => {
     let active = true;

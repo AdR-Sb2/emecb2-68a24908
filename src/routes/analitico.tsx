@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { AnaliticoManutencao } from "@/components/analitico-manutencao";
-import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
+import { cargoTemPainel, getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 
 export const Route = createFileRoute("/analitico")({
   head: () => ({
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/analitico")({
 
 function AnaliticoPage() {
   const navigate = useNavigate();
-  const { profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [podeVer, setPodeVer] = useState(false);
 
@@ -30,18 +30,15 @@ function AnaliticoPage() {
           navigate({ to: "/", replace: true });
           return;
         }
-        const { data: panelData } = await supabase
-          .from("cargo_paineis")
-          .select("paineis!inner(chave)")
-          .eq("cargo_id", profile.cargo_id)
-          .eq("paineis.chave", "registros")
-          .maybeSingle();
-        if (!panelData) {
+        const [autorizado, perms] = await Promise.all([
+          cargoTemPainel(profile.cargo_id, user?.id, "registros"),
+          getPermissoesCargo(profile.cargo_id, user?.id),
+        ]);
+        if (!autorizado) {
           toast.error("Acesso não autorizado ao painel de Registros");
           navigate({ to: "/", replace: true });
           return;
         }
-        const perms = await getPermissoesCargo(profile.cargo_id);
         setPodeVer(temPermissao(perms, "registros", "visualizar"));
       } catch (err) {
         toast.error(

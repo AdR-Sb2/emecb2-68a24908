@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
+import { cargoTemPainel } from "../lib/permissoes";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
 
 export const Route = createFileRoute("/admin")({
@@ -105,13 +106,8 @@ function AdminPage() {
       navigate({ to: "/", replace: true });
       return;
     }
-    const { data } = await supabase
-      .from("cargo_paineis")
-      .select("painel_id, paineis!inner(chave)")
-      .eq("cargo_id", profile.cargo_id)
-      .eq("paineis.chave", "admin")
-      .maybeSingle();
-    if (!data) navigate({ to: "/", replace: true });
+    const autorizado = await cargoTemPainel(profile.cargo_id, user?.id, "admin");
+    if (!autorizado) navigate({ to: "/", replace: true });
     else loadData();
   };
 

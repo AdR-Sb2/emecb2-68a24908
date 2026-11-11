@@ -71,7 +71,7 @@ function AvaliacaoPage() {
     if (!profile?.cargo_id) return;
     (async () => {
       const { getPermissoesCargo } = await import("../lib/permissoes");
-      const perms = await getPermissoesCargo(profile.cargo_id);
+      const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
       if (!temPermissao(perms, "manuais", "editar_arquivo")) {
         navigate({ to: "/manuais", replace: true });
         return;

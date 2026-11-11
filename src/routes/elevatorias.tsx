@@ -29,7 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ListaRegistros } from "@/components/registros/ListaRegistros";
 import type { PermissoesRegistros } from "@/lib/registros-permissoes";
-import { getPermissoesCargo, temPermissao, temPainel } from "@/lib/permissoes";
+import { cargoTemPainel, getPermissoesCargo, temPermissao, temPainel } from "@/lib/permissoes";
 import type {
   Elevatoria,
   ElevatoriaEquipamento,
@@ -149,18 +149,13 @@ function ElevatoriasPage() {
   useEffect(() => {
     if (!profile?.cargo_id) return;
     const init = async () => {
-      const { data: panelData } = await supabase
-        .from("cargo_paineis")
-        .select("paineis!inner(chave)")
-        .eq("cargo_id", profile.cargo_id)
-        .eq("paineis.chave", "ficha_elevatoria")
-        .maybeSingle();
-      if (!panelData) {
+      const autorizado = await cargoTemPainel(profile.cargo_id, user?.id, "ficha_elevatoria");
+      if (!autorizado) {
         navigate({ to: "/", replace: true });
         return;
       }
 
-      const perms = await getPermissoesCargo(profile.cargo_id);
+      const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
       const podeVerRegistros = temPermissao(perms, "registros", "visualizar");
       const podeGerarLink = temPermissao(perms, "ficha_elevatoria", "gerar_link_publico");
       setPermissoes({
