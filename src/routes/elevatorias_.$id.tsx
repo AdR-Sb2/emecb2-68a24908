@@ -1,5 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useRef, useCallback, useContext, createContext } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  useContext,
+  createContext,
+} from "react";
 import {
   ArrowLeft,
   Loader2,
@@ -240,6 +248,7 @@ function ElevatoriaFichaPage() {
   const [salvando, setSalvando] = useState(false);
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const lastSavedNome = useRef<string>("");
+  const loadRequestId = useRef(0);
 
   const elevId = Number(id);
 
@@ -263,14 +272,16 @@ function ElevatoriaFichaPage() {
     if (!profile?.cargo_id || !elevId) return;
     const init = async () => {
       try {
-        const autorizado = await cargoTemPainel(profile.cargo_id, user?.id, "ficha_elevatoria");
+        const [autorizado, perms] = await Promise.all([
+          cargoTemPainel(profile.cargo_id, user?.id, "ficha_elevatoria"),
+          getPermissoesCargo(profile.cargo_id, user?.id),
+        ]);
         if (!autorizado) {
           toast.error("Acesso não autorizado ao painel Ficha da Elevatória");
           navigate({ to: "/", replace: true });
           return;
         }
 
-        const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
         setPermissoes({
           podeVer: temPermissao(perms, "ficha_elevatoria", "ver"),
           podeEditar: temPermissao(perms, "ficha_elevatoria", "editar"),
@@ -298,62 +309,58 @@ function ElevatoriaFichaPage() {
   }, [profile?.cargo_id, elevId]);
 
   const carregarTudo = async () => {
+    const requestId = ++loadRequestId.current;
+    const etapasPromise = supabase.from("elevatoria_implantacao_etapas").select("*").order("ordem");
+    const auditoriaPromise = supabase
+      .from("elevatoria_dados_mestres_auditoria")
+      .select("*, profiles:usuario_id(nome_completo)")
+      .eq("elevatoria_id", elevId)
+      .order("criado_em", { ascending: false })
+      .limit(200);
     setLoading(true);
     try {
-      const [
-        elevRes,
-        equipRes,
-        eletRes,
-        eletGeralRes,
-        hidrRes,
-        areaRes,
-        rolaRes,
-        impRes,
-        etapasRes,
-        audRes,
-        naRes,
-      ] = await Promise.all([
-        supabase.from("elevatorias").select("*").eq("id", elevId).single(),
-        supabase
-          .from("elevatoria_equipamento")
-          .select("*")
-          .eq("elevatoria_id", elevId)
-          .order("grupo"),
-        supabase.from("elevatoria_eletrica").select("*").eq("elevatoria_id", elevId).order("grupo"),
-        supabase
-          .from("elevatoria_eletrica_geral")
-          .select("*")
-          .eq("elevatoria_id", elevId)
-          .maybeSingle(),
-        supabase
-          .from("elevatoria_hidraulica")
-          .select("*")
-          .eq("elevatoria_id", elevId)
-          .maybeSingle(),
-        supabase
-          .from("elevatoria_area_influencia")
-          .select("*")
-          .eq("elevatoria_id", elevId)
-          .maybeSingle(),
-        supabase
-          .from("elevatoria_rolamentos_selos")
-          .select("*")
-          .eq("elevatoria_id", elevId)
-          .order("id"),
-        supabase
-          .from("elevatoria_implantacao")
-          .select("*")
-          .eq("elevatoria_id", elevId)
-          .maybeSingle(),
-        supabase.from("elevatoria_implantacao_etapas").select("*").order("ordem"),
-        supabase
-          .from("elevatoria_dados_mestres_auditoria")
-          .select("*, profiles:usuario_id(nome_completo)")
-          .eq("elevatoria_id", elevId)
-          .order("criado_em", { ascending: false })
-          .limit(200),
-        supabase.from("elevatoria_campo_na").select("*").eq("elevatoria_id", elevId),
-      ]);
+      const [elevRes, equipRes, eletRes, eletGeralRes, hidrRes, areaRes, rolaRes, impRes, naRes] =
+        await Promise.all([
+          supabase.from("elevatorias").select("*").eq("id", elevId).single(),
+          supabase
+            .from("elevatoria_equipamento")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .order("grupo"),
+          supabase
+            .from("elevatoria_eletrica")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .order("grupo"),
+          supabase
+            .from("elevatoria_eletrica_geral")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .maybeSingle(),
+          supabase
+            .from("elevatoria_hidraulica")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .maybeSingle(),
+          supabase
+            .from("elevatoria_area_influencia")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .maybeSingle(),
+          supabase
+            .from("elevatoria_rolamentos_selos")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .order("id"),
+          supabase
+            .from("elevatoria_implantacao")
+            .select("*")
+            .eq("elevatoria_id", elevId)
+            .maybeSingle(),
+          supabase.from("elevatoria_campo_na").select("*").eq("elevatoria_id", elevId),
+        ]);
+
+      if (requestId !== loadRequestId.current) return;
 
       if (elevRes.error) {
         console.error("Erro Supabase:", elevRes.error);
@@ -385,17 +392,6 @@ function ElevatoriaFichaPage() {
         setRolamentos([]);
       }
       if (impRes.data) setImplantacao(impRes.data);
-      if (etapasRes.data) setEtapas(etapasRes.data);
-
-      if (audRes.data) {
-        setAuditoria(
-          audRes.data.map((a: Record<string, unknown>) => ({
-            ...a,
-            usuario_nome: (a.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
-          })) as ElevatoriaAuditoria[],
-        );
-      }
-
       if (naRes.data) setCamposNA(naRes.data);
 
       if (!elevRes.data) {
@@ -403,16 +399,38 @@ function ElevatoriaFichaPage() {
         navigate({ to: "/elevatorias", replace: true });
         return;
       }
+
+      void Promise.all([etapasPromise, auditoriaPromise])
+        .then(([etapasRes, audRes]) => {
+          if (requestId !== loadRequestId.current) return;
+          if (etapasRes.data) setEtapas(etapasRes.data);
+          if (audRes.data) {
+            setAuditoria(
+              audRes.data.map((a: Record<string, unknown>) => ({
+                ...a,
+                usuario_nome:
+                  (a.profiles as { nome_completo?: string } | null)?.nome_completo ?? null,
+              })) as ElevatoriaAuditoria[],
+            );
+          }
+        })
+        .catch((err) => {
+          console.error("Erro ao carregar dados secundários da ficha:", err);
+        });
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
       toast.error("Erro inesperado ao carregar ficha");
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) setLoading(false);
     }
   };
 
-  const isNA = (tabela: string, campo: string) =>
-    camposNA.some((c) => c.tabela === tabela && c.campo === campo && c.elevatoria_id === elevId);
+  const naKeys = useMemo(
+    () => new Set(camposNA.map((c) => `${c.tabela}|${c.campo}|${c.elevatoria_id}`)),
+    [camposNA],
+  );
+
+  const isNA = (tabela: string, campo: string) => naKeys.has(`${tabela}|${campo}|${elevId}`);
 
   const toggleNA = async (tabela: string, campo: string, motivo?: string) => {
     if (isNA(tabela, campo)) {
