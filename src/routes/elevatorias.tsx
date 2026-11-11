@@ -109,10 +109,20 @@ function ElevatoriasPage() {
   const [editandoTipo, setEditandoTipo] = useState<number | null>(null);
   const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
   const [editandoTipoConstrutivo, setEditandoTipoConstrutivo] = useState<number | null>(null);
-  const [sortField, setSortField] = useState(() => localStorage.getItem("elev_sort") || "nome");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">(
-    () => (localStorage.getItem("elev_sort_dir") as "asc" | "desc") || "asc",
-  );
+  // Keep the server render deterministic; browser storage is read after hydration.
+  const [sortField, setSortField] = useState("nome");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  useEffect(() => {
+    try {
+      const savedField = window.localStorage.getItem("elev_sort");
+      const savedDir = window.localStorage.getItem("elev_sort_dir");
+      if (savedField) setSortField(savedField);
+      if (savedDir === "asc" || savedDir === "desc") setSortDir(savedDir);
+    } catch {
+      // Storage may be unavailable (privacy settings or restricted browser context).
+    }
+  }, []);
   const [registrosDialog, setRegistrosDialog] = useState<number | null>(null);
   const [pendentesRegistros, setPendentesRegistros] = useState(0);
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -561,8 +571,12 @@ function ElevatoriasPage() {
     const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
     setSortField(field);
     setSortDir(newDir);
-    localStorage.setItem("elev_sort", field);
-    localStorage.setItem("elev_sort_dir", newDir);
+    try {
+      window.localStorage.setItem("elev_sort", field);
+      window.localStorage.setItem("elev_sort_dir", newDir);
+    } catch {
+      // Sorting still works for this session when browser storage is unavailable.
+    }
   };
 
   const excluirElevatoria = async (elev: Elevatoria) => {
