@@ -12,6 +12,7 @@ import {
   type AliasEquipe,
   type AliasIntegrante,
 } from "@/lib/equipe-utils";
+import { isOrdemServico } from "@/lib/produtividade-os";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -81,23 +82,6 @@ function normalizeStatus(s: string): string {
   if (lower === "suspenso" || lower === "pendente") return "suspenso";
   if (lower === "cancelado") return "cancelado";
   return lower;
-}
-
-function isAtividadeAdministrativa(tipo: string | null | undefined): boolean {
-  if (!tipo) return false;
-  const t = tipo.toUpperCase().trim();
-  return [
-    "DDS",
-    "ALMOÇO",
-    "ALMOCO",
-    "RETORNO PARA BASE",
-    "MONTAR EQUIPE",
-    "SEPARAR MATERIAL / FERRAMENTA",
-    "SEPARAR MATERIAL / FERRAMENTAS",
-    "FEEDBACK",
-    "PROBLEMAS COM VEÍCULO",
-    "PROBLEMAS COM VEICULO",
-  ].includes(t);
 }
 
 // ─── Fit Bounds ───────────────────────────────────────────────
@@ -247,16 +231,12 @@ export default function ProdutividadeMap({
         if (
           atividade.dia_id !== equipe.dia_id ||
           !tecnicos.has(atividade.id_recurso) ||
-          isAtividadeAdministrativa(atividade.tipo_atividade) ||
+          !isOrdemServico(atividade.ordem_manutencao) ||
           normalizeStatus(atividade.status) !== "concluido"
         ) {
           continue;
         }
-        osExecutadas.add(
-          atividade.ordem_manutencao
-            ? `om:${atividade.ordem_manutencao}`
-            : `at:${atividade.id_atividade}`,
-        );
+        osExecutadas.add(`om:${atividade.ordem_manutencao}`);
       }
       const quantidade = osExecutadas.size || 1;
       variantes.set(equipe.nome_equipe, (variantes.get(equipe.nome_equipe) || 0) + quantidade);
@@ -325,9 +305,11 @@ export default function ProdutividadeMap({
       equipeChave: string;
       at: FieldAtividade;
     }> = [];
+    const ordensIncluidas = new Set<number>();
 
     for (const at of atividades) {
-      if (isAtividadeAdministrativa(at.tipo_atividade)) continue;
+      if (!isOrdemServico(at.ordem_manutencao) || ordensIncluidas.has(at.ordem_manutencao))
+        continue;
       // Só considera atividades de técnicos que estão em equipe
       if (!resourceToEquipe.has(at.id_recurso)) continue;
       if (!at.planta) continue;
@@ -355,6 +337,7 @@ export default function ProdutividadeMap({
         equipeChave: eqChave,
         at,
       });
+      ordensIncluidas.add(at.ordem_manutencao);
     }
 
     return result;
@@ -364,10 +347,12 @@ export default function ProdutividadeMap({
     let tentadas = 0;
     let comPlanta = 0;
     let semPlanta = 0;
+    const ordensContadas = new Set<number>();
     for (const at of atividades) {
-      if (isAtividadeAdministrativa(at.tipo_atividade)) continue;
+      if (!isOrdemServico(at.ordem_manutencao) || ordensContadas.has(at.ordem_manutencao)) continue;
       if (!resourceToEquipe.has(at.id_recurso)) continue;
       if (!at.planta) continue;
+      ordensContadas.add(at.ordem_manutencao);
       tentadas++;
       if (plantaMap.has(at.planta.trim().toUpperCase())) comPlanta++;
       else semPlanta++;

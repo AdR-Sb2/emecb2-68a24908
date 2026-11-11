@@ -75,6 +75,7 @@ import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { DashboardComparacao } from "@/components/produtividade-dashboard";
 import { ConfiguracoesDialog } from "@/components/produtividade-configuracoes";
 import logoHeader from "@/assets/logo-branca.png";
+import { isOrdemServico } from "@/lib/produtividade-os";
 
 import ProdutividadeMap from "@/components/produtividade-map";
 
@@ -263,7 +264,8 @@ function breakdownHoras(atividades: FieldAtividade[]): {
     if (norm === "DDS") b.dds += m;
     else if (norm === "ALMOÇO" || norm === "ALMOCO") b.almoco += m;
     else if (norm === "RETORNO PARA BASE") b.desloc += m;
-    else if (isAtividadeAdministrativa(a.tipo_atividade)) b.outras += m;
+    else if (isAtividadeAdministrativa(a.tipo_atividade) || !isOrdemServico(a.ordem_manutencao))
+      b.outras += m;
     else b.os += m;
   }
   return b;
@@ -333,8 +335,7 @@ function calcAlmocoMin(atividades: FieldAtividade[]): number {
 function dedupOS(atividades: FieldAtividade[]) {
   const groups = new Map<number, string[]>();
   for (const a of atividades) {
-    if (isAtividadeAdministrativa(a.tipo_atividade)) continue;
-    if (!a.ordem_manutencao) continue;
+    if (!isOrdemServico(a.ordem_manutencao)) continue;
     const om = a.ordem_manutencao;
     const arr = groups.get(om);
     if (arr) arr.push(normalizeStatus(a.status));
@@ -544,9 +545,8 @@ function SummaryCards({
 }) {
   const tecnicas = atividades.filter(
     (a) =>
-      !isAtividadeAdministrativa(a.tipo_atividade) &&
       // O.S. desvinculada de um ID continua contando no total do dia.
-      (a.id_recurso == null || tecnicosEmEquipe.has(a.id_recurso)),
+      a.id_recurso == null || tecnicosEmEquipe.has(a.id_recurso),
   );
   const { exec, susp, canc } = dedupOS(tecnicas);
   const mediaOS = numEquipes > 0 ? (exec / numEquipes).toFixed(1) : "0";
@@ -627,7 +627,7 @@ function VinculosOSCard({
     const tecSet = new Set<number>();
     for (const a of atividades) {
       if (a.id_recurso) tecSet.add(a.id_recurso);
-      if (!a.ordem_manutencao || isAtividadeAdministrativa(a.tipo_atividade)) continue;
+      if (!isOrdemServico(a.ordem_manutencao)) continue;
       const om = a.ordem_manutencao;
       const st = normalizeStatus(a.status);
       const arr = statusPorOm.get(om);
@@ -812,9 +812,10 @@ function TipoServicoChart({
     const executadas = new Map<string, { norm: string; idRecurso: number }>();
     for (const a of atividades) {
       if (!tecSet.has(a.id_recurso)) continue;
+      if (!isOrdemServico(a.ordem_manutencao)) continue;
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
       if (map[norm] === undefined) continue;
-      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      const key = `om:${a.ordem_manutencao}`;
       if (normalizeStatus(a.status) !== "concluido") continue;
       if (!executadas.has(key)) executadas.set(key, { norm, idRecurso: a.id_recurso });
     }
@@ -842,9 +843,10 @@ function TipoServicoChart({
     const executadas = new Map<string, { norm: string; idRecurso: number }>();
     for (const a of atividades) {
       if (!tecSet.has(a.id_recurso)) continue;
+      if (!isOrdemServico(a.ordem_manutencao)) continue;
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
       if (!(norm in porChave)) continue;
-      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      const key = `om:${a.ordem_manutencao}`;
       if (normalizeStatus(a.status) !== "concluido") continue;
       if (!executadas.has(key)) executadas.set(key, { norm, idRecurso: a.id_recurso });
     }
@@ -999,8 +1001,8 @@ function EquipeSection({
     const map: Record<string, number> = {};
     const vistos = new Set<string>();
     for (const a of equipeAtividades) {
-      if (isAtividadeAdministrativa(a.tipo_atividade)) continue;
-      const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+      if (!isOrdemServico(a.ordem_manutencao)) continue;
+      const key = `om:${a.ordem_manutencao}`;
       if (vistos.has(key)) continue;
       vistos.add(key);
       const norm = (a.tipo_atividade || "").toUpperCase().trim();
@@ -1037,15 +1039,10 @@ function EquipeSection({
       const tipos: Record<string, { count: number; minutos: number }> = {};
       const vistosTec = new Set<string>();
       for (const a of techAtividades) {
+        if (!isOrdemServico(a.ordem_manutencao)) continue;
         const norm = (a.tipo_atividade || "").toUpperCase().trim();
-        if (
-          norm === "ALMOÇO" ||
-          norm === "ALMOCO" ||
-          norm === "DDS" ||
-          isAtividadeAdministrativa(a.tipo_atividade)
-        )
-          continue;
-        const key = a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+        if (norm === "ALMOÇO" || norm === "ALMOCO" || norm === "DDS") continue;
+        const key = `om:${a.ordem_manutencao}`;
         if (vistosTec.has(key)) continue;
         vistosTec.add(key);
         const label = TIPO_SERVICO_MAP[norm] || norm || "Outro";
@@ -1098,11 +1095,11 @@ function EquipeSection({
   });
 
   const suspAtividades = equipeAtividades.filter(
-    (a) => suspensas.includes(a.ordem_manutencao) && !isAtividadeAdministrativa(a.tipo_atividade),
+    (a) => suspensas.includes(a.ordem_manutencao) && isOrdemServico(a.ordem_manutencao),
   );
 
   const cancAtividades = equipeAtividades.filter(
-    (a) => canceladas.includes(a.ordem_manutencao) && !isAtividadeAdministrativa(a.tipo_atividade),
+    (a) => canceladas.includes(a.ordem_manutencao) && isOrdemServico(a.ordem_manutencao),
   );
 
   const getJustText = (tipo: string, idAtividade: number | null) =>
@@ -1985,7 +1982,10 @@ function UploadModal({
 function equipeTemTipo(eq: FieldEquipe, atividades: FieldAtividade[], tipoNorm: string): boolean {
   const techSet = new Set(eq.tecnicos);
   return atividades.some(
-    (a) => techSet.has(a.id_recurso) && (a.tipo_atividade || "").toUpperCase().trim() === tipoNorm,
+    (a) =>
+      techSet.has(a.id_recurso) &&
+      isOrdemServico(a.ordem_manutencao) &&
+      (a.tipo_atividade || "").toUpperCase().trim() === tipoNorm,
   );
 }
 
@@ -2183,6 +2183,7 @@ function DayDetail({
     month: "2-digit",
     year: "numeric",
   });
+  const atividadesOS = atividades.filter((a) => isOrdemServico(a.ordem_manutencao));
 
   if (loading) {
     return (
@@ -2254,7 +2255,7 @@ function DayDetail({
                   </tr>
                 </thead>
                 <tbody>
-                  {atividades.map((a) => (
+                  {atividadesOS.map((a) => (
                     <tr
                       key={a.id}
                       className="border-t border-slate-100 align-top dark:border-slate-700"

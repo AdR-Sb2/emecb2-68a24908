@@ -55,6 +55,7 @@ import { useEquipeAliases } from "@/hooks/use-equipe-aliases";
 import { useAuth } from "@/lib/auth";
 import { getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import { toast } from "sonner";
+import { isOrdemServico } from "@/lib/produtividade-os";
 import {
   UnificarEquipesDialog,
   type EquipeGerenciavel,
@@ -163,28 +164,6 @@ type ComparacaoDef = { id: string; rotulo: string; curto: string };
 
 // ─── Constantes ───────────────────────────────────────────────
 
-const ATIVIDADES_ADMINISTRATIVAS = [
-  "DDS",
-  "ALMOÇO",
-  "ALMOCO",
-  "RETORNO PARA BASE",
-  "MONTAR EQUIPE",
-  "SEPARAR MATERIAL / FERRAMENTA",
-  "SEPARAR MATERIAL / FERRAMENTAS",
-  "FEEDBACK",
-  "PROBLEMAS COM VEÍCULO",
-  "PROBLEMAS COM VEICULO",
-  "REUNIÃO",
-  "REUNIÕES",
-  "REUNIAO",
-  "TREINAMENTO",
-  "ABASTECIMENTO",
-  "ABASTECIMENTO DE VEÍCULO",
-  "ABASTECIMENTO DE COMBUSTÍVEL",
-  "ABASTECIMENTO DE VEICULO",
-  "REABASTECIMENTO",
-];
-
 const EQUIPE_COLORS = [
   { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", hex: "#3b82f6" },
   { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", hex: "#10b981" },
@@ -269,17 +248,8 @@ function encaixaStatus(os: OsAgrupada, status: string): boolean {
   return true;
 }
 
-function isAtividadeAdministrativa(tipo: string | null | undefined): boolean {
-  if (!tipo) return false;
-  const norm = tipo.toUpperCase().trim();
-  if (ATIVIDADES_ADMINISTRATIVAS.includes(norm)) return true;
-  // Notas de abastecimento não são ordem de serviço de execução.
-  if (norm.startsWith("ABASTECIMENTO")) return true;
-  return false;
-}
-
 function chaveOs(a: FieldAtividade): string {
-  return a.ordem_manutencao ? `om:${a.ordem_manutencao}` : `at:${a.id_atividade}`;
+  return `om:${a.ordem_manutencao}`;
 }
 
 function formatDataBR(d: string): string {
@@ -425,7 +395,7 @@ function agruparAtividades(
   }
 
   for (const a of atividades) {
-    if (isAtividadeAdministrativa(a.tipo_atividade)) continue;
+    if (!isOrdemServico(a.ordem_manutencao)) continue;
     const key = chaveOs(a);
     let os = mapa.get(key);
     if (!os) {
