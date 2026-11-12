@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Send,
@@ -14,10 +14,14 @@ import {
   ShieldCheck,
   BarChart3,
   CheckCircle2,
+  Link2,
+  Link2Off,
+  Share2,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { supabase } from "@/lib/supabase";
 import logoHeader from "@/assets/logo-branca.png";
 import elevatorias from "@/data/elevatorias.json";
 
@@ -28,8 +32,16 @@ export const Route = createFileRoute("/relatorio")({
       { name: "description", content: "Geração de Relatório Técnico e de Planta/Unidade." },
     ],
   }),
-  component: RelatorioPage,
+  component: RelatorioLayout,
 });
+
+// /relatorio/publico/$token é rota filha: nesse caso deixamos a página
+// pública renderizar sozinha (mesmo padrão de produtividade/backlog).
+function RelatorioLayout() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/relatorio/publico/")) return <Outlet />;
+  return <RelatorioPage />;
+}
 
 // URL do Apps Script publicado como Web App (deixe vazio se ainda não configurado).
 const APPS_SCRIPT_URL =
@@ -289,7 +301,7 @@ function emptyGrupo(i: number): Grupo {
   };
 }
 
-function RelatorioTecnico() {
+function RelatorioTecnico({ publico = false }: { publico?: boolean } = {}) {
   const l = useLookup();
   const [qtd, setQtd] = useState(1);
   const [grupos, setGrupos] = useState<Grupo[]>([emptyGrupo(1)]);
@@ -660,7 +672,7 @@ function RelatorioTecnico() {
         </div>
       </section>
 
-      <ActionBar onSend={handleEnviar} />
+      <ActionBar onSend={handleEnviar} publico={publico} />
     </div>
   );
 }
@@ -681,7 +693,7 @@ function outrosLabel(v: string) {
   return v === "Outros" ? "Outros (Ver parecer técnico abaixo) ⚠️" : v;
 }
 
-function RelatorioPlanta() {
+function RelatorioPlanta({ publico = false }: { publico?: boolean } = {}) {
   const l = useLookup();
   const [estrutura, setEstrutura] = useState(OP_ESTRUTURA[1]);
   const [vazamentos, setVazamentos] = useState(OP_VAZAMENTOS[0]);
@@ -843,12 +855,12 @@ function RelatorioPlanta() {
         </div>
       </section>
 
-      <ActionBar onSend={handleEnviar} />
+      <ActionBar onSend={handleEnviar} publico={publico} />
     </div>
   );
 }
 
-function ActionBar({ onSend }: { onSend: () => void }) {
+function ActionBar({ onSend, publico = false }: { onSend: () => void; publico?: boolean }) {
   return (
     <div className="sticky bottom-2 z-10 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg backdrop-blur">
       <span className="hidden text-xs text-slate-500 dark:text-slate-400 sm:inline">
@@ -861,18 +873,84 @@ function ActionBar({ onSend }: { onSend: () => void }) {
       >
         <Send className="h-4 w-4" /> Enviar Relatório
       </button>
-      <Link
-        to="/"
-        className="inline-flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-700"
-      >
-        Voltar
-      </Link>
+      {!publico && (
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-700"
+        >
+          Voltar
+        </Link>
+      )}
     </div>
   );
 }
 
-function RelatorioPage() {
+export function RelatorioPage({ publico = false }: { publico?: boolean } = {}) {
   const [aba, setAba] = useState<"tecnico" | "planta">("tecnico");
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (publico) return;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("field_config")
+          .select("relatorio_link_publico_token")
+          .eq("id", 1)
+          .maybeSingle();
+        if (!error) setLinkToken(data?.relatorio_link_publico_token || null);
+      } catch {
+        // coluna ainda não criada no Supabase → segue sem link
+      }
+    })();
+  }, [publico]);
+
+  const gerarLinkPublico = async () => {
+    const token = crypto.randomUUID();
+    const url = `${window.location.origin}/relatorio/publico/${token}`;
+    try {
+      const { error } = await supabase
+        .from("field_config")
+        .upsert({ id: 1, relatorio_link_publico_token: token }, { onConflict: "id" });
+      if (error) throw error;
+      setLinkToken(token);
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      toast.success("Link público copiado!", {
+        description: "Qualquer pessoa com o link acessa o Relatório sem login.",
+        action: { label: "Abrir", onClick: () => window.open(url, "_blank") },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const faltaColuna = msg.includes("relatorio_link_publico_token");
+      console.error("Erro ao gerar link público:", err);
+      toast.error(
+        faltaColuna
+          ? "Coluna relatorio_link_publico_token ainda não existe no Supabase."
+          : "Não foi possível gerar o link." + (msg ? ` (${msg})` : ""),
+        faltaColuna
+          ? {
+              description: "Rode a migration 00098 no SQL Editor do Supabase.",
+            }
+          : undefined,
+      );
+    }
+  };
+
+  const revogarLinkPublico = async () => {
+    try {
+      const { error } = await supabase
+        .from("field_config")
+        .update({ relatorio_link_publico_token: null })
+        .eq("id", 1);
+      if (error) throw error;
+      setLinkToken(null);
+      toast.success("Link público revogado.");
+    } catch (err) {
+      console.error("Erro ao revogar link público:", err);
+      toast.error("Não foi possível revogar o link.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
       <Toaster richColors position="top-right" />
@@ -896,7 +974,32 @@ function RelatorioPage() {
                 </p>
               </div>
             </div>
-            <NavVoltarHome />
+            {publico ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px] font-semibold text-cyan-50">
+                <Link2 className="h-3.5 w-3.5" /> Visualização pública · sem login
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {linkToken ? (
+                  <button
+                    onClick={revogarLinkPublico}
+                    className="inline-flex items-center gap-2 rounded-md border border-white/30 bg-white/10 px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-white/20"
+                    title={`Link público ativo — clique para revogar ( /relatorio/publico/${linkToken} )`}
+                  >
+                    <Link2Off className="h-4 w-4" /> Link Ativo
+                  </button>
+                ) : (
+                  <button
+                    onClick={gerarLinkPublico}
+                    className="inline-flex items-center gap-2 rounded-md border border-white/30 bg-white/10 px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-white/20"
+                    title="Gerar link público (sem login) para o Relatório"
+                  >
+                    <Share2 className="h-4 w-4" /> Link
+                  </button>
+                )}
+                <NavVoltarHome />
+              </div>
+            )}
           </div>
         </div>
 
@@ -947,7 +1050,11 @@ function RelatorioPage() {
           </div>
         </div>
 
-        {aba === "tecnico" ? <RelatorioTecnico /> : <RelatorioPlanta />}
+        {aba === "tecnico" ? (
+          <RelatorioTecnico publico={publico} />
+        ) : (
+          <RelatorioPlanta publico={publico} />
+        )}
       </div>
     </div>
   );
