@@ -642,12 +642,23 @@ function TestesPage() {
   }
 
   async function carregarIdsExistentes(): Promise<Set<number>> {
+    const ids = new Set<number>();
+    const PAGE = 1000;
     try {
-      const { data, error } = await supabase.from("testes_afericoes").select("id");
-      if (error) throw error;
-      return new Set((data || []).map((r) => Number(r.id)));
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("testes_afericoes")
+          .select("id")
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        const lote = data || [];
+        for (const r of lote) ids.add(Number(r.id));
+        if (lote.length < PAGE) break;
+      }
+      return ids;
     } catch {
-      return new Set();
+      return ids;
     }
   }
 
@@ -657,9 +668,17 @@ function TestesPage() {
     erros: { linha: number; motivo: string }[];
   }> {
     const idsExistentes = await carregarIdsExistentes();
+    const erros: { linha: number; motivo: string }[] = [];
+
     let inseridos = 0;
     let atualizados = 0;
-    const erros: { linha: number; motivo: string }[] = [];
+
+    const payloads: Array<{
+      linha: number;
+      id: number;
+      existente: boolean;
+      payload: Record<string, unknown>;
+    }> = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -669,52 +688,64 @@ function TestesPage() {
         continue;
       }
 
-      const payload = {
-        id: id,
-        hora_inicio: row["Hora de início"] || null,
-        hora_conclusao: row["Hora de conclusão"] || null,
-        email: row.Email || null,
-        nome: row.Nome || null,
-        data_teste: row["Data do Teste"]
-          ? new Date(row["Data do Teste"]).toISOString().split("T")[0]
-          : null,
-        tipo_servico: row["Tipo de Serviço"] || null,
-        elevatoria: row.Elevatória || null,
-        grupo: row.Grupo ? String(row.Grupo) : null,
-        tensao_v: row["Tensão ( V )"] || null,
-        corrente_a: row["Corrente ( A )"] || null,
-        retaguarda: row.Retaguarda || null,
-        recalque: row.Recalque || null,
-        corrente_shutoff: row["Corrente ShutOff"] || null,
-        retaguarda_shutoff: row["Retaguarda ShutOff"] || null,
-        recalque_shutoff: row["Recalque ShutOff"] || null,
-        impossibilidade: row["Impossibilidade:"] || null,
-        servico_executado: row["Serviço Executado:"] || null,
-        nome_colaboradores: row["Nome dos Colaboradores:"] || null,
-        observacao: row["Observação:"] || null,
-        na_chegada: row["Na Chegada"] || null,
-        na_saida: row["Na saida"] || null,
-        status: row.Status || null,
-        criado_por: "IMPORTACAO_PLANILHA",
-        atualizado_em: new Date().toISOString(),
-      };
+      const existente = idsExistentes.has(id);
+      idsExistentes.add(id);
 
+      payloads.push({
+        linha: i + 2,
+        id,
+        existente,
+        payload: {
+          id: id,
+          hora_inicio: row["Hora de início"] || null,
+          hora_conclusao: row["Hora de conclusão"] || null,
+          email: row.Email || null,
+          nome: row.Nome || null,
+          data_teste: row["Data do Teste"]
+            ? new Date(row["Data do Teste"]).toISOString().split("T")[0]
+            : null,
+          tipo_servico: row["Tipo de Serviço"] || null,
+          elevatoria: row.Elevatória || null,
+          grupo: row.Grupo ? String(row.Grupo) : null,
+          tensao_v: row["Tensão ( V )"] || null,
+          corrente_a: row["Corrente ( A )"] || null,
+          retaguarda: row.Retaguarda || null,
+          recalque: row.Recalque || null,
+          corrente_shutoff: row["Corrente ShutOff"] || null,
+          retaguarda_shutoff: row["Retaguarda ShutOff"] || null,
+          recalque_shutoff: row["Recalque ShutOff"] || null,
+          impossibilidade: row["Impossibilidade:"] || null,
+          servico_executado: row["Serviço Executado:"] || null,
+          nome_colaboradores: row["Nome dos Colaboradores:"] || null,
+          observacao: row["Observação:"] || null,
+          na_chegada: row["Na Chegada"] || null,
+          na_saida: row["Na saida"] || null,
+          status: row.Status || null,
+          criado_por: "IMPORTACAO_PLANILHA",
+          atualizado_em: new Date().toISOString(),
+        },
+      });
+    }
+
+    const CHUNK = 200;
+    for (let i = 0; i < payloads.length; i += CHUNK) {
+      const lote = payloads.slice(i, i + CHUNK);
       try {
-        const { error } = await supabase
-          .from("testes_afericoes")
-          .upsert(payload, { onConflict: "id" });
-
+        const { error } = await supabase.from("testes_afericoes").upsert(
+          lote.map((p) => p.payload),
+          { onConflict: "id" },
+        );
         if (error) throw error;
 
-        if (idsExistentes.has(id)) {
-          atualizados++;
-        } else {
-          inseridos++;
-          idsExistentes.add(id);
+        for (const p of lote) {
+          if (p.existente) atualizados++;
+          else inseridos++;
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Erro desconhecido";
-        erros.push({ linha: i + 2, motivo: message });
+        for (const p of lote) {
+          erros.push({ linha: p.linha, motivo: message });
+        }
       }
     }
 
@@ -784,9 +815,11 @@ function TestesPage() {
       }
 
       // Show preview
+      const idsAtuais = new Set(data.map((d) => d.Id));
+      const atualizados = rowsParaImportar.filter((r) => idsAtuais.has(r.Id)).length;
       setImportPreview({
-        novos: rowsParaImportar.filter((r) => !data.some((d) => d.Id === r.Id)).length,
-        atualizados: rowsParaImportar.filter((r) => data.some((d) => d.Id === r.Id)).length,
+        novos: rowsParaImportar.length - atualizados,
+        atualizados,
         ignorados,
         erros,
         rows: rowsParaImportar,
