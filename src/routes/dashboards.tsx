@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   Activity,
-  ArrowLeft,
   ArrowRight,
   Cpu,
   FlaskConical,
@@ -87,7 +86,7 @@ function DashboardsPage() {
   const pageShell =
     "min-h-screen bg-[#f4f7fc] px-3 py-4 text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100 sm:px-6 sm:py-6 lg:px-8";
   const panelCard =
-    "group flex min-h-[250px] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_28px_-20px_rgba(15,45,85,0.35)] transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_18px_36px_-20px_rgba(15,45,85,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700 sm:p-7";
+    "flex min-h-[250px] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_28px_-20px_rgba(15,45,85,0.35)] transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_18px_36px_-20px_rgba(15,45,85,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700 sm:p-7";
 
   return (
     <div className={pageShell}>
@@ -122,13 +121,6 @@ function DashboardsPage() {
               Escolha o painel que deseja consultar.
             </p>
           </div>
-          <Link
-            to="/"
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Hub
-          </Link>
         </div>
 
         {authLoading || loadingAccess ? (
@@ -194,7 +186,7 @@ function DashboardsPage() {
                   <div className="mt-auto pt-7">
                     <Link
                       to={card.path}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0b3a73] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f7ad6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                      className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0b3a73] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f7ad6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                     >
                       Abrir
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
