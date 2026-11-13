@@ -41,6 +41,7 @@ import { HubOverview, HubWelcome } from "@/components/hub-overview";
 import {
   HUB_PUBLIC_LINKS_GROUP,
   HUB_DASHBOARDS_ROUTE,
+  canShowProcedimentosNavigation,
   getActiveHubGroup,
   getVisibleHubSidebarGroups,
 } from "@/lib/hub-navigation";
@@ -288,7 +289,10 @@ function Index() {
   const shouldShowFichaElevatoria = hasPanel("ficha_elevatoria");
   const shouldShowPlanoManutencao =
     hasPanel("plano_manutencao") || hasPanel("ficha_elevatoria") || hasPanel("estoque");
-  const shouldShowProcedimentos = hasPanel("procedimentos");
+  const shouldShowProcedimentos = canShowProcedimentosNavigation(
+    hasPanel("procedimentos"),
+    temPermissao(permissoes, "procedimentos", "ver"),
+  );
   const canAdmin = hasPanel("admin");
   const categorias = [
     {
@@ -493,6 +497,12 @@ function Index() {
           >
             {openOsCount.toLocaleString("pt-BR")}
           </span>
+        )}
+        {isPublic && (
+          <ExternalLink
+            className="mt-0.5 hidden h-3.5 w-3.5 shrink-0 text-cyan-200 lg:block"
+            aria-hidden="true"
+          />
         )}
       </>
     );
@@ -702,44 +712,29 @@ function Index() {
           })}
 
           {sidebarPublicItems.length > 0 && (
-            <div className="space-y-1">
-              {sidebarPublicItems.length === 1 ? (
-                <div role="group" aria-label={HUB_PUBLIC_LINKS_GROUP.label}>
-                  {sidebarPublicItems.map(renderTool)}
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    data-hub-group-trigger
-                    aria-label={`${HUB_PUBLIC_LINKS_GROUP.label}, grupo de navegação, ${sidebarPublicItems.length} itens`}
-                    aria-expanded={openSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id}
-                    aria-controls="hub-sidebar-group-links-publicos"
-                    onClick={() => setOpenSidebarGroup((current) => current === HUB_PUBLIC_LINKS_GROUP.id ? null : HUB_PUBLIC_LINKS_GROUP.id)}
-                    onKeyDown={(event) => handleSidebarGroupKeyDown(event, HUB_PUBLIC_LINKS_GROUP.id)}
-                    className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06264d] ${
-                      activeSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id
-                        ? "bg-white/15 text-white"
-                        : "text-blue-100 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    <Globe2 className="h-4 w-4 shrink-0 text-cyan-200 lg:hidden" aria-hidden="true" />
-                    <span className="hidden min-w-0 flex-1 whitespace-normal lg:block">{HUB_PUBLIC_LINKS_GROUP.label}</span>
-                    <ChevronDown className={`ml-auto hidden h-4 w-4 shrink-0 transition-transform lg:block ${openSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id ? "rotate-180" : ""}`} aria-hidden="true" />
-                  </button>
-                  {openSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id && (
-                    <div
-                      id="hub-sidebar-group-links-publicos"
-                      role="group"
-                      aria-label={HUB_PUBLIC_LINKS_GROUP.label}
-                      className="space-y-0.5 pl-1"
-                    >
-                      {sidebarPublicItems.map(renderTool)}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <section
+              aria-labelledby="hub-sidebar-public-links-heading"
+              className="mt-3 border-t border-white/15 pt-3"
+            >
+              <h2
+                id="hub-sidebar-public-links-heading"
+                className={`mb-1.5 flex items-center gap-2 px-2.5 text-[11px] font-bold uppercase tracking-wider ${
+                  activeSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id
+                    ? "text-white"
+                    : "text-cyan-100"
+                }`}
+              >
+                <Globe2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="hidden lg:inline">{HUB_PUBLIC_LINKS_GROUP.label}</span>
+              </h2>
+              <div
+                role="group"
+                aria-label={HUB_PUBLIC_LINKS_GROUP.label}
+                className="space-y-0.5"
+              >
+                {sidebarPublicItems.map(renderTool)}
+              </div>
+            </section>
           )}
         </nav>
 
