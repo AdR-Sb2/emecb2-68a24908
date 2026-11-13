@@ -44,6 +44,10 @@ import type {
 } from "@/lib/elevatoria-types";
 import { IMPLANTACAO_STATUS_CORES, IMPLANTACAO_STATUS_OPCOES } from "@/lib/elevatoria-types";
 import {
+  resolverEstadoVisualListaElevatorias,
+  type StatusCarregamentoElevatorias,
+} from "@/lib/elevatorias-list-state";
+import {
   calcularMediaCompletudeElevatorias,
   calcularPercentualCompletude,
 } from "@/lib/elevatoria-completude";
@@ -104,6 +108,8 @@ function ElevatoriasPage() {
   const [completudes, setCompletudes] = useState<Map<string, ElevatoriaCompletude>>(new Map());
   const [filtroSecaoCompletude, setFiltroSecaoCompletude] = useState("geral");
   const [loading, setLoading] = useState(true);
+  const [statusLista, setStatusLista] = useState<StatusCarregamentoElevatorias>("loading");
+  const [erroLista, setErroLista] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filtroMunicipio, setFiltroMunicipio] = useState("TODAS");
   const [filtroCompletude, setFiltroCompletude] = useState("TODAS");
@@ -225,21 +231,41 @@ function ElevatoriasPage() {
 
   const carregarDados = async () => {
     setLoading(true);
-    const [elevRes, impRes, equipRes, egRes] = await Promise.all([
-      supabase.from("elevatorias").select("*").order("nome"),
-      supabase.from("elevatoria_implantacao").select("*"),
-      supabase.from("elevatoria_equipamento").select("*"),
-      supabase.from("elevatoria_eletrica_geral").select("*"),
-    ]);
-    if (elevRes.data) setElevatorias(elevRes.data);
-    if (impRes.data) setImplantacoes(impRes.data);
-    if (equipRes.data) setEquipamentos(equipRes.data);
-    if (egRes.data) setEletricaGeral(egRes.data);
+    setStatusLista("loading");
+    setErroLista(null);
 
-    if (elevRes.data) {
+    try {
+      const [elevRes, impRes, equipRes, egRes] = await Promise.all([
+        supabase.from("elevatorias").select("*").order("nome"),
+        supabase.from("elevatoria_implantacao").select("*"),
+        supabase.from("elevatoria_equipamento").select("*"),
+        supabase.from("elevatoria_eletrica_geral").select("*"),
+      ]);
+
+      if (elevRes.error) {
+        throw new Error(elevRes.error.message || "Falha ao consultar a tabela de elevatórias.");
+      }
+      if (!elevRes.data) {
+        throw new Error("O servidor não retornou a lista de elevatórias.");
+      }
+
+      // Só substitui o estado anterior após confirmar que a consulta principal teve sucesso.
+      setElevatorias(elevRes.data);
+      if (impRes.data) setImplantacoes(impRes.data);
+      if (equipRes.data) setEquipamentos(equipRes.data);
+      if (egRes.data) setEletricaGeral(egRes.data);
+
       await calcularCompletudes(elevRes.data);
+      setStatusLista("success");
+    } catch (err) {
+      const mensagem =
+        err instanceof Error ? err.message : "Não foi possível carregar a lista de elevatórias.";
+      console.error("Erro ao carregar lista de elevatórias:", err);
+      setErroLista(mensagem);
+      setStatusLista("error");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const calcularCompletudes = async (elevs: Elevatoria[]) => {
@@ -602,6 +628,13 @@ function ElevatoriasPage() {
     setFiltroPotenciaMotor("TODAS");
     setFiltroKpi("");
   };
+
+  const estadoVisualLista = resolverEstadoVisualListaElevatorias(
+    statusLista,
+    elevatorias.length,
+    filtered.length,
+    filtrosAtivos > 0,
+  );
 
   const handleSort = (field: string) => {
     const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
@@ -1255,7 +1288,83 @@ function ElevatoriasPage() {
         </div>
       </div>
 
-      {elevatorias.length === 0 ? (
+      {estadoVisualLista === "loading" ? (
+        <div className="space-y-4" role="status" aria-live="polite" aria-label="Carregando elevatórias">
+          {/* KPI placeholders: do not display zero/old percentages before the first response. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {["Total filtradas", "Completude média", "Críticas", "Em implantação"].map((label) => (
+              <div
+                key={label}
+                className="min-h-[88px] rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {label}
+                </p>
+                <div className="mt-3 h-7 w-20 animate-pulse rounded-md bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-2 h-2.5 w-28 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+              </div>
+            ))}
+          </div>
+
+          {/* Filter placeholders keep the page structure stable while options load. */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-3 h-4 w-16 rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              ))}
+            </div>
+          </section>
+
+          {/* Fixed minimum height avoids a page jump when the first response arrives. */}
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <div className="h-4 w-44 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <div className="h-6 w-24 animate-pulse rounded-full bg-slate-100 dark:bg-slate-800" />
+            </div>
+            <div className="min-h-[360px] max-h-[68vh] space-y-0 overflow-hidden p-4">
+              <div className="mb-4 grid grid-cols-8 gap-4">
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
+                  <div key={item} className="h-3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                ))}
+              </div>
+              {Array.from({ length: 8 }, (_, row) => (
+                <div key={row} className="grid grid-cols-8 gap-4 border-t border-slate-100 py-4 dark:border-slate-800">
+                  {Array.from({ length: 8 }, (_, cell) => (
+                    <div
+                      key={cell}
+                      className={`h-3 animate-pulse rounded bg-slate-100 dark:bg-slate-800 ${cell === 0 ? "w-3/4" : "w-full"}`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : estadoVisualLista === "error" ? (
+        <section
+          className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-red-200 bg-white px-6 py-12 text-center shadow-sm dark:border-red-900/60 dark:bg-slate-900"
+          role="alert"
+        >
+          <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-300">
+            <AlertTriangle className="h-6 w-6" />
+          </span>
+          <h2 className="text-lg font-bold text-[#0b3a73] dark:text-white">
+            Não foi possível carregar as elevatórias
+          </h2>
+          <p className="mt-2 max-w-lg text-sm text-slate-500 dark:text-slate-400">
+            {erroLista || "Ocorreu um erro ao consultar os dados. Verifique sua conexão e tente novamente."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void carregarDados()}
+            className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f7ad6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] focus-visible:ring-offset-2"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Tentar novamente
+          </button>
+        </section>
+      ) : estadoVisualLista === "empty" ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-16 text-center dark:border-slate-600 dark:bg-slate-800">
           <Building2 className="mb-4 h-16 w-16 text-slate-300 dark:text-slate-500" />
           <h2 className="text-xl font-bold text-[#0b3a73] dark:text-white">
@@ -1285,6 +1394,28 @@ function ElevatoriasPage() {
         </div>
       ) : (
         <>
+          {statusLista === "loading" && elevatorias.length > 0 && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Atualizando a lista. Exibindo os últimos dados carregados.
+            </div>
+          )}
+          {statusLista === "error" && elevatorias.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
+              <span>
+                Não foi possível atualizar a lista. Exibindo os últimos dados carregados.
+                {erroLista ? ` ${erroLista}` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => void carregarDados()}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold transition hover:bg-amber-100 dark:hover:bg-amber-900/40"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Tentar novamente
+              </button>
+            </div>
+          )}
           {/* KPI Cards */}
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <button
@@ -2026,13 +2157,29 @@ function ElevatoriasPage() {
                       </tr>
                     );
                   })}
-                  {filtered.length === 0 && (
+                  {estadoVisualLista === "filtered-empty" && (
                     <tr>
                       <td
                         colSpan={permissoes.podeVerMestres ? 12 : 8}
-                        className="px-3 py-8 text-center text-sm text-slate-400"
+                        className="px-3 py-12 text-center"
                       >
-                        Nenhuma elevatória encontrada com os filtros atuais.
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Search className="h-7 w-7 text-slate-300 dark:text-slate-600" />
+                          <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                            Nenhum resultado para os filtros aplicados
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Altere os critérios ou limpe os filtros para visualizar as elevatórias.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={limparFiltros}
+                            className="mt-1 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0b3a73] transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Limpar filtros
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )}
