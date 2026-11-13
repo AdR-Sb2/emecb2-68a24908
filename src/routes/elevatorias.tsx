@@ -1120,9 +1120,9 @@ function ElevatoriasPage() {
   };
 
   return (
-    <div translate="no" className="notranslate min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
+    <div translate="no" className="notranslate min-h-screen min-w-0 bg-[#f4f7fb] p-3 sm:p-4 xl:p-5 2xl:p-6 dark:bg-slate-950">
       {/* Header */}
-      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+      <div className="mb-5 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-3 sm:p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
@@ -1145,17 +1145,17 @@ function ElevatoriasPage() {
       </div>
 
       {/* Title + actions */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0b3a73] dark:text-white sm:text-2xl">
+          <h1 className="text-xl font-bold tracking-tight text-[#0b3a73] dark:text-white sm:text-2xl">
             Ficha da Elevatória
           </h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2 xl:justify-end">
           {permissoes.podeEditar && (
             <button
               onClick={criarElevatoria}
-              className="inline-flex min-h-11 items-center gap-1 rounded-md bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white shadow hover:bg-[#1f7ad6]"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-[#0b3a73] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1f7ad6] sm:text-sm"
             >
               <Plus className="h-4 w-4" /> Nova Elevatória
             </button>
@@ -1163,7 +1163,7 @@ function ElevatoriasPage() {
           {permissoes.podeImportar && (
             <button
               onClick={() => setDialogImportar(true)}
-              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#1f7ad6] bg-white px-3 py-2 text-xs font-semibold text-[#0b3a73] shadow-sm transition hover:bg-[#eaf3fb] dark:bg-slate-800 dark:text-white sm:text-sm"
             >
               <Upload className="h-4 w-4" /> Importar
             </button>
@@ -1171,7 +1171,7 @@ function ElevatoriasPage() {
           {permissoes.podeExportar && (
             <button
               onClick={exportarPlanilha}
-              className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:text-sm"
             >
               <Download className="h-4 w-4" /> Exportar
             </button>
@@ -1202,7 +1202,7 @@ function ElevatoriasPage() {
               {linkToken ? (
                 <button
                   onClick={revogarLinkPublico}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-red-300 bg-white dark:border-red-700 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-700 dark:bg-slate-800 dark:text-red-400 dark:hover:bg-red-900/30 sm:text-sm"
                   title="Revogar link público"
                 >
                   <Link2Off className="h-4 w-4" /> Revogar Link
@@ -1210,7 +1210,7 @@ function ElevatoriasPage() {
               ) : (
                 <button
                   onClick={gerarLinkPublico}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[#1f7ad6] bg-white dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-[#0b3a73] dark:text-white hover:bg-[#eaf3fb]"
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#1f7ad6] bg-white px-3 py-2 text-xs font-semibold text-[#0b3a73] shadow-sm transition hover:bg-[#eaf3fb] dark:bg-slate-800 dark:text-white sm:text-sm"
                   title="Gerar link de apresentação"
                 >
                   <Share2 className="h-4 w-4" /> Link
@@ -1252,10 +1252,10 @@ function ElevatoriasPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4">
             <div
               onClick={() => setFiltroKpi("")}
-              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
+              className={`cursor-pointer rounded-xl border p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-4 ${
                 filtroKpi === ""
                   ? "border-blue-400 bg-blue-100 ring-2 ring-blue-300"
                   : "border-blue-200 bg-blue-50"
@@ -1264,18 +1264,18 @@ function ElevatoriasPage() {
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
                 <Building2 className="h-3 w-3" /> Total (filtradas)
               </div>
-              <div className="mt-1 text-3xl font-bold text-blue-700">{filtered.length}</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-blue-700 sm:text-3xl">{filtered.length}</div>
               <div className="text-[11px] text-blue-500">
                 de {kpis.total} elevatórias cadastradas
               </div>
             </div>
 
             {permissoes.podeVerMestres && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 shadow-sm sm:p-4">
                 <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                   <TrendingUp className="h-3 w-3" /> Completude Média
                 </div>
-                <div className="mt-1 text-3xl font-bold text-emerald-700">
+                <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-700 sm:text-3xl">
                   {kpis.completudeMedia}%
                 </div>
                 <div className="text-[11px] text-emerald-500">do cadastro preenchido</div>
@@ -1294,7 +1294,7 @@ function ElevatoriasPage() {
                 <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-700">
                   <AlertTriangle className="h-3 w-3" /> Críticas
                 </div>
-                <div className="mt-1 text-3xl font-bold text-red-700">{kpis.criticas}</div>
+                <div className="mt-1 text-2xl font-bold tabular-nums text-red-700 sm:text-3xl">{kpis.criticas}</div>
                 <div className="text-[11px] text-red-500">completude &lt; 50%</div>
               </div>
             )}
@@ -1310,146 +1310,221 @@ function ElevatoriasPage() {
               <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
                 <HardHat className="h-3 w-3" /> Em Implantação
               </div>
-              <div className="mt-1 text-3xl font-bold text-amber-700">{kpis.emImplantacao}</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-amber-700 sm:text-3xl">{kpis.emImplantacao}</div>
               <div className="text-[11px] text-amber-500">não operacionais</div>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nome, planta, município, UC, endereço..."
-                className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-700 placeholder-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+          <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white">Filtros</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Refine a lista por localização, cadastro e implantação.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {filtered.length} resultado{filtered.length === 1 ? "" : "s"}
+              </span>
             </div>
 
-            <select
-              value={filtroMunicipio}
-              onChange={(e) => setFiltroMunicipio(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODAS">Todos os municípios</option>
-              {municipios.map((m) => (
-                <option key={m} value={m!}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="flex min-w-0 flex-col gap-1.5 xl:col-span-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Buscar elevatória
+                </span>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Nome, planta, município, UC ou endereço..."
+                    className="h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                      aria-label="Limpar busca"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </label>
 
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODAS">Todos os tipos</option>
-              {tipos.map((t) => (
-                <option key={t} value={t!}>
-                  {t}
-                </option>
-              ))}
-            </select>
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Município
+                </span>
+                <select
+                  value={filtroMunicipio}
+                  onChange={(e) => setFiltroMunicipio(e.target.value)}
+                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <option value="TODAS">Todos os municípios</option>
+                  {municipios.map((m) => (
+                    <option key={m} value={m!}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <select
-              value={filtroEndereco}
-              onChange={(e) => setFiltroEndereco(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODAS">Todos os endereços</option>
-              {enderecos.map((en) => (
-                <option key={en} value={en!}>
-                  {en}
-                </option>
-              ))}
-            </select>
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Tipo de elevatória
+                </span>
+                <select
+                  value={filtroTipo}
+                  onChange={(e) => setFiltroTipo(e.target.value)}
+                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <option value="TODAS">Todos os tipos</option>
+                  {tipos.map((t) => (
+                    <option key={t} value={t!}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            {permissoes.podeVerMestres && (
-              <select
-                value={filtroSecaoCompletude}
-                onChange={(e) => setFiltroSecaoCompletude(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {SECOES_COMPLETUDE.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            {permissoes.podeVerMestres && (
-              <select
-                value={filtroCompletude}
-                onChange={(e) => setFiltroCompletude(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {COMPLETUDE_OPCOES.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            )}
+              <label className="flex min-w-0 flex-col gap-1.5 xl:col-span-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Endereço
+                </span>
+                <select
+                  value={filtroEndereco}
+                  onChange={(e) => setFiltroEndereco(e.target.value)}
+                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <option value="TODAS">Todos os endereços</option>
+                  {enderecos.map((en) => (
+                    <option key={en} value={en!}>
+                      {en}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <select
-              value={filtroImplantacao}
-              onChange={(e) => setFiltroImplantacao(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            >
-              <option value="TODAS">Status de implantação</option>
-              <option value="operacional">Operacional</option>
-              {IMPLANTACAO_STATUS_OPCOES.filter((o) => o.value !== "operacional").map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              {permissoes.podeVerMestres && (
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Seção da completude
+                  </span>
+                  <select
+                    value={filtroSecaoCompletude}
+                    onChange={(e) => setFiltroSecaoCompletude(e.target.value)}
+                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {SECOES_COMPLETUDE.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
-            {permissoes.podeVerMestres && (
-              <select
-                value={filtroTipoConstrutivo}
-                onChange={(e) => setFiltroTipoConstrutivo(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <option value="TODAS">Tipo construtivo</option>
-                {tiposConstrutivos.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            )}
+              {permissoes.podeVerMestres && (
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Faixa de completude
+                  </span>
+                  <select
+                    value={filtroCompletude}
+                    onChange={(e) => setFiltroCompletude(e.target.value)}
+                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {COMPLETUDE_OPCOES.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
-            {permissoes.podeVerMestres && (
-              <select
-                value={filtroPotenciaMotor}
-                onChange={(e) => setFiltroPotenciaMotor(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-[#1f7ad6] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <option value="TODAS">Potência motor</option>
-                {potenciasMotor.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+              <label className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Status de implantação
+                </span>
+                <select
+                  value={filtroImplantacao}
+                  onChange={(e) => setFiltroImplantacao(e.target.value)}
+                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <option value="TODAS">Todos os status</option>
+                  <option value="operacional">Operacional</option>
+                  {IMPLANTACAO_STATUS_OPCOES.filter((o) => o.value !== "operacional").map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {permissoes.podeVerMestres && (
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Tipo construtivo
+                  </span>
+                  <select
+                    value={filtroTipoConstrutivo}
+                    onChange={(e) => setFiltroTipoConstrutivo(e.target.value)}
+                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <option value="TODAS">Todos os tipos construtivos</option>
+                    {tiposConstrutivos.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {permissoes.podeVerMestres && (
+                <label className="flex min-w-0 flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Potência do motor
+                  </span>
+                  <select
+                    value={filtroPotenciaMotor}
+                    onChange={(e) => setFiltroPotenciaMotor(e.target.value)}
+                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <option value="TODAS">Todas as potências</option>
+                    {potenciasMotor.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          </section>
 
           {/* Table */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <div className="max-h-[600px] overflow-auto">
-              <table className="min-w-[1100px] w-full text-left text-[13px]">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <div>
+                <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white">
+                  Elevatórias cadastradas
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {filtered.length} de {elevatorias.length} registros
+                </p>
+              </div>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Role horizontalmente para ver todas as colunas
+              </span>
+            </div>
+            <div className="max-h-[calc(100vh-22rem)] min-h-[320px] max-w-full overflow-auto overscroll-contain">
+              <table className="w-full min-w-[1120px] 2xl:min-w-[1280px] table-fixed text-left text-xs xl:text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                   <tr>
                     {(["nome", "planta", "tipo", "municipio"] as const).map((f) => (
@@ -1887,7 +1962,7 @@ function ElevatoriasPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         </>
       )}
 
