@@ -201,7 +201,7 @@ function InputField({
             else handleFieldChange(tabela, campo, newVal, grupo, rowId);
           }}
           disabled={!podeEditar}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
+          className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-700 shadow-sm transition placeholder:text-slate-400 focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-800"
         />
       )}
     </div>
@@ -785,7 +785,7 @@ function ElevatoriaFichaPage() {
                     );
                   }
                 }}
-                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800 px-3 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <FileSpreadsheet className="h-4 w-4" /> Exportar
               </button>
@@ -894,7 +894,7 @@ function ElevatoriaFichaPage() {
                       href={`https://www.google.com/maps/search/?api=1&query=${elevatoria.latitude},${elevatoria.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="col-span-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f7ad6] bg-[#1f7ad6]/10 px-3 py-2 text-[13px] font-semibold text-[#1f7ad6] transition hover:bg-[#1f7ad6] hover:text-white dark:border-[#38bdf8] dark:bg-[#38bdf8]/10 dark:text-[#38bdf8] dark:hover:bg-[#38bdf8]"
+                      className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#1f7ad6] bg-[#1f7ad6]/10 px-4 py-2.5 text-sm font-semibold text-[#1f7ad6] shadow-sm transition hover:bg-[#1f7ad6] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f7ad6] dark:border-[#38bdf8] dark:bg-[#38bdf8]/10 dark:text-[#38bdf8] dark:hover:bg-[#38bdf8]"
                     >
                       <ExternalLink className="h-4 w-4" /> Abrir mapa
                     </a>
