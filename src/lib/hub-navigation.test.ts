@@ -63,11 +63,11 @@ describe("Hub sidebar navigation", () => {
     expect(HUB_PUBLIC_LINKS_GROUP.expandedByDefault).toBe(true);
   });
 
-  it("keeps Procedimentos as a visible standalone item when it is the only Documentation item", () => {
+  it("keeps Procedimentos inside the Documentation group when it is the only visible item", () => {
     const groups = getVisibleHubSidebarGroups(["procedimentos"]);
     const docs = groups.find((group) => group.id === "documentacao");
     expect(docs?.items.map((item) => item.key)).toEqual(["procedimentos"]);
-    expect(docs?.showHeading).toBe(false);
+    expect(docs?.showHeading).toBe(true);
   });
 
   it("identifies public links as their own active group", () => {
