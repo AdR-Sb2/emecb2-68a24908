@@ -147,9 +147,9 @@ function InputField({
   if (!podeVer) return null;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
           {label}
         </label>
         {podeEditar && (
@@ -181,7 +181,7 @@ function InputField({
             else handleFieldChange(tabela, campo, newVal, grupo, rowId);
           }}
           disabled={!podeEditar}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:disabled:bg-slate-800"
+          className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-800"
         >
           <option value="">—</option>
           {opcoes.map((o) => (
@@ -210,9 +210,9 @@ function InputField({
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <h3 className="mb-4 text-sm font-bold text-[#0b3a73] dark:text-white">{title}</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_8px_30px_-22px_rgba(15,23,42,0.35)] sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+      <h3 className="mb-5 text-base font-bold tracking-tight text-[#0b3a73] dark:text-white">{title}</h3>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:gap-6">
         {children}
       </div>
     </div>
@@ -623,9 +623,9 @@ function ElevatoriaFichaPage() {
 
   return (
     <FichaContext.Provider value={{ isNA, toggleNA, handleFieldChange, editMode, permissoes }}>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-3 md:p-6">
+      <div className="min-h-screen bg-[#f4f7fb] px-4 py-5 sm:px-6 lg:px-8 dark:bg-slate-950">
         {/* Header */}
-        <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)] md:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
@@ -648,7 +648,7 @@ function ElevatoriaFichaPage() {
         </div>
 
         {/* Title + actions */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mx-auto mb-6 flex w-full max-w-[1680px] flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Link
               to="/elevatorias"
@@ -658,7 +658,7 @@ function ElevatoriaFichaPage() {
             </Link>
             <div className="min-w-0">
               <h1
-                className={`truncate text-lg font-bold text-[#0b3a73] dark:text-white ${editMode ? "cursor-pointer" : ""}`}
+                className={`truncate text-2xl font-bold tracking-tight text-[#0b3a73] dark:text-white sm:text-3xl ${editMode ? "cursor-pointer" : ""}`}
                 onClick={() => {
                   if (editMode && permissoes.podeEditar) {
                     setEditingNome(true);
@@ -717,7 +717,7 @@ function ElevatoriaFichaPage() {
               {elevatoria.planta && (
                 <Badge
                   variant="outline"
-                  className="border-slate-300 bg-white text-[10px] text-slate-500 dark:border-slate-600 dark:bg-slate-800"
+                  className="rounded-full border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
                 >
                   {elevatoria.planta}
                 </Badge>
@@ -793,10 +793,10 @@ function ElevatoriaFichaPage() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-[1400px]">
+        <div className="mx-auto w-full max-w-[1680px]">
           {/* Basic Info Card */}
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="mb-7 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_8px_30px_-22px_rgba(15,23,42,0.35)] sm:p-6 lg:p-7 dark:border-slate-800 dark:bg-slate-900">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 xl:gap-8">
               <div className="xl:col-span-2">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   <InputField
@@ -874,7 +874,7 @@ function ElevatoriaFichaPage() {
                     valor={elevatoria.funcao}
                   />
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-4 sm:w-1/2 lg:w-1/3">
+                <div className="mt-5 grid grid-cols-2 gap-5 sm:w-1/2 lg:w-1/3">
                   <InputField
                     tabela="elevatoria"
                     campo="latitude"
@@ -902,7 +902,7 @@ function ElevatoriaFichaPage() {
                 </div>
               </div>
               <div className="xl:col-span-1">
-                <div className="flex h-full min-h-[200px] items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
+                <div className="flex h-full min-h-[240px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-inner dark:border-slate-700 dark:bg-slate-800">
                   {elevatoria.latitude && elevatoria.longitude ? (
                     <iframe
                       title="Mapa"
@@ -946,7 +946,7 @@ function ElevatoriaFichaPage() {
           {permissoes.podeVerMestres && (
             <>
               {/* Tabs */}
-              <div className="mb-4 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700">
+              <div className="mb-5 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                 {[
                   {
                     key: "equipamento" as AbaDadosMestres,
@@ -967,9 +967,9 @@ function ElevatoriaFichaPage() {
                   <button
                     key={tab.key}
                     onClick={() => setAba(tab.key)}
-                    className={`inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
+                    className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition ${
                       aba === tab.key
-                        ? "border-[#1f7ad6] text-[#1f7ad6] dark:border-[#38bdf8] dark:text-[#38bdf8]"
+                        ? "border-blue-200 bg-blue-50 text-[#0b3a73] dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200"
                         : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                     }`}
                   >
@@ -981,7 +981,7 @@ function ElevatoriaFichaPage() {
 
               {/* Tab Content */}
               {aba === "equipamento" && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {equipamentos.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-600 dark:bg-slate-800">
                       <Wrench className="mx-auto mb-2 h-8 w-8 text-slate-300 dark:text-slate-500" />
@@ -995,7 +995,7 @@ function ElevatoriaFichaPage() {
                   ) : (
                     equipamentos.map((eq) => (
                       <div key={eq.id} className="space-y-4">
-                        <h4 className="text-sm font-bold text-[#0b3a73] dark:text-white">
+                        <h4 className="border-b border-slate-100 pb-2 text-base font-bold text-[#0b3a73] dark:border-slate-700 dark:text-white">
                           Grupo {eq.grupo}
                         </h4>
                         <SectionCard title="Motor Elétrico">
