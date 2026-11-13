@@ -1524,7 +1524,7 @@ function ElevatoriasPage() {
               </span>
             </div>
             <div className="max-h-[calc(100vh-22rem)] min-h-[320px] max-w-full overflow-auto overscroll-contain">
-              <table className="w-full min-w-[1120px] 2xl:min-w-[1280px] table-fixed text-left text-xs xl:text-[13px]">
+              <table className="w-full min-w-[1120px] 2xl:min-w-[1280px] table-auto text-left text-xs xl:text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                   <tr>
                     {(["nome", "planta", "tipo", "municipio"] as const).map((f) => (
