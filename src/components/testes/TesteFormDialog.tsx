@@ -52,6 +52,33 @@ const CAMPOS: Array<{ key: keyof FormularioTeste; label: string; tipo?: string; 
     { key: "status", label: "Status" },
   ];
 
+type ErroOperacaoTeste = {
+  message?: unknown;
+  details?: unknown;
+  hint?: unknown;
+  code?: unknown;
+};
+
+function extrairMensagemErroTeste(err: unknown): string {
+  if (err instanceof Error) return err.message;
+
+  if (err && typeof err === "object") {
+    const erro = err as ErroOperacaoTeste;
+    const mensagem =
+      typeof erro.message === "string" && erro.message.trim()
+        ? erro.message.trim()
+        : "Erro não identificado pelo Supabase.";
+    const detalhes = [erro.details, erro.hint]
+      .filter((valor): valor is string => typeof valor === "string" && valor.trim().length > 0)
+      .map((valor) => valor.trim());
+    const codigo =
+      typeof erro.code === "string" && erro.code.trim() ? ` (código ${erro.code.trim()})` : "";
+    return [mensagem, ...detalhes].join(" — ") + codigo;
+  }
+
+  return typeof err === "string" && err.trim() ? err : "Erro não identificado ao salvar o teste.";
+}
+
 function rotuloTipo(t: TipoTeste): string {
   return t === TIPO_TESTE_CEDAE ? "CEDAE" : TIPO_TESTE_ADR_LABEL;
 }
@@ -109,8 +136,8 @@ export function TesteFormDialog({
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      const mensagem = err instanceof Error ? err.message : "Falha ao salvar o teste.";
-      toast.error(mensagem);
+      console.error("Erro ao salvar teste em testes_afericoes:", err);
+      toast.error(`Falha ao salvar teste: ${extrairMensagemErroTeste(err)}`);
     } finally {
       setSalvando(false);
     }
