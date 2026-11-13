@@ -573,6 +573,36 @@ function ElevatoriasPage() {
     sortDir,
   ]);
 
+  const filtrosAvancadosAtivos = [
+    filtroEndereco !== "TODAS",
+    permissoes.podeVerMestres && filtroSecaoCompletude !== "geral",
+    permissoes.podeVerMestres && filtroCompletude !== "TODAS",
+    permissoes.podeVerMestres && filtroTipoConstrutivo !== "TODAS",
+    permissoes.podeVerMestres && filtroPotenciaMotor !== "TODAS",
+  ].filter(Boolean).length;
+
+  const filtrosAtivos = [
+    search.trim() !== "",
+    filtroMunicipio !== "TODAS",
+    filtroTipo !== "TODAS",
+    filtroImplantacao !== "TODAS",
+    filtrosAvancadosAtivos > 0,
+    filtroKpi !== "",
+  ].filter(Boolean).length;
+
+  const limparFiltros = () => {
+    setSearch("");
+    setFiltroMunicipio("TODAS");
+    setFiltroTipo("TODAS");
+    setFiltroEndereco("TODAS");
+    setFiltroSecaoCompletude("geral");
+    setFiltroCompletude("TODAS");
+    setFiltroImplantacao("TODAS");
+    setFiltroTipoConstrutivo("TODAS");
+    setFiltroPotenciaMotor("TODAS");
+    setFiltroKpi("");
+  };
+
   const handleSort = (field: string) => {
     const newDir = sortField === field && sortDir === "asc" ? "desc" : "asc";
     setSortField(field);
@@ -1421,16 +1451,33 @@ function ElevatoriasPage() {
                 </select>
               </label>
 
-              <button
-                type="button"
-                onClick={() => setMostrarFiltrosAvancados((aberto) => !aberto)}
-                aria-expanded={mostrarFiltrosAvancados}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                Mais filtros
-                <ChevronDown className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? "rotate-180" : ""}`} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarFiltrosAvancados((aberto) => !aberto)}
+                  aria-expanded={mostrarFiltrosAvancados}
+                  className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition ${mostrarFiltrosAvancados || filtrosAvancadosAtivos > 0 ? "border-blue-300 bg-blue-50 text-[#0b3a73] dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "border-slate-300 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"}`}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Mais filtros
+                  {filtrosAvancadosAtivos > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0b3a73] px-1 text-[10px] font-bold text-white">
+                      {filtrosAvancadosAtivos}
+                    </span>
+                  )}
+                  <ChevronDown className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? "rotate-180" : ""}`} />
+                </button>
+                {filtrosAtivos > 0 && (
+                  <button
+                    type="button"
+                    onClick={limparFiltros}
+                    className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-[#0b3a73] dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Limpar
+                  </button>
+                )}
+              </div>
             </div>
 
             {mostrarFiltrosAvancados && (
@@ -1439,25 +1486,11 @@ function ElevatoriasPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Filtros avançados
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch("");
-                      setFiltroMunicipio("TODAS");
-                      setFiltroTipo("TODAS");
-                      setFiltroEndereco("TODAS");
-                      setFiltroSecaoCompletude("geral");
-                      setFiltroCompletude("TODAS");
-                      setFiltroImplantacao("TODAS");
-                      setFiltroTipoConstrutivo("TODAS");
-                      setFiltroPotenciaMotor("TODAS");
-                      setFiltroKpi("");
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[#1f7ad6] transition hover:bg-blue-50 dark:hover:bg-slate-800"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Limpar todos os filtros
-                  </button>
+                  <span className="text-xs text-slate-400">
+                    {filtrosAvancadosAtivos > 0
+                      ? `${filtrosAvancadosAtivos} filtro(s) avançado(s) ativo(s)`
+                      : "Use estes campos quando precisar refinar a busca"}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
