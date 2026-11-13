@@ -114,7 +114,9 @@ export function getVisibleHubSidebarGroups(
     return {
       ...group,
       items,
-      showHeading: items.length > 1,
+      // Documentação keeps its group label even when only Procedimentos is
+      // visible for a specific cargo, so it never looks like an unrelated item.
+      showHeading: items.length > 1 || group.id === "documentacao",
     };
   }).filter((group) => group.items.length > 0);
 }
