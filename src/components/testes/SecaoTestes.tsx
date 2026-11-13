@@ -51,57 +51,57 @@ function TabelaTestes({
     );
   }
   return (
-    <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-200 bg-white shadow-inner dark:border-slate-700 dark:bg-slate-900">
-      <table className="w-full min-w-[1120px] text-left text-[13px] leading-5">
+    <div className="w-full max-w-full max-h-[65vh] overflow-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-inner dark:border-slate-700 dark:bg-slate-900">
+      <table className="w-full min-w-[980px] 2xl:min-w-0 table-auto text-left text-xs 2xl:text-[13px] leading-5">
         <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 shadow-sm dark:bg-slate-700 dark:text-slate-200">
           <tr>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Data
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Grupo
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Tipo
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Colaboradores
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Serviço Executado
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Observação
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Tensão (V)
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Corrente (A)
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Recalque
             </th>
             <th
-              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+              className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-[10px] 2xl:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
             >
               Retaguarda
             </th>
@@ -118,38 +118,38 @@ function TabelaTestes({
               key={r.Id}
               className="border-t border-slate-100 align-top odd:bg-white even:bg-slate-50/70 hover:bg-blue-50/70 dark:border-slate-700 dark:odd:bg-slate-900 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60"
             >
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+              <td className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 font-medium text-slate-700 dark:text-slate-200">
                 {fmtData(r["Data do Teste"])}
               </td>
-              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
+              <td className="px-2 py-2 2xl:px-3 2xl:py-3 text-slate-700 dark:text-slate-200">
                 {r.Grupo ?? "N/A"}
               </td>
-              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
+              <td className="px-2 py-2 2xl:px-3 2xl:py-3 text-slate-700 dark:text-slate-200">
                 {r["Tipo de Serviço"] ?? "N/A"}
               </td>
-              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
+              <td className="px-2 py-2 2xl:px-3 2xl:py-3 text-slate-700 dark:text-slate-200">
                 {r["Nome dos Colaboradores:"] ?? "N/A"}
               </td>
-              <td className="max-w-[340px] whitespace-normal px-3 py-3 text-slate-700 dark:text-slate-200">
+              <td className="max-w-[220px] 2xl:max-w-[320px] break-words whitespace-normal px-2 py-2 2xl:px-3 2xl:py-3 text-slate-700 dark:text-slate-200">
                 {r["Serviço Executado:"] ?? "N/A"}
               </td>
-              <td className="max-w-[340px] whitespace-normal px-3 py-3 text-slate-700 dark:text-slate-200">
+              <td className="max-w-[220px] 2xl:max-w-[320px] break-words whitespace-normal px-2 py-2 2xl:px-3 2xl:py-3 text-slate-700 dark:text-slate-200">
                 {r["Observação:"] ?? "N/A"}
               </td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+              <td className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 font-medium text-slate-700 dark:text-slate-200">
                 {r["Tensão ( V )"] ?? "N/A"}
               </td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+              <td className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 font-medium text-slate-700 dark:text-slate-200">
                 {r["Corrente ( A )"] ?? "N/A"}
               </td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+              <td className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 font-medium text-slate-700 dark:text-slate-200">
                 {r.Recalque ?? "N/A"}
               </td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+              <td className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 font-medium text-slate-700 dark:text-slate-200">
                 {r.Retaguarda ?? "N/A"}
               </td>
               {onExcluir && (
-                <td className="whitespace-nowrap px-3 py-3 text-right">
+                <td className="whitespace-nowrap px-2 py-2 2xl:px-3 2xl:py-3 text-right">
                   <button
                     type="button"
                     title="Excluir teste CEDAE"
@@ -256,8 +256,8 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
   };
 
   const barraFiltros = (
-    <div className="flex flex-wrap items-end gap-3">
-      <label className="flex flex-col gap-1">
+    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:flex 2xl:w-auto 2xl:items-end 2xl:gap-3">
+      <label className="flex min-w-0 flex-col gap-1 2xl:min-w-[150px]">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           De
         </span>
@@ -265,11 +265,11 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
           type="month"
           value={mesIni}
           onChange={(e) => setMesIni(e.target.value)}
-          className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           aria-label="Mês inicial"
         />
       </label>
-      <label className="flex flex-col gap-1">
+      <label className="flex min-w-0 flex-col gap-1 2xl:min-w-[150px]">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Até
         </span>
@@ -277,18 +277,18 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
           type="month"
           value={mesFim}
           onChange={(e) => setMesFim(e.target.value)}
-          className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           aria-label="Mês final"
         />
       </label>
-      <label className="flex min-w-[180px] flex-col gap-1">
+      <label className="flex min-w-0 flex-col gap-1 2xl:min-w-[190px]">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Tipo de serviço
         </span>
         <select
           value={tipoServico}
           onChange={(e) => setTipoServico(e.target.value)}
-          className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           aria-label="Tipo de serviço"
         >
         <option value="TODOS">Todos os tipos</option>
@@ -303,8 +303,8 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
   );
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_8px_30px_-22px_rgba(15,23,42,0.35)] sm:p-6 lg:p-7 dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-5 flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
+    <div className="w-full min-w-0 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_8px_30px_-22px_rgba(15,23,42,0.35)] sm:p-5 2xl:p-7 dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
         <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-[#0b3a73] dark:text-white">
           <ShieldCheck className="h-4 w-4" /> Testes &amp; Aferições
         </h3>
@@ -334,7 +334,7 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
         </div>
       ) : (
         <Tabs value={aba} onValueChange={(v) => setAba(v as "adr" | "cedae")}>
-          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="mb-5 flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <TabsList className="h-11 w-fit bg-slate-100 p-1.5 dark:bg-slate-800">
               <TabsTrigger
                 value="adr"
@@ -354,7 +354,7 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
 
           <TabsContent value="adr" className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50/70 px-3 py-2.5 dark:bg-blue-950/30">
-              <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+              <p className="min-w-0 text-xs leading-5 text-slate-500 dark:text-slate-400">
                 Somente leitura · mesma base da aba Testes (dashboard), filtrada pela planta{" "}
                 <span className="font-semibold text-slate-500 dark:text-slate-300">{codigo}</span>,
                 mais recente primeiro.
