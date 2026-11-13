@@ -1765,7 +1765,7 @@ function ElevatoriasPage() {
             </div>
             <div className="elevatorias-list-page__table-scroll min-w-0 max-w-full overflow-auto overscroll-contain">
               <table className="w-full min-w-[1240px] 2xl:min-w-[1380px] table-auto text-left text-xs xl:text-[13px]">
-                <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
+                <thead className="bg-[#eaf3fb] text-[12px] text-[#0b3a73] dark:bg-slate-700 dark:text-slate-200">
                   <tr>
                     {(["nome", "planta", "tipo", "municipio"] as const).map((f) => (
                       <th
