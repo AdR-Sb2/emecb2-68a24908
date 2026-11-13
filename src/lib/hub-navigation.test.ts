@@ -3,6 +3,7 @@ import {
   HUB_DASHBOARD_CARDS,
   HUB_DASHBOARDS_ROUTE,
   HUB_PUBLIC_LINKS_GROUP,
+  canShowProcedimentosNavigation,
   HUB_SIDEBAR_GROUPS,
   getActiveHubGroup,
   getVisibleDashboardCards,
@@ -48,6 +49,25 @@ describe("Hub sidebar navigation", () => {
     expect(getActiveHubGroup("/plano-manutencao")).toBe("planejamento");
     expect(getActiveHubGroup("/testes")).toBe("analises");
     expect(getActiveHubGroup("/estoque/equipamento/10")).toBe("ativos");
+  });
+
+  it("keeps Procedimentos visible only when panel and view permission are both granted", () => {
+    expect(canShowProcedimentosNavigation(true, true)).toBe(true);
+    expect(canShowProcedimentosNavigation(true, false)).toBe(false);
+    expect(canShowProcedimentosNavigation(false, true)).toBe(false);
+    expect(canShowProcedimentosNavigation(false, false)).toBe(false);
+  });
+
+  it("configures public links as a separate always-expanded section", () => {
+    expect(HUB_PUBLIC_LINKS_GROUP.collapsible).toBe(false);
+    expect(HUB_PUBLIC_LINKS_GROUP.expandedByDefault).toBe(true);
+  });
+
+  it("keeps Procedimentos as a visible standalone item when it is the only Documentation item", () => {
+    const groups = getVisibleHubSidebarGroups(["procedimentos"]);
+    const docs = groups.find((group) => group.id === "documentacao");
+    expect(docs?.items.map((item) => item.key)).toEqual(["procedimentos"]);
+    expect(docs?.showHeading).toBe(false);
   });
 
   it("identifies public links as their own active group", () => {
