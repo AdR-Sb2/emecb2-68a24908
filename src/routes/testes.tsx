@@ -28,6 +28,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { COLUNAS_MODELO_TESTE, linhaModeloVazia, mapearLinhaModelo } from "@/lib/testes-tipos";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/testes")({
@@ -68,6 +69,7 @@ type Row = {
   "Na Chegada": string | null;
   "Na saida": string | null;
   Status: string | null;
+  tipo_teste?: string | null;
 };
 
 const DATA = rawData as unknown as Row[];
@@ -223,6 +225,7 @@ function TestesPage() {
               "Na Chegada": (row.na_chegada as string) ?? null,
               "Na saida": (row.na_saida as string) ?? null,
               Status: (row.status as string) ?? null,
+              tipo_teste: (row.tipo_teste as string) ?? "ADR",
             };
             return r;
           });
@@ -289,6 +292,8 @@ function TestesPage() {
   }, [data]);
 
   const [tipo, setTipo] = useState<string>("TODOS");
+  // CEDAE fica fora dos KPIs/gráficos por padrão; só entra com filtro explícito.
+  const [tipoTeste, setTipoTeste] = useState<string>("ADR");
   const [grupo, setGrupo] = useState<string>("TODOS");
   const [elev, setElev] = useState<string>("TODOS");
   const [mesIni, setMesIni] = useState<string>("TODOS");
@@ -323,6 +328,7 @@ function TestesPage() {
   const rows = useMemo(
     () =>
       data.filter((d) => {
+        if (tipoTeste !== "TODOS" && (d.tipo_teste ?? "ADR") !== tipoTeste) return false;
         if (tipo !== "TODOS" && d["Tipo de Serviço"] !== tipo) return false;
         if (grupo !== "TODOS") {
           if (grupo === "__VAZIO__") {
@@ -343,7 +349,7 @@ function TestesPage() {
         }
         return true;
       }),
-    [data, tipo, grupo, elev, mesIni, mesFim, crossElev, crossMes, obstrOnly],
+    [data, tipoTeste, tipo, grupo, elev, mesIni, mesFim, crossElev, crossMes, obstrOnly],
   );
 
   const tableRows = useMemo(() => {
@@ -542,104 +548,12 @@ function TestesPage() {
     }
   };
 
-  // --- Import from Microsoft Forms Excel ---
-  const COLUNAS_ESPERADAS = [
-    "ID",
-    "Hora de início",
-    "Hora de conclusão",
-    "Email",
-    "Nome",
-    "Hora da última modificação",
-    "Data do Teste",
-    "Tipo de Serviço",
-    "Elevatória",
-    "Grupo",
-    "Tensão ( V )",
-    "Corrente ( A )",
-    "Retaguarda",
-    "Recalque",
-    "Corrente ShutOff",
-    "Retaguarda ShutOff",
-    "Recalque ShutOff",
-    "Impossibilidade:",
-    "Serviço Executado:",
-    "Nome dos Colaboradores:",
-    "Observação:",
-    "Na Chegada",
-    "Na saida",
-    "Status",
-  ];
-
-  const COLUNA_MAP: Record<string, keyof Row> = {
-    ID: "Id",
-    "Hora de início": "Hora de início",
-    "Hora de conclusão": "Hora de conclusão",
-    Email: "Email",
-    Nome: "Nome",
-    "Data do Teste": "Data do Teste",
-    "Tipo de Serviço": "Tipo de Serviço",
-    Elevatória: "Elevatória",
-    Grupo: "Grupo",
-    "Tensão ( V )": "Tensão ( V )",
-    "Corrente ( A )": "Corrente ( A )",
-    Retaguarda: "Retaguarda",
-    Recalque: "Recalque",
-    "Corrente ShutOff": "Corrente ShutOff",
-    "Retaguarda ShutOff": "Retaguarda ShutOff",
-    "Recalque ShutOff": "Recalque ShutOff",
-    "Impossibilidade:": "Impossibilidade:",
-    "Serviço Executado:": "Serviço Executado:",
-    "Nome dos Colaboradores:": "Nome dos Colaboradores:",
-    "Observação:": "Observação:",
-    "Na Chegada": "Na Chegada",
-    "Na saida": "Na saida",
-    Status: "Status",
-  };
-
-  function linhaVazia(row: Record<string, unknown>): boolean {
-    const camposTeste = [
-      "Data do Teste",
-      "Tipo de Serviço",
-      "Elevatória",
-      "Grupo",
-      "Tensão ( V )",
-      "Corrente ( A )",
-      "Retaguarda",
-      "Recalque",
-      "Corrente ShutOff",
-      "Retaguarda ShutOff",
-      "Recalque ShutOff",
-      "Impossibilidade:",
-      "Serviço Executado:",
-      "Nome dos Colaboradores:",
-      "Observação:",
-      "Na Chegada",
-      "Na saida",
-      "Status",
-    ];
-    return camposTeste.every((c) => {
-      const v = row[c];
-      return v === null || v === undefined || String(v).trim() === "";
-    });
-  }
-
-  function mapearLinha(row: Record<string, unknown>): Row {
-    const out: Record<string, unknown> = {};
-    for (const [colForms, colInternal] of Object.entries(COLUNA_MAP)) {
-      const v = row[colForms];
-      if (v !== null && v !== undefined) {
-        if (v instanceof Date) {
-          out[colInternal] = v.toISOString();
-        } else {
-          out[colInternal] = v;
-        }
-      }
-    }
-    if (out.Id !== undefined && out.Id !== null) {
-      out.Id = Number(out.Id);
-    }
-    return out as unknown as Row;
-  }
+  // --- Import from Microsoft Forms Excel (modelo de 24 colunas) ---
+  // A leitura/normalização vem de src/lib/testes-tipos.ts (coberto por testes),
+  // garantindo que a planilha padrão continue importando sem erro.
+  const COLUNAS_ESPERADAS = COLUNAS_MODELO_TESTE;
+  const linhaVazia = linhaModeloVazia;
+  const mapearLinha = mapearLinhaModelo;
 
   async function carregarIdsExistentes(): Promise<Set<number>> {
     const ids = new Set<number>();
@@ -721,6 +635,9 @@ function TestesPage() {
           na_chegada: row["Na Chegada"] || null,
           na_saida: row["Na saida"] || null,
           status: row.Status || null,
+          // A planilha de 24 colunas não classifica o teste: importação gera AdR.
+          // O limite de CEDAE é garantido no banco (trigger) caso haja CEDAE.
+          tipo_teste: "ADR",
           criado_por: "IMPORTACAO_PLANILHA",
           atualizado_em: new Date().toISOString(),
         },
@@ -870,6 +787,7 @@ function TestesPage() {
             "Na Chegada": (row.na_chegada as string) ?? null,
             "Na saida": (row.na_saida as string) ?? null,
             Status: (row.status as string) ?? null,
+            tipo_teste: (row.tipo_teste as string) ?? "ADR",
           };
           return r;
         });
@@ -879,6 +797,11 @@ function TestesPage() {
       setImportModalOpen(false);
       setImportPreview(null);
       setImportFile(null);
+
+      // Notifica a ficha da elevatória para recarregar o histórico AdR (fonte única).
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("testes-atualizados"));
+      }
 
       const msg = `${resultado.inseridos} registros importados, ${resultado.atualizados} atualizados${resultado.erros.length > 0 ? `, ${resultado.erros.length} erros` : ""}`;
       alert(msg);
@@ -932,6 +855,14 @@ function TestesPage() {
         </summary>
         <div className="flex flex-col gap-3 border-t border-slate-100 p-3 dark:border-slate-700">
           <FilterSelect
+            label="TIPO DE TESTE"
+            value={tipoTeste}
+            onChange={setTipoTeste}
+            options={["ADR", "CEDAE"]}
+            renderOption={(v) => (v === "ADR" ? "AdR" : "CEDAE")}
+            block
+          />
+          <FilterSelect
             label="TIPO DE SERVIÇO"
             value={tipo}
             onChange={setTipo}
@@ -970,7 +901,8 @@ function TestesPage() {
             renderOption={labelMes}
             block
           />
-          {(tipo !== "TODOS" ||
+          {(tipoTeste !== "ADR" ||
+            tipo !== "TODOS" ||
             grupo !== "TODOS" ||
             elev !== "TODOS" ||
             mesIni !== "TODOS" ||
@@ -978,6 +910,7 @@ function TestesPage() {
             <button
               type="button"
               onClick={() => {
+                setTipoTeste("ADR");
                 setTipo("TODOS");
                 setGrupo("TODOS");
                 setElev("TODOS");
@@ -1001,6 +934,13 @@ function TestesPage() {
       </details>
 
       <div className="mb-4 hidden flex-wrap items-center gap-3 sm:flex">
+        <FilterSelect
+          label="TIPO DE TESTE"
+          value={tipoTeste}
+          onChange={setTipoTeste}
+          options={["ADR", "CEDAE"]}
+          renderOption={(v) => (v === "ADR" ? "AdR" : "CEDAE")}
+        />
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
         <FilterSelect
           label="GRUPO"
@@ -1030,7 +970,8 @@ function TestesPage() {
           options={MESES_DISPONIVEIS}
           renderOption={labelMes}
         />
-        {(tipo !== "TODOS" ||
+        {(tipoTeste !== "ADR" ||
+          tipo !== "TODOS" ||
           grupo !== "TODOS" ||
           elev !== "TODOS" ||
           mesIni !== "TODOS" ||
@@ -1038,6 +979,7 @@ function TestesPage() {
           <button
             type="button"
             onClick={() => {
+              setTipoTeste("ADR");
               setTipo("TODOS");
               setGrupo("TODOS");
               setElev("TODOS");
