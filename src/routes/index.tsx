@@ -1,8 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import {
   LayoutDashboard,
-  Boxes,
   ArrowRight,
   FileText,
   ClipboardList,
@@ -39,6 +38,12 @@ import { useAuth } from "../lib/auth";
 import { supabase, supabaseConfigSummary } from "../lib/supabase";
 import { getCargoPaineis, getPermissoesCargo, temPermissao } from "../lib/permissoes";
 import { HubOverview, HubWelcome } from "@/components/hub-overview";
+import {
+  HUB_PUBLIC_LINKS_GROUP,
+  HUB_DASHBOARDS_ROUTE,
+  getActiveHubGroup,
+  getVisibleHubSidebarGroups,
+} from "@/lib/hub-navigation";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,9 +54,6 @@ export const Route = createFileRoute("/")({
   }),
   component: Index,
 });
-
-const SISTEMAS_OPERACIONAL_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/";
-const SISTEMAS_ADMINISTRATIVO_URL = "https://adr-sb2.github.io/Gest-o-de-Ativos/adm/adm.html";
 
 type Painel = {
   chave: string;
@@ -64,12 +66,11 @@ type PublicLink = { key: string; nome: string; descricao: string; url: string };
 
 function Index() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, loading, signOut } = useAuth();
   const [paineis, setPaineis] = useState<Painel[]>([]);
   const [loadingPaineis, setLoadingPaineis] = useState(true);
-  const [dashOpen, setDashOpen] = useState(false);
-  const [sysOpen, setSysOpen] = useState(false);
-  const [fichaChoiceOpen, setFichaChoiceOpen] = useState(false);
+  const [openSidebarGroup, setOpenSidebarGroup] = useState<string | null>(null);
   const [categoryChoice, setCategoryChoice] = useState<string | null>(null);
   const [publicLinks, setPublicLinks] = useState<PublicLink[]>([]);
   const [permissoes, setPermissoes] = useState<Map<string, Set<string>>>(new Map());
@@ -85,6 +86,10 @@ function Index() {
   const updateOpenOsCount = useCallback((count: number | null) => setOpenOsCount(count), []);
   const canViewRecords = temPermissao(permissoes, "registros", "visualizar");
   const canViewEquipment = temPermissao(permissoes, "estoque", "equipamentos_ver");
+
+  useEffect(() => {
+    setOpenSidebarGroup(getActiveHubGroup(location.pathname));
+  }, [location.pathname]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setHoraAtual(new Date()), 60_000);
@@ -273,7 +278,6 @@ function Index() {
   const hasFallbackPanels = paineis.length === 0;
   const shouldShowDashboard =
     hasPanel("dashboard_automacao") || hasPanel("dashboard_testes") || hasFallbackPanels;
-  const shouldShowSistema = hasPanel("sistemas") || hasFallbackPanels;
   const shouldShowRelatorio = hasPanel("relatorio_tecnico") || hasFallbackPanels;
   const shouldShowBacklog = hasPanel("dashboard_os") || hasFallbackPanels;
   const shouldShowEscala = hasPanel("escala_trabalho") || hasFallbackPanels;
@@ -303,8 +307,8 @@ function Index() {
     },
     {
       id: "ativos",
-      nome: "Ativos e Recursos",
-      descricao: "Gerencie os ativos da operação.",
+      nome: "Ativos",
+      descricao: "Consulte e mantenha os ativos da operação.",
       icon: Cog,
       color: "bg-slate-100 text-[#245b8f]",
     },
@@ -320,13 +324,6 @@ function Index() {
       nome: "Análises",
       descricao: "Acompanhe indicadores e dashboards.",
       icon: BarChart3,
-      color: "bg-slate-100 text-[#245b8f]",
-    },
-    {
-      id: "relatorios",
-      nome: "Relatórios",
-      descricao: "Gere relatórios e exporte dados.",
-      icon: FileText,
       color: "bg-slate-100 text-[#245b8f]",
     },
     {
@@ -399,7 +396,7 @@ function Index() {
       categoria: "ativos",
       icon: Building2,
       visible: shouldShowFichaElevatoria,
-      onClick: () => setFichaChoiceOpen(true),
+      to: "/elevatorias",
     },
     {
       key: "estoque",
@@ -409,15 +406,6 @@ function Index() {
       icon: Package,
       visible: shouldShowEstoque,
       to: "/estoque",
-    },
-    {
-      key: "sistemas",
-      nome: "Sistemas",
-      descricao: "Hubs administrativos e operacionais.",
-      categoria: "ativos",
-      icon: Boxes,
-      visible: shouldShowSistema,
-      onClick: () => setSysOpen(true),
     },
     {
       key: "manuais",
@@ -439,18 +427,18 @@ function Index() {
     },
     {
       key: "dashboard",
-      nome: "Dashboard",
-      descricao: "Painéis de automação, testes e medições.",
+      nome: "Dashboards",
+      descricao: "Acesse os painéis de automação e Testes & Aferições.",
       categoria: "analises",
       icon: LayoutDashboard,
       visible: shouldShowDashboard,
-      onClick: () => setDashOpen(true),
+      to: HUB_DASHBOARDS_ROUTE,
     },
     {
       key: "relatorio",
       nome: "Relatório",
       descricao: "Relatórios técnicos e de Planta/Unidade.",
-      categoria: "relatorios",
+      categoria: "analises",
       icon: FileText,
       visible: shouldShowRelatorio,
       to: "/relatorio",
@@ -458,6 +446,7 @@ function Index() {
     ...publicLinks.map((link) => ({
       key: link.key,
       nome: link.nome,
+      sidebarNome: link.key.startsWith("public-cronograma-") ? "Cronograma público" : link.nome,
       descricao: link.descricao,
       categoria: "links-publicos",
       icon: ExternalLink,
@@ -480,20 +469,35 @@ function Index() {
     : [];
   const renderTool = (tool: (typeof ferramentas)[number]) => {
     const Icon = tool.icon;
+    const label = "sidebarNome" in tool ? tool.sidebarNome : tool.nome;
+    const destination = "to" in tool ? tool.to : undefined;
+    const isActive =
+      !!destination &&
+      (location.pathname === destination || location.pathname.startsWith(`${destination}/`));
+    const isPublic = tool.key.startsWith("public-");
+    const rowClass = `group flex w-full min-w-0 items-start gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] leading-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06264d] ${
+      isActive
+        ? "bg-[#0b4a9d] font-semibold text-white shadow-inner"
+        : "text-slate-100 hover:bg-white/10 hover:text-white"
+    }`;
     const content = (
       <>
-        <Icon className="h-4 w-4 shrink-0 text-cyan-200" />
-        <span className="hidden truncate lg:inline">{tool.nome}</span>
+        <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${isActive ? "text-cyan-200" : "text-cyan-200"}`} />
+        <span className="hidden min-w-0 flex-1 whitespace-normal break-words lg:block">
+          {label}
+        </span>
         {tool.key === "backlog" && openOsCount !== null && openOsCount > 0 && (
           <span
-            className="hidden min-w-6 rounded-full bg-blue-100 px-2 py-0.5 text-center text-[11px] font-bold tabular-nums text-[#0b3a73] lg:inline"
+            className="hidden min-w-6 shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-center text-[11px] font-bold tabular-nums text-[#0b3a73] lg:inline"
             aria-label={`${openOsCount.toLocaleString("pt-BR")} O.S. abertas ou pendentes`}
           >
             {openOsCount.toLocaleString("pt-BR")}
           </span>
         )}
+        {isPublic && <ExternalLink className="mt-0.5 hidden h-3.5 w-3.5 shrink-0 text-cyan-200 lg:block" aria-hidden="true" />}
       </>
     );
+
     if (tool.onClick) {
       return (
         <button
@@ -501,22 +505,54 @@ function Index() {
           type="button"
           onClick={tool.onClick}
           title={tool.nome}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-100 transition hover:bg-white/10 hover:text-white"
+          aria-label={isPublic ? `${label}; abre em nova aba` : tool.nome}
+          className={rowClass}
         >
           {content}
         </button>
       );
     }
+
     return (
       <Link
         key={tool.key}
-        to={tool.to || "/"}
-        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-100 transition hover:bg-white/10 hover:text-white"
+        to={destination || "/"}
+        className={rowClass}
         title={tool.nome}
+        aria-current={isActive ? "page" : undefined}
       >
         {content}
       </Link>
     );
+  };
+
+  const sidebarPrimaryGroups = getVisibleHubSidebarGroups(
+    ferramentasVisiveis
+      .filter((tool) => !tool.key.startsWith("public-"))
+      .map((tool) => tool.key),
+  );
+  const sidebarPublicItems = ferramentasVisiveis.filter((tool) => tool.key.startsWith("public-"));
+  const activeSidebarGroup = getActiveHubGroup(location.pathname);
+
+  const handleSidebarGroupKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    groupId: string,
+  ) => {
+    const triggers = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("[data-hub-group-trigger]"),
+    );
+    const currentIndex = triggers.indexOf(event.currentTarget);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      triggers[(currentIndex + delta + triggers.length) % triggers.length]?.focus();
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setOpenSidebarGroup(groupId);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setOpenSidebarGroup(null);
+    }
   };
 
   const initials = (profile?.nome_completo || user?.email || "U")
@@ -595,58 +631,133 @@ function Index() {
 
   return (
     <div id="hub-top" className="min-h-screen bg-[#f4f7fc] text-[#0b2b55] dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[68px] flex-col sm:flex bg-gradient-to-b from-[#082b55] via-[#06264d] to-[#041b3a] px-2 py-4 text-white shadow-[8px_0_30px_-20px_rgba(3,20,45,0.65)] lg:w-64 lg:px-4 lg:py-6">
-        <div className="mb-5 flex items-center justify-center lg:mb-8 lg:justify-start">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[68px] flex-col bg-gradient-to-b from-[#082b55] via-[#06264d] to-[#041b3a] px-2 py-3 text-white shadow-[8px_0_30px_-20px_rgba(3,20,45,0.65)] sm:flex lg:w-64 lg:px-3 lg:py-4">
+        <div className="mb-4 flex shrink-0 items-center justify-center lg:mb-5 lg:justify-start">
           <img
             src={logoHeader}
             alt="Águas do Rio"
-            className="h-9 w-auto object-contain lg:h-14"
+            className="h-9 w-auto object-contain lg:h-12"
             loading="eager"
           />
         </div>
-        <nav aria-label="Navegação principal" className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+
+        <nav aria-label="Navegação principal" className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
           <Link
             to="/"
             title="Início"
             aria-current="page"
-            className="flex items-center gap-3 rounded-xl bg-[#0b4a9d] px-3 py-2.5 text-sm font-semibold shadow-inner"
+            className="flex min-h-10 items-center gap-3 rounded-xl bg-[#0b4a9d] px-2.5 py-2 text-sm font-semibold shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06264d]"
           >
             <Home className="h-4 w-4 shrink-0" />
             <span className="hidden lg:inline">Início</span>
           </Link>
-          {categorias.map((category) => {
-            const CategoryIcon = category.icon;
-            const items = ferramentasVisiveis.filter((tool) => tool.categoria === category.id);
-            if (!items.length) return null;
+
+          {sidebarPrimaryGroups.map((group) => {
+            const expanded = openSidebarGroup === group.id;
+            const groupIcon = categorias.find((category) => category.id === group.id)?.icon || Activity;
+            const items = group.items
+              .map((item) => ferramentasVisiveis.find((tool) => tool.key === item.key))
+              .filter((tool): tool is (typeof ferramentas)[number] => !!tool);
+
+            if (!group.showHeading) {
+              return (
+                <div key={group.id} role="group" aria-label={group.label} className="space-y-1">
+                  {items.map(renderTool)}
+                </div>
+              );
+            }
+
+            const GroupIcon = groupIcon;
             return (
-              <div key={category.id} className="space-y-1">
-                <a
-                  href={`#categoria-${category.id}`}
-                  title={category.nome}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold text-blue-100 hover:bg-white/10 hover:text-white"
+              <div key={group.id} className="space-y-1">
+                <button
+                  type="button"
+                  data-hub-group-trigger
+                  aria-label={`${group.label}, grupo de navegação, ${items.length} itens`}
+                  aria-expanded={expanded}
+                  aria-controls={`hub-sidebar-group-${group.id}`}
+                  onClick={() => setOpenSidebarGroup((current) => current === group.id ? null : group.id)}
+                  onKeyDown={(event) => handleSidebarGroupKeyDown(event, group.id)}
+                  className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06264d] ${
+                    activeSidebarGroup === group.id
+                      ? "bg-white/15 text-white"
+                      : "text-blue-100 hover:bg-white/10 hover:text-white"
+                  }`}
                 >
-                  <CategoryIcon className="h-4 w-4 shrink-0 text-cyan-200 lg:hidden" />
-                  <span className="hidden lg:inline">{category.nome}</span>
-                  <ChevronDown className="ml-auto hidden h-4 w-4 text-slate-300 lg:block" />
-                </a>
-                {items.map(renderTool)}
+                  <GroupIcon className="h-4 w-4 shrink-0 text-cyan-200 lg:hidden" aria-hidden="true" />
+                  <span className="hidden min-w-0 flex-1 whitespace-normal lg:block">{group.label}</span>
+                  <ChevronDown className={`ml-auto hidden h-4 w-4 shrink-0 transition-transform lg:block ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>
+                {expanded && (
+                  <div
+                    id={`hub-sidebar-group-${group.id}`}
+                    role="group"
+                    aria-label={group.label}
+                    className="space-y-0.5 pl-1"
+                  >
+                    {items.map(renderTool)}
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {sidebarPublicItems.length > 0 && (
+            <div className="space-y-1">
+              {sidebarPublicItems.length === 1 ? (
+                <div role="group" aria-label={HUB_PUBLIC_LINKS_GROUP.label}>
+                  {sidebarPublicItems.map(renderTool)}
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    data-hub-group-trigger
+                    aria-label={`${HUB_PUBLIC_LINKS_GROUP.label}, grupo de navegação, ${sidebarPublicItems.length} itens`}
+                    aria-expanded={openSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id}
+                    aria-controls="hub-sidebar-group-links-publicos"
+                    onClick={() => setOpenSidebarGroup((current) => current === HUB_PUBLIC_LINKS_GROUP.id ? null : HUB_PUBLIC_LINKS_GROUP.id)}
+                    onKeyDown={(event) => handleSidebarGroupKeyDown(event, HUB_PUBLIC_LINKS_GROUP.id)}
+                    className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06264d] ${
+                      activeSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id
+                        ? "bg-white/15 text-white"
+                        : "text-blue-100 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Globe2 className="h-4 w-4 shrink-0 text-cyan-200 lg:hidden" aria-hidden="true" />
+                    <span className="hidden min-w-0 flex-1 whitespace-normal lg:block">{HUB_PUBLIC_LINKS_GROUP.label}</span>
+                    <ChevronDown className={`ml-auto hidden h-4 w-4 shrink-0 transition-transform lg:block ${openSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                  {openSidebarGroup === HUB_PUBLIC_LINKS_GROUP.id && (
+                    <div
+                      id="hub-sidebar-group-links-publicos"
+                      role="group"
+                      aria-label={HUB_PUBLIC_LINKS_GROUP.label}
+                      className="space-y-0.5 pl-1"
+                    >
+                      {sidebarPublicItems.map(renderTool)}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </nav>
-        <div className="mt-4 border-t border-white/15 pt-3">
+
+        <div className="mt-3 shrink-0 border-t border-white/15 pt-2">
           {canAdmin && (
             <Link
               to="/admin"
               title="Painel Administrativo"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-100 hover:bg-white/10 hover:text-white"
+              aria-current={location.pathname === "/admin" ? "page" : undefined}
+              className="flex min-h-10 items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-slate-100 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#06264d]"
             >
               <Shield className="h-4 w-4 shrink-0" />
-              <span className="hidden lg:inline">Painel Administrativo</span>
+              <span className="hidden whitespace-normal lg:inline">Painel Administrativo</span>
             </Link>
           )}
-          <div className="hidden items-center gap-2 px-3 pt-2 text-xs text-blue-100 lg:flex">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <div className="hidden items-center gap-2 px-2.5 pt-2 text-xs text-blue-100 lg:flex">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
             Sistema Online
           </div>
         </div>
@@ -978,145 +1089,6 @@ function Index() {
         </DialogContent>
       </Dialog>
 
-      {/* ===== DIALOG: DASHBOARDS ===== */}
-      <Dialog open={dashOpen} onOpenChange={setDashOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#0b3a73] dark:text-white">
-              Escolha um dashboard
-            </DialogTitle>
-            <DialogDescription>Qual painel você quer abrir?</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            {hasPanel("dashboard_automacao") && (
-              <Link
-                to="/dashboard"
-                onClick={() => setDashOpen(false)}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-              >
-                <div>
-                  <div className="font-semibold text-[#0b3a73] dark:text-white">Automação</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Elevatórias · sensores · CLP/PCP · ELIPSE
-                  </div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
-              </Link>
-            )}
-            {hasPanel("dashboard_testes") && (
-              <Link
-                to="/testes"
-                onClick={() => setDashOpen(false)}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-              >
-                <div>
-                  <div className="font-semibold text-[#0b3a73] dark:text-white">
-                    Testes & Aferições
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Serviços · equipes · parâmetros · impossibilidade
-                  </div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
-              </Link>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== DIALOG: FICHA / PLANO ===== */}
-      <Dialog open={fichaChoiceOpen} onOpenChange={setFichaChoiceOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="text-[#0b3a73] dark:text-white">Escolha o módulo</DialogTitle>
-            <DialogDescription>
-              Acesse a ficha técnica da elevatória ou o controle de manutenção por equipamento.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Link
-              to="/elevatorias"
-              onClick={() => setFichaChoiceOpen(false)}
-              className="flex min-h-[144px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-            >
-              <div>
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-                  <Building2 className="h-5 w-5" />
-                </div>
-                <div className="text-lg font-semibold text-[#0b3a73] dark:text-white">
-                  Ficha de Elevatórias
-                </div>
-              </div>
-              <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                Consulte o cadastro técnico, informações e histórico das elevatórias.
-              </div>
-            </Link>
-
-            <Link
-              to="/plano-manutencao"
-              onClick={() => setFichaChoiceOpen(false)}
-              className="flex min-h-[144px] flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#f59e0b] hover:bg-orange-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#f59e0b] dark:hover:bg-slate-700"
-            >
-              <div>
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
-                  <Wrench className="h-5 w-5" />
-                </div>
-                <div className="text-lg font-semibold text-[#0b3a73] dark:text-white">
-                  Plano de Manutenção
-                </div>
-              </div>
-              <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                Cadastre equipamentos, acompanhe planos ativos e identifique pendências de
-                manutenção.
-              </div>
-            </Link>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ===== DIALOG: SISTEMAS ===== */}
-      <Dialog open={sysOpen} onOpenChange={setSysOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#0b3a73] dark:text-white">Escolha um sistema</DialogTitle>
-            <DialogDescription>Qual hub você quer abrir?</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            {temPermissao(permissoes, "sistemas", "administrativo") && (
-              <a
-                href={SISTEMAS_ADMINISTRATIVO_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setSysOpen(false)}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-              >
-                <div>
-                  <div className="font-semibold text-[#0b3a73] dark:text-white">Administrativo</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Gestão administrativa
-                  </div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
-              </a>
-            )}
-            {temPermissao(permissoes, "sistemas", "operacional") && (
-              <a
-                href={SISTEMAS_OPERACIONAL_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setSysOpen(false)}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#eaf3fb] dark:border-slate-600 dark:bg-slate-800 dark:hover:border-[#38bdf8] dark:hover:bg-slate-700"
-              >
-                <div>
-                  <div className="font-semibold text-[#0b3a73] dark:text-white">Operacional</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Gestão de Ativos</div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-[#1f7ad6] dark:text-[#38bdf8]" />
-              </a>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
