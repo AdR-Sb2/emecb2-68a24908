@@ -494,7 +494,6 @@ function Index() {
             {openOsCount.toLocaleString("pt-BR")}
           </span>
         )}
-        {isPublic && <ExternalLink className="mt-0.5 hidden h-3.5 w-3.5 shrink-0 text-cyan-200 lg:block" aria-hidden="true" />}
       </>
     );
 
