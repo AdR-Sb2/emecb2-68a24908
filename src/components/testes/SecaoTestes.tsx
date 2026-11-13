@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TesteFormDialog } from "@/components/testes/TesteFormDialog";
-import { fetchTestes } from "@/lib/testes-api";
+import { fetchTestesComFallback } from "@/lib/testes-api";
 import {
   filtrarTestesPorPlanta,
   filtrarTestesPorTipo,
@@ -127,7 +127,7 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
     }
     setLoading(true);
     try {
-      setRegistros(await fetchTestes());
+      setRegistros(await fetchTestesComFallback());
     } catch (err) {
       console.error("Erro ao carregar testes da elevatória:", err);
       setRegistros([]);
