@@ -523,3 +523,12 @@ npm run dev
 ### Aplicar migrations
 
 As migrations SQL estão em `supabase/migrations/` e devem ser executadas no **SQL Editor do Supabase** na ordem numérica. Após aplicar migrations, recarregar o schema com `NOTIFY pgrst, 'reload schema';`.
+
+
+### Testes & Aferições — classificação AdR x CEDAE
+
+- A tabela única é `testes_afericoes`; o dashboard e a Ficha da elevatória consultam a mesma função compartilhada (`fetchTestesComFallback`). A Ficha aplica apenas o filtro adicional pela planta normalizada.
+- O valor persistido canônico de AdR é `ADR` (a interface exibe `AdR`); CEDAE permanece `CEDAE`. A normalização ignora diferenças de caixa e espaços.
+- Registros oriundos da importação histórica do Forms/planilha sem `tipo_teste` são classificados como AdR. A regra é segura porque o arquivo de 24 colunas não contém classificação CEDAE; os testes CEDAE são cadastrados separadamente pela Ficha. A importação futura também grava `ADR` explicitamente.
+- O cadastro/edição exige a permissão `testes.criar` no backend. A Ficha mantém o cadastro exclusivamente para CEDAE, limitado a dois registros por planta; a aba AdR é somente leitura.
+- A planta é extraída do texto da elevatória pelo padrão `PL-RJB-[A-Z]+[0-9]+`, normalizada em caixa alta e sem espaços.
