@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui/badge";
 import { ListaRegistros } from "@/components/registros/ListaRegistros";
+import { SecaoTestes } from "@/components/testes/SecaoTestes";
 import type { PermissoesRegistros } from "@/lib/registros-permissoes";
 import { cargoTemPainel, getPermissoesCargo, temPermissao } from "@/lib/permissoes";
 import type {
@@ -918,6 +919,17 @@ function ElevatoriaFichaPage() {
           {permissoes.podeVerRegistros && (
             <div className="mb-6">
               <ListaRegistros elevatoriaId={elevId} permissoes={permissoes.permissoesRegistros} />
+            </div>
+          )}
+
+          {/* Testes & Aferições (CEDAE x AdR) */}
+          {elevatoria && (
+            <div className="mb-6">
+              <SecaoTestes
+                planta={elevatoria.planta}
+                nome={elevatoria.nome}
+                podeEditar={permissoes.podeEditar}
+              />
             </div>
           )}
 
