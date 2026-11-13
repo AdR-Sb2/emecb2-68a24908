@@ -55,17 +55,61 @@ function TabelaTestes({
       <table className="w-full min-w-[1120px] text-left text-[13px] leading-5">
         <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 shadow-sm dark:bg-slate-700 dark:text-slate-200">
           <tr>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Data</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Grupo</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Tipo</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Colaboradores</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Serviço Executado</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Observação</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Tensão (V)</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Corrente (A)</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Recalque</th>
-            <th className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">Retaguarda</th>
-            {onExcluir && <th className="px-2 py-1.5 text-right">Ações</th>}
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Data
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Grupo
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Tipo
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Colaboradores
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Serviço Executado
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Observação
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Tensão (V)
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Corrente (A)
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Recalque
+            </th>
+            <th
+              className="whitespace-nowrap px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300"
+            >
+              Retaguarda
+            </th>
+            {onExcluir && (
+              <th className="whitespace-nowrap px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                Ações
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -74,16 +118,36 @@ function TabelaTestes({
               key={r.Id}
               className="border-t border-slate-100 align-top odd:bg-white even:bg-slate-50/70 hover:bg-blue-50/70 dark:border-slate-700 dark:odd:bg-slate-900 dark:even:bg-slate-800/60 dark:hover:bg-slate-700/60"
             >
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">{fmtData(r["Data do Teste"])}</td>
-              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">{r.Grupo ?? "N/A"}</td>
-              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">{r["Tipo de Serviço"] ?? "N/A"}</td>
-              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">{r["Nome dos Colaboradores:"] ?? "N/A"}</td>
-              <td className="max-w-[340px] whitespace-normal px-3 py-3 text-slate-700 dark:text-slate-200">{r["Serviço Executado:"] ?? "N/A"}</td>
-              <td className="max-w-[340px] whitespace-normal px-3 py-3 text-slate-700 dark:text-slate-200">{r["Observação:"] ?? "N/A"}</td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">{r["Tensão ( V )"] ?? "N/A"}</td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">{r["Corrente ( A )"] ?? "N/A"}</td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">{r.Recalque ?? "N/A"}</td>
-              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">{r.Retaguarda ?? "N/A"}</td>
+              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+                {fmtData(r["Data do Teste"])}
+              </td>
+              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
+                {r.Grupo ?? "N/A"}
+              </td>
+              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
+                {r["Tipo de Serviço"] ?? "N/A"}
+              </td>
+              <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
+                {r["Nome dos Colaboradores:"] ?? "N/A"}
+              </td>
+              <td className="max-w-[340px] whitespace-normal px-3 py-3 text-slate-700 dark:text-slate-200">
+                {r["Serviço Executado:"] ?? "N/A"}
+              </td>
+              <td className="max-w-[340px] whitespace-normal px-3 py-3 text-slate-700 dark:text-slate-200">
+                {r["Observação:"] ?? "N/A"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+                {r["Tensão ( V )"] ?? "N/A"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+                {r["Corrente ( A )"] ?? "N/A"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+                {r.Recalque ?? "N/A"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700 dark:text-slate-200">
+                {r.Retaguarda ?? "N/A"}
+              </td>
               {onExcluir && (
                 <td className="whitespace-nowrap px-3 py-3 text-right">
                   <button
@@ -194,7 +258,9 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
   const barraFiltros = (
     <div className="flex flex-wrap items-end gap-3">
       <label className="flex flex-col gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">De</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          De
+        </span>
         <input
           type="month"
           value={mesIni}
@@ -204,7 +270,9 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Até</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          Até
+        </span>
         <input
           type="month"
           value={mesFim}
@@ -214,7 +282,9 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
         />
       </label>
       <label className="flex min-w-[180px] flex-col gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tipo de serviço</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          Tipo de serviço
+        </span>
         <select
           value={tipoServico}
           onChange={(e) => setTipoServico(e.target.value)}
@@ -266,10 +336,16 @@ export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props)
         <Tabs value={aba} onValueChange={(v) => setAba(v as "adr" | "cedae")}>
           <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <TabsList className="h-11 w-fit bg-slate-100 p-1.5 dark:bg-slate-800">
-              <TabsTrigger value="adr" className="h-9 gap-2 px-4 text-sm font-semibold text-slate-600 data-[state=active]:text-[#0b3a73] dark:text-slate-300 dark:data-[state=active]:text-white">
+              <TabsTrigger
+                value="adr"
+                className="h-9 gap-2 px-4 text-sm font-semibold text-slate-600 data-[state=active]:text-[#0b3a73] dark:text-slate-300 dark:data-[state=active]:text-white"
+              >
                 <History className="h-4 w-4" /> Testes AdR ({adr.length})
               </TabsTrigger>
-              <TabsTrigger value="cedae" className="h-9 gap-2 px-4 text-sm font-semibold text-slate-600 data-[state=active]:text-[#0b3a73] dark:text-slate-300 dark:data-[state=active]:text-white">
+              <TabsTrigger
+                value="cedae"
+                className="h-9 gap-2 px-4 text-sm font-semibold text-slate-600 data-[state=active]:text-[#0b3a73] dark:text-slate-300 dark:data-[state=active]:text-white"
+              >
                 <ShieldCheck className="h-4 w-4" /> Testes CEDAE ({qtdCedae}/{LIMITE_CEDAE})
               </TabsTrigger>
             </TabsList>
