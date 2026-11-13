@@ -132,6 +132,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_cargo_id: { Args: never; Returns: number }
       delete_user: { Args: { user_id: string }; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
