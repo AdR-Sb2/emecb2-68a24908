@@ -249,13 +249,14 @@ function ElevatoriasPage() {
         throw new Error("O servidor não retornou a lista de elevatórias.");
       }
 
-      // Só substitui o estado anterior após confirmar que a consulta principal teve sucesso.
-      setElevatorias(elevRes.data);
+      // Mantém os últimos dados na tela durante revalidação e publica o novo conjunto
+      // somente depois de terminar também o cálculo das completudes dos KPIs.
       if (impRes.data) setImplantacoes(impRes.data);
       if (equipRes.data) setEquipamentos(equipRes.data);
       if (egRes.data) setEletricaGeral(egRes.data);
 
       await calcularCompletudes(elevRes.data);
+      setElevatorias(elevRes.data);
       setStatusLista("success");
     } catch (err) {
       const mensagem =
@@ -1292,18 +1293,25 @@ function ElevatoriasPage() {
         <div className="space-y-4" role="status" aria-live="polite" aria-label="Carregando elevatórias">
           {/* KPI placeholders: do not display zero/old percentages before the first response. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {["Total filtradas", "Completude média", "Críticas", "Em implantação"].map((label) => (
-              <div
-                key={label}
-                className="min-h-[88px] rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  {label}
-                </p>
-                <div className="mt-3 h-7 w-20 animate-pulse rounded-md bg-slate-200 dark:bg-slate-700" />
-                <div className="mt-2 h-2.5 w-28 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
-              </div>
-            ))}
+            {[
+              { label: "Total filtradas", visible: true },
+              { label: "Completude média", visible: permissoes.podeVerMestres },
+              { label: "Críticas", visible: permissoes.podeVerMestres },
+              { label: "Em implantação", visible: true },
+            ]
+              .filter((item) => item.visible)
+              .map(({ label }) => (
+                <div
+                  key={label}
+                  className="min-h-[88px] rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {label}
+                  </p>
+                  <div className="mt-3 h-7 w-20 animate-pulse rounded-md bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-2 h-2.5 w-28 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                </div>
+              ))}
           </div>
 
           {/* Filter placeholders keep the page structure stable while options load. */}
