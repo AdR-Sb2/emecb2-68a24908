@@ -532,3 +532,11 @@ As migrations SQL estão em `supabase/migrations/` e devem ser executadas no **S
 - Registros oriundos da importação histórica do Forms/planilha sem `tipo_teste` são classificados como AdR. A regra é segura porque o arquivo de 24 colunas não contém classificação CEDAE; os testes CEDAE são cadastrados separadamente pela Ficha. A importação futura também grava `ADR` explicitamente.
 - O cadastro/edição exige a permissão `testes.criar` no backend. A Ficha mantém o cadastro exclusivamente para CEDAE, limitado a dois registros por planta; a aba AdR é somente leitura.
 - A planta é extraída do texto da elevatória pelo padrão `PL-RJB-[A-Z]+[0-9]+`, normalizada em caixa alta e sem espaços.
+
+
+### Restauração do histórico de Testes & Aferições
+
+- O arquivo legado `src/data/testes.json` contém 213 registros importados do Forms, incluindo 37 registros da planta `PL-RJB-EAT0746`.
+- Depois que a tabela `testes_afericoes` passa a responder com qualquer registro, `fetchTestesComFallback()` considera a tabela como fonte principal e deixa de usar o JSON como fallback. Por isso o histórico legado precisa ser carregado uma única vez na tabela.
+- A migration `00102_restaurar_historico_testes_forms.sql` insere os 213 registros históricos com tipo canônico `ADR`, mantém os IDs do Forms e usa `ON CONFLICT (id) DO NOTHING` para preservar registros já existentes.
+- Depois de executar a migration no Supabase, dashboard e Ficha consultam o mesmo conjunto na tabela `testes_afericoes`.
