@@ -3,29 +3,24 @@
 -- (elevatoria_codigo), garantindo a regra de no máximo 2 testes CEDAE por
 -- elevatória no próprio banco (vale para formulário e importação).
 
--- 1) Normalização do código da planta. Espelha src/lib/testes-tipos.ts:
+-- 1) Extração da planta. Espelha src/lib/testes-tipos.ts:
 --    "PL-RJB-EAT0053 - Ivo Miranda" -> "PL-RJB-EAT0053"
---    "PL-RJB-EEAT739 - TIMBÓ"       -> "PL-RJB-EAT739"
---    "EEAT739"                       -> "PL-RJB-EAT739"
+--    "PL-RJB-EEAT0073  - CHATUBA"   -> "PL-RJB-EEAT0073"
+--    "  pl-rjb-sda1003"             -> "PL-RJB-SDA1003"
+-- Prefixos diferentes NÃO são unificados (EAT0053 <> EEAT0053); sem planta -> NULL.
 CREATE OR REPLACE FUNCTION normalizar_codigo_elevatoria(valor TEXT)
 RETURNS TEXT AS $$
 DECLARE
-  s TEXT;
   m TEXT[];
 BEGIN
   IF valor IS NULL OR btrim(valor) = '' THEN
     RETURN NULL;
   END IF;
-  s := upper(valor);
-  m := regexp_match(s, 'PL[\s-]*RJB[\s-]*E{1,2}AT[\s-]*([0-9]+)');
-  IF m IS NOT NULL THEN
-    RETURN 'PL-RJB-EAT' || m[1];
+  m := regexp_match(upper(valor), 'PL-RJB-[A-Z]+[[:space:]]*[0-9]+');
+  IF m IS NULL THEN
+    RETURN NULL;
   END IF;
-  m := regexp_match(s, '(E{1,2}AT)[\s-]*([0-9]+)');
-  IF m IS NOT NULL THEN
-    RETURN 'PL-RJB-EAT' || m[2];
-  END IF;
-  RETURN upper(btrim(regexp_replace(s, '\s+', ' ', 'g')));
+  RETURN regexp_replace(m[1], '[[:space:]]+', '', 'g');
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 

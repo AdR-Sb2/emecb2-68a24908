@@ -5,6 +5,7 @@ import {
   TIPO_TESTE_ADR,
   TIPO_TESTE_CEDAE,
   contarCedaePorCodigo,
+  detectarPrefixosDivergentes,
   formularioParaLinhaModelo,
   gerarIdTeste,
   linhaModeloVazia,
@@ -18,6 +19,7 @@ import {
 // Fixtures fictícias — sem dados reais de colaboradores ou plantas.
 const PLANTA = "PL-RJB-EAT9001";
 const NOME_SUJO = "PL-RJB-EAT9001 - ESTAÇÃO FICTÍCIA";
+const PLANTA_EEAT = "PL-RJB-EEAT9001";
 const NOME_EEAT = "pl-rjb-eeat9001 - OUTRO NOME";
 
 function linhaModelo(overrides: Record<string, unknown> = {}) {
@@ -50,25 +52,52 @@ function linhaModelo(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("normalização do código de elevatória", () => {
-  it("unifica nome com sufixo e caixa diferente", () => {
+describe("normalização da planta", () => {
+  it("extrai a planta ignorando sufixo de nome e caixa", () => {
     expect(normalizarCodigoElevatoria(NOME_SUJO)).toBe(PLANTA);
     expect(normalizarCodigoElevatoria(PLANTA)).toBe(PLANTA);
     expect(normalizarCodigoElevatoria("  pl-rjb-eat9001   ")).toBe(PLANTA);
   });
 
-  it("unifica EAT e EEAT no mesmo código", () => {
-    expect(normalizarCodigoElevatoria(NOME_EEAT)).toBe(PLANTA);
-    expect(normalizarCodigoElevatoria("EEAT9001")).toBe(PLANTA);
+  it("aceita espaço antes e depois do código", () => {
+    expect(normalizarCodigoElevatoria("  PL-RJB-EEAT0073  - CHATUBA")).toBe("PL-RJB-EEAT0073");
+    expect(normalizarCodigoElevatoria("PL-RJB-SDA1003")).toBe("PL-RJB-SDA1003");
+    expect(normalizarCodigoElevatoria("PL-RJB-OFI0005")).toBe("PL-RJB-OFI0005");
+  });
+
+  it("mantém EAT e EEAT como plantas diferentes", () => {
+    expect(normalizarCodigoElevatoria(NOME_EEAT)).toBe(PLANTA_EEAT);
+    expect(normalizarCodigoElevatoria("EEAT9001")).toBeNull();
+    expect(normalizarCodigoElevatoria(NOME_EEAT)).not.toBe(PLANTA);
   });
 
   it("preserva zeros à esquerda do código", () => {
     expect(normalizarCodigoElevatoria("PL-RJB-EAT0053 - FICTÍCIA")).toBe("PL-RJB-EAT0053");
   });
 
-  it("retorna null para vazio", () => {
+  it("retorna null para vazio ou texto sem planta", () => {
     expect(normalizarCodigoElevatoria(null)).toBeNull();
     expect(normalizarCodigoElevatoria("   ")).toBeNull();
+    expect(normalizarCodigoElevatoria("MORRO DA TORRE")).toBeNull();
+  });
+});
+
+describe("relatório de prefixos divergentes", () => {
+  it("reporta o mesmo número com prefixos diferentes sem juntar", () => {
+    const divergencias = detectarPrefixosDivergentes([
+      "PL-RJB-EAT0053 - IVO",
+      "PL-RJB-EEAT0053 - OUTRO",
+      "PL-RJB-EAT0053 - SEM NOME",
+    ]);
+    expect(divergencias).toHaveLength(1);
+    expect(divergencias[0].numero).toBe("0053");
+    expect(divergencias[0].prefixos).toEqual(["EAT", "EEAT"]);
+  });
+
+  it("não reporta plantas distintas com números distintos", () => {
+    expect(
+      detectarPrefixosDivergentes(["PL-RJB-EAT0053", "PL-RJB-EEAT0073", "PL-RJB-SDA1003"]),
+    ).toEqual([]);
   });
 });
 
@@ -145,22 +174,42 @@ describe("modelo de importação de 24 colunas", () => {
   });
 });
 
-describe("AdR reflete importação nova", () => {
-  it("importação gera registro ADR que aparece na consulta da ficha (sem refresh)", () => {
-    const importada = mapearLinhaModelo(linhaModelo({ ID: 500 }));
-    const payload = montarPayloadTeste(importada);
+describe("histórico AdR (somente leitura, filtrado por planta)", () => {
+  const historicoDe = (
+    registros: Array<{ tipo_teste?: string | null; elevatoria_codigo?: string | null }>,
+    planta: string | null,
+  ) =>
+    planta == null
+      ? []
+      : registros.filter(
+          (r) =>
+            (r.tipo_teste ?? TIPO_TESTE_ADR) === TIPO_TESTE_ADR && r.elevatoria_codigo === planta,
+        );
+
+  it("importação nova na aba Testes aparece no histórico da ficha correspondente", () => {
+    const payload = montarPayloadTeste(mapearLinhaModelo(linhaModelo({ ID: 500 })));
     const base = [
-      { tipo_teste: TIPO_TESTE_CEDAE, elevatoria_codigo: PLANTA, Elevatória: NOME_SUJO },
-      { tipo_teste: TIPO_TESTE_CEDAE, elevatoria_codigo: PLANTA, Elevatória: NOME_EEAT },
+      { tipo_teste: TIPO_TESTE_CEDAE, elevatoria_codigo: PLANTA },
+      { tipo_teste: TIPO_TESTE_ADR, elevatoria_codigo: PLANTA },
     ];
-    // A nova importação entra como AdR e é encontrada pelo mesmo código normalizado.
     const combinado = [...base, payload];
-    const historicoAdr = combinado.filter(
-      (r) => (r.tipo_teste ?? TIPO_TESTE_ADR) === TIPO_TESTE_ADR && r.elevatoria_codigo === PLANTA,
-    );
-    expect(historicoAdr).toHaveLength(1);
-    // E não consome a cota CEDAE.
-    expect(contarCedaePorCodigo(combinado, PLANTA)).toBe(2);
+    expect(historicoDe(combinado, PLANTA)).toHaveLength(2);
+    // CEDAE não entra no histórico AdR.
+    expect(historicoDe(combinado, PLANTA).every((r) => r.tipo_teste === TIPO_TESTE_ADR)).toBe(true);
+  });
+
+  it("elevatória sem planta não puxa nada", () => {
+    const registros = [{ tipo_teste: TIPO_TESTE_ADR, elevatoria_codigo: PLANTA }];
+    expect(historicoDe(registros, normalizarCodigoElevatoria("MORRO DA TORRE"))).toEqual([]);
+  });
+
+  it("plantas diferentes com o mesmo número não se misturam", () => {
+    const registros = [
+      { tipo_teste: TIPO_TESTE_ADR, elevatoria_codigo: "PL-RJB-EAT0053" },
+      { tipo_teste: TIPO_TESTE_ADR, elevatoria_codigo: "PL-RJB-EEAT0053" },
+    ];
+    expect(historicoDe(registros, "PL-RJB-EAT0053")).toHaveLength(1);
+    expect(historicoDe(registros, "PL-RJB-EEAT0053")).toHaveLength(1);
   });
 });
 
@@ -194,7 +243,7 @@ describe("formulário manual", () => {
     expect(payload.elevatoria_codigo).toBe(PLANTA);
   });
 
-  it("monta payload de formulário com id gerado", () => {
+  it("monta payload CEDAE de formulário com id gerado", () => {
     const payload = montarPayloadFormulario(
       {
         dataTeste: "2026-02-02",
@@ -213,11 +262,11 @@ describe("formulário manual", () => {
         naChegada: "",
         naSaida: "",
       },
-      NOME_EEAT,
-      TIPO_TESTE_ADR,
+      NOME_SUJO,
+      TIPO_TESTE_CEDAE,
     );
     expect(payload.id).toBeGreaterThan(0);
-    expect(payload.tipo_teste).toBe(TIPO_TESTE_ADR);
+    expect(payload.tipo_teste).toBe(TIPO_TESTE_CEDAE);
     expect(payload.elevatoria_codigo).toBe(PLANTA);
   });
 

@@ -95,36 +95,63 @@ export const COLUNA_MODELO_PARA_INTERNO: Record<ColunaModeloTeste, keyof TesteNo
   Status: "Status",
 };
 
-// Normaliza o nome/código da elevatória para um código canônico por planta.
+// Extrai a planta (código) da elevatória a partir de um texto livre.
+// A planta é o padrão "PL-RJB-" + letras + números; compara-se sempre em caixa
+// alta e sem espaços, NUNCA pelo nome.
 // Ex.: "PL-RJB-EAT0053 - Ivo Miranda" -> "PL-RJB-EAT0053"
-//      "PL-RJB-EEAT739 - TIMBÓ"       -> "PL-RJB-EAT739"
-//      "EEAT739"                       -> "PL-RJB-EAT739"
-//      "pl-rjb-eat0832"               -> "PL-RJB-EAT0832"
-// A chave é sempre o código (EAT/EEAT unificados), nunca o nome — que é
-// inconsistente na origem (maiúsculas, espaços extras, sufixo de nome).
+//      "PL-RJB-EEAT0073  - CHATUBA"   -> "PL-RJB-EEAT0073"
+//      "  pl-rjb-sda1003"             -> "PL-RJB-SDA1003"
+// Prefixos diferentes NÃO são unificados: EAT0053 e EEAT0053 são plantas
+// distintas (ver detectarPrefixosDivergentes). Sem planta reconhecível -> null.
+const PLANTA_RE = /PL-RJB-[A-Z]+\s*\d+/i;
+
 export function normalizarCodigoElevatoria(valor: string | null | undefined): string | null {
   if (valor == null) return null;
-  const texto = String(valor).trim();
-  if (!texto) return null;
+  const texto = String(valor);
+  if (!texto.trim()) return null;
 
-  const match = texto.match(/PL[\s-]*RJB[\s-]*(E{1,2}AT)[\s-]*(\d+)/i);
-  if (match) {
-    return `PL-RJB-EAT${match[2]}`;
+  const match = texto.match(PLANTA_RE);
+  if (!match) return null;
+
+  return match[0].replace(/\s+/g, "").toUpperCase();
+}
+
+export type DivergenciaPlanta = {
+  numero: string;
+  prefixos: string[];
+  exemplos: string[];
+};
+
+// Detecta números de planta que aparecem com prefixos diferentes (ex.: EAT0053
+// e EEAT0053). Esses casos NÃO devem ser juntados em silêncio — são reportados
+// para revisão. Retorna apenas os números com mais de um prefixo.
+export function detectarPrefixosDivergentes(
+  valores: Array<string | null | undefined>,
+): DivergenciaPlanta[] {
+  const porNumero = new Map<string, Map<string, Set<string>>>();
+  for (const valor of valores) {
+    const codigo = normalizarCodigoElevatoria(valor);
+    if (!codigo) continue;
+    const m = codigo.match(/^PL-RJB-([A-Z]+)(\d+)$/);
+    if (!m) continue;
+    const [, prefixo, numero] = m;
+    if (!porNumero.has(numero)) porNumero.set(numero, new Map());
+    const prefixos = porNumero.get(numero)!;
+    if (!prefixos.has(prefixo)) prefixos.set(prefixo, new Set());
+    prefixos.get(prefixo)!.add(codigo);
   }
 
-  const curto = texto.match(/\b(E{1,2}AT)[\s-]*(\d+)/i);
-  if (curto) {
-    return `PL-RJB-EAT${curto[2]}`;
+  const divergencias: DivergenciaPlanta[] = [];
+  for (const [numero, prefixos] of porNumero.entries()) {
+    if (prefixos.size > 1) {
+      divergencias.push({
+        numero,
+        prefixos: [...prefixos.keys()].sort(),
+        exemplos: [...prefixos.values()].flatMap((s) => [...s]).sort(),
+      });
+    }
   }
-
-  // Sem código reconhecível: devolve a parte antes do separador de nome,
-  // em caixa alta e sem espaços duplicados (fallback estável para agrupar).
-  const base = texto
-    .split(/\s+[-–—]\s+/)[0]
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-  return base || null;
+  return divergencias.sort((a, b) => a.numero.localeCompare(b.numero, "pt-BR", { numeric: true }));
 }
 
 export type ResultadoValidacao = { ok: boolean; mensagem?: string };

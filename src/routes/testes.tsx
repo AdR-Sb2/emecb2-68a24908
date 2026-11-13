@@ -25,10 +25,16 @@ import {
   Upload,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { COLUNAS_MODELO_TESTE, linhaModeloVazia, mapearLinhaModelo } from "@/lib/testes-tipos";
+import {
+  COLUNAS_MODELO_TESTE,
+  detectarPrefixosDivergentes,
+  linhaModeloVazia,
+  mapearLinhaModelo,
+} from "@/lib/testes-tipos";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/testes")({
@@ -280,6 +286,12 @@ function TestesPage() {
       (Array.from(new Set(data.map((d) => d.Elevatória).filter(Boolean))) as string[]).sort(
         (a, b) => a.localeCompare(b, "pt-BR"),
       ),
+    [data],
+  );
+  // Mesmo número de planta com prefixos diferentes (ex.: EAT0053 x EEAT0053):
+  // não são unificados; ficam registrados aqui para revisão.
+  const divergenciasPlanta = useMemo(
+    () => detectarPrefixosDivergentes(data.map((d) => d.Elevatória)),
     [data],
   );
   const MESES_DISPONIVEIS = useMemo(() => {
@@ -839,6 +851,22 @@ function TestesPage() {
       <h1 className="mb-3 text-base font-bold text-[#0b3a73] sm:text-lg dark:text-white">
         Testes & Aferições de Ativos
       </h1>
+
+      {divergenciasPlanta.length > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">Plantas com prefixos divergentes (não unificadas):</p>
+            <ul className="mt-1 list-inside list-disc">
+              {divergenciasPlanta.map((d) => (
+                <li key={d.numero}>
+                  Número {d.numero}: {d.exemplos.join(", ")}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <Kpi label="Total de Testes" value={total} />
