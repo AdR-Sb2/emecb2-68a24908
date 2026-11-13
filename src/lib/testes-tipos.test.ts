@@ -13,6 +13,7 @@ import {
   montarPayloadFormulario,
   montarPayloadTeste,
   normalizarCodigoElevatoria,
+  normalizarTipoTeste,
   validarLimiteCedae,
 } from "./testes-tipos";
 
@@ -79,6 +80,29 @@ describe("normalização da planta", () => {
     expect(normalizarCodigoElevatoria(null)).toBeNull();
     expect(normalizarCodigoElevatoria("   ")).toBeNull();
     expect(normalizarCodigoElevatoria("MORRO DA TORRE")).toBeNull();
+  });
+
+  it("normaliza variações de espaço e caixa do mesmo código", () => {
+    const esperado = "PL-RJB-EAT0746";
+    expect(normalizarCodigoElevatoria("PL-RJB-EAT0746 - BOOSTER JK")).toBe(esperado);
+    expect(normalizarCodigoElevatoria("PL-RJB-EAT0746  - BOOSTER JK")).toBe(esperado);
+    expect(normalizarCodigoElevatoria("PL-RJB-EAT0746")).toBe(esperado);
+    expect(normalizarCodigoElevatoria("  pl-rjb-eat0746   ")).toBe(esperado);
+    expect(normalizarCodigoElevatoria("pl-rjb-eat0746 - booster jk")).toBe(esperado);
+  });
+});
+
+describe("valor canônico de tipo de teste", () => {
+  it("canonicaliza AdR/ADR/ausente para ADR e CEDAE para CEDAE", () => {
+    expect(TIPO_TESTE_ADR).toBe("ADR");
+    expect(normalizarTipoTeste("AdR")).toBe(TIPO_TESTE_ADR);
+    expect(normalizarTipoTeste("adr")).toBe(TIPO_TESTE_ADR);
+    expect(normalizarTipoTeste("ADR")).toBe(TIPO_TESTE_ADR);
+    expect(normalizarTipoTeste(null)).toBe(TIPO_TESTE_ADR);
+    expect(normalizarTipoTeste(undefined)).toBe(TIPO_TESTE_ADR);
+    expect(normalizarTipoTeste("")).toBe(TIPO_TESTE_ADR);
+    expect(normalizarTipoTeste("cedae")).toBe(TIPO_TESTE_CEDAE);
+    expect(normalizarTipoTeste("CEDAE")).toBe(TIPO_TESTE_CEDAE);
   });
 });
 

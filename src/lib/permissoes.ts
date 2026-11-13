@@ -109,6 +109,18 @@ export function temPainel(permissoes: Map<string, Set<string>>, panelKey: string
   return permissoes.has(panelKey);
 }
 
+// Verifica uma chave de permissão completa (ex.: "testes.criar") dentro de um
+// painel, útil quando a chave não segue o padrão "<painel>.<ação>".
+export function temPermissaoChave(
+  permissoes: Map<string, Set<string>>,
+  panelKey: string,
+  chaveCompleta: string,
+): boolean {
+  const panelPerms = permissoes.get(panelKey);
+  if (!panelPerms) return false;
+  return panelPerms.has(chaveCompleta);
+}
+
 export function clearPermissoesCache() {
   configClient.clear();
 }

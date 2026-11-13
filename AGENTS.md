@@ -44,11 +44,13 @@ Stack: React + TanStack Router (file-based routing) + Supabase + Tailwind + shad
 
 ### Testes & Aferições (CEDAE x AdR)
 - Single source of truth: table `testes_afericoes`. Classification column `tipo_teste` (`CEDAE` | `ADR`); link column `elevatoria_codigo` (plant code extracted from the free-text name).
-- Pure logic (tested): `src/lib/testes-tipos.ts` — `normalizarCodigoElevatoria`, `detectarPrefixosDivergentes`, `validarLimiteCedae`, 24-column model, payload builders.
-- UI: `src/components/testes/SecaoTestes.tsx` (Registros of the Ficha) and `AdicionarTesteDialog.tsx` (modal "Testes CEDAE" / "Testes AdR"). Dashboard `/testes` filters by `tipo_teste` (default `ADR`; CEDAE only with explicit filter).
-- **AdR is read-only**: it queries the dashboard's `testes_afericoes` by planta and never creates/edits rows. Choosing "Testes AdR" in the modal just reveals the filtered history. AdR only enters via the `/testes` tab (import or manual cadastro there).
-- Rule: max **2 CEDAE per elevatoria**, enforced in the DB by trigger `trg_validar_limite_cedae_testes` (migration `00099_testes_tipo_teste.sql`) — also in import.
-- Cross-component refresh uses the browser event `testes-atualizados` (dispatched after import/manual save; `SecaoTestes` re-queries).
+- Pure logic (tested): `src/lib/testes-tipos.ts` — `normalizarCodigoElevatoria`, `normalizarTipoTeste`, `detectarPrefixosDivergentes`, `validarLimiteCedae`, 24-column model, payload builders. Canonical tipo value is **`ADR`** (UI label `AdR`).
+- Shared read layer: `src/lib/testes-data.ts` (pure mapping/filters: `mesmaPlanta`, `filtrarTestesPorPlanta`, `filtrarTestesPorTipo`, `testesDaFicha`, `testesDoDashboard`) and `src/lib/testes-api.ts` (`fetchTestes`, single query used by both dashboard and Ficha). **Ficha and dashboard must show the same set for a planta** — parity covered by `src/lib/testes-data.test.ts`.
+- UI: `src/components/testes/SecaoTestes.tsx` (Ficha: tabs AdR read-only + CEDAE) and `src/components/testes/TesteFormDialog.tsx` (shared creation modal, Forms field order). The main "Adicionar teste" entry point is the dashboard header (`/testes`), gated by the `dashboard_testes.testes.criar` permission.
+- **AdR is read-only**: never created/edited from the Ficha. AdR only enters via the `/testes` tab (import or manual cadastro there); the Ficha AdR tab just reveals the planta-filtered history.
+- Rule: max **2 CEDAE per elevatoria**, enforced in the DB by trigger `trg_validar_limite_cedae_testes` (migration `00099_testes_tipo_teste.sql`) — also in import and in `TesteFormDialog` (client check) with backend 403 via `validar_permissao_teste()`.
+- Creation permission `testes.criar` (panel `dashboard_testes`) is seeded in `supabase/migrations/00100_testes_criar_permissao_tipo.sql`, which also canonicalizes `tipo_teste` and backfills `elevatoria_codigo`. Checked with `temPermissaoChave(perms, "dashboard_testes", "testes.criar")`; `service_role` bypasses the trigger.
+- Cross-component refresh uses the browser event `testes-atualizados` (dispatched after import/manual save; `SecaoTestes` re-queries) — a test created on the dashboard appears in the Ficha without reload.
 
 ### Assumptions (Testes CEDAE/AdR)
 - Planta = regex `PL-RJB-[A-Z]+\s*\d+` (case-insensitive), spaces stripped, uppercased. Matched **only by planta**, never by name.
@@ -56,7 +58,7 @@ Stack: React + TanStack Router (file-based routing) + Supabase + Tailwind + shad
 - The 24-column import sheet has no classification field, so **imports always create `ADR`**; the DB trigger still blocks CEDAE if one is ever provided via an optional column.
 - Manual CEDAE rows use `Date.now()` as `id` (PK is BIGINT with no identity/sequence) and store `elevatoria` as `"<planta> - <nome>"` so `elevatoria_codigo` links correctly.
 - CEDAE tests live in the same table but are excluded from dashboard KPIs/charts unless the `TIPO DE TESTE` filter is set to CEDAE.
-- Automated tests use fictitious fixtures only (`src/lib/testes-tipos.test.ts`); no real collaborator data or credentials are logged.
+- Automated tests use fictitious fixtures only (`src/lib/testes-tipos.test.ts`, `src/lib/testes-data.test.ts`); no real collaborator data or credentials are logged.
 
 ### Lint & typecheck
 - `npx eslint src/routes/cronograma.tsx`

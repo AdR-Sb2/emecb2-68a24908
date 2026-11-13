@@ -7,6 +7,20 @@ export const TIPO_TESTE_CEDAE: TipoTeste = "CEDAE";
 export const TIPO_TESTE_ADR: TipoTeste = "ADR";
 export const TIPOS_TESTE: TipoTeste[] = [TIPO_TESTE_CEDAE, TIPO_TESTE_ADR];
 
+// Valor canônico exibido na interface (o persistido é sempre "ADR"/"CEDAE").
+export const TIPO_TESTE_ADR_LABEL = "AdR";
+
+// Canonicaliza o valor de tipo_teste. Compara sem diferenciar maiúsculas, aceita
+// "AdR"/"adr"/"ADR" e trata ausente/vazio/desconhecido como AdR (o padrão da
+// importação de planilha, que não classifica o teste).
+export function normalizarTipoTeste(valor: string | null | undefined): TipoTeste {
+  if (valor == null) return TIPO_TESTE_ADR;
+  const v = String(valor).trim().toUpperCase();
+  if (v === TIPO_TESTE_CEDAE) return TIPO_TESTE_CEDAE;
+  if (v === TIPO_TESTE_ADR) return TIPO_TESTE_ADR;
+  return TIPO_TESTE_ADR;
+}
+
 // Cada elevatória aceita no máximo 2 testes CEDAE.
 export const LIMITE_CEDAE = 2;
 
@@ -183,8 +197,7 @@ export function contarCedaePorCodigo(
 ): number {
   if (!codigo) return 0;
   return registros.filter((r) => {
-    const tipo = r.tipo_teste ?? TIPO_TESTE_ADR;
-    if (tipo !== TIPO_TESTE_CEDAE) return false;
+    if (normalizarTipoTeste(r.tipo_teste) !== TIPO_TESTE_CEDAE) return false;
     const chave = r.elevatoria_codigo ?? normalizarCodigoElevatoria(r.Elevatória ?? null);
     return chave === codigo;
   }).length;
@@ -321,51 +334,60 @@ export function montarPayloadTeste(
 }
 
 // Dados do formulário manual de teste (modal "Adicionar teste").
+// Os campos seguem o Forms do Microsoft, na mesma ordem e rótulos.
 export type FormularioTeste = {
   dataTeste: string;
   tipoServico: string;
+  // Quando vazio, usa-se o fallback informado (ex.: a elevatória da Ficha).
+  elevatoria?: string;
   grupo: string;
-  nomeColaboradores: string;
-  servicoExecutado: string;
-  observacao: string;
   tensao: string;
   corrente: string;
-  recalque: string;
   retaguarda: string;
+  recalque: string;
   correnteShutOff: string;
   retaguardaShutOff: string;
   recalqueShutOff: string;
+  impossibilidade?: string;
+  servicoExecutado: string;
+  nomeColaboradores: string;
+  observacao: string;
   naChegada: string;
   naSaida: string;
+  status?: string;
 };
 
 export const FORMULARIO_TESTE_VAZIO: FormularioTeste = {
   dataTeste: "",
   tipoServico: "",
+  elevatoria: "",
   grupo: "",
-  nomeColaboradores: "",
-  servicoExecutado: "",
-  observacao: "",
   tensao: "",
   corrente: "",
-  recalque: "",
   retaguarda: "",
+  recalque: "",
   correnteShutOff: "",
   retaguardaShutOff: "",
   recalqueShutOff: "",
+  impossibilidade: "",
+  servicoExecutado: "",
+  nomeColaboradores: "",
+  observacao: "",
   naChegada: "",
   naSaida: "",
+  status: "",
 };
 
 // Converte o formulário manual no formato do modelo interno (24 colunas).
 export function formularioParaLinhaModelo(
   form: FormularioTeste,
-  elevatoriaNome: string,
+  elevatoriaFallback = "",
 ): TesteNormalizado {
+  const elevatoria = form.elevatoria || elevatoriaFallback;
   const row: Record<string, unknown> = {
     "Data do Teste": form.dataTeste || null,
     "Tipo de Serviço": form.tipoServico || null,
-    Elevatória: elevatoriaNome || null,
+    Elevatória: elevatoria || null,
     Grupo: form.grupo || null,
     "Tensão ( V )": form.tensao || null,
     "Corrente ( A )": form.corrente || null,
@@ -374,21 +396,23 @@ export function formularioParaLinhaModelo(
     "Corrente ShutOff": form.correnteShutOff || null,
     "Retaguarda ShutOff": form.retaguardaShutOff || null,
     "Recalque ShutOff": form.recalqueShutOff || null,
+    "Impossibilidade:": form.impossibilidade || null,
     "Serviço Executado:": form.servicoExecutado || null,
     "Nome dos Colaboradores:": form.nomeColaboradores || null,
     "Observação:": form.observacao || null,
     "Na Chegada": form.naChegada || null,
     "Na saida": form.naSaida || null,
+    Status: form.status || null,
   };
   return row as unknown as TesteNormalizado;
 }
 
 export function montarPayloadFormulario(
   form: FormularioTeste,
-  elevatoriaNome: string,
+  elevatoriaFallback: string,
   tipoTeste: TipoTeste,
 ): TestePayload {
-  return montarPayloadTeste(formularioParaLinhaModelo(form, elevatoriaNome), tipoTeste, {
+  return montarPayloadTeste(formularioParaLinhaModelo(form, elevatoriaFallback), tipoTeste, {
     id: gerarIdTeste(),
   });
 }

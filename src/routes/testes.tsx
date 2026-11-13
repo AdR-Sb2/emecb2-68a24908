@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Bar,
@@ -27,13 +27,25 @@ import {
   AlertCircle,
   AlertTriangle,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { getPermissoesCargo, temPermissaoChave } from "@/lib/permissoes";
+import { TesteFormDialog } from "@/components/testes/TesteFormDialog";
+import { fetchTestes } from "@/lib/testes-api";
+import { mesmaPlanta, type TesteRow } from "@/lib/testes-data";
 import {
   COLUNAS_MODELO_TESTE,
+  TIPO_TESTE_ADR,
+  TIPO_TESTE_ADR_LABEL,
+  TIPO_TESTE_CEDAE,
+  contarCedaePorCodigo,
   detectarPrefixosDivergentes,
   linhaModeloVazia,
   mapearLinhaModelo,
+  normalizarTipoTeste,
+  type TesteNormalizado,
 } from "@/lib/testes-tipos";
 import { toast } from "sonner";
 
@@ -51,32 +63,7 @@ export const Route = createFileRoute("/testes")({
   component: TestesPage,
 });
 
-type Row = {
-  Id: number | null;
-  "Hora de início": string | null;
-  "Hora de conclusão": string | null;
-  Email: string | null;
-  Nome: string | null;
-  "Data do Teste": string | null;
-  "Tipo de Serviço": string | null;
-  Elevatória: string | null;
-  Grupo: string | number | null;
-  "Tensão ( V )": string | null;
-  "Corrente ( A )": string | null;
-  Retaguarda: string | null;
-  Recalque: string | null;
-  "Corrente ShutOff": string | null;
-  "Retaguarda ShutOff": string | null;
-  "Recalque ShutOff": string | null;
-  "Impossibilidade:": string | null;
-  "Serviço Executado:": string | null;
-  "Nome dos Colaboradores:": string | null;
-  "Observação:": string | null;
-  "Na Chegada": string | null;
-  "Na saida": string | null;
-  Status: string | null;
-  tipo_teste?: string | null;
-};
+type Row = TesteRow;
 
 const DATA = rawData as unknown as Row[];
 const STORAGE_KEY = "testes_data_v1";
@@ -175,9 +162,12 @@ function fmtDate(iso: string | null): string {
 }
 
 function TestesPage() {
+  const { user, profile } = useAuth();
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasCustomData, setHasCustomData] = useState(false);
+  const [podeCriarTeste, setPodeCriarTeste] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   // Import modal state
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -187,68 +177,41 @@ function TestesPage() {
     atualizados: number;
     ignorados: number;
     erros: { linha: number; motivo: string }[];
-    rows: Row[];
+    rows: TesteNormalizado[];
   } | null>(null);
   const [importConfirming, setImportConfirming] = useState(false);
 
-  // Fetch data from Supabase
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: supabaseData, error } = await supabase
-          .from("testes_afericoes")
-          .select("*")
-          .order("data_teste", { ascending: false });
-
-        if (error) {
-          console.error("Erro ao buscar dados:", error);
-          // Fallback to local data
-          setData(DATA);
-        } else if (supabaseData && supabaseData.length > 0) {
-          // Convert from Supabase format to Row format
-          const mappedData = (supabaseData as Array<Record<string, unknown>>).map((row) => {
-            const r: Row = {
-              Id: typeof row.id === "number" ? row.id : row.id ? Number(row.id) : null,
-              "Hora de início": (row.hora_inicio as string) ?? null,
-              "Hora de conclusão": (row.hora_conclusao as string) ?? null,
-              Email: (row.email as string) ?? null,
-              Nome: (row.nome as string) ?? null,
-              "Data do Teste": (row.data_teste as string) ?? null,
-              "Tipo de Serviço": (row.tipo_servico as string) ?? null,
-              Elevatória: (row.elevatoria as string) ?? null,
-              Grupo: (row.grupo as string) ?? null,
-              "Tensão ( V )": (row.tensao_v as string) ?? null,
-              "Corrente ( A )": (row.corrente_a as string) ?? null,
-              Retaguarda: (row.retaguarda as string) ?? null,
-              Recalque: (row.recalque as string) ?? null,
-              "Corrente ShutOff": (row.corrente_shutoff as string) ?? null,
-              "Retaguarda ShutOff": (row.retaguarda_shutoff as string) ?? null,
-              "Recalque ShutOff": (row.recalque_shutoff as string) ?? null,
-              "Impossibilidade:": (row.impossibilidade as string) ?? null,
-              "Serviço Executado:": (row.servico_executado as string) ?? null,
-              "Nome dos Colaboradores:": (row.nome_colaboradores as string) ?? null,
-              "Observação:": (row.observacao as string) ?? null,
-              "Na Chegada": (row.na_chegada as string) ?? null,
-              "Na saida": (row.na_saida as string) ?? null,
-              Status: (row.status as string) ?? null,
-              tipo_teste: (row.tipo_teste as string) ?? "ADR",
-            };
-            return r;
-          });
-          setData(mappedData);
-        } else {
-          setData(DATA);
-        }
-      } catch (err) {
-        console.error("Erro ao carregar dados:", err);
-        setData(DATA);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+  // Fonte única de dados: a MESMA consulta usada pela Ficha da elevatória.
+  const carregarDados = useCallback(async () => {
+    try {
+      setData(await fetchTestesComFallback());
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+      setData(DATA);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void carregarDados();
+  }, [carregarDados]);
+
+  // Permissão de criação de testes (mesma chave exigida no backend: testes.criar).
+  useEffect(() => {
+    if (!profile?.cargo_id) {
+      setPodeCriarTeste(false);
+      return;
+    }
+    let ativo = true;
+    (async () => {
+      const perms = await getPermissoesCargo(profile.cargo_id, user?.id);
+      if (ativo) setPodeCriarTeste(temPermissaoChave(perms, "dashboard_testes", "testes.criar"));
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [profile?.cargo_id, user?.id]);
 
   // Check for localStorage data as fallback
   useEffect(() => {
@@ -305,7 +268,7 @@ function TestesPage() {
 
   const [tipo, setTipo] = useState<string>("TODOS");
   // CEDAE fica fora dos KPIs/gráficos por padrão; só entra com filtro explícito.
-  const [tipoTeste, setTipoTeste] = useState<string>("ADR");
+  const [tipoTeste, setTipoTeste] = useState<string>(TIPO_TESTE_ADR);
   const [grupo, setGrupo] = useState<string>("TODOS");
   const [elev, setElev] = useState<string>("TODOS");
   const [mesIni, setMesIni] = useState<string>("TODOS");
@@ -340,7 +303,11 @@ function TestesPage() {
   const rows = useMemo(
     () =>
       data.filter((d) => {
-        if (tipoTeste !== "TODOS" && (d.tipo_teste ?? "ADR") !== tipoTeste) return false;
+        if (
+          tipoTeste !== "TODOS" &&
+          normalizarTipoTeste(d.tipo_teste) !== normalizarTipoTeste(tipoTeste)
+        )
+          return false;
         if (tipo !== "TODOS" && d["Tipo de Serviço"] !== tipo) return false;
         if (grupo !== "TODOS") {
           if (grupo === "__VAZIO__") {
@@ -349,7 +316,8 @@ function TestesPage() {
             return false;
           }
         }
-        if (elev !== "TODOS" && d.Elevatória !== elev) return false;
+        // Compara pela PLANTA (não pelo nome): cobre variações de espaço/caixa.
+        if (elev !== "TODOS" && !mesmaPlanta(d.Elevatória, elev)) return false;
         const mk = monthKey(d["Data do Teste"]);
         if (mesIni !== "TODOS" && (!mk || mk < mesIni)) return false;
         if (mesFim !== "TODOS" && (!mk || mk > mesFim)) return false;
@@ -588,7 +556,7 @@ function TestesPage() {
     }
   }
 
-  async function upsertTestes(rows: Row[]): Promise<{
+  async function upsertTestes(rows: TesteNormalizado[]): Promise<{
     inseridos: number;
     atualizados: number;
     erros: { linha: number; motivo: string }[];
@@ -722,7 +690,7 @@ function TestesPage() {
       // Process rows
       let ignorados = 0;
       const erros: { linha: number; motivo: string }[] = [];
-      const rowsParaImportar: Row[] = [];
+      const rowsParaImportar: TesteNormalizado[] = [];
 
       for (let i = 0; i < normalized.length; i++) {
         const row = normalized[i];
@@ -767,44 +735,8 @@ function TestesPage() {
     try {
       const resultado = await upsertTestes(importPreview.rows);
 
-      // Reload data from Supabase
-      const { data: supabaseData, error } = await supabase
-        .from("testes_afericoes")
-        .select("*")
-        .order("data_teste", { ascending: false });
-
-      if (!error && supabaseData) {
-        const mappedData = (supabaseData as Array<Record<string, unknown>>).map((row) => {
-          const r: Row = {
-            Id: typeof row.id === "number" ? row.id : row.id ? Number(row.id) : null,
-            "Hora de início": (row.hora_inicio as string) ?? null,
-            "Hora de conclusão": (row.hora_conclusao as string) ?? null,
-            Email: (row.email as string) ?? null,
-            Nome: (row.nome as string) ?? null,
-            "Data do Teste": (row.data_teste as string) ?? null,
-            "Tipo de Serviço": (row.tipo_servico as string) ?? null,
-            Elevatória: (row.elevatoria as string) ?? null,
-            Grupo: (row.grupo as string) ?? null,
-            "Tensão ( V )": (row.tensao_v as string) ?? null,
-            "Corrente ( A )": (row.corrente_a as string) ?? null,
-            Retaguarda: (row.retaguarda as string) ?? null,
-            Recalque: (row.recalque as string) ?? null,
-            "Corrente ShutOff": (row.corrente_shutoff as string) ?? null,
-            "Retaguarda ShutOff": (row.retaguarda_shutoff as string) ?? null,
-            "Recalque ShutOff": (row.recalque_shutoff as string) ?? null,
-            "Impossibilidade:": (row.impossibilidade as string) ?? null,
-            "Serviço Executado:": (row.servico_executado as string) ?? null,
-            "Nome dos Colaboradores:": (row.nome_colaboradores as string) ?? null,
-            "Observação:": (row.observacao as string) ?? null,
-            "Na Chegada": (row.na_chegada as string) ?? null,
-            "Na saida": (row.na_saida as string) ?? null,
-            Status: (row.status as string) ?? null,
-            tipo_teste: (row.tipo_teste as string) ?? "ADR",
-          };
-          return r;
-        });
-        setData(mappedData);
-      }
+      // Recarrega pela mesma consulta compartilhada (fonte única de dados).
+      await carregarDados();
 
       setImportModalOpen(false);
       setImportPreview(null);
@@ -886,8 +818,8 @@ function TestesPage() {
             label="TIPO DE TESTE"
             value={tipoTeste}
             onChange={setTipoTeste}
-            options={["ADR", "CEDAE"]}
-            renderOption={(v) => (v === "ADR" ? "AdR" : "CEDAE")}
+            options={[TIPO_TESTE_ADR, TIPO_TESTE_CEDAE]}
+            renderOption={(v) => (v === TIPO_TESTE_ADR ? TIPO_TESTE_ADR_LABEL : v)}
             block
           />
           <FilterSelect
@@ -929,7 +861,7 @@ function TestesPage() {
             renderOption={labelMes}
             block
           />
-          {(tipoTeste !== "ADR" ||
+          {(tipoTeste !== TIPO_TESTE_ADR ||
             tipo !== "TODOS" ||
             grupo !== "TODOS" ||
             elev !== "TODOS" ||
@@ -938,7 +870,7 @@ function TestesPage() {
             <button
               type="button"
               onClick={() => {
-                setTipoTeste("ADR");
+                setTipoTeste(TIPO_TESTE_ADR);
                 setTipo("TODOS");
                 setGrupo("TODOS");
                 setElev("TODOS");
@@ -958,6 +890,16 @@ function TestesPage() {
             <Upload className="h-4 w-4" />
             Importar
           </button>
+          {podeCriarTeste && (
+            <button
+              type="button"
+              onClick={() => setAddDialogOpen(true)}
+              className="min-h-11 inline-flex items-center gap-1.5 rounded bg-[#0b3a73] px-3 text-sm font-semibold text-white shadow-sm hover:bg-[#1f7ad6]"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar teste
+            </button>
+          )}
         </div>
       </details>
 
@@ -966,8 +908,8 @@ function TestesPage() {
           label="TIPO DE TESTE"
           value={tipoTeste}
           onChange={setTipoTeste}
-          options={["ADR", "CEDAE"]}
-          renderOption={(v) => (v === "ADR" ? "AdR" : "CEDAE")}
+          options={[TIPO_TESTE_ADR, TIPO_TESTE_CEDAE]}
+          renderOption={(v) => (v === TIPO_TESTE_ADR ? TIPO_TESTE_ADR_LABEL : v)}
         />
         <FilterSelect label="TIPO DE SERVIÇO" value={tipo} onChange={setTipo} options={TIPOS} />
         <FilterSelect
@@ -998,7 +940,7 @@ function TestesPage() {
           options={MESES_DISPONIVEIS}
           renderOption={labelMes}
         />
-        {(tipoTeste !== "ADR" ||
+        {(tipoTeste !== TIPO_TESTE_ADR ||
           tipo !== "TODOS" ||
           grupo !== "TODOS" ||
           elev !== "TODOS" ||
@@ -1007,7 +949,7 @@ function TestesPage() {
           <button
             type="button"
             onClick={() => {
-              setTipoTeste("ADR");
+              setTipoTeste(TIPO_TESTE_ADR);
               setTipo("TODOS");
               setGrupo("TODOS");
               setElev("TODOS");
@@ -1027,6 +969,16 @@ function TestesPage() {
           <Upload className="h-4 w-4" />
           Importar
         </button>
+        {podeCriarTeste && (
+          <button
+            type="button"
+            onClick={() => setAddDialogOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded bg-[#0b3a73] px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1f7ad6]"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar teste
+          </button>
+        )}
       </div>
 
       {(crossElev || crossMes) && (
@@ -1647,6 +1599,17 @@ function TestesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cadastro manual (ponto principal). Reaproveita o formulário do Forms. */}
+      <TesteFormDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        tiposPermitidos={[TIPO_TESTE_ADR, TIPO_TESTE_CEDAE]}
+        qtdCedaePorPlanta={(planta) => contarCedaePorCodigo(data, planta)}
+        onSaved={() => {
+          void carregarDados();
+        }}
+      />
     </div>
   );
 }

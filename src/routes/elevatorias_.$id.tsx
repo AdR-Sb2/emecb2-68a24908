@@ -36,7 +36,12 @@ import { Badge } from "@/components/ui/badge";
 import { ListaRegistros } from "@/components/registros/ListaRegistros";
 import { SecaoTestes } from "@/components/testes/SecaoTestes";
 import type { PermissoesRegistros } from "@/lib/registros-permissoes";
-import { cargoTemPainel, getPermissoesCargo, temPermissao } from "@/lib/permissoes";
+import {
+  cargoTemPainel,
+  getPermissoesCargo,
+  temPermissao,
+  temPermissaoChave,
+} from "@/lib/permissoes";
 import type {
   Elevatoria,
   ElevatoriaEquipamento,
@@ -67,6 +72,7 @@ type PermissoesElev = {
   podeEditarMestres: boolean;
   podeExportar: boolean;
   podeVerRegistros: boolean;
+  podeCriarTeste: boolean;
   permissoesRegistros: PermissoesRegistros;
 };
 
@@ -227,6 +233,7 @@ function ElevatoriaFichaPage() {
     podeEditarMestres: false,
     podeExportar: false,
     podeVerRegistros: false,
+    podeCriarTeste: false,
     permissoesRegistros: { visualizar: false, criar: false, importar: false, anexarPdf: false },
   });
 
@@ -290,6 +297,7 @@ function ElevatoriaFichaPage() {
           podeEditarMestres: temPermissao(perms, "ficha_elevatoria", "dados_mestres.editar"),
           podeExportar: temPermissao(perms, "ficha_elevatoria", "exportar"),
           podeVerRegistros: temPermissao(perms, "registros", "visualizar"),
+          podeCriarTeste: temPermissaoChave(perms, "dashboard_testes", "testes.criar"),
           permissoesRegistros: {
             visualizar: temPermissao(perms, "registros", "visualizar"),
             criar: temPermissao(perms, "registros", "criar"),
@@ -929,6 +937,7 @@ function ElevatoriaFichaPage() {
                 planta={elevatoria.planta}
                 nome={elevatoria.nome}
                 podeEditar={permissoes.podeEditar}
+                podeCriarTeste={permissoes.podeCriarTeste}
               />
             </div>
           )}

@@ -3,36 +3,21 @@ import { AlertTriangle, History, Loader2, Plus, ShieldCheck, Trash2 } from "luci
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AdicionarTesteDialog } from "@/components/testes/AdicionarTesteDialog";
+import { TesteFormDialog } from "@/components/testes/TesteFormDialog";
+import { fetchTestes } from "@/lib/testes-api";
 import {
-  LIMITE_CEDAE,
-  TIPO_TESTE_ADR,
-  TIPO_TESTE_CEDAE,
-  contarCedaePorCodigo,
-  normalizarCodigoElevatoria,
-} from "@/lib/testes-tipos";
-
-type TesteDb = {
-  id: number;
-  data_teste: string | null;
-  tipo_servico: string | null;
-  elevatoria: string | null;
-  elevatoria_codigo: string | null;
-  grupo: string | null;
-  tensao_v: string | null;
-  corrente_a: string | null;
-  recalque: string | null;
-  retaguarda: string | null;
-  nome_colaboradores: string | null;
-  servico_executado: string | null;
-  observacao: string | null;
-  tipo_teste: string | null;
-};
+  filtrarTestesPorPlanta,
+  filtrarTestesPorTipo,
+  testesDaFicha,
+  type TesteRow,
+} from "@/lib/testes-data";
+import { LIMITE_CEDAE, TIPO_TESTE_CEDAE, normalizarCodigoElevatoria } from "@/lib/testes-tipos";
 
 type Props = {
   planta: string | null;
   nome: string;
   podeEditar: boolean;
+  podeCriarTeste: boolean;
 };
 
 function fmtData(iso: string | null): string {
@@ -54,7 +39,7 @@ function TabelaTestes({
   onExcluir,
   mensagemVazia,
 }: {
-  registros: TesteDb[];
+  registros: TesteRow[];
   onExcluir?: (id: number) => void;
   mensagemVazia?: string;
 }) {
@@ -86,25 +71,25 @@ function TabelaTestes({
         <tbody>
           {registros.map((r) => (
             <tr
-              key={r.id}
+              key={r.Id}
               className="border-t border-slate-100 align-top hover:bg-slate-50 dark:border-slate-700"
             >
-              <td className="px-2 py-1 whitespace-nowrap">{fmtData(r.data_teste)}</td>
-              <td className="px-2 py-1">{r.grupo ?? "N/A"}</td>
-              <td className="px-2 py-1">{r.tipo_servico ?? "N/A"}</td>
-              <td className="px-2 py-1">{r.nome_colaboradores ?? "N/A"}</td>
-              <td className="px-2 py-1 whitespace-normal">{r.servico_executado ?? "N/A"}</td>
-              <td className="px-2 py-1 whitespace-normal">{r.observacao ?? "N/A"}</td>
-              <td className="px-2 py-1 whitespace-nowrap">{r.tensao_v ?? "N/A"}</td>
-              <td className="px-2 py-1 whitespace-nowrap">{r.corrente_a ?? "N/A"}</td>
-              <td className="px-2 py-1 whitespace-nowrap">{r.recalque ?? "N/A"}</td>
-              <td className="px-2 py-1 whitespace-nowrap">{r.retaguarda ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-nowrap">{fmtData(r["Data do Teste"])}</td>
+              <td className="px-2 py-1">{r.Grupo ?? "N/A"}</td>
+              <td className="px-2 py-1">{r["Tipo de Serviço"] ?? "N/A"}</td>
+              <td className="px-2 py-1">{r["Nome dos Colaboradores:"] ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-normal">{r["Serviço Executado:"] ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-normal">{r["Observação:"] ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-nowrap">{r["Tensão ( V )"] ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-nowrap">{r["Corrente ( A )"] ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-nowrap">{r.Recalque ?? "N/A"}</td>
+              <td className="px-2 py-1 whitespace-nowrap">{r.Retaguarda ?? "N/A"}</td>
               {onExcluir && (
                 <td className="px-2 py-1 text-right">
                   <button
                     type="button"
                     title="Excluir teste CEDAE"
-                    onClick={() => onExcluir(r.id)}
+                    onClick={() => r.Id != null && onExcluir(r.Id)}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -119,11 +104,12 @@ function TabelaTestes({
   );
 }
 
-export function SecaoTestes({ planta, nome, podeEditar }: Props) {
+export function SecaoTestes({ planta, nome, podeEditar, podeCriarTeste }: Props) {
   const codigo = useMemo(() => normalizarCodigoElevatoria(planta), [planta]);
   // Rótulo gravado no campo "Elevatória" dos CEDAE (inclui a planta para o vínculo).
   const elevatoriaLabel = codigo ? `${codigo} - ${nome}` : nome;
-  const [registros, setRegistros] = useState<TesteDb[]>([]);
+
+  const [registros, setRegistros] = useState<TesteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [aba, setAba] = useState<"adr" | "cedae">("adr");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -132,6 +118,7 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
   const [mesFim, setMesFim] = useState("");
   const [tipoServico, setTipoServico] = useState("TODOS");
 
+  // Mesma consulta do dashboard; o filtro por planta é aplicado aqui.
   const carregar = useCallback(async () => {
     if (!codigo) {
       setRegistros([]);
@@ -139,68 +126,60 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("testes_afericoes")
-      .select(
-        "id, data_teste, tipo_servico, elevatoria, elevatoria_codigo, grupo, tensao_v, corrente_a, recalque, retaguarda, nome_colaboradores, servico_executado, observacao, tipo_teste",
-      )
-      .eq("elevatoria_codigo", codigo)
-      .order("data_teste", { ascending: false });
-    if (error) {
-      console.error("Erro ao carregar testes da elevatória:", error);
+    try {
+      setRegistros(await fetchTestes());
+    } catch (err) {
+      console.error("Erro ao carregar testes da elevatória:", err);
       setRegistros([]);
-    } else {
-      setRegistros((data as TesteDb[]) ?? []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [codigo]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
 
-  // Atualiza o histórico AdR automaticamente quando o dashboard cadastra/importa
-  // (a ficha escuta o evento e reconsulta a mesma base — fonte única de dados).
+  // Atualiza o histórico automaticamente quando o dashboard cadastra/importa
+  // (mesma base de dados — fonte única).
   useEffect(() => {
     const handler = () => void carregar();
     window.addEventListener("testes-atualizados", handler);
     return () => window.removeEventListener("testes-atualizados", handler);
   }, [carregar]);
 
-  const qtdCedae = useMemo(
-    () =>
-      contarCedaePorCodigo(
-        registros.map((r) => ({
-          tipo_teste: r.tipo_teste,
-          elevatoria_codigo: r.elevatoria_codigo,
-          Elevatória: r.elevatoria,
-        })),
-        codigo,
-      ),
-    [registros, codigo],
+  const cedaeBase = useMemo(
+    () => filtrarTestesPorPlanta(filtrarTestesPorTipo(registros, TIPO_TESTE_CEDAE), planta),
+    [registros, planta],
   );
+  const qtdCedae = cedaeBase.length;
 
   const tiposDisponiveis = useMemo(() => {
     const s = new Set<string>();
-    for (const r of registros) if (r.tipo_servico) s.add(r.tipo_servico);
+    for (const r of registros) {
+      const t = r["Tipo de Serviço"];
+      if (t) s.add(t);
+    }
     return Array.from(s).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [registros]);
 
-  const filtrar = useCallback(
-    (tipo: string) =>
-      registros.filter((r) => {
-        if ((r.tipo_teste ?? TIPO_TESTE_ADR) !== tipo) return false;
-        if (tipoServico !== "TODOS" && r.tipo_servico !== tipoServico) return false;
-        const mk = mesKey(r.data_teste);
+  const aplicarFiltros = useCallback(
+    (base: TesteRow[]) =>
+      base.filter((r) => {
+        if (tipoServico !== "TODOS" && r["Tipo de Serviço"] !== tipoServico) return false;
+        const mk = mesKey(r["Data do Teste"]);
         if (mesIni && (!mk || mk < mesIni)) return false;
         if (mesFim && (!mk || mk > mesFim)) return false;
         return true;
       }),
-    [registros, tipoServico, mesIni, mesFim],
+    [tipoServico, mesIni, mesFim],
   );
 
-  const adr = useMemo(() => filtrar(TIPO_TESTE_ADR), [filtrar]);
-  const cedae = useMemo(() => filtrar(TIPO_TESTE_CEDAE), [filtrar]);
+  const adr = useMemo(
+    () => aplicarFiltros(testesDaFicha(registros, planta)),
+    [aplicarFiltros, registros, planta],
+  );
+  const cedae = useMemo(() => aplicarFiltros(cedaeBase), [aplicarFiltros, cedaeBase]);
 
   const excluirCedae = async (id: number) => {
     const { error } = await supabase.from("testes_afericoes").delete().eq("id", id);
@@ -251,14 +230,14 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
         <h3 className="flex items-center gap-2 text-sm font-bold text-[#0b3a73] dark:text-white">
           <ShieldCheck className="h-4 w-4" /> Testes &amp; Aferições
         </h3>
-        {podeEditar && (
+        {podeCriarTeste && (
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
             disabled={!codigo}
             className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-[#0b3a73] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" /> Adicionar teste
+            <Plus className="h-4 w-4" /> Adicionar teste CEDAE
           </button>
         )}
       </div>
@@ -267,7 +246,7 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            Elevatória sem planta (código <strong>PL-RJB-…</strong>) no cabeçalho. Os testes AdR não
+            Elevatória sem planta (código <strong>PL-RJB-…</strong>) no cabeçalho. Os testes não
             podem ser vinculados e nenhum teste de outra elevatória é exibido.
           </span>
         </div>
@@ -292,7 +271,7 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
           <TabsContent value="adr" className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-1">
               <p className="text-[11px] text-slate-400">
-                Somente leitura · puxado da aba Testes (dashboard) pela planta{" "}
+                Somente leitura · mesma base da aba Testes (dashboard), filtrada pela planta{" "}
                 <span className="font-semibold text-slate-500 dark:text-slate-300">{codigo}</span>,
                 mais recente primeiro.
               </p>
@@ -308,8 +287,8 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
 
           <TabsContent value="cedae" className="space-y-2">
             <p className="text-[11px] text-slate-400">
-              Testes CEDAE desta elevatória. Não entram nos KPIs/gráficos do dashboard e não
-              aparecem no histórico AdR.
+              Testes CEDAE desta elevatória (máximo de {LIMITE_CEDAE}). Não entram nos KPIs/gráficos
+              do dashboard e não aparecem no histórico AdR.
             </p>
             <TabelaTestes
               registros={cedae}
@@ -320,13 +299,17 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
         </Tabs>
       )}
 
-      <AdicionarTesteDialog
+      <TesteFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        elevatoriaLabel={elevatoriaLabel}
-        qtdCedae={qtdCedae}
+        tiposPermitidos={[TIPO_TESTE_CEDAE]}
+        elevatoriaInicial={elevatoriaLabel}
+        lockElevatoria
+        qtdCedaePorPlanta={(plantaAlvo) =>
+          filtrarTestesPorPlanta(filtrarTestesPorTipo(registros, TIPO_TESTE_CEDAE), plantaAlvo)
+            .length
+        }
         onSaved={carregar}
-        onVerAdR={() => setAba("adr")}
       />
     </div>
   );
