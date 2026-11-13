@@ -106,6 +106,26 @@ describe("paridade Ficha x dashboard (mesma consulta, filtro por planta)", () =>
     expect(dashboard).toHaveLength(4);
   });
 
+  it("mantém 37 registros fictícios com paridade entre dashboard e Ficha", () => {
+    const fixtures = Array.from({ length: 37 }, (_, index) =>
+      row({
+        Id: index + 100,
+        Elevatória:
+          index % 3 === 0
+            ? "PL-RJB-EAT0746 - BOOSTER JK"
+            : index % 3 === 1
+              ? "PL-RJB-EAT0746  - BOOSTER JK"
+              : "pl-rjb-eat0746",
+        tipo_teste: TIPO_TESTE_ADR,
+      }),
+    );
+    const ficha = testesDaFicha(fixtures, PLANTA);
+    const dashboard = testesDoDashboard(fixtures, { tipoTeste: "AdR", planta: PLANTA });
+    expect(ficha).toHaveLength(37);
+    expect(dashboard).toHaveLength(37);
+    expect(ficha.map((r) => r.Id)).toEqual(dashboard.map((r) => r.Id));
+  });
+
   it("planta sem código não retorna nada", () => {
     expect(filtrarTestesPorPlanta(rows, "MORRO DA TORRE")).toEqual([]);
     expect(testesDaFicha(rows, null)).toEqual([]);
