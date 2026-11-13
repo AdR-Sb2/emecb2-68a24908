@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, History, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,14 +52,16 @@ function mesKey(iso: string | null): string | null {
 function TabelaTestes({
   registros,
   onExcluir,
+  mensagemVazia,
 }: {
   registros: TesteDb[];
   onExcluir?: (id: number) => void;
+  mensagemVazia?: string;
 }) {
   if (registros.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-400 dark:border-slate-600 dark:bg-slate-800">
-        Nenhum teste registrado.
+        {mensagemVazia ?? "Nenhum teste registrado."}
       </div>
     );
   }
@@ -119,6 +121,8 @@ function TabelaTestes({
 
 export function SecaoTestes({ planta, nome, podeEditar }: Props) {
   const codigo = useMemo(() => normalizarCodigoElevatoria(planta), [planta]);
+  // Rótulo gravado no campo "Elevatória" dos CEDAE (inclui a planta para o vínculo).
+  const elevatoriaLabel = codigo ? `${codigo} - ${nome}` : nome;
   const [registros, setRegistros] = useState<TesteDb[]>([]);
   const [loading, setLoading] = useState(true);
   const [aba, setAba] = useState<"adr" | "cedae">("adr");
@@ -260,9 +264,13 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
       </div>
 
       {!codigo ? (
-        <p className="text-sm text-slate-400">
-          Elevatória sem código de planta (PL-RJB) — não é possível vincular testes.
-        </p>
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Elevatória sem planta (código <strong>PL-RJB-…</strong>) no cabeçalho. Os testes AdR não
+            podem ser vinculados e nenhum teste de outra elevatória é exibido.
+          </span>
+        </div>
       ) : loading ? (
         <div className="flex min-h-[120px] items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-[#1f7ad6]" />
@@ -282,11 +290,20 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
           </div>
 
           <TabsContent value="adr" className="space-y-2">
-            <p className="text-[11px] text-slate-400">
-              Histórico completo, atualizado automaticamente a partir do dashboard de Testes &amp;
-              Aferições (mais recente primeiro).
-            </p>
-            <TabelaTestes registros={adr} />
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <p className="text-[11px] text-slate-400">
+                Somente leitura · puxado da aba Testes (dashboard) pela planta{" "}
+                <span className="font-semibold text-slate-500 dark:text-slate-300">{codigo}</span>,
+                mais recente primeiro.
+              </p>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-300">
+                Mostrando {adr.length} teste{adr.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <TabelaTestes
+              registros={adr}
+              mensagemVazia={`Nenhum teste AdR encontrado para a planta ${codigo}.`}
+            />
           </TabsContent>
 
           <TabsContent value="cedae" className="space-y-2">
@@ -294,7 +311,11 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
               Testes CEDAE desta elevatória. Não entram nos KPIs/gráficos do dashboard e não
               aparecem no histórico AdR.
             </p>
-            <TabelaTestes registros={cedae} onExcluir={podeEditar ? excluirCedae : undefined} />
+            <TabelaTestes
+              registros={cedae}
+              onExcluir={podeEditar ? excluirCedae : undefined}
+              mensagemVazia={`Nenhum teste CEDAE cadastrado para ${codigo}.`}
+            />
           </TabsContent>
         </Tabs>
       )}
@@ -302,9 +323,10 @@ export function SecaoTestes({ planta, nome, podeEditar }: Props) {
       <AdicionarTesteDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        elevatoriaNome={nome}
+        elevatoriaLabel={elevatoriaLabel}
         qtdCedae={qtdCedae}
         onSaved={carregar}
+        onVerAdR={() => setAba("adr")}
       />
     </div>
   );

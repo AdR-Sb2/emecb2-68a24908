@@ -6,19 +6,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   FORMULARIO_TESTE_VAZIO,
   LIMITE_CEDAE,
-  TIPO_TESTE_ADR,
   TIPO_TESTE_CEDAE,
   montarPayloadFormulario,
   type FormularioTeste,
-  type TipoTeste,
 } from "@/lib/testes-tipos";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  elevatoriaNome: string;
+  // Texto usado como "Elevatória" (inclui a planta, ex.: "PL-RJB-EAT0053 - NOME").
+  elevatoriaLabel: string;
   qtdCedae: number;
   onSaved: () => void;
+  // "Testes AdR" é somente leitura: apenas revela o histórico, não grava nada.
+  onVerAdR: () => void;
 };
 
 const CAMPOS: Array<{ key: keyof FormularioTeste; label: string; tipo?: string; wide?: boolean }> =
@@ -43,17 +44,18 @@ const CAMPOS: Array<{ key: keyof FormularioTeste; label: string; tipo?: string; 
 export function AdicionarTesteDialog({
   open,
   onOpenChange,
-  elevatoriaNome,
+  elevatoriaLabel,
   qtdCedae,
   onSaved,
+  onVerAdR,
 }: Props) {
-  const [tipo, setTipo] = useState<TipoTeste | null>(null);
+  const [modoCedae, setModoCedae] = useState(false);
   const [form, setForm] = useState<FormularioTeste>(FORMULARIO_TESTE_VAZIO);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setTipo(null);
+      setModoCedae(false);
       setForm(FORMULARIO_TESTE_VAZIO);
       setSalvando(false);
     }
@@ -61,20 +63,17 @@ export function AdicionarTesteDialog({
 
   const cedaeCheio = qtdCedae >= LIMITE_CEDAE;
 
-  const salvar = async () => {
-    if (!tipo) return;
+  const salvarCedae = async () => {
     if (!form.dataTeste) {
       toast.error("Informe a data do teste.");
       return;
     }
     setSalvando(true);
     try {
-      const payload = montarPayloadFormulario(form, elevatoriaNome, tipo);
+      const payload = montarPayloadFormulario(form, elevatoriaLabel, TIPO_TESTE_CEDAE);
       const { error } = await supabase.from("testes_afericoes").insert(payload);
       if (error) throw error;
-      toast.success(
-        tipo === TIPO_TESTE_CEDAE ? "Teste CEDAE cadastrado." : "Teste AdR cadastrado.",
-      );
+      toast.success("Teste CEDAE cadastrado.");
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("testes-atualizados"));
       }
@@ -98,12 +97,12 @@ export function AdicionarTesteDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {tipo === null ? (
+        {!modoCedae ? (
           <div className="grid gap-3 py-2 sm:grid-cols-2">
             <button
               type="button"
               disabled={cedaeCheio}
-              onClick={() => setTipo(TIPO_TESTE_CEDAE)}
+              onClick={() => setModoCedae(true)}
               className="flex flex-col items-start gap-1 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#1f7ad6]/5 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800"
             >
               <span className="flex items-center gap-2 text-sm font-bold text-[#0b3a73] dark:text-white">
@@ -130,14 +129,17 @@ export function AdicionarTesteDialog({
 
             <button
               type="button"
-              onClick={() => setTipo(TIPO_TESTE_ADR)}
+              onClick={() => {
+                onVerAdR();
+                onOpenChange(false);
+              }}
               className="flex flex-col items-start gap-1 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#1f7ad6] hover:bg-[#1f7ad6]/5 dark:border-slate-600 dark:bg-slate-800"
             >
               <span className="flex items-center gap-2 text-sm font-bold text-[#0b3a73] dark:text-white">
                 <History className="h-4 w-4" /> Testes AdR
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Histórico completo da elevatória, sem limite. Aparece também no dashboard.
+                Histórico somente leitura, puxado da aba Testes do dashboard e filtrado pela planta.
               </span>
             </button>
           </div>
@@ -145,11 +147,11 @@ export function AdicionarTesteDialog({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-[#0b3a73] dark:text-white">
-                {tipo === TIPO_TESTE_CEDAE ? "Testes CEDAE" : "Testes AdR"}
+                Testes CEDAE
               </span>
               <button
                 type="button"
-                onClick={() => setTipo(null)}
+                onClick={() => setModoCedae(false)}
                 className="text-xs font-semibold text-[#1f7ad6] hover:underline"
               >
                 Trocar tipo
@@ -185,7 +187,7 @@ export function AdicionarTesteDialog({
               </button>
               <button
                 type="button"
-                onClick={salvar}
+                onClick={salvarCedae}
                 disabled={salvando}
                 className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-[#0b3a73] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1f7ad6] disabled:opacity-50"
               >
