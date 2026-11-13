@@ -128,6 +128,21 @@ function ElevatoriasPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     try {
       const savedField = window.localStorage.getItem("elev_sort");
       const savedDir = window.localStorage.getItem("elev_sort_dir");
@@ -1188,9 +1203,9 @@ function ElevatoriasPage() {
   };
 
   return (
-    <div translate="no" className="notranslate mx-auto min-h-screen min-w-0 max-w-[1920px] bg-[#f5f7fb] p-3 sm:p-4 xl:p-5 2xl:p-6 dark:bg-slate-950">
+    <div translate="no" className="elevatorias-list-page notranslate min-w-0 bg-[#f5f7fb] p-2 sm:p-3 xl:p-4 dark:bg-slate-950">
       {/* Header */}
-      <div className="mb-4 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] px-3 py-2.5 sm:px-4 shadow-[0_12px_30px_-22px_rgba(0,0,0,0.55)]">
+      <div className="elevatorias-list-page__header mb-3 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] px-3 py-2 sm:px-4 shadow-[0_12px_30px_-22px_rgba(0,0,0,0.55)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 shrink-0 items-center justify-center rounded-xl">
@@ -1213,7 +1228,7 @@ function ElevatoriasPage() {
       </div>
 
       {/* Title + actions */}
-      <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="elevatorias-list-page__title mb-3 flex shrink-0 flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#0b3a73] dark:text-white sm:text-2xl">
             Ficha da Elevatória
@@ -1290,7 +1305,7 @@ function ElevatoriasPage() {
       </div>
 
       {estadoVisualLista === "loading" ? (
-        <div className="space-y-4" role="status" aria-live="polite" aria-label="Carregando elevatórias">
+        <div className="elevatorias-list-page__content space-y-3" role="status" aria-live="polite" aria-label="Carregando elevatórias">
           {/* KPI placeholders: do not display zero/old percentages before the first response. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
@@ -1334,12 +1349,12 @@ function ElevatoriasPage() {
           </section>
 
           {/* Fixed minimum height avoids a page jump when the first response arrives. */}
-          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <section className="elevatorias-list-page__table-card min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
               <div className="h-4 w-44 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
               <div className="h-6 w-24 animate-pulse rounded-full bg-slate-100 dark:bg-slate-800" />
             </div>
-            <div className="min-h-[360px] max-h-[68vh] space-y-0 overflow-hidden p-4">
+            <div className="elevatorias-list-page__table-scroll space-y-0 p-4">
               <div className="mb-4 grid grid-cols-8 gap-4">
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
                   <div key={item} className="h-3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
@@ -1360,7 +1375,7 @@ function ElevatoriasPage() {
         </div>
       ) : estadoVisualLista === "error" ? (
         <section
-          className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-red-200 bg-white px-6 py-12 text-center shadow-sm dark:border-red-900/60 dark:bg-slate-900"
+          className="elevatorias-list-page__content flex items-center justify-center rounded-2xl border border-red-200 bg-white px-6 py-8 text-center shadow-sm dark:border-red-900/60 dark:bg-slate-900"
           role="alert"
         >
           <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-300">
@@ -1382,7 +1397,7 @@ function ElevatoriasPage() {
           </button>
         </section>
       ) : estadoVisualLista === "empty" ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-16 text-center dark:border-slate-600 dark:bg-slate-800">
+        <div className="elevatorias-list-page__content flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-600 dark:bg-slate-800">
           <Building2 className="mb-4 h-16 w-16 text-slate-300 dark:text-slate-500" />
           <h2 className="text-xl font-bold text-[#0b3a73] dark:text-white">
             Nenhuma elevatória cadastrada
@@ -1410,7 +1425,7 @@ function ElevatoriasPage() {
           </div>
         </div>
       ) : (
-        <>
+        <div className="elevatorias-list-page__content elevatorias-list-page__data min-w-0">
           {statusLista === "loading" && elevatorias.length > 0 && (
             <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1434,7 +1449,7 @@ function ElevatoriasPage() {
             </div>
           )}
           {/* KPI Cards */}
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="elevatorias-list-page__kpis mb-3 grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <button
               type="button"
               onClick={() => setFiltroKpi("")}
@@ -1523,7 +1538,7 @@ function ElevatoriasPage() {
           </div>
 
           {/* Filters */}
-          <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900">
+          <section className="elevatorias-list-page__filters mb-3 shrink-0 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-[minmax(260px,1.7fr)_repeat(3,minmax(150px,1fr))_auto]">
               <label className="flex min-w-0 flex-col gap-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -1729,7 +1744,7 @@ function ElevatoriasPage() {
           </section>
 
           {/* Table */}
-          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <section className="elevatorias-list-page__table-card min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-700">
               <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0b3a73] dark:bg-blue-950/50 dark:text-blue-300">
@@ -1748,7 +1763,7 @@ function ElevatoriasPage() {
                 {filtered.length} registros
               </span>
             </div>
-            <div className="max-h-[68vh] min-h-[300px] max-w-full overflow-auto overscroll-contain">
+            <div className="elevatorias-list-page__table-scroll min-w-0 max-w-full overflow-auto overscroll-contain">
               <table className="w-full min-w-[1240px] 2xl:min-w-[1380px] table-auto text-left text-xs xl:text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                   <tr>
@@ -2204,7 +2219,7 @@ function ElevatoriasPage() {
               </table>
             </div>
           </section>
-        </>
+        </div>
       )}
 
       {/* Registros Dialog */}
