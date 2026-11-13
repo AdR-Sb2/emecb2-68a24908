@@ -33,7 +33,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { getPermissoesCargo, temPermissaoChave } from "@/lib/permissoes";
 import { TesteFormDialog } from "@/components/testes/TesteFormDialog";
-import { fetchTestes } from "@/lib/testes-api";
+import { fetchTestesComFallback } from "@/lib/testes-api";
 import { mesmaPlanta, type TesteRow } from "@/lib/testes-data";
 import {
   COLUNAS_MODELO_TESTE,
