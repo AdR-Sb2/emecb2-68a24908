@@ -40,6 +40,10 @@ import type {
   ElevatoriaImplantacao,
 } from "@/lib/elevatoria-types";
 import { IMPLANTACAO_STATUS_CORES, IMPLANTACAO_STATUS_OPCOES } from "@/lib/elevatoria-types";
+import {
+  calcularMediaCompletudeElevatorias,
+  calcularPercentualCompletude,
+} from "@/lib/elevatoria-completude";
 
 export const Route = createFileRoute("/elevatorias")({
   head: () => ({
@@ -285,15 +289,15 @@ function ElevatoriasPage() {
       preenchidos: number,
       naAplicaveis: number,
     ): ElevatoriaCompletude => {
-      const aplicaveis = total - naAplicaveis;
-      const pct = aplicaveis > 0 ? (preenchidos / aplicaveis) * 100 : 100;
-      const nivel: CompletudeNivel = pct >= 80 ? "bom" : pct >= 50 ? "atencao" : "critico";
+      const percentual = calcularPercentualCompletude(total, preenchidos, naAplicaveis);
+      const nivel: CompletudeNivel =
+        percentual >= 80 ? "bom" : percentual >= 50 ? "atencao" : "critico";
       return {
         elevatoria_id: 0,
         total_campos: total,
         preenchidos,
         na_aplicaveis: naAplicaveis,
-        percentual: Math.round(pct),
+        percentual,
         nivel,
       };
     };
@@ -341,7 +345,6 @@ function ElevatoriasPage() {
               total++;
               if (naFields.has(field)) {
                 naAplicaveis++;
-                preenchidos++;
               } else if (
                 (row as Record<string, unknown>)[field] !== null &&
                 (row as Record<string, unknown>)[field] !== "" &&
@@ -360,7 +363,6 @@ function ElevatoriasPage() {
             total++;
             if (naFields.has(field)) {
               naAplicaveis++;
-              preenchidos++;
             } else if (
               (row as Record<string, unknown>)[field] !== null &&
               (row as Record<string, unknown>)[field] !== "" &&
@@ -437,19 +439,19 @@ function ElevatoriasPage() {
 
   const kpis = useMemo(() => {
     const total = elevatorias.length;
-    let completudeMedia = 0;
-    let criticas = 0;
+    const completudesIndividuais = elevatorias
+      .map((e) => completudes.get(`${e.id}:geral`))
+      .filter((c): c is ElevatoriaCompletude => c !== undefined);
+    const completudeMedia = calcularMediaCompletudeElevatorias(
+      completudesIndividuais.map((c) => c.percentual),
+    );
+    const criticas = completudesIndividuais.filter((c) => c.nivel === "critico").length;
+
     let emImplantacao = 0;
     for (const e of elevatorias) {
-      const c = completudes.get(`${e.id}:geral`);
-      if (c) {
-        completudeMedia += c.percentual;
-        if (c.nivel === "critico") criticas++;
-      }
       const imp = implantacoes.find((i) => i.elevatoria_id === e.id);
       if (imp && imp.status !== "operacional") emImplantacao++;
     }
-    completudeMedia = total > 0 ? Math.round(completudeMedia / total) : 0;
     return { total, completudeMedia, criticas, emImplantacao };
   }, [elevatorias, completudes, implantacoes]);
 
