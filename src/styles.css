@@ -266,10 +266,15 @@
   scrollbar-gutter: stable;
 }
 
-.elevatorias-list-page__table-card thead {
+.elevatorias-list-page__table-card thead th {
   position: sticky;
   top: 0;
   z-index: 20;
+  background: #eaf3fb;
+}
+
+.dark .elevatorias-list-page__table-card thead th {
+  background: #334155;
 }
 
 /* Em notebooks baixos, comprime os elementos fixos antes de reduzir a tabela. */
