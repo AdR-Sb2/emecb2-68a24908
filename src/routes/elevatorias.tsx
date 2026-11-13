@@ -1315,11 +1315,20 @@ function ElevatoriasPage() {
           </div>
 
           {/* Filter placeholders keep the page structure stable while options load. */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900">
-            <div className="mb-3 h-4 w-16 rounded bg-slate-200 dark:bg-slate-700" />
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900" aria-label="Filtros carregando">
+            <div className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              Filtros
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[0, 1, 2, 3].map((item) => (
-                <div key={item} className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              {["Buscar elevatória", "Município", "Tipo", "Implantação"].map((label) => (
+                <div key={label} className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    {label}
+                  </p>
+                  <div className="flex h-10 items-center rounded-lg bg-slate-100 px-3 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                    Carregando...
+                  </div>
+                </div>
               ))}
             </div>
           </section>
