@@ -1307,7 +1307,7 @@ function ElevatoriasPage() {
       {estadoVisualLista === "loading" ? (
         <div className="elevatorias-list-page__content space-y-3" role="status" aria-live="polite" aria-label="Carregando elevatórias">
           {/* KPI placeholders: do not display zero/old percentages before the first response. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="elevatorias-list-page__kpis grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {[
               { label: "Total filtradas", visible: true },
               { label: "Completude média", visible: permissoes.podeVerMestres },
@@ -1330,7 +1330,7 @@ function ElevatoriasPage() {
           </div>
 
           {/* Filter placeholders keep the page structure stable while options load. */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900" aria-label="Filtros carregando">
+          <section className="elevatorias-list-page__filters shrink-0 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-3 dark:border-slate-700 dark:bg-slate-900" aria-label="Filtros carregando">
             <div className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
               Filtros
             </div>
