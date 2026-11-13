@@ -211,3 +211,139 @@
     transition: none;
   }
 }
+
+
+/* Ficha da Elevatória: viewport fixo com rolagem restrita à tabela. */
+.elevatorias-list-page {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1920px;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  margin-inline: auto;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.elevatorias-list-page__header,
+.elevatorias-list-page__title,
+.elevatorias-list-page__kpis,
+.elevatorias-list-page__filters {
+  flex: 0 0 auto;
+}
+
+.elevatorias-list-page__content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.elevatorias-list-page__data > :not(.elevatorias-list-page__table-card) {
+  flex-shrink: 0;
+}
+
+.elevatorias-list-page__table-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.elevatorias-list-page__table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.elevatorias-list-page__table-card thead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+/* Em notebooks baixos, comprime os elementos fixos antes de reduzir a tabela. */
+@media (max-height: 800px) and (min-width: 768px) {
+  .elevatorias-list-page {
+    padding: 8px;
+  }
+
+  .elevatorias-list-page__header {
+    margin-bottom: 8px;
+    padding-block: 6px;
+  }
+
+  .elevatorias-list-page__header img {
+    height: 36px;
+  }
+
+  .elevatorias-list-page__title {
+    margin-bottom: 8px;
+  }
+
+  .elevatorias-list-page__kpis {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .elevatorias-list-page__kpis > * {
+    min-height: 64px;
+    padding-block: 8px;
+  }
+
+  .elevatorias-list-page__filters {
+    margin-bottom: 8px;
+    padding: 8px;
+  }
+
+  .elevatorias-list-page__filters label {
+    gap: 4px;
+  }
+
+  .elevatorias-list-page__filters input,
+  .elevatorias-list-page__filters select,
+  .elevatorias-list-page__filters button {
+    min-height: 34px;
+    height: 34px;
+  }
+}
+
+/* Alturas muito reduzidas: mantém os filtros essenciais compactos. */
+@media (max-height: 680px) and (min-width: 768px) {
+  .elevatorias-list-page__header {
+    margin-bottom: 6px;
+    padding-block: 4px;
+  }
+
+  .elevatorias-list-page__header img {
+    height: 30px;
+  }
+
+  .elevatorias-list-page__title {
+    margin-bottom: 6px;
+  }
+
+  .elevatorias-list-page__kpis {
+    margin-bottom: 6px;
+  }
+
+  .elevatorias-list-page__kpis > * {
+    min-height: 56px;
+    padding-block: 5px;
+  }
+
+  .elevatorias-list-page__filters {
+    margin-bottom: 6px;
+    padding: 6px;
+  }
+}
