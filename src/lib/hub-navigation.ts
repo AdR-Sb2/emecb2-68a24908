@@ -65,7 +65,17 @@ export const HUB_SIDEBAR_GROUPS: {
 export const HUB_PUBLIC_LINKS_GROUP = {
   id: "links-publicos",
   label: "Links públicos",
+  collapsible: false,
+  expandedByDefault: true,
 } as const;
+
+/** The route requires both panel assignment and the granular view permission. */
+export function canShowProcedimentosNavigation(
+  hasPanel: boolean,
+  hasViewPermission: boolean,
+): boolean {
+  return hasPanel && hasViewPermission;
+}
 
 export type HubDashboardCard = {
   key: "dashboard_automacao" | "dashboard_testes";
