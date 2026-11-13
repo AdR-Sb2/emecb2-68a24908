@@ -17,6 +17,9 @@ import {
   ArrowUpDown,
   Share2,
   Link2Off,
+  SlidersHorizontal,
+  ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 import { NavVoltarHome } from "@/components/nav-voltar-home";
 import logoHeader from "@/assets/logo-branca.png";
@@ -110,6 +113,7 @@ function ElevatoriasPage() {
   const [filtroPotenciaMotor, setFiltroPotenciaMotor] = useState("TODAS");
   const [filtroEndereco, setFiltroEndereco] = useState("TODAS");
   const [filtroKpi, setFiltroKpi] = useState("");
+  const [mostrarFiltrosAvancados, setMostrarFiltrosAvancados] = useState(false);
   const [editandoTipo, setEditandoTipo] = useState<number | null>(null);
   const [editandoImplantacao, setEditandoImplantacao] = useState<number | null>(null);
   const [editandoTipoConstrutivo, setEditandoTipoConstrutivo] = useState<number | null>(null);
@@ -1120,16 +1124,16 @@ function ElevatoriasPage() {
   };
 
   return (
-    <div translate="no" className="notranslate min-h-screen min-w-0 bg-[#f4f7fb] p-3 sm:p-4 xl:p-5 2xl:p-6 dark:bg-slate-950">
+    <div translate="no" className="notranslate mx-auto min-h-screen min-w-0 max-w-[1920px] bg-[#f5f7fb] p-3 sm:p-4 xl:p-5 2xl:p-6 dark:bg-slate-950">
       {/* Header */}
-      <div className="mb-5 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] p-3 sm:p-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)]">
+      <div className="mb-4 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-[#002d74] via-[#003087] to-[#00AEEF] px-3 py-2.5 sm:px-4 shadow-[0_12px_30px_-22px_rgba(0,0,0,0.55)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-14 shrink-0 items-center justify-center rounded-2xl">
+            <div className="flex h-11 shrink-0 items-center justify-center rounded-xl">
               <img
                 src={logoHeader}
                 alt="Águas do Rio"
-                className="h-14 w-auto object-contain"
+                className="h-11 w-auto object-contain"
                 loading="eager"
               />
             </div>
@@ -1252,85 +1256,98 @@ function ElevatoriasPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-4">
-            <div
+          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <button
+              type="button"
               onClick={() => setFiltroKpi("")}
-              className={`cursor-pointer rounded-xl border p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-4 ${
-                filtroKpi === ""
-                  ? "border-blue-400 bg-blue-100 ring-2 ring-blue-300"
-                  : "border-blue-200 bg-blue-50"
-              }`}
+              className={`group flex min-h-[88px] items-center justify-between gap-3 rounded-xl border border-slate-200 border-l-4 border-l-blue-500 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:border-l-blue-400 dark:bg-slate-900 ${filtroKpi === "" ? "ring-2 ring-blue-200 dark:ring-blue-900" : ""}`}
             >
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
-                <Building2 className="h-3 w-3" /> Total (filtradas)
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  <Building2 className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Total filtradas
+                  </span>
+                  <span className="mt-1 block text-[11px] text-slate-400">
+                    de {kpis.total} cadastradas
+                  </span>
+                </span>
               </div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-blue-700 sm:text-3xl">{filtered.length}</div>
-              <div className="text-[11px] text-blue-500">
-                de {kpis.total} elevatórias cadastradas
-              </div>
-            </div>
+              <strong className="shrink-0 text-2xl font-bold tabular-nums text-[#0b3a73] dark:text-white">
+                {filtered.length}
+              </strong>
+            </button>
 
             {permissoes.podeVerMestres && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 shadow-sm sm:p-4">
-                <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                  <TrendingUp className="h-3 w-3" /> Completude Média
+              <div className="flex min-h-[88px] items-center justify-between gap-3 rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:border-l-emerald-400 dark:bg-slate-900">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    <TrendingUp className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Completude média
+                    </span>
+                    <span className="mt-1 block text-[11px] text-slate-400">média das elevatórias</span>
+                  </span>
                 </div>
-                <div className="mt-1 text-2xl font-bold tabular-nums text-emerald-700 sm:text-3xl">
+                <strong className="shrink-0 text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
                   {kpis.completudeMedia}%
-                </div>
-                <div className="text-[11px] text-emerald-500">do cadastro preenchido</div>
+                </strong>
               </div>
             )}
 
             {permissoes.podeVerMestres && (
-              <div
+              <button
+                type="button"
                 onClick={() => setFiltroKpi(filtroKpi === "criticas" ? "" : "criticas")}
-                className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
-                  filtroKpi === "criticas"
-                    ? "border-red-400 bg-red-100 ring-2 ring-red-300"
-                    : "border-red-200 bg-red-50"
-                }`}
+                className={`flex min-h-[88px] items-center justify-between gap-3 rounded-xl border border-slate-200 border-l-4 border-l-red-500 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:border-l-red-400 dark:bg-slate-900 ${filtroKpi === "criticas" ? "ring-2 ring-red-200 dark:ring-red-900" : ""}`}
               >
-                <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-700">
-                  <AlertTriangle className="h-3 w-3" /> Críticas
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                    <AlertTriangle className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Críticas
+                    </span>
+                    <span className="mt-1 block text-[11px] text-slate-400">completude abaixo de 50%</span>
+                  </span>
                 </div>
-                <div className="mt-1 text-2xl font-bold tabular-nums text-red-700 sm:text-3xl">{kpis.criticas}</div>
-                <div className="text-[11px] text-red-500">completude &lt; 50%</div>
-              </div>
+                <strong className="shrink-0 text-2xl font-bold tabular-nums text-red-700 dark:text-red-300">
+                  {kpis.criticas}
+                </strong>
+              </button>
             )}
 
-            <div
+            <button
+              type="button"
               onClick={() => setFiltroKpi(filtroKpi === "implantacao" ? "" : "implantacao")}
-              className={`cursor-pointer rounded-xl border p-4 shadow-sm transition-all hover:shadow-md ${
-                filtroKpi === "implantacao"
-                  ? "border-amber-400 bg-amber-100 ring-2 ring-amber-300"
-                  : "border-amber-200 bg-amber-50"
-              }`}
+              className={`flex min-h-[88px] items-center justify-between gap-3 rounded-xl border border-slate-200 border-l-4 border-l-amber-500 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:border-l-amber-400 dark:bg-slate-900 ${filtroKpi === "implantacao" ? "ring-2 ring-amber-200 dark:ring-amber-900" : ""}`}
             >
-              <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                <HardHat className="h-3 w-3" /> Em Implantação
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                  <HardHat className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Em implantação
+                  </span>
+                  <span className="mt-1 block text-[11px] text-slate-400">não operacionais</span>
+                </span>
               </div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-amber-700 sm:text-3xl">{kpis.emImplantacao}</div>
-              <div className="text-[11px] text-amber-500">não operacionais</div>
-            </div>
+              <strong className="shrink-0 text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                {kpis.emImplantacao}
+              </strong>
+            </button>
           </div>
 
           {/* Filters */}
-          <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white">Filtros</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Refine a lista por localização, cadastro e implantação.
-                </p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                {filtered.length} resultado{filtered.length === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="flex min-w-0 flex-col gap-1.5 xl:col-span-2">
+          <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-900">
+            <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-[minmax(260px,1.7fr)_repeat(3,minmax(150px,1fr))_auto]">
+              <label className="flex min-w-0 flex-col gap-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Buscar elevatória
                 </span>
@@ -1339,7 +1356,7 @@ function ElevatoriasPage() {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Nome, planta, município, UC ou endereço..."
+                    placeholder="Nome, planta, município ou UC..."
                     className="h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                   />
                   {search && (
@@ -1366,16 +1383,14 @@ function ElevatoriasPage() {
                 >
                   <option value="TODAS">Todos os municípios</option>
                   {municipios.map((m) => (
-                    <option key={m} value={m!}>
-                      {m}
-                    </option>
+                    <option key={m} value={m!}>{m}</option>
                   ))}
                 </select>
               </label>
 
               <label className="flex min-w-0 flex-col gap-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Tipo de elevatória
+                  Tipo
                 </span>
                 <select
                   value={filtroTipo}
@@ -1384,72 +1399,14 @@ function ElevatoriasPage() {
                 >
                   <option value="TODAS">Todos os tipos</option>
                   {tipos.map((t) => (
-                    <option key={t} value={t!}>
-                      {t}
-                    </option>
+                    <option key={t} value={t!}>{t}</option>
                   ))}
                 </select>
               </label>
-
-              <label className="flex min-w-0 flex-col gap-1.5 xl:col-span-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Endereço
-                </span>
-                <select
-                  value={filtroEndereco}
-                  onChange={(e) => setFiltroEndereco(e.target.value)}
-                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                >
-                  <option value="TODAS">Todos os endereços</option>
-                  {enderecos.map((en) => (
-                    <option key={en} value={en!}>
-                      {en}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {permissoes.podeVerMestres && (
-                <label className="flex min-w-0 flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Seção da completude
-                  </span>
-                  <select
-                    value={filtroSecaoCompletude}
-                    onChange={(e) => setFiltroSecaoCompletude(e.target.value)}
-                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    {SECOES_COMPLETUDE.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {permissoes.podeVerMestres && (
-                <label className="flex min-w-0 flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Faixa de completude
-                  </span>
-                  <select
-                    value={filtroCompletude}
-                    onChange={(e) => setFiltroCompletude(e.target.value)}
-                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    {COMPLETUDE_OPCOES.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
 
               <label className="flex min-w-0 flex-col gap-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Status de implantação
+                  Implantação
                 </span>
                 <select
                   value={filtroImplantacao}
@@ -1459,72 +1416,159 @@ function ElevatoriasPage() {
                   <option value="TODAS">Todos os status</option>
                   <option value="operacional">Operacional</option>
                   {IMPLANTACAO_STATUS_OPCOES.filter((o) => o.value !== "operacional").map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
+                    <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
               </label>
 
-              {permissoes.podeVerMestres && (
-                <label className="flex min-w-0 flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Tipo construtivo
-                  </span>
-                  <select
-                    value={filtroTipoConstrutivo}
-                    onChange={(e) => setFiltroTipoConstrutivo(e.target.value)}
-                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    <option value="TODAS">Todos os tipos construtivos</option>
-                    {tiposConstrutivos.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {permissoes.podeVerMestres && (
-                <label className="flex min-w-0 flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Potência do motor
-                  </span>
-                  <select
-                    value={filtroPotenciaMotor}
-                    onChange={(e) => setFiltroPotenciaMotor(e.target.value)}
-                    className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    <option value="TODAS">Todas as potências</option>
-                    {potenciasMotor.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              <button
+                type="button"
+                onClick={() => setMostrarFiltrosAvancados((aberto) => !aberto)}
+                aria-expanded={mostrarFiltrosAvancados}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Mais filtros
+                <ChevronDown className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? "rotate-180" : ""}`} />
+              </button>
             </div>
+
+            {mostrarFiltrosAvancados && (
+              <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-700">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Filtros avançados
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setFiltroMunicipio("TODAS");
+                      setFiltroTipo("TODAS");
+                      setFiltroEndereco("TODAS");
+                      setFiltroSecaoCompletude("geral");
+                      setFiltroCompletude("TODAS");
+                      setFiltroImplantacao("TODAS");
+                      setFiltroTipoConstrutivo("TODAS");
+                      setFiltroPotenciaMotor("TODAS");
+                      setFiltroKpi("");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[#1f7ad6] transition hover:bg-blue-50 dark:hover:bg-slate-800"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Limpar todos os filtros
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <label className="flex min-w-0 flex-col gap-1.5 xl:col-span-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Endereço
+                    </span>
+                    <select
+                      value={filtroEndereco}
+                      onChange={(e) => setFiltroEndereco(e.target.value)}
+                      className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      <option value="TODAS">Todos os endereços</option>
+                      {enderecos.map((en) => (
+                        <option key={en} value={en!}>{en}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {permissoes.podeVerMestres && (
+                    <>
+                      <label className="flex min-w-0 flex-col gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Seção da completude
+                        </span>
+                        <select
+                          value={filtroSecaoCompletude}
+                          onChange={(e) => setFiltroSecaoCompletude(e.target.value)}
+                          className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          {SECOES_COMPLETUDE.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="flex min-w-0 flex-col gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Faixa de completude
+                        </span>
+                        <select
+                          value={filtroCompletude}
+                          onChange={(e) => setFiltroCompletude(e.target.value)}
+                          className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          {COMPLETUDE_OPCOES.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="flex min-w-0 flex-col gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Tipo construtivo
+                        </span>
+                        <select
+                          value={filtroTipoConstrutivo}
+                          onChange={(e) => setFiltroTipoConstrutivo(e.target.value)}
+                          className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          <option value="TODAS">Todos os tipos construtivos</option>
+                          {tiposConstrutivos.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="flex min-w-0 flex-col gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Potência do motor
+                        </span>
+                        <select
+                          value={filtroPotenciaMotor}
+                          onChange={(e) => setFiltroPotenciaMotor(e.target.value)}
+                          className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:border-[#1f7ad6] focus:outline-none focus:ring-2 focus:ring-[#1f7ad6]/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                          <option value="TODAS">Todas as potências</option>
+                          {potenciasMotor.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Table */}
           <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-700">
-              <div>
-                <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white">
-                  Elevatórias cadastradas
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {filtered.length} de {elevatorias.length} registros
-                </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0b3a73] dark:bg-blue-950/50 dark:text-blue-300">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold text-[#0b3a73] dark:text-white">
+                    Elevatórias cadastradas
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {filtered.length} resultado{filtered.length === 1 ? "" : "s"} · {elevatorias.length} no total
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Role horizontalmente para ver todas as colunas
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {filtered.length} registros
               </span>
             </div>
-            <div className="max-h-[calc(100vh-22rem)] min-h-[320px] max-w-full overflow-auto overscroll-contain">
-              <table className="w-full min-w-[1120px] 2xl:min-w-[1280px] table-auto text-left text-xs xl:text-[13px]">
+            <div className="max-h-[68vh] min-h-[300px] max-w-full overflow-auto overscroll-contain">
+              <table className="w-full min-w-[1240px] 2xl:min-w-[1380px] table-auto text-left text-xs xl:text-[13px]">
                 <thead className="sticky top-0 bg-[#eaf3fb] text-[12px] text-[#0b3a73] z-10 dark:bg-slate-700 dark:text-slate-200">
                   <tr>
                     {(["nome", "planta", "tipo", "municipio"] as const).map((f) => (
